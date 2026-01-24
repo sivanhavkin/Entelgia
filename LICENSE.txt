@@ -1,9 +1,0 @@
-MIT License (with Ethical Clause)
-
-Copyright (c) 2026 Sivan Havkin
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-...
-The original creator, Sivan Havkin, does not endorse or take responsibility
-for any derivative or applied use that contradicts the ethical clause or
-causes harm to living beings.
