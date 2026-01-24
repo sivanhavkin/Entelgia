@@ -11,25 +11,21 @@ This repository presents Entelgia not as a chatbot, but as a *consciousness-insp
 * **Unified AI core** implemented as a single runnable Python file (`entelgia_unified.py`)
 * **Persistent agents** with evolving internal state
 * **Emotion- and conflict-driven dialogue**, not prompt-only responses
-* **Long-term memory** influencing future behavior
-* **Observer agent (Fixy)** that detects loops, contradictions, and stagnation
+
 
 ---
 
 ## What Happens When You Run It
 
-When you run the system, two primary agents engage in an ongoing dialogue.
+When you run the system, two primary agents engage in an ongoing dialogue driven by a **shared persistent memory database**.
 
 They:
 
-* Remember previous exchanges
-* Experience internal emotional and moral tension
-* Revisit unresolved themes
-* Gradually shift tone, perspective, and behavior
+* Maintain continuity across turns via a unified memory store
+* Revisit previously introduced concepts and themes
+* Exhibit emerging internal tension through dialogue (not hard-coded rules)
 
-An observer agent monitors the interaction, intervening when patterns become repetitive, incoherent, or ethically unstable.
-
-The result is not a scripted conversation, but an evolving cognitive process.
+At this stage, the system functions as a **research prototype** focused on persistent dialogue and internal coherence, rather than a fully autonomous cognitive simulation.
 
 ---
 
@@ -88,8 +84,16 @@ Entelgia is organized around six interacting cores:
 
 ### Memory Core
 
+* **Single shared persistent database** (no short-term / long-term separation yet)
+
+* Memory continuity across agent turns
+
+* Architecture prepared for future memory stratification
+
 * Short-term and long-term memory
+
 * Unified conscious and unconscious storage
+
 * Memory promotion through error, emotion, and reflection
 
 ### Emotion Core
@@ -110,31 +114,50 @@ Entelgia is organized around six interacting cores:
 
 ### Observer Core (Fixy)
 
+* Defined as an architectural role
+
+* **Currently inactive / partially implemented**
+
+* Planned to act as a meta-cognitive monitor in future versions
+
 * Meta-level monitoring
+
 * Detection of loops and instability
+
 * Corrective intervention
 
 ---
 
 ## Ethics Model
 
-Entelgia does not rely on external censorship layers.
+Entelgia explores ethical behavior through **dialogue-based internal tension**, not enforced safety constraints.
 
-Regulation emerges through:
+At present:
 
-* Internal moral tension
-* Consequence and reflection
-* Memory of past failures
+* Ethical dynamics emerge implicitly through agent interaction
+* There is **no active dreaming or subconscious processing layer**
+* No autonomous observer intervention is enforced
 
-The system is designed to *struggle* with ethical complexity rather than bypass it.
+These components are part of the system’s conceptual roadmap rather than fully implemented modules.
 
 ---
 
 ## Who This Is For
 
+* Researchers exploring early-stage consciousness-inspired AI architectures
+
+* Developers interested in persistent multi-agent dialogue systems
+
+* Philosophers and psychologists examining computational models of self and conflict
+
+* Contributors who want to help evolve experimental AI systems
+
 * Researchers exploring consciousness-inspired AI
+
 * Developers interested in multi-agent systems with memory and emotion
+
 * Philosophers and psychologists experimenting with computational models of selfhood
+
 * Anyone curious about AI systems that do more than respond
 
 ---
@@ -151,6 +174,20 @@ The system is designed to *struggle* with ethical complexity rather than bypass 
 ```bash
 python entelgia_unified.py
 ```
+
+---
+
+## Project Status
+
+Entelgia is an **actively evolving research prototype**.
+
+Current limitations:
+
+* No separation between short-term and long-term memory (single shared database)
+* Observer agent (Fixy) is not yet active
+* Dreaming / REM-like processing is not implemented
+
+These limitations are explicit and intentional at this stage of development.
 
 ---
 
