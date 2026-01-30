@@ -201,7 +201,7 @@ The original creator does not endorse or take responsibility for uses that contr
 
 ---
 
-## Author
+## Authorship
 
-**Sivan Havkin**
-Entelgia Labs
+Entelgia was conceived and developed by **Sivan Havkin**.
+The architecture and core ideas are original and evolve through ongoing research and experimentation.
