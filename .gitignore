@@ -24,7 +24,7 @@ entelgia_data/
 data/
 outputs/
 runs/
-
+live dialog.txt
 # Local configs (if any)
 config.local.json
 settings.local.json
