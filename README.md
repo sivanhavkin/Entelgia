@@ -1,3 +1,7 @@
+**Note: This release includes an updated runtime file uploaded as a release asset.**
+**The main branch reflects the same version as of this release.**
+
+
 # Entelgia
 
 **Entelgia** is a psychologically-inspired, multi-agent AI architecture designed to explore persistent identity, emotional regulation, internal conflict, and moral self-regulation through dialogue.
