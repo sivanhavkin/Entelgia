@@ -88,7 +88,7 @@ Entelgia is organized around six interacting cores:
 
 ### Memory Core
 
-* **Single shared persistent database** (no short-term / long-term separation yet)
+* **Single shared persistent database** 
 
 * Memory continuity across agent turns
 
