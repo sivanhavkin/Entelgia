@@ -120,8 +120,6 @@ Entelgia is organized around six interacting cores:
 
 * Defined as an architectural role
 
-* **Currently inactive / partially implemented**
-
 * Planned to act as a meta-cognitive monitor in future versions
 
 * Meta-level monitoring
