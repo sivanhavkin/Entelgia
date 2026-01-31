@@ -189,8 +189,7 @@ ollama run phi3 "hi"
 On systems with 8GB RAM, large models may be very slow.
 Consider using a smaller model or API-based mode.
 
-למה זה חשוב (אבל גם מחזק אות
-זה מראה שאתה מבי
+
 ## Run
 
 ```bash
