@@ -170,7 +170,7 @@ Download from: https://ollama.com
 
 After installation, pull a model (example):
 
-ollama pull phi3:
+ollama pull phi3
 
 Verify Ollama is running:
 
