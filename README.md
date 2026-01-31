@@ -166,10 +166,31 @@ At present:
 ## Requirements
 
 * Python **3.10+**
-* Optional: [Ollama](https://ollama.com) with a local LLM (e.g. `phi`)
+* [Ollama](https://ollama.com) with a local LLM (e.g. `phi3:latest`)
 
 ---
+**Prerequisites – Ollama**
 
+This project requires a local LLM runtime.
+
+Install Ollama
+Download from: https://ollama.com
+
+After installation, pull a model (example):
+
+ollama pull phi3:
+
+Verify Ollama is running:
+
+ollama run phi3 "hi"
+
+
+  **Memory note:**
+On systems with 8GB RAM, large models may be very slow.
+Consider using a smaller model or API-based mode.
+
+למה זה חשוב (אבל גם מחזק אות
+זה מראה שאתה מבי
 ## Run
 
 ```bash
