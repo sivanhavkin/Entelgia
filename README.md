@@ -151,12 +151,6 @@ At present:
 
 * Contributors who want to help evolve experimental AI systems
 
-* Researchers exploring consciousness-inspired AI
-
-* Developers interested in multi-agent systems with memory and emotion
-
-* Philosophers and psychologists experimenting with computational models of selfhood
-
 * Anyone curious about AI systems that do more than respond
 
 ---
