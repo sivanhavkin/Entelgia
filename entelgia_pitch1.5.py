@@ -48,9 +48,9 @@ from colorama import Fore, Style, init as colorama_init
 class Config:
     ollama_url: str = "http://localhost:11434/api/generate"
     # Choose your local models (examples)
-    model_socrates: str = "phi"
-    model_athena: str = "phi"
-    model_fixy: str = "phi"
+    model_socrates: str = "phi3:latest"
+    model_athena: str = "phi3:latest"
+    model_fixy: str = "phi3:latest"
 
     # Memory paths
     data_dir: str = "entelgia_data"
