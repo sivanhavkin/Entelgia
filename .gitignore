@@ -1,18 +1,30 @@
 # Python
 __pycache__/
-*.pyc
-
-# Local databases
-*.db
-entelgia_data/
-
-# Logs
-logs/
-*.log
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Env
-.env
+# Runtime data / databases / logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+entelgia_data/
+data/
+outputs/
+runs/
+
+# Local configs (if any)
+config.local.json
+settings.local.json
