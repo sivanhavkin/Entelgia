@@ -139,10 +139,7 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 At present:
 
 * Ethical dynamics emerge implicitly through agent interaction
-* There is **no active dreaming or subconscious processing layer**
-* No autonomous observer intervention is enforced
 
-These components are part of the system’s conceptual roadmap rather than fully implemented modules.
 
 ---
 
@@ -184,14 +181,6 @@ python entelgia_unified.py
 ## Project Status
 
 Entelgia is an **actively evolving research prototype**.
-
-Current limitations:
-
-* No separation between short-term and long-term memory (single shared database)
-* Observer agent (Fixy) is not yet active
-* Dreaming / REM-like processing is not implemented
-
-These limitations are explicit and intentional at this stage of development.
 
 ---
 
