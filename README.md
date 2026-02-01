@@ -1,7 +1,7 @@
 **Note: This release includes an updated runtime file uploaded as a release asset.**
 **The main branch reflects the same version as of this release.**
 
-
+---
 # Entelgia
 
 **Entelgia** is a psychologically-inspired, multi-agent AI architecture designed to explore persistent identity, emotional regulation, internal conflict, and moral self-regulation through dialogue.
@@ -9,6 +9,13 @@
 This repository presents Entelgia not as a chatbot, but as a *consciousness-inspired system* — one that remembers, reflects, struggles, and evolves over time.
 
 ---
+## Metaphor Disclaimer
+
+Note on terminology
+Entelgia uses terms such as consciousness, emotion, conflict, and self-regulation as architectural metaphors, not as claims of biological or phenomenological consciousness.
+These concepts describe internal system dynamics (memory prioritization, competing objectives, observer-based correction loops) rather than human mental states.
+
+The goal is not to simulate a mind, but to explore how complex internal structure and moral tension can emerge in autonomous AI systems through design.
 
 ## Overview
 
