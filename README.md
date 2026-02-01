@@ -185,7 +185,8 @@ Consider using a smaller model or API-based mode.
 ## Run
 
 ```bash
-python entelgia_unified.py
+
+python entelgia_pitch1.5.py
 ```
 
 ---
