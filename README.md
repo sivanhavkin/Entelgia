@@ -106,6 +106,12 @@ Entelgia is organized around six interacting cores:
 * Unified conscious and unconscious storage
 
 * Memory promotion through error, emotion, and reflection
+  
+**Data Layout**
+/memory/        short-term agent memory (JSON)
+/entelgia.db    unified long-term memory (SQLite)
+/logs/          CSV logs per session
+/graphs/        optional GEXF exports
 
 ### Emotion Core
 
