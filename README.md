@@ -1,14 +1,14 @@
 **Research Branch Notice**
 
-This branch contains an experimental research build of Entelgia.
-The system runs end-to-end but may surface meta-instructions,
-internal rules, or HTTP errors as part of ongoing experiments.
-High resource usage is expected.
----
-## Security & Safety
+Security & Safety
 
 This version includes additional security hardening and usage safeguards
 to reduce the risk of misuse and unintended behavior.
+
+These measures are experimental and part of ongoing research, not a claim of complete protection.
+
+---
+
 
 # Entelgia
 
