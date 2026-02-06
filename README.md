@@ -27,7 +27,7 @@ The goal is not to simulate a mind, but to explore how complex internal structur
 
 ## Overview
 
-* **Unified AI core** implemented as a single runnable Python file (`entelgia_pitch1.5.py`)
+* **Unified AI core** implemented as a single runnable Python file (`entelgia_unified_meta.py`)
 * **Persistent agents** with evolving internal state
 * **Emotion- and conflict-driven dialogue**, not prompt-only responses
 ---
