@@ -46,9 +46,10 @@ from colorama import Fore, Style, init as colorama_init
 # -----------------------------
 
 class LLM:
-    """
-    HTTP wrapper with timeout for Ollama.
-    """
+    """HTTP wrapper with timeout for Ollama."""
+    def __init__(self, cfg):
+        self.cfg = cfg
+
     def generate(self, model: str, prompt: str, temperature: float = 0.7) -> str:
         try:
             payload = {
@@ -57,7 +58,8 @@ class LLM:
                 "stream": False,
                 "options": {"temperature": temperature},
             }
-            r = requests.post(CFG.ollama_url, json=payload, timeout=(10, 400))
+            url = getattr(self.cfg, "ollama_url", "http://localhost:11434/api/generate")
+            r = requests.post(url, json=payload, timeout=(10, 400))
             r.raise_for_status()
             data = r.json()
             return (data.get("response") or "").strip()
@@ -70,6 +72,7 @@ class LLM:
 
 @dataclass
 class Config:
+
     ollama_url: str = "http://localhost:11434/api/generate"
     # Choose your local models (examples)
     model_socrates: str = "tinyllama:latest"
@@ -810,7 +813,7 @@ class MainScript:
         colorama_init(autoreset=True)
 
         self.cfg = cfg
-        self.llm = LLM()
+        self.llm = LLM(self.cfg)
         self.memory = MemoryCore(cfg.db_path)
         self.emotion = EmotionCore(self.llm)
         self.language = LanguageCore()
@@ -1043,7 +1046,8 @@ class MainScript:
 # -----------------------------
 
 if __name__ == "__main__":
-    print(Fore.GREEN + "Entelgia Unified starting..." + Style.RESET_ALL)
+    
+    print(Fore.GREEN + "Entelgia Unified Experimental starting..." + Style.RESET_ALL)
     print("Config:")
     print(json.dumps(asdict(CFG), ensure_ascii=False, indent=2))
     print()
