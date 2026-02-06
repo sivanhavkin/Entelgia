@@ -197,7 +197,7 @@ Consider using a smaller model or API-based mode.
 
 ```bash
 
-python entelgia_unified_meta.py
+python entekgia_pitch1.5.py
 ```
 
 ---
