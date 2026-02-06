@@ -63,8 +63,8 @@ class LLM:
             r.raise_for_status()
             data = r.json()
             return (data.get("response") or "").strip()
-        except Exception as e:
-            return f"[OLLAMA_HTTP_ERROR] model={model}: {e}"
+        except Exception:
+            return ""
 
 # -----------------------------
 # Config
@@ -103,6 +103,10 @@ class Config:
     # Safety
     enable_auto_patch: bool = False  # default off; turn on when you trust it
     allow_write_self_file: bool = False  # extra safety: default off
+    # Privacy defaults
+    store_raw_stm: bool = True                # STM can be raw
+    store_raw_subconscious_ltm: bool = False  # SAFER DEFAULT: don't store raw in LTM
+
 
     # Conversation
     max_turns: int = 200
@@ -184,17 +188,59 @@ def append_csv_row(path: str, row: Dict[str, Any]):
     if header_needed:
         with open(path, "w", encoding="utf-8") as f:
             f.write(",".join(line_keys) + "\n")
-    # escape commas/newlines
+
     def esc(v: Any) -> str:
         s = "" if v is None else str(v)
         s = s.replace("\n", "\\n")
-        if "," in s:
+        if "," in s or '"' in s:
             s = '"' + s.replace('"', '""') + '"'
         return s
 
     with open(path, "a", encoding="utf-8") as f:
         f.write(",".join(esc(row[k]) for k in line_keys) + "\n")
 
+# -----------------------------
+# Privacy / Redaction Utilities
+# -----------------------------
+
+PII_PATTERNS = [
+    # Emails
+    r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+    # Phone-like patterns (rough)
+    r"\b(?:\+?\d{1,3}[-.\s]?)?(?:\d{2,3}[-.\s]?){2,5}\b",
+    # Long numeric strings (IDs / cards - rough)
+    r"\b\d{8,19}\b",
+    # API-key-ish
+    r"sk-[A-Za-z0-9]{20,}",
+]
+
+SENSITIVE_KEYWORDS = {
+    "password", "passcode", "api key", "secret", "token",
+    "private key", "seed phrase", "credit card", "cvv"
+}
+
+def redact_pii(text: str) -> str:
+    if not text:
+        return text
+    out = text
+    for pat in PII_PATTERNS:
+        out = re.sub(pat, "[REDACTED]", out)
+    return out
+
+def is_sensitive_text(text: str) -> bool:
+    if not text:
+        return False
+    lowered = text.lower()
+    if any(k in lowered for k in SENSITIVE_KEYWORDS):
+        return True
+    # If redaction changes content, treat as sensitive
+    return redact_pii(text) != text
+
+def safe_ltm_payload(text: str, topic: str, emo: str, inten: float, imp: float) -> str:
+    return (
+        "[SENSITIVE_CONTENT_REDACTED] "
+        f"topic={topic} emotion={emo} intensity={inten:.2f} importance={imp:.2f}"
+    )
 # -----------------------------
 
 
@@ -209,8 +255,14 @@ class MemoryCore:
         self._init_db()
 
     def _conn(self) -> sqlite3.Connection:
-        c = sqlite3.connect(self.db_path)
+        c = sqlite3.connect(self.db_path, timeout=30)
         c.row_factory = sqlite3.Row
+        try:
+            c.execute("PRAGMA journal_mode=WAL;")
+            c.execute("PRAGMA synchronous=NORMAL;")
+            c.execute("PRAGMA busy_timeout=5000;")
+        except Exception:
+            pass
         return c
 
     def _init_db(self):
@@ -540,7 +592,7 @@ class Agent:
         name: str,
         model: str,
         color: str,
-        llm: OllamaClient,
+        llm: LLM,
         memory: MemoryCore,
         emotion: EmotionCore,
         behavior: BehaviorCore,
@@ -657,7 +709,7 @@ class Agent:
         for m in recent_ltm[:6]:
             prompt += f"- {m.get('content','')}\n"
 
-        prompt += "\nRECENT LTM (subconscious raw):\n"
+        prompt += "\nRECENT LTM (subconscious):\n"
         for m in recent_sub[:4]:
             prompt += f"- {m.get('content','')}\n"
 
@@ -666,7 +718,8 @@ class Agent:
  
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
         prompt = self._build_prompt(seed, dialog_tail)
-        out = self.llm.generate(self.model, prompt, temperature=0.75)
+        out = self.llm.generate(self.model, prompt, temperature=0.75) or "[LLM_ERROR]"
+
 
         # infer emotion + intensity for state evolution
         emo, inten = self.emotion.infer(self.model, out)
@@ -690,23 +743,33 @@ class Agent:
         emo, inten = self.emotion.infer(self.model, text)
         imp = self.behavior.importance_score(self.model, text)
 
-        # store to STM
+        sensitive = is_sensitive_text(text)
+        redacted = redact_pii(text)
+
+    # STM
+        stm_text = text if CFG.store_raw_stm else redacted
         stm_entry = {
             "ts": now_iso(),
-            "text": text,
+            "text": stm_text,
             "topic": topic,
             "emotion": emo,
-            "emotion_intensity": inten,
-            "importance": imp,
+            "emotion_intensity": float(inten),
+            "importance": float(imp),
             "source": source,
+            "sensitive": int(sensitive),
         }
         self.memory.stm_append(self.name, stm_entry)
 
-        # store raw to subconscious LTM always (your preference: raw unlimited)
+    # LTM (subconscious)
+        if sensitive:
+            ltm_content = safe_ltm_payload(text, topic, emo, float(inten), float(imp))
+        else:
+            ltm_content = text if CFG.store_raw_subconscious_ltm else redacted
+
         self.memory.ltm_insert(
             agent=self.name,
             layer="subconscious",
-            content=text,
+            content=ltm_content,
             topic=topic,
             emotion=emo,
             emotion_intensity=float(inten),
@@ -715,9 +778,8 @@ class Agent:
             promoted_from=None,
             intrusive=0,
             suppressed=0,
-            retrain_status=0
+            retrain_status=0,
         )
-
 # -----------------------------
 # Version Tracking + Safe Auto Patch
 # -----------------------------
@@ -901,14 +963,22 @@ class MainScript:
         reflection = self.behavior.dream_reflection(agent.model, batch)
         agent.conscious.update_reflection(agent.name, reflection)
 
-        # Store dream reflection into subconscious
+        # Store dream reflection into subconscious (respect privacy flags)
         emo, inten = self.emotion.infer(agent.model, reflection)
         imp = self.behavior.importance_score(agent.model, reflection)
+
+        sensitive = is_sensitive_text(reflection)
+        redacted = redact_pii(reflection)
+
+        if sensitive:
+            content_to_store = safe_ltm_payload(reflection, topic, emo, float(inten), float(imp))
+        else:
+            content_to_store = reflection if self.cfg.store_raw_subconscious_ltm else redacted
 
         self.memory.ltm_insert(
             agent=agent.name,
             layer="subconscious",
-            content=reflection,
+            content=content_to_store,
             topic=topic,
             emotion=emo,
             emotion_intensity=float(inten),
