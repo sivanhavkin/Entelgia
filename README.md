@@ -1,6 +1,9 @@
-**Note: This release includes an updated runtime file uploaded as a release asset.**
-**The main branch reflects the same version as of this release.**
+**Research Branch Notice**
 
+This branch contains an experimental research build of Entelgia.
+The system runs end-to-end but may surface meta-instructions,
+internal rules, or HTTP errors as part of ongoing experiments.
+High resource usage is expected.
 ---
 # Entelgia
 
