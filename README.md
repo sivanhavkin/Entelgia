@@ -205,8 +205,7 @@ Consider using a smaller model or API-based mode.
 
 ```bash
 
-python entelgia_pitch1.5.py
-```
+python entelgia_unified_meta.py```
 
 ---
 
