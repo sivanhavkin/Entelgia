@@ -5,6 +5,11 @@ The system runs end-to-end but may surface meta-instructions,
 internal rules, or HTTP errors as part of ongoing experiments.
 High resource usage is expected.
 ---
+## Security & Safety
+
+This version includes additional security hardening and usage safeguards
+to reduce the risk of misuse and unintended behavior.
+
 # Entelgia
 
 **Entelgia** is a psychologically-inspired, multi-agent AI architecture designed to explore persistent identity, emotional regulation, internal conflict, and moral self-regulation through dialogue.
