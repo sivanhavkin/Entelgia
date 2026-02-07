@@ -63,7 +63,7 @@ These concepts describe internal system dynamics:
 ## 🎯 Overview
 
 **Core Features:**
-- ✅ Unified AI core implemented as a single runnable Python file (`entelgia_unified_meta.py`)
+- ✅ Unified AI core implemented as a single runnable Python file (`entelgia_production_meta.py`)
 - ✅ Persistent agents with evolving internal state
 - ✅ Emotion- and conflict-driven dialogue, not prompt-only responses
 - ✅ Dialogue continuity across sessions via shared persistent memory
@@ -264,7 +264,7 @@ ollama serve
 
 ### 3. Run Entelgia
 ```bash
-python entelgia_unified_meta.py
+python entelgia_production_meta.py
 ```
 
 ### Expected Output
