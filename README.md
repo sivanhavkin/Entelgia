@@ -1,14 +1,4 @@
-**Research Branch Notice**
-
-Security & Safety
-
-This version includes additional security hardening and usage safeguards
-to reduce the risk of misuse and unintended behavior.
-
-These measures are experimental and part of ongoing research, not a claim of complete protection.
-
 ---
-
 
 # Entelgia
 
@@ -17,6 +7,37 @@ These measures are experimental and part of ongoing research, not a claim of com
 This repository presents Entelgia not as a chatbot, but as a *consciousness-inspired system* — one that remembers, reflects, struggles, and evolves over time.
 
 ---
+
+**Research Branch Notice**
+
+**Security & Safety**
+
+This version includes additional security hardening and usage safeguards
+to reduce the risk of misuse and unintended behavior.
+
+These measures are experimental and part of ongoing research, not a claim of complete protection.
+
+---
+## Manual Memory Wipe (Reset)
+
+Entelgia stores memory locally on your machine.
+
+To delete all stored memory and reset the system:
+
+1) Stop the program.
+2) Delete the SQLite database:
+   - `entelgia_data/entelgia_memory.sqlite`
+
+3) Delete per-agent short-term memory files:
+   - `entelgia_data/stm_*.json`
+
+(Optional) To also clear logs and graphs:
+- `entelgia_data/entelgia_log.csv`
+- `entelgia_data/entelgia_graph.gexf`
+- `entelgia_data/versions/`
+
+After deletion, run the system again — it will recreate the files automatically.
+
 ## Metaphor Disclaimer
 
 Note on terminology
