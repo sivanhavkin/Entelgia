@@ -205,9 +205,28 @@ python entekgia_pitch1.5.py
 ## Project Status
 
 Entelgia is an **actively evolving research prototype**.
-
 ---
+---
+## Manual Memory Wipe (Reset)
 
+Entelgia stores memory locally on your machine.
+
+To delete all stored memory and reset the system:
+
+1) Stop the program.
+2) Delete the SQLite database:
+   - `entelgia_data/entelgia_memory.sqlite`
+
+3) Delete per-agent short-term memory files:
+   - `entelgia_data/stm_*.json`
+
+(Optional) To also clear logs and graphs:
+- `entelgia_data/entelgia_log.csv`
+- `entelgia_data/entelgia_graph.gexf`
+- `entelgia_data/versions/`
+
+After deletion, run the system again — it will recreate the files automatically.
+---
 ## License
 
 This project is released under the **Entelgia License (Ethical MIT Variant with Attribution Clause)**.
