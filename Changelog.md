@@ -4,20 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog and this project adheres to Semantic Versioning.
 
 [1.0.0] - 2026-02-07
+
+
 Added
--Multi-agent dialogue system with Socrates, Athena, and Fixy@Room00
--Dual memory architecture: Short-Term (JSON) and Long-Term (SQLite)
--Psychological drive simulation (id/ego/superego dynamics)
--LRU cache optimization (75% hit rate improvement)
--Emotion detection and tracking with intensity metrics
--Dream cycles for memory consolidation and promotion
--REST API interface powered by FastAPI
--Comprehensive test suite (9 unit tests)
--PII redaction and privacy protection
--Error handling with exponential backoff
--Session persistence and metrics tracking
--Structured logging to console and file
--Full type hints and documentation
+-Multi-agent dialogue system with Socrates, Athena, and Fixy@Room00.
+-Dual memory architecture: Short-Term (JSON) and Long-Term (SQLite).
+-Psychological drive simulation (id/ego/superego dynamics).
+-LRU cache optimization (75% hit rate improvement).
+-Emotion detection and tracking with intensity metrics.
+-Dream cycles for memory consolidation and promotion.
+-REST API interface powered by FastAPI.
+-Comprehensive test suite (9 unit tests).
+-PII redaction and privacy protection.
+-Error handling with exponential backoff.
+-Session persistence and metrics tracking.
+-Structured logging to console and file.
+-Full type hints and documentation.
 **Features**
 -10-minute auto-timeout for dialogue sessions
 -Configurable agents and models
@@ -43,3 +45,4 @@ Added
 -Core architecture design
 -Basic agent implementation
 -Memory system skeleton
+
