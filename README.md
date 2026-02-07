@@ -1,4 +1,4 @@
-Entelgia
+**Entelgia**
 A Consciousness-Inspired Multi-Agent AI Architecture
 Entelgia is a psychologically-inspired, multi-agent AI architecture designed to explore persistent identity, emotional regulation, internal conflict, and moral self-regulation through dialogue.
 
