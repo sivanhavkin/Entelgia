@@ -316,7 +316,56 @@ ATHENA: "Yes, and I've been reflecting on..."
 - [ ] Open research collaboration framework
 
 ---
+## Tests & Validation
 
+Entelgia includes an integrated test suite focused on system stability, safety, and behavioral integrity, rather than narrow function-level correctness.
+
+The tests are designed to validate that the system remains coherent, responsible, and resilient under evolving conditions.
+
+### What the Tests Cover
+
+Configuration Validation  
+Ensures configuration values are within safe and meaningful ranges and prevents the system from starting with invalid or unsafe settings.
+
+Short-Term Memory (LRU) Behavior  
+Verifies that short-term memory behaves as a bounded LRU structure, ensuring older entries are discarded predictably without memory leaks or corruption.
+
+Privacy & Redaction  
+Confirms that sensitive information (such as emails, phone numbers, or identifiers) is properly redacted. Validates that raw sensitive content is not stored when privacy flags are disabled and prevents accidental exposure of private data in logs or memory.
+
+System-Wide Validation  
+Performs sanity checks across core components to ensure internal consistency and detect broken or partially initialized system states.
+
+Metrics Tracking  
+Ensures internal metrics such as turns, counters, and timestamps update reliably to support reproducibility and research-oriented analysis.
+
+Topic Management  
+Verifies correct topic cycling and rotation, preventing conversational stagnation or infinite agreement loops.
+
+Behavior Core  
+Validates importance scoring and basic behavioral responses while ensuring graceful handling of unexpected or malformed model outputs.
+
+Language Core  
+Confirms correct language state initialization and switching, preventing undefined or stuck language modes.
+
+Observer (Fixy) Integrity  
+Verifies that the Observer layer can detect issues and generate structured reports while ensuring corrective intervention remains proportional and non-intrusive.
+
+### How Tests Are Run
+
+Tests are executed via a built-in test runner:
+
+python entelgia_production_meta.py test
+
+No external testing framework is required at this stage. Core safety and behavior checks run automatically and are intended to evolve alongside the system.
+
+### Design Philosophy
+
+These tests are not intended to assert deterministic outputs from probabilistic models. Instead, they validate continuity over time, responsible memory handling, ethical boundary enforcement, and system coherence under uncertainty.
+
+This reflects Entelgia’s core philosophy: regulation through internal structure and reflection, not external censorship.
+
+---
 ## 📊 Project Status
 
 Entelgia is an **actively evolving research prototype**.
