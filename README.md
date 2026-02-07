@@ -6,7 +6,7 @@ Entelgia is a psychologically-inspired, multi-agent AI architecture designed to 
 This repository presents Entelgia not as a chatbot, but as a **consciousness-inspired system** — one that remembers, reflects, struggles, and evolves over time. Two primary agents engage in ongoing, persistent dialogue driven by a shared memory database, creating emergent internal tension and moral reasoning rather than executing pre-defined rules.
 
 
-**Security & Safety:** This version includes additional security hardening and usage safeguards to reduce the risk of misuse and unintended behavior.
+**Security & Safety:**  This version includes additional security hardening and usage safeguards to reduce the risk of misuse and unintended behavior.
 ---
 
 ## 💾 Memory Management
