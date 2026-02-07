@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Entelgia Unified – PRODUCTION Edition
+Entelgia Unified – PRODUCTION Edition- By Sivan Havkin
 ======================================
 
 Advanced Multi-Agent Dialogue System with:
@@ -1831,4 +1831,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
