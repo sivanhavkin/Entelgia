@@ -1,252 +1,282 @@
+Entelgia
+A Consciousness-Inspired Multi-Agent AI Architecture
+Entelgia is a psychologically-inspired, multi-agent AI architecture designed to explore persistent identity, emotional regulation, internal conflict, and moral self-regulation through dialogue.
 
+This repository presents Entelgia not as a chatbot, but as a consciousness-inspired system — one that remembers, reflects, struggles, and evolves over time. Two primary agents engage in ongoing, persistent dialogue driven by a shared memory database, creating emergent internal tension and moral reasoning rather than executing pre-defined rules.
 
-# Entelgia
+🔬 Research Branch Notice
+Status: Active Research Prototype
 
-**Entelgia** is a psychologically-inspired, multi-agent AI architecture designed to explore persistent identity, emotional regulation, internal conflict, and moral self-regulation through dialogue.
+Security & Safety: This version includes additional security hardening and usage safeguards to reduce the risk of misuse and unintended behavior. These measures are experimental and part of ongoing research, not a claim of complete protection.
 
-This repository presents Entelgia not as a chatbot, but as a *consciousness-inspired system* — one that remembers, reflects, struggles, and evolves over time.
+💾 Memory Management
+Local Memory Storage
+Entelgia stores memory locally on your machine using SQLite and JSON files.
 
----
+Memory Structure:
 
-**Research Branch Notice**
-
-**Security & Safety**
-
-This version includes additional security hardening and usage safeguards
-to reduce the risk of misuse and unintended behavior.
-
-These measures are experimental and part of ongoing research, not a claim of complete protection.
-
----
-## Manual Memory Wipe (Reset)
-
-Entelgia stores memory locally on your machine.
-
+Code
+entelgia_data/
+├── entelgia_memory.sqlite    # Unified long-term memory database
+├── stm_*.json                # Per-agent short-term memory
+├── entelgia_log.csv          # Session logs and interaction history
+├── entelgia_graph.gexf       # Memory graph exports (optional)
+└── versions/                 # Version history
+Manual Memory Wipe (Reset)
 To delete all stored memory and reset the system:
 
-1) Stop the program.
-2) Delete the SQLite database:
-   - `entelgia_data/entelgia_memory.sqlite`
-
-3) Delete per-agent short-term memory files:
-   - `entelgia_data/stm_*.json`
-
-(Optional) To also clear logs and graphs:
-- `entelgia_data/entelgia_log.csv`
-- `entelgia_data/entelgia_graph.gexf`
-- `entelgia_data/versions/`
-
-After deletion, run the system again — it will recreate the files automatically.
-
-## Metaphor Disclaimer
-
-Note on terminology
+Stop the program
+Delete the SQLite database:
+bash
+rm entelgia_data/entelgia_memory.sqlite
+Delete per-agent short-term memory files:
+bash
+rm entelgia_data/stm_*.json
+(Optional) Clear logs and graphs:
+bash
+rm entelgia_data/entelgia_log.csv
+rm entelgia_data/entelgia_graph.gexf
+rm -rf entelgia_data/versions/
+Run the system again — it will recreate the files automatically.
+📝 Metaphor Disclaimer
 Entelgia uses terms such as consciousness, emotion, conflict, and self-regulation as architectural metaphors, not as claims of biological or phenomenological consciousness.
-These concepts describe internal system dynamics (memory prioritization, competing objectives, observer-based correction loops) rather than human mental states.
 
+These concepts describe internal system dynamics:
+
+Memory prioritization (what gets retained and revisited)
+Competing objectives (conflicting goals within dialogue)
+Observer-based correction loops (meta-cognitive feedback)
 The goal is not to simulate a mind, but to explore how complex internal structure and moral tension can emerge in autonomous AI systems through design.
 
-## Overview
+🎯 Overview
+Core Features:
 
-* **Unified AI core** implemented as a single runnable Python file (`entelgia_unified_meta.py`)
-* **Persistent agents** with evolving internal state
-* **Emotion- and conflict-driven dialogue**, not prompt-only responses
----
+✅ Unified AI core implemented as a single runnable Python file (entelgia_unified_meta.py)
+✅ Persistent agents with evolving internal state
+✅ Emotion- and conflict-driven dialogue, not prompt-only responses
+✅ Dialogue continuity across sessions via shared persistent memory
+✅ Meta-cognitive monitoring and corrective feedback loops
+At this stage, the system functions as a research prototype focused on persistent dialogue and internal coherence, rather than a fully autonomous cognitive simulation.
 
-## What Happens When You Run It
+🤖 The Agents
+Socrates – The Questioner
+Reflective, questioning, and internally conflicted; drives inquiry through doubt and self-examination. Serves as the primary agent for exploration and dialectical reasoning.
 
-When you run the system, two primary agents engage in an ongoing dialogue driven by a **shared persistent memory database**.
+Athena – The Synthesizer
+Integrative and adaptive; synthesizes emotion, memory, and reasoning. Provides coherent frameworks and emotional context to Socrates' questions.
 
-They:
+Fixy – The Observer (Meta-Cognitive Layer)
+A planned architectural role that detects loops, errors, and blind spots, injecting corrective perspective shifts to prevent stagnation or logical fallacies.
 
-* Maintain continuity across turns via a unified memory store
-* Revisit previously introduced concepts and themes
-* Exhibit emerging internal tension through dialogue (not hard-coded rules)
+📚 What This Is / What This Is NOT
+✅ What This Is
+A research-oriented architecture inspired by psychology, philosophy, and cognitive science
+A system modeling identity continuity rather than stateless interaction
+A platform for experimenting with:
+Emotional regulation
+Moral conflict and resolution
+Self-reflection and meta-cognition
+Meaning construction over time
+❌ What This Is NOT
+Not a chatbot toy
+Not prompt-only roleplay
+Not safety-through-censorship
+Not a replacement for human judgment or ethics review
+🧠 Core Philosophy
+Central Premise: True regulation emerges from internal conflict and reflection, not from external constraints.
 
-At this stage, the system functions as a **research prototype** focused on persistent dialogue and internal coherence, rather than a fully autonomous cognitive simulation.
+Instead of relying on hard-coded safety barriers, Entelgia emphasizes:
 
----
+Moral reasoning through dialogue
+Emotional consequence tracking
+Responsibility and repair mechanisms
+Learning through error rather than suppression
+Consciousness as Process: Consciousness is treated as a process, not a binary state. The system explores how reflective dialogue, memory continuity, and internal tension create emergent cognitive properties.
 
-## The Agents
-
-* **Socrates** – reflective, questioning, and internally conflicted; drives inquiry through doubt and self-examination
-* **Athena** – integrative and adaptive; synthesizes emotion, memory, and reasoning
-* **Fixy (Observer)** – meta-cognitive layer that detects loops, errors, and blind spots, and injects corrective perspective shifts
-
----
-
-## What This Is
-
-* A research-oriented architecture inspired by psychology, philosophy, and cognitive science
-* A system modeling *identity continuity* rather than stateless interaction
-* A platform for experimenting with:
-
-  * Emotional regulation
-  * Moral conflict
-  * Self-reflection
-  * Meaning construction over time
-
-## What This Is NOT
-
-* ❌ Not a chatbot toy
-* ❌ Not prompt-only roleplay
-* ❌ Not safety-through-censorship
-
----
-
-## Core Philosophy
-
-Entelgia is built on a central premise:
-
-> **True regulation emerges from internal conflict and reflection, not from external constraints.**
-
-Instead of relying on hard-coded safety barriers, the system emphasizes:
-
-* Moral reasoning
-* Emotional consequence
-* Responsibility and repair
-* Learning through error rather than suppression
-
-Consciousness is treated as a *process*, not a binary state.
-
----
-
-## Architecture – CoreMind
-
+🏗️ Architecture – CoreMind
 Entelgia is organized around six interacting cores:
 
-### Conscious Core
+1. Conscious Core
+Self-awareness and internal narrative construction
+Reflection on actions and responses
+Active sense-making and meaning integration
+2. Memory Core
+Single shared persistent SQLite database
+Memory continuity across agent turns and sessions
+Short-term and long-term memory stratification
+Memory promotion through error, emotion, and reflection
+Prepared for future distributed memory architectures
+3. Emotion Core
+Dominant emotion detection and tracking
+Emotional intensity and valence measurement
+Limbic reaction vs. regulatory modulation
+Emotion-driven memory prioritization
+4. Language Core
+Dialogue-driven cognition and reasoning
+Adaptive phrasing based on emotional and moral state
+Context-sensitive response generation
+5. Behavior Core
+Goal-oriented response selection
+Intentionality rather than reflex-based reactions
+Action commitment and consequence tracking
+6. Observer Core (Fixy)
+Defined as an architectural role (currently in planning phase)
+Meta-level monitoring of agent behavior
+Detection of loops, contradictions, and instability
+Corrective intervention and perspective injection
+🗣️ Example: What Happens When You Run It
+When you run entelgia_unified_meta.py, the system initiates an ongoing dialogue:
 
-* Self-awareness and internal narrative
-* Reflection on actions and responses
+Code
+[Session Start - Memory Loaded]
 
-### Memory Core
+SOCRATES: "Athena, we revisited our discussion about intention yesterday. 
+          I notice I'm still uncertain: does responsibility require 
+          the ability to have chosen otherwise?"
 
-* **Single shared persistent database** 
+ATHENA:   "Your uncertainty is not a flaw, Socrates. But remember—we also 
+          explored how emotional commitment shapes choice. Perhaps the 
+          question isn't about abstract possibility, but about what we 
+          genuinely care about."
 
-* Memory continuity across agent turns
+[Emotion tracking: Socrates = Contemplative (0.7), Athena = Integrative (0.8)]
+[Memory update: "responsibility-intention-link" promoted to long-term]
 
-* Architecture prepared for future memory stratification
+SOCRATES: "That's different from what I concluded before. Let me reconsider..."
+The agents:
 
-* Short-term and long-term memory
+Maintain continuity across turns via unified memory store
+Revisit previously introduced concepts and themes
+Exhibit emerging internal tension through dialogue (not hard-coded rules)
+Track emotional states and allow them to influence reasoning
+Build on prior conversations naturally
+💡 Ethics Model
+Entelgia explores ethical behavior through dialogue-based internal tension, not enforced safety constraints.
 
-* Unified conscious and unconscious storage
+Current Approach:
 
-* Memory promotion through error, emotion, and reflection
-  
-**Data Layout**
-/memory/        short-term agent memory (JSON)
-/entelgia.db    unified long-term memory (SQLite)
-/logs/          CSV logs per session
-/graphs/        optional GEXF exports
+Ethical dynamics emerge implicitly through agent interaction
+Conflicts between agents represent different moral frameworks
+Resolution attempts create reflective, growth-oriented dialogue
+Errors and contradictions trigger memory promotion and re-examination
+Future Direction:
 
-### Emotion Core
+Explicit ethical frameworks as dialogue agents
+Consequence tracking for moral decisions
+Integration of virtue ethics and consequentialist reasoning
+👥 Who This Is For
+Researchers exploring early-stage consciousness-inspired AI architectures
+Developers interested in persistent multi-agent dialogue systems
+Philosophers & Psychologists examining computational models of self and conflict
+Contributors who want to help evolve experimental AI systems
+Anyone curious about AI systems that do more than respond
+📋 Requirements
+Python 3.10+
+Ollama with a local LLM (e.g., phi3:latest, mistral, neural-chat)
+8GB+ RAM recommended (16GB+ for larger models)
+Prerequisites – Ollama
+This project requires a local LLM runtime for privacy and control.
 
-* Dominant emotion detection
-* Emotional intensity tracking
-* Limbic reaction vs. regulatory modulation
+Installation:
 
-### Language Core
-
-* Dialogue-driven cognition
-* Adaptive phrasing based on emotional and moral state
-
-### Behavior Core
-
-* Goal-oriented response selection
-* Intentionality rather than reflex
-
-### Observer Core (Fixy)
-
-* Defined as an architectural role
-
-* Planned to act as a meta-cognitive monitor in future versions
-
-* Meta-level monitoring
-
-* Detection of loops and instability
-
-* Corrective intervention
-
----
-
-## Ethics Model
-
-Entelgia explores ethical behavior through **dialogue-based internal tension**, not enforced safety constraints.
-
-At present:
-
-* Ethical dynamics emerge implicitly through agent interaction
-
-
----
-
-## Who This Is For
-
-* Researchers exploring early-stage consciousness-inspired AI architectures
-
-* Developers interested in persistent multi-agent dialogue systems
-
-* Philosophers and psychologists examining computational models of self and conflict
-
-* Contributors who want to help evolve experimental AI systems
-
-* Anyone curious about AI systems that do more than respond
-
----
-
-## Requirements
-
-* Python **3.10+**
-* [Ollama](https://ollama.com) with a local LLM (e.g. `phi3:latest`)
-
----
-**Prerequisites – Ollama**
-
-This project requires a local LLM runtime.
-
-Install Ollama
-Download from: https://ollama.com
-
-After installation, pull a model (example):
-
+Download Ollama from: https://ollama.com
+After installation, pull a model:
+bash
 ollama pull phi3
-
 Verify Ollama is running:
-
+bash
 ollama run phi3 "hi"
+Model Recommendations:
 
+phi3 (3.8B) – Fast, good for testing, limited depth
+mistral (7B) – Balanced performance and reasoning
+neural-chat (7B) – Good dialogue quality
+openchat (7B) – Fast and coherent
+Memory Note: On systems with 8GB RAM, large models may be very slow. Consider using a smaller model like phi3 or exploring API-based mode.
 
-  **Memory note:**
-On systems with 8GB RAM, large models may be very slow.
-Consider using a smaller model or API-based mode.
+🚀 Quick Start
+1. Clone the Repository
+bash
+git clone https://github.com/sivanhavkin/Entelgia.git
+cd Entelgia
+2. Ensure Ollama is Running
+bash
+ollama serve
+(In a separate terminal window)
 
+3. Run Entelgia
+bash
+python entelgia_unified_meta.py
+Expected Output
+Code
+[Entelgia System Initialized]
+[Loading persistent memory...]
+[Memory state: 427 long-term entries, 12 active agent concepts]
 
-## Run
+[Session #47 - 2026-02-07]
+SOCRATES: (from memory) "We were discussing..."
+ATHENA: "Yes, and I've been reflecting on..."
+Exploring the Memory
+View session logs: cat entelgia_data/entelgia_log.csv
+View memory graph: Open entelgia_data/entelgia_graph.gexf in Gephi or similar
+Inspect dialogue history: Check entelgia_data/stm_*.json files
+🗺️ Roadmap & Future Directions
+Current Phase (Research Prototype)
+ Unified core with persistent memory
+ Two-agent dialogue system (Socrates & Athena)
+ Emotion tracking and state evolution
+ Memory continuity across sessions
+ Comprehensive testing and validation
+Near Term (Q1-Q2 2026)
+ Implement Fixy (Observer) as active architectural layer
+ Add explicit ethical framework agents
+ Enhanced conflict resolution mechanisms
+ Consequence tracking for actions and decisions
+ Improved memory retrieval and prioritization
+Medium Term (Q3-Q4 2026)
+ Distributed memory architecture
+ Dynamic agent creation (emergence of new perspective agents)
+ Integration with external knowledge bases
+ Advanced meta-cognitive feedback loops
+ Emotional learning and regulation refinement
+Long Term (2027+)
+ Multi-session consciousness continuity experiments
+ Integration with embodied systems
+ Cross-instance memory and identity persistence
+ Formal philosophical validation studies
+ Open research collaboration framework
+📊 Project Status
+Entelgia is an actively evolving research prototype.
 
-```bash
+Last Updated: February 7, 2026
+Current Version: Alpha (Persistent Dialogue)
+Stability: Experimental – Breaking changes may occur
 
-python entelgia_unified_meta.py```
-
----
-
-## Project Status
-
-Entelgia is an **actively evolving research prototype**.
-
----
-
-## License
-
-This project is released under the **Entelgia License (Ethical MIT Variant with Attribution Clause)**.
+📄 License
+This project is released under the Entelgia License (Ethical MIT Variant with Attribution Clause).
 
 It is open for study, experimentation, and ethical derivative work.
 
 The original creator does not endorse or take responsibility for uses that contradict the ethical intent of the system or cause harm to living beings.
 
----
+👤 Authorship
+Entelgia was conceived and developed by Sivan Havkin.
 
-## Authorship
-
-Entelgia was conceived and developed by **Sivan Havkin**.
 The architecture and core ideas are original and evolve through ongoing research and experimentation.
+
+🤝 Contributing
+Contributions are welcome! Areas of particular interest:
+
+Architecture improvements – Refactoring and optimization
+Memory research – Novel persistence and retrieval mechanisms
+Emotional modeling – Expanding the emotion core
+Ethical frameworks – Adding structured moral reasoning
+Testing & validation – Dialogue quality and consistency testing
+Documentation – Clarifying the system for new researchers
+Please open an issue or discussion before submitting significant changes.
+
+📞 Contact & Discussion
+Issues & Bug Reports: GitHub Issues
+Research Discussion: GitHub Discussions
+Direct Contact: See repository profile
+Remember: This is research code. Be curious, critical, and ethical in your exploration.
