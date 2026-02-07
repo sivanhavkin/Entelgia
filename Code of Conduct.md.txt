@@ -1,0 +1,31 @@
+Code of Conduct
+Our Pledge
+We are committed to providing a welcoming and inclusive environment for all contributors and community members. We pledge to treat everyone with respect, regardless of age, body size, disability, ethnicity, gender identity, experience level, nationality, personal appearance, political belief, race, religion, or sexual identity and orientation.
+
+Our Standards
+Examples of behavior that contribute to creating a positive environment include:
+
+Using welcoming and inclusive language
+Being respectful of differing viewpoints and experiences
+Gracefully accepting constructive criticism
+Focusing on what is best for the community
+Showing empathy towards other community members
+Examples of unacceptable behavior include:
+
+Harassment or discrimination of any kind
+Offensive comments related to personal characteristics
+Unwelcome sexual attention or advances
+Trolling or insulting comments
+Any form of aggression or intimidation
+Enforcement
+Community members who violate this code of conduct may be:
+
+Asked to stop the behavior
+Temporarily banned from the project
+Permanently removed from the project
+To report violations, contact: sivanhavkin@github.com
+
+Attribution
+This Code of Conduct is adapted from the Contributor Covenant, version 2.0.
+
+For more information, visit: https://www.contributor-covenant.org/
