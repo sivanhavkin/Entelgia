@@ -136,7 +136,7 @@ class Config:
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
-    llm_timeout: int = 30
+    llm_timeout: int = 600
     max_prompt_tokens: int = 800
     output_max_length: int = 500
     log_level: int = logging.INFO
@@ -1831,3 +1831,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
