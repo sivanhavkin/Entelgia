@@ -69,7 +69,6 @@ These concepts describe internal system dynamics:
 - ✅ Dialogue continuity across sessions via shared persistent memory
 - ✅ Meta-cognitive monitoring and corrective feedback loops
 
-**At this stage**, the system functions as a research prototype focused on persistent dialogue and internal coherence, rather than a fully autonomous cognitive simulation.
 
 ---
 
@@ -322,8 +321,8 @@ ATHENA: "Yes, and I've been reflecting on..."
 Entelgia is an **actively evolving research prototype**.
 
 **Last Updated:** February 7, 2026  
-**Current Version:** Alpha (Persistent Dialogue)  
-**Stability:** Experimental – Breaking changes may occur
+**Current Version:** Production v1.0 
+**Stability:** Production
 
 ---
 
