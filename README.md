@@ -44,13 +44,6 @@ The original creator is **NOT responsible** for:
 
 ---
 
-## 🔬 Research Branch Notice
-
-**Status:** Active Research Prototype
-
-**Security & Safety:** This version includes additional security hardening and usage safeguards to reduce the risk of misuse and unintended behavior. These measures are experimental and part of ongoing research, not a claim of complete protection.
-
----
 
 ## 💾 Memory Management
 
