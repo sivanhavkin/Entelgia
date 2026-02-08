@@ -1,39 +1,70 @@
 # Entelgia
 ## A Consciousness-Inspired Multi-Agent AI Architecture
 
-Entelgia is a psychologically-inspired, multi-agent AI architecture designed to explore **persistent identity**, **emotional regulation**, **internal conflict**, and **moral self-regulation through dialogue**.
+# 🧠 Entelgia
 
-This repository presents Entelgia not as a chatbot, but as a **consciousness-inspired system** — one that remembers, reflects, struggles, and evolves over time. Two primary agents engage in ongoing, persistent dialogue driven by a shared memory database, creating emergent internal tension and moral reasoning rather than executing pre-defined rules.
-----
-**BREAKING CHANGE:**
-Complete rewrite with production-ready architecture
+**Entelgia** is a psychologically-inspired, multi-agent AI architecture designed to explore **persistent identity**, **emotional regulation**, **internal conflict**, and **moral self-regulation** through dialogue.
 
-**Features:**
+This repository presents Entelgia **not as a chatbot**, but as a **consciousness-inspired system** — one that **remembers**, **reflects**, **struggles**, and **evolves over time**.
 
--Multi-agent dialogue system (Socrates + Athena + Fixy)
--Persistent memory (JSON STM + SQLite LTM)
--Psychological drives (id/ego/superego dynamics)
--Emotion tracking & importance scoring
--Dream cycles & memory promotion
--LRU cache (75% hit rate improvement)
--REST API (FastAPI) interface
--9 unit tests (pytest)
--10-minute auto-timeout
--PII redaction & privacy protection
--Error handling with exponential backoff
--Full structured logging
+Two primary agents engage in continuous, persistent dialogue driven by a **shared memory database**, allowing **emergent internal tension and moral reasoning** to arise naturally — rather than executing pre-defined rules.
 
-**Performance:**
--50% reduction in LLM calls via caching
--70% reduction in token usage via compression
--2-3x faster response times
+---
 
-**Architecture**
-~1860 lines of production code
-25+ classes with full type hints
-50+ documented functions
-Modular core system (Memory, Emotion, Language, Conscious, Behavior, Observer)
-----
+## 🚨 Breaking Change
+
+> **Complete rewrite with a production-ready architecture**
+
+This version represents a full architectural overhaul focused on robustness, performance, and long-term extensibility.
+
+---
+
+## ✨ Features
+
+* **Multi-agent dialogue system** (Socrates · Athena · Fixy)
+* **Persistent memory**
+
+  * Short-term memory (JSON)
+  * Long-term memory (SQLite)
+* **Psychological drives**
+
+  * Id / Ego / Superego dynamics
+* **Emotion tracking & importance scoring**
+* **Dream cycles & memory promotion**
+* **LRU caching** (≈ 75% hit-rate improvement)
+* **REST API** interface (FastAPI)
+* **Unit testing** (9 tests, pytest)
+* **10-minute auto-timeout**
+* **PII redaction & privacy protection**
+* **Resilient error handling** with exponential backoff
+* **Full structured logging**
+
+---
+
+## ⚡ Performance
+
+* **~50% reduction** in LLM calls via caching
+* **~70% reduction** in token usage via compression
+* **2–3× faster** response times
+
+---
+
+## 🏗 Architecture Overview
+
+* ~**1,860 lines** of production-ready code
+* **25+ classes** with full type hints
+* **50+ documented functions**
+* Modular core system:
+
+  * `Memory`
+  * `Emotion`
+  * `Language`
+  * `Conscious`
+  * `Behavior`
+  * `Observer`
+
+---
+
 
 ## 💾 Memory Management
 
