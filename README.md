@@ -125,7 +125,7 @@ The goal is not to simulate a mind, but to explore how **complex internal struct
 
 ### Core Capabilities
 
-* ✅ Unified AI core implemented as a single runnable Python file (`entelgia_production_meta.py`)
+* ✅ Unified AI core implemented as a single runnable Python file (`Entelgia_production_meta.py`)
 * ✅ Persistent agents with evolving internal state
 * ✅ Emotion- and conflict-driven dialogue (not prompt-only)
 * ✅ Dialogue continuity across sessions via shared memory
@@ -243,6 +243,57 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 ## 📋 Requirements
 
 * Python **3.10+**
+* **Ollama** (local LLM runtime)
+* **8GB+ RAM** recommended (16GB+ for larger models)
+
+---
+
+## 🔧 Installing Ollama (Required)
+
+Entelgia runs **entirely on a local LLM** for privacy, control, and reproducibility. You must install **Ollama** before running the system.
+
+### Step 1: Download Ollama
+
+Download Ollama for your operating system:
+
+👉 [https://ollama.com](https://ollama.com)
+
+Supported platforms:
+
+* macOS
+* Linux
+* Windows (WSL recommended)
+
+### Step 2: Install a Model
+
+After installing Ollama, pull at least one supported model:
+
+```bash
+ollama pull phi3
+```
+
+Recommended models:
+
+* **phi3 (3.8B)** – Fast, low memory, ideal for testing
+* **mistral (7B)** – Balanced reasoning and performance
+* **neural-chat (7B)** – Strong conversational coherence
+* **openchat (7B)** – Fast and stable dialogue
+
+> 💡 On systems with **8GB RAM**, prefer `phi3`. Larger models may be slow or unstable.
+
+### Step 3: Verify Ollama Is Running
+
+Run a quick test:
+
+```bash
+ollama run phi3 "hello"
+```
+
+If you see a response, Ollama is installed and working correctly.
+
+---
+**Requirements-**
+* Python **3.10+**
 * **Ollama** with a local LLM (e.g., `phi3`, `mistral`, `neural-chat`)
 * **8GB+ RAM** recommended (16GB+ for larger models)
 
@@ -254,7 +305,7 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 git clone https://github.com/sivanhavkin/Entelgia.git
 cd Entelgia
 ollama serve
-python entelgia_production_meta.py
+python Entelgia_production_meta.py
 ```
 
 ---
