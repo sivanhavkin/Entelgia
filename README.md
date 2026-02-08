@@ -242,9 +242,12 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 
 ## 📋 Requirements
 
+**Requirements-**
 * Python **3.10+**
-* **Ollama** (local LLM runtime)
+* **Ollama** with a local LLM (e.g., `phi3`, `mistral`, `neural-chat`)
 * **8GB+ RAM** recommended (16GB+ for larger models)
+* **pip install** requests colorama fastapi uvicorn pytest networkx
+* **Entelgia** will automatically attempt to install missing Python dependencies at runtime for convenience.
 
 ---
 
@@ -292,14 +295,7 @@ ollama run phi3 "hello"
 If you see a response, Ollama is installed and working correctly.
 
 ---
-**Requirements-**
-* Python **3.10+**
-* **Ollama** with a local LLM (e.g., `phi3`, `mistral`, `neural-chat`)
-* **8GB+ RAM** recommended (16GB+ for larger models)
-* **pip install** requests colorama fastapi uvicorn pytest networkx
-* **Entelgia** will automatically attempt to install missing Python dependencies at runtime for convenience.
 
----
 
 ## 🚀 Quick Start
 
