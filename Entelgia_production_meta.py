@@ -1490,10 +1490,10 @@ class MainScript:
 
         self.language.set("Socrates", "he")
         self.language.set("Athena", "he")
-        self.language.set("Fixy@Room00", "en")
+        self.language.set("Fixy", "en")
 
         self.fixy_agent = Agent(
-            name="Fixy@Room00",
+            name="Fixy",
             model=cfg.model_fixy,
             color=Fore.YELLOW,
             llm=self.llm,
@@ -1599,16 +1599,16 @@ class MainScript:
 
         if report.detected_issue:
             logger.warning(f"Fixy detected issue: {report.issue_summary}")
-            print(Fore.YELLOW + "Fixy@Room00 detected issue: " + Style.RESET_ALL + report.issue_summary)
+            print(Fore.YELLOW + "Fixy detected issue: " + Style.RESET_ALL + report.issue_summary)
             if report.proposed_patch:
                 print(Fore.YELLOW + "Proposed patch:" + Style.RESET_ALL)
                 print(report.proposed_patch[:100] + "\n")
 
         if msg:
-            self.dialog.append({"role": "Fixy@Room00", "text": msg})
+            self.dialog.append({"role": "Fixy, "text": msg})
             self.fixy_agent.store_turn(msg, topic="observer", source="reflection")
-            self.log_turn("Fixy@Room00", msg, topic="observer")
-            print(Fore.YELLOW + "Fixy@Room00: " + Style.RESET_ALL + msg + "\n")
+            self.log_turn("Fixy", msg, topic="observer")
+            print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + msg + "\n")
 
         if report.detected_issue and report.proposed_patch and self.cfg.enable_auto_patch and self.cfg.allow_write_self_file:
             try:
@@ -1831,6 +1831,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
