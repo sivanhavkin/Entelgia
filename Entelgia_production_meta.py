@@ -140,7 +140,7 @@ class Config:
     max_prompt_tokens: int = 800
     output_max_length: int = 500
     log_level: int = logging.INFO
-    timeout_minutes: int = 10
+    timeout_minutes: int = 30
 
     def __post_init__(self):
         """Validate configuration."""
@@ -1695,12 +1695,12 @@ class MainScript:
 # ============================================
 
 def run_cli():
-    """Run command line interface - 10 minute dialogue."""
+    """Run command line interface - 30 minute dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=10)
+    CFG = Config(max_turns=200, timeout_minutes=30)
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
-    print(Fore.GREEN + "Entelgia Unified – PRODUCTION Edition" + Style.RESET_ALL)
+    print(Fore.GREEN + "Entelgia Unified – PRODUCTION Edition By Sivan Havkin" + Style.RESET_ALL)
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print("\nConfiguration:")
     config_dict = asdict(CFG)
@@ -1808,7 +1808,7 @@ def main():
             print("  • pip install pytest pytest-mock (for testing)")
             print()
             print("Features:")
-            print("  • 10-minute auto-timeout dialogue")
+            print("  • 30-minute auto-timeout dialogue")
             print("  • Multi-agent with Socrates & Athena")
             print("  • Persistent memory (STM + LTM)")
             print("  • Emotion tracking & importance scoring")
@@ -1831,6 +1831,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
