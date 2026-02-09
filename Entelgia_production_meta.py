@@ -1000,18 +1000,18 @@ class Agent:
 
         for turn in dialog_tail[-5:]:
             role = turn.get("role", "").upper()[:3]
-            text = turn.get("text", "")[:80]
+            text = turn.get("text", "")[:300]
             prompt += f"{role}: {text}\n"
 
         if stm:
             prompt += "\nRecent thoughts:\n"
             for e in stm[-3:]:
-                prompt += f"- {e.get('text', '')[:60]}\n"
+                prompt += f"- {e.get('text', '')[:300]}\n"
 
         if recent_ltm:
             prompt += "\nKey memories:\n"
             for m in recent_ltm[:2]:
-                prompt += f"- {m.get('content', '')[:60]}\n"
+                prompt += f"- {m.get('content', '')[:400]}\n"
 
         prompt += "\nRespond now:\n"
         return prompt
@@ -1831,6 +1831,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
