@@ -333,3 +333,7 @@ Contributions are welcome. Please open an issue or discussion before submitting 
 * **Status:** Production / Research Hybrid
 * **Version:** v1.0
 * **Last Updated:** February 7, 2026
+
+#### AI Agent Marketplace Index And Agent Router | [API Doc](https://www.deepnlp.org/doc/ai_agent_marketplace)
+    [![AI Agent Marketplace and Router Badge](https://www.deepnlp.org/api/ai_agent_marketplace/svg?name=sivanhavkin/Entelgia&badge_type=review)](https://www.deepnlp.org/store/ai-agent/autonomous-agent/pub-sivanhavkin/entelgia)
+    
