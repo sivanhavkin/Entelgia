@@ -25,6 +25,7 @@ This version represents a full architectural overhaul focused on robustness, per
 
   * Short-term memory (JSON)
   * Long-term memory (SQLite)
+  * **🔐 Cryptographic signatures** (HMAC-SHA256) for memory integrity
 * **Psychological drives**
 
   * Id / Ego / Superego dynamics
@@ -37,6 +38,7 @@ This version represents a full architectural overhaul focused on robustness, per
 * **PII redaction & privacy protection**
 * **Resilient error handling** with exponential backoff
 * **Full structured logging**
+* **🛡️ Memory poisoning protection** - tampered memories are detected and discarded
 
 ---
 
@@ -104,6 +106,45 @@ To delete all stored memory and reset the system:
    rm -rf entelgia_data/versions/
    ```
 5. Run the system again — files will be recreated automatically.
+
+---
+
+## 🔐 Memory Security
+
+Entelgia implements **cryptographic signatures** for all memory entries to prevent tampering and poisoning attacks.
+
+### Quick Start
+
+1. **Generate a secure key:**
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+
+2. **Set environment variable:**
+   ```bash
+   export MEMORY_SECRET_KEY="your-generated-key-here"
+   ```
+
+3. **Run Entelgia:**
+   ```bash
+   python Entelgia_production_meta.py
+   ```
+
+### Security Features
+
+* 🔐 **HMAC-SHA256 signatures** for all memory entries
+* 🛡️ **Tampering detection** - invalid memories are automatically filtered out
+* ⚡ **Constant-time comparison** - prevents timing attacks
+* 🔑 **Environment-based keys** - secure key management
+* ↔️ **Backward compatible** - legacy memories still work
+
+### Learn More
+
+See [docs/memory_security.md](docs/memory_security.md) for complete documentation including:
+- Setup instructions
+- Security guarantees
+- Best practices
+- Troubleshooting
 
 ---
 

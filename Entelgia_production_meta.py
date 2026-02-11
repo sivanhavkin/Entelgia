@@ -52,6 +52,9 @@ from pathlib import Path
 import requests
 from colorama import Fore, Style, init as colorama_init
 
+# Memory security module for HMAC-SHA256 signatures
+import memory_security
+
 # Optional: FastAPI for REST API
 try:
     from fastapi import FastAPI, HTTPException
@@ -101,6 +104,24 @@ def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
 
 
 logger = setup_logging()
+
+
+# ============================================
+# MEMORY SECURITY CONFIGURATION
+# ============================================
+
+# Load secret key from environment variable for memory signature validation
+MEMORY_SECRET_KEY = os.environ.get('MEMORY_SECRET_KEY', 'dev-insecure-key-change-in-production')
+
+# Warn if using development key
+if MEMORY_SECRET_KEY == 'dev-insecure-key-change-in-production':
+    logger.warning(
+        "⚠️  Using insecure development MEMORY_SECRET_KEY! "
+        "Set MEMORY_SECRET_KEY environment variable for production use. "
+        "Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+else:
+    logger.info("✓ MEMORY_SECRET_KEY loaded from environment (production mode)")
 
 
 # ============================================
@@ -541,7 +562,8 @@ class MemoryCore:
                         promoted_from TEXT,
                         intrusive INTEGER DEFAULT 0,
                         suppressed INTEGER DEFAULT 0,
-                        retrain_status INTEGER DEFAULT 0
+                        retrain_status INTEGER DEFAULT 0,
+                        signature_hex TEXT DEFAULT NULL
                     );
                 """)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_mem_agent_ts ON memories(agent, ts DESC);")
@@ -582,8 +604,23 @@ class MemoryCore:
         safe_json_dump(self.stm_path(agent_name), entries)
 
     def stm_append(self, agent_name: str, entry: Dict[str, Any]):
-        """Append entry to STM."""
+        """Append entry to STM with cryptographic signature.
+        
+        Note: The signature is computed on the entry BEFORE adding the _signature field,
+        so the signature validates the original entry content only. Do not modify the
+        entry after this point, as modifications won't be covered by the signature.
+        """
         entries = self.stm_load(agent_name)
+        
+        # Generate HMAC-SHA256 signature for STM entry
+        # Use JSON serialization with sort_keys=True to create a stable message format
+        # sort_keys ensures consistent ordering for validation
+        message = json.dumps(entry, sort_keys=True)
+        signature = memory_security.create_signature(message, MEMORY_SECRET_KEY)
+        
+        # Store signature in the entry
+        entry['_signature'] = signature
+        
         entries.append(entry)
         self.stm_save(agent_name, entries)
 
@@ -603,19 +640,33 @@ class MemoryCore:
         retrain_status: int = 0,
         ts: Optional[str] = None,
     ) -> str:
-        """Insert entry to long-term memory."""
+        """Insert entry to long-term memory with cryptographic signature."""
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
+        
+        # Create payload for signature using JSON for robust serialization
+        # This ensures special characters don't break signature validation
+        # IMPORTANT: sort_keys=True ensures consistent key ordering between
+        # signing and validation - this is critical for correct validation
+        payload_dict = {
+            "content": content,
+            "topic": topic or "",
+            "emotion": emotion or "",
+            "ts": ts
+        }
+        payload = json.dumps(payload_dict, sort_keys=True)
+        signature_hex = memory_security.create_signature(payload, MEMORY_SECRET_KEY)
+        
         try:
             with self._conn() as conn:
                 conn.execute("""
                     INSERT INTO memories
                     (id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
-                     promoted_from, intrusive, suppressed, retrain_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     promoted_from, intrusive, suppressed, retrain_status, signature_hex)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     mem_id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
-                    promoted_from, intrusive, suppressed, retrain_status
+                    promoted_from, intrusive, suppressed, retrain_status, signature_hex
                 ))
                 conn.commit()
         except Exception as e:
@@ -623,7 +674,7 @@ class MemoryCore:
         return mem_id
 
     def ltm_recent(self, agent: str, limit: int = 30, layer: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Get recent memories from LTM (optimized query)."""
+        """Get recent memories from LTM with signature validation."""
         try:
             q = "SELECT * FROM memories WHERE agent = ?"
             params: List[Any] = [agent]
@@ -634,7 +685,39 @@ class MemoryCore:
             params.append(limit)
             with self._conn() as conn:
                 rows = conn.execute(q, params).fetchall()
-            return [dict(r) for r in rows]
+            
+            # Validate signatures and filter out tampered memories
+            validated_memories = []
+            for row in rows:
+                mem = dict(row)
+                
+                # Check if memory has a signature (backward compatibility)
+                if 'signature_hex' in mem and mem['signature_hex']:
+                    # Reconstruct payload using JSON for robust serialization
+                    # IMPORTANT: Must use same key ordering (sort_keys=True) as signing
+                    payload_dict = {
+                        "content": mem['content'],
+                        "topic": mem.get('topic') or "",
+                        "emotion": mem.get('emotion') or "",
+                        "ts": mem['ts']
+                    }
+                    payload = json.dumps(payload_dict, sort_keys=True)
+                    
+                    # Validate signature using constant-time comparison
+                    if memory_security.validate_signature(payload, MEMORY_SECRET_KEY, mem['signature_hex']):
+                        validated_memories.append(mem)
+                    else:
+                        # Invalid signature - memory has been tampered with
+                        logger.warning(
+                            f"⚠️  SECURITY: Invalid signature detected for memory {mem.get('id', 'unknown')}. "
+                            f"Memory skipped (forgotten). This may indicate tampering or poisoning attempt."
+                        )
+                        # Skip this memory (don't add to validated_memories)
+                else:
+                    # Legacy memory without signature - accept for backward compatibility
+                    validated_memories.append(mem)
+            
+            return validated_memories
         except Exception as e:
             logger.error(f"DB Query Error: {e}")
             return []
@@ -1605,7 +1688,7 @@ class MainScript:
                 print(report.proposed_patch[:100] + "\n")
 
         if msg:
-            self.dialog.append({"role": "Fixy, "text": msg})
+            self.dialog.append({"role": "Fixy", "text": msg})
             self.fixy_agent.store_turn(msg, topic="observer", source="reflection")
             self.log_turn("Fixy", msg, topic="observer")
             print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + msg + "\n")
