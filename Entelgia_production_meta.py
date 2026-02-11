@@ -604,11 +604,17 @@ class MemoryCore:
         safe_json_dump(self.stm_path(agent_name), entries)
 
     def stm_append(self, agent_name: str, entry: Dict[str, Any]):
-        """Append entry to STM with cryptographic signature."""
+        """Append entry to STM with cryptographic signature.
+        
+        Note: The signature is computed on the entry BEFORE adding the _signature field,
+        so the signature validates the original entry content only. Do not modify the
+        entry after this point, as modifications won't be covered by the signature.
+        """
         entries = self.stm_load(agent_name)
         
         # Generate HMAC-SHA256 signature for STM entry
-        # Use JSON serialization to create a stable message format
+        # Use JSON serialization with sort_keys=True to create a stable message format
+        # sort_keys ensures consistent ordering for validation
         message = json.dumps(entry, sort_keys=True)
         signature = memory_security.create_signature(message, MEMORY_SECRET_KEY)
         
@@ -640,6 +646,8 @@ class MemoryCore:
         
         # Create payload for signature using JSON for robust serialization
         # This ensures special characters don't break signature validation
+        # IMPORTANT: sort_keys=True ensures consistent key ordering between
+        # signing and validation - this is critical for correct validation
         payload_dict = {
             "content": content,
             "topic": topic or "",
@@ -686,6 +694,7 @@ class MemoryCore:
                 # Check if memory has a signature (backward compatibility)
                 if 'signature_hex' in mem and mem['signature_hex']:
                     # Reconstruct payload using JSON for robust serialization
+                    # IMPORTANT: Must use same key ordering (sort_keys=True) as signing
                     payload_dict = {
                         "content": mem['content'],
                         "topic": mem.get('topic') or "",
