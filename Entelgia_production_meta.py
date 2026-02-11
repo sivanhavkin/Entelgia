@@ -20,7 +20,31 @@ Advanced Multi-Agent Dialogue System with:
 Requirements:
 - Python 3.10+
 - Ollama running locally (http://localhost:11434)
-- pip install requests colorama fastapi uvicorn pytest pytest-mock
+
+# ============================================
+# Core Dependencies
+# ============================================
+requests>=2.31.0          # HTTP requests to Ollama
+colorama>=0.4.6           # Colored terminal output
+python-dotenv>=1.0.0      # Environment variables from .env
+
+# ============================================
+# API Server
+# ============================================
+fastapi>=0.104.0          # REST API framework
+uvicorn>=0.24.0           # ASGI server
+pydantic>=2.0.0           # Data validation
+
+# ============================================
+# Testing
+# ============================================
+pytest>=7.4.0             # Testing framework
+pytest-mock>=3.12.0       # Mocking for tests
+
+# ============================================
+# Optional
+# ============================================
+python-dateutil>=2.8.2    # Date utilities
 
 Run CLI (30 min auto-timeout):
   python entelgia_production_meta.py
@@ -2116,4 +2140,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
