@@ -3,8 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to [Semantic Versioning](https://semver.org/).
+## [1.0.0] - 2026-02-11 - Memory Security Release
 
-## [1.0.0] - 2026-02-07
+### Features
+HMAC-SHA256 cryptographic signatures on all memories
+Automatic memory forgetting for tampered entries
+Windows Unicode encoding fix (emoji + Hebrew support)
+Environment variable secret key management 
+Unit tests for signature validation
+
+### Files Changed
+- `Entelgia_production_meta.py` - Added signature creation/validation
+- NEW: `memory_security.py` - Cryptographic functions
+- NEW: `.env.example` - Security configuration template
+
+### Security Impact
+ All memories now protected against tampering
+ Invalid signatures = automatic memory deletion
+ Constant-time comparison prevents timing attacks
+
+
+## [0.9.0] - 2026-02-07
 
 ### Added
 
@@ -47,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 - Type-safe implementation
 - Comprehensive error handling
 
-## [0.9.0] - 2026-02-06
+## [0.8.0] - 2026-02-06
 
 ### Added
 
@@ -55,3 +74,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 - Core architecture design
 - Basic agent implementation
 - Memory system skeleton
+
