@@ -23,12 +23,15 @@ def create_signature(message: str, key: str) -> str:
     Returns:
         Hexadecimal string representation of the signature
         
+    Raises:
+        ValueError: If message or key is None or empty string
+        
     Example:
         >>> signature = create_signature("hello world", "secret_key")
         >>> len(signature)
         64
     """
-    if not message or not key:
+    if message is None or key is None or message == "" or key == "":
         raise ValueError("Message and key must be non-empty strings")
     
     # Create HMAC-SHA256 signature
@@ -60,7 +63,10 @@ def validate_signature(message: str, key: str, signature: str) -> bool:
         >>> validate_signature("hello", "wrong_key", sig)
         False
     """
-    if not message or not key or not signature:
+    if message is None or key is None or signature is None:
+        return False
+    
+    if message == "" or key == "" or signature == "":
         return False
     
     try:

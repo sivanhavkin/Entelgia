@@ -638,9 +638,15 @@ class MemoryCore:
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
         
-        # Create payload for signature: content|topic|emotion|ts
-        # This ensures the core data is protected
-        payload = f"{content}|{topic or ''}|{emotion or ''}|{ts}"
+        # Create payload for signature using JSON for robust serialization
+        # This ensures special characters don't break signature validation
+        payload_dict = {
+            "content": content,
+            "topic": topic or "",
+            "emotion": emotion or "",
+            "ts": ts
+        }
+        payload = json.dumps(payload_dict, sort_keys=True)
         signature_hex = memory_security.create_signature(payload, MEMORY_SECRET_KEY)
         
         try:
@@ -679,8 +685,14 @@ class MemoryCore:
                 
                 # Check if memory has a signature (backward compatibility)
                 if 'signature_hex' in mem and mem['signature_hex']:
-                    # Reconstruct payload: content|topic|emotion|ts
-                    payload = f"{mem['content']}|{mem.get('topic') or ''}|{mem.get('emotion') or ''}|{mem['ts']}"
+                    # Reconstruct payload using JSON for robust serialization
+                    payload_dict = {
+                        "content": mem['content'],
+                        "topic": mem.get('topic') or "",
+                        "emotion": mem.get('emotion') or "",
+                        "ts": mem['ts']
+                    }
+                    payload = json.dumps(payload_dict, sort_keys=True)
                     
                     # Validate signature using constant-time comparison
                     if memory_security.validate_signature(payload, MEMORY_SECRET_KEY, mem['signature_hex']):
