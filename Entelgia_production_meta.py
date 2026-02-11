@@ -1246,38 +1246,123 @@ def export_gexf_placeholder(path: str, nodes: List[Tuple[str, str]], edges: List
 # ============================================
 
 class SessionManager:
-    """Manage dialogue sessions."""
+    """Manage dialogue sessions with security and validation."""
+    
     def __init__(self, sessions_dir: str):
         self.sessions_dir = sessions_dir
+        os.makedirs(sessions_dir, exist_ok=True)
         logger.info("SessionManager initialized")
-
-    def save_session(self, session_id: str, dialog: List[Dict[str, str]], metrics: Dict[str, Any]):
-        """Save a complete session."""
-        session_data = {
-            "session_id": session_id,
-            "timestamp": now_iso(),
-            "dialog": dialog,
-            "metrics": metrics,
-        }
-        path = os.path.join(self.sessions_dir, f"session_{session_id}.json")
-        safe_json_dump(path, session_data)
-        logger.info(f"Session saved: {session_id}")
+    
+    def _validate_session_id(self, session_id: str) -> bool:
+        """Validate session ID (alphanumeric + hyphens only)."""
+        if not session_id or len(session_id) > 64:
+            return False
+        return bool(re.match(r'^[a-zA-Z0-9_\-]+$', session_id))
+    
+    def _get_session_path(self, session_id: str) -> Path:
+        """Get safe session file path with validation."""
+        if not self._validate_session_id(session_id):
+            raise ValueError(f"Invalid session_id: {session_id}")
+        
+        path = Path(self.sessions_dir) / f"session_{session_id}.json"
+        
+        # Prevent path traversal
+        if not str(path.resolve()).startswith(str(Path(self.sessions_dir).resolve())):
+            raise ValueError("Path traversal detected!")
+        
         return path
-
-    def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Load a session."""
-        path = os.path.join(self.sessions_dir, f"session_{session_id}.json")
-        return load_json(path, default=None)
-
-    def list_sessions(self) -> List[str]:
-        """List all available sessions."""
+    
+    def save_session(self, session_id: str, dialog: List[Dict[str, str]], metrics: Dict[str, Any]) -> str:
+        """Save a complete session with signature."""
         try:
-            files = os.listdir(self.sessions_dir)
-            sessions = [f.replace("session_", "").replace(".json", "") for f in files if f.startswith("session_")]
+            path = self._get_session_path(session_id)
+            
+            session_data = {
+                "session_id": session_id,
+                "timestamp": now_iso(),
+                "dialog": dialog,
+                "metrics": metrics,
+                "version": "1.0",
+            }
+            
+            # Sign the session
+            session_json = json.dumps(session_data, sort_keys=True)
+            sig = create_signature(session_json.encode('utf-8'), MEMORY_SECRET_KEY_BYTES)
+            session_data['_signature'] = sig.hex()
+            
+            safe_json_dump(str(path), session_data)
+            logger.info(f"Session saved: {session_id}")
+            return str(path)
+        
+        except ValueError as e:
+            logger.error(f"Session validation error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Session save error: {e}")
+            raise
+    
+    def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Load a session with signature validation."""
+        try:
+            path = self._get_session_path(session_id)
+            
+            if not path.exists():
+                logger.warning(f"Session not found: {session_id}")
+                return None
+            
+            session_data = load_json(str(path), default=None)
+            if not session_data:
+                return None
+            
+            # Validate signature
+            sig_hex = session_data.pop('_signature', None)
+            if sig_hex:
+                session_json = json.dumps(session_data, sort_keys=True)
+                sig_bytes = bytes.fromhex(sig_hex)
+                
+                if not validate_signature(session_json.encode('utf-8'), MEMORY_SECRET_KEY_BYTES, sig_bytes):
+                    logger.warning(f"🚨 INVALID SESSION SIGNATURE: {session_id}")
+                    return None
+            
+            return session_data
+        
+        except ValueError as e:
+            logger.error(f"Session validation error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Session load error: {e}")
+            return None
+    
+    def list_sessions(self) -> List[str]:
+        """List all available valid sessions."""
+        try:
+            sessions = []
+            for file in os.listdir(self.sessions_dir):
+                if file.startswith("session_") and file.endswith(".json"):
+                    session_id = file.replace("session_", "").replace(".json", "")
+                    
+                    # Validate before adding to list
+                    if self._validate_session_id(session_id):
+                        sessions.append(session_id)
+            
             return sorted(sessions)
+        
         except Exception as e:
             logger.error(f"Session listing error: {e}")
             return []
+    
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session safely."""
+        try:
+            path = self._get_session_path(session_id)
+            if path.exists():
+                path.unlink()
+                logger.info(f"Session deleted: {session_id}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Session delete error: {e}")
+            return False
 
 
 # ============================================
@@ -1536,6 +1621,88 @@ def test_memory_signatures():
     assert validate_signature(test_msg, wrong_key, sig) == False
     
     logger.info("✓ Memory signature tests passed")
+
+
+def test_session_manager():
+    """Test SessionManager with security features."""
+    import tempfile
+    import shutil
+    
+    # Create temporary test directory
+    test_dir = tempfile.mkdtemp(prefix="test_sessions_")
+    
+    try:
+        sm = SessionManager(test_dir)
+        
+        # Test 1: Valid session ID
+        assert sm._validate_session_id("test-123_abc") == True
+        assert sm._validate_session_id("abc123") == True
+        
+        # Test 2: Invalid session IDs
+        assert sm._validate_session_id("") == False
+        assert sm._validate_session_id("../evil") == False
+        assert sm._validate_session_id("test/path") == False
+        assert sm._validate_session_id("a" * 65) == False  # too long
+        assert sm._validate_session_id(None) == False
+        
+        # Test 3: Save and load session with signature
+        test_dialog = [{"role": "user", "content": "hello"}]
+        test_metrics = {"turns": 1, "time": 10.5}
+        
+        path = sm.save_session("test123", test_dialog, test_metrics)
+        assert os.path.exists(path)
+        
+        loaded = sm.load_session("test123")
+        assert loaded is not None
+        assert loaded["session_id"] == "test123"
+        assert loaded["dialog"] == test_dialog
+        assert loaded["metrics"] == test_metrics
+        assert loaded["version"] == "1.0"
+        assert "_signature" not in loaded  # signature should be removed after validation
+        
+        # Test 4: Tampered session detection
+        # Manually tamper with the session file
+        with open(path, "r") as f:
+            data = json.load(f)
+        data["dialog"] = [{"role": "user", "content": "TAMPERED"}]
+        with open(path, "w") as f:
+            json.dump(data, f)
+        
+        # Should return None for tampered session
+        tampered_result = sm.load_session("test123")
+        assert tampered_result is None
+        
+        # Test 5: List sessions
+        sm.save_session("session1", test_dialog, test_metrics)
+        sm.save_session("session2", test_dialog, test_metrics)
+        sessions = sm.list_sessions()
+        assert "session1" in sessions
+        assert "session2" in sessions
+        
+        # Test 6: Delete session
+        assert sm.delete_session("session1") == True
+        assert sm.delete_session("session1") == False  # already deleted
+        sessions = sm.list_sessions()
+        assert "session1" not in sessions
+        assert "session2" in sessions
+        
+        # Test 7: Path traversal protection
+        try:
+            sm._get_session_path("../../../etc/passwd")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Invalid session_id" in str(e)
+        
+        # Test 8: Load non-existent session
+        result = sm.load_session("nonexistent")
+        assert result is None
+        
+        logger.info("✓ SessionManager security tests passed")
+    
+    finally:
+        # Cleanup
+        if os.path.exists(test_dir):
+            shutil.rmtree(test_dir)
 
 
 # ============================================
@@ -1840,6 +2007,7 @@ def run_tests():
         test_language_core()
         test_fixy_report()
         test_memory_signatures()
+        test_session_manager()
         
         print()
         print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
