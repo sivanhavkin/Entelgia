@@ -290,22 +290,22 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 * **Entelgia** will automatically attempt to install missing Python dependencies at runtime for convenience.
 * 
 
-# Core Dependencies
+**Core Dependencies**
 requests>=2.31.0          # HTTP requests to Ollama
 colorama>=0.4.6           # Colored terminal output
 python-dotenv>=1.0.0      # Environment variables from .env
 
 
-# API Server
+**API Server**
 fastapi>=0.104.0          # REST API framework
 uvicorn>=0.24.0           # ASGI server
 pydantic>=2.0.0           # Data validation
 
-# Testing
+**Testing**
 pytest>=7.4.0             # Testing framework
 pytest-mock>=3.12.0       # Mocking for tests
 
-# Optional
+**Optional**
 python-dateutil>=2.8.2    # Date utilities
 
 ---
