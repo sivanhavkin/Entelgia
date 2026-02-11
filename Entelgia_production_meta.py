@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+
 """
 Entelgia Unified – PRODUCTION Edition - By Sivan Havkin
 ======================================
@@ -13,26 +15,35 @@ Advanced Multi-Agent Dialogue System with:
 - REST API (FastAPI)
 - Better monitoring
 - 10-MINUTE AUTO-TIMEOUT
+- MEMORY SECURITY with HMAC-SHA256 signatures
 
 Requirements:
 - Python 3.10+
 - Ollama running locally (http://localhost:11434)
 - pip install requests colorama fastapi uvicorn pytest pytest-mock
 
-Run CLI (10 min auto-timeout):
-  python entelgia_unified_meta_production.py
+Run CLI (30 min auto-timeout):
+  python entelgia_production_meta.py
 
 Run API:
-  python entelgia_unified_meta_production.py api
+  python entelgia_production_meta.py api
 
 Run tests:
-  python entelgia_unified_meta_production.py test
+  python entelgia_production_meta.py test
 
 Show help:
-  python entelgia_unified_meta_production.py help
+  python entelgia_production_meta.py help
 """
+from __future__ import annotations  # <-- זה חייב להיות ראשון!
+import sys
+import io
 
-from __future__ import annotations
+# Fix Windows Unicode encoding
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+
 import json
 import os
 import re
@@ -40,10 +51,10 @@ import time
 import uuid
 import sqlite3
 import hashlib
+import hmac
 import datetime as dt
 import logging
 import asyncio
-import sys
 from dataclasses import dataclass, asdict, field
 from typing import Any, Dict, List, Optional, Tuple
 from collections import OrderedDict
@@ -51,9 +62,6 @@ from pathlib import Path
 
 import requests
 from colorama import Fore, Style, init as colorama_init
-
-# Memory security module for HMAC-SHA256 signatures
-import memory_security
 
 # Optional: FastAPI for REST API
 try:
@@ -69,6 +77,29 @@ try:
     PYTEST_AVAILABLE = True
 except ImportError:
     PYTEST_AVAILABLE = False
+
+
+# ============================================
+# MEMORY SECURITY - CRYPTOGRAPHIC SIGNATURES
+# ============================================
+
+def create_signature(message: bytes, key: bytes) -> bytes:
+    """Create HMAC-SHA256 signature for message."""
+    if not isinstance(message, bytes):
+        message = message.encode('utf-8')
+    if not isinstance(key, bytes):
+        key = key.encode('utf-8')
+    return hmac.new(key, message, hashlib.sha256).digest()
+
+
+def validate_signature(message: bytes, key: bytes, signature: bytes) -> bool:
+    """Validate HMAC-SHA256 signature using constant-time comparison."""
+    if not isinstance(message, bytes):
+        message = message.encode('utf-8')
+    if not isinstance(key, bytes):
+        key = key.encode('utf-8')
+    expected_sig = hmac.new(key, message, hashlib.sha256).digest()
+    return hmac.compare_digest(expected_sig, signature)
 
 
 # ============================================
@@ -107,21 +138,15 @@ logger = setup_logging()
 
 
 # ============================================
-# MEMORY SECURITY CONFIGURATION
+# MEMORY SECRET KEY - LOAD FROM ENVIRONMENT
 # ============================================
 
-# Load secret key from environment variable for memory signature validation
-MEMORY_SECRET_KEY = os.environ.get('MEMORY_SECRET_KEY', 'dev-insecure-key-change-in-production')
-
-# Warn if using development key
-if MEMORY_SECRET_KEY == 'dev-insecure-key-change-in-production':
-    logger.warning(
-        "⚠️  Using insecure development MEMORY_SECRET_KEY! "
-        "Set MEMORY_SECRET_KEY environment variable for production use. "
-        "Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
-    )
-else:
-    logger.info("✓ MEMORY_SECRET_KEY loaded from environment (production mode)")
+MEMORY_SECRET_KEY = os.getenv("MEMORY_SECRET_KEY")
+if not MEMORY_SECRET_KEY:
+    logger.warning(" MEMORY_SECRET_KEY not set in environment! Using insecure dev key.")
+    MEMORY_SECRET_KEY = "dev-insecure-key-change-in-production-DANGER"
+MEMORY_SECRET_KEY_BYTES = MEMORY_SECRET_KEY.encode('utf-8')
+logger.info(f" Memory security initialized (key length: {len(MEMORY_SECRET_KEY)} chars)")
 
 
 # ============================================
@@ -197,9 +222,13 @@ class MetricsTracker:
             "cache_misses": 0,
             "avg_response_time": 0.0,
             "total_turns": 0,
-            "start_time": now_iso(),
+            "start_time": self._now_iso(),
         }
         logger.info("MetricsTracker initialized")
+
+    def _now_iso(self) -> str:
+        """Return current timestamp in ISO format."""
+        return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
     def record_llm_call(self, duration: float, success: bool):
         """Record an LLM call."""
@@ -223,7 +252,7 @@ class MetricsTracker:
 
     def save(self):
         """Save metrics to file."""
-        self.metrics["end_time"] = now_iso()
+        self.metrics["end_time"] = self._now_iso()
         safe_json_dump(self.metrics_path, self.metrics)
         logger.info(f"Metrics saved: {self.metrics['total_turns']} turns completed")
 
@@ -361,9 +390,7 @@ def validate_output(text: str, max_length: int = 500) -> str:
     text = re.sub(r'\n{3,}', '\n\n', text)
     
     return text.strip()
-
-
-# ============================================
+    # ============================================
 # PRIVACY / REDACTION
 # ============================================
 
@@ -524,7 +551,7 @@ class TopicManager:
 # ============================================
 
 class MemoryCore:
-    """Unified memory system: JSON STM + SQLite LTM with optimized queries."""
+    """Unified memory system: JSON STM + SQLite LTM with cryptographic signatures."""
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._init_db()
@@ -582,7 +609,7 @@ class MemoryCore:
                     );
                 """)
                 conn.commit()
-                logger.info("Database schema initialized")
+                logger.info("Database schema initialized with memory security")
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
 
@@ -604,25 +631,17 @@ class MemoryCore:
         safe_json_dump(self.stm_path(agent_name), entries)
 
     def stm_append(self, agent_name: str, entry: Dict[str, Any]):
-        """Append entry to STM with cryptographic signature.
-        
-        Note: The signature is computed on the entry BEFORE adding the _signature field,
-        so the signature validates the original entry content only. Do not modify the
-        entry after this point, as modifications won't be covered by the signature.
-        """
+        """Append entry to STM with cryptographic signature."""
         entries = self.stm_load(agent_name)
         
-        # Generate HMAC-SHA256 signature for STM entry
-        # Use JSON serialization with sort_keys=True to create a stable message format
-        # sort_keys ensures consistent ordering for validation
-        message = json.dumps(entry, sort_keys=True)
-        signature = memory_security.create_signature(message, MEMORY_SECRET_KEY)
-        
-        # Store signature in the entry
-        entry['_signature'] = signature
+        # Create signature for STM entry
+        entry_json = json.dumps(entry, sort_keys=True)
+        sig = create_signature(entry_json.encode('utf-8'), MEMORY_SECRET_KEY_BYTES)
+        entry['_signature'] = sig.hex()
         
         entries.append(entry)
         self.stm_save(agent_name, entries)
+        logger.debug(f"STM entry signed for {agent_name}")
 
     def ltm_insert(
         self,
@@ -644,18 +663,10 @@ class MemoryCore:
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
         
-        # Create payload for signature using JSON for robust serialization
-        # This ensures special characters don't break signature validation
-        # IMPORTANT: sort_keys=True ensures consistent key ordering between
-        # signing and validation - this is critical for correct validation
-        payload_dict = {
-            "content": content,
-            "topic": topic or "",
-            "emotion": emotion or "",
-            "ts": ts
-        }
-        payload = json.dumps(payload_dict, sort_keys=True)
-        signature_hex = memory_security.create_signature(payload, MEMORY_SECRET_KEY)
+        # Create payload for signature
+        payload_for_sig = f"{content}|{topic}|{emotion}|{ts}"
+        sig = create_signature(payload_for_sig.encode('utf-8'), MEMORY_SECRET_KEY_BYTES)
+        sig_hex = sig.hex()
         
         try:
             with self._conn() as conn:
@@ -666,9 +677,10 @@ class MemoryCore:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     mem_id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
-                    promoted_from, intrusive, suppressed, retrain_status, signature_hex
+                    promoted_from, intrusive, suppressed, retrain_status, sig_hex
                 ))
                 conn.commit()
+                logger.debug(f"Memory inserted with signature: {mem_id[:8]}...")
         except Exception as e:
             logger.error(f"DB Insert Error: {e}")
         return mem_id
@@ -686,38 +698,27 @@ class MemoryCore:
             with self._conn() as conn:
                 rows = conn.execute(q, params).fetchall()
             
-            # Validate signatures and filter out tampered memories
-            validated_memories = []
-            for row in rows:
-                mem = dict(row)
+            valid_memories = []
+            for r in rows:
+                mem = dict(r)
+                sig_hex = mem.get('signature_hex')
                 
-                # Check if memory has a signature (backward compatibility)
-                if 'signature_hex' in mem and mem['signature_hex']:
-                    # Reconstruct payload using JSON for robust serialization
-                    # IMPORTANT: Must use same key ordering (sort_keys=True) as signing
-                    payload_dict = {
-                        "content": mem['content'],
-                        "topic": mem.get('topic') or "",
-                        "emotion": mem.get('emotion') or "",
-                        "ts": mem['ts']
-                    }
-                    payload = json.dumps(payload_dict, sort_keys=True)
-                    
-                    # Validate signature using constant-time comparison
-                    if memory_security.validate_signature(payload, MEMORY_SECRET_KEY, mem['signature_hex']):
-                        validated_memories.append(mem)
-                    else:
-                        # Invalid signature - memory has been tampered with
-                        logger.warning(
-                            f"⚠️  SECURITY: Invalid signature detected for memory {mem.get('id', 'unknown')}. "
-                            f"Memory skipped (forgotten). This may indicate tampering or poisoning attempt."
-                        )
-                        # Skip this memory (don't add to validated_memories)
+                if sig_hex:
+                    # Validate signature
+                    payload = f"{mem['content']}|{mem.get('topic', '')}|{mem.get('emotion', '')}|{mem['ts']}"
+                    try:
+                        sig_bytes = bytes.fromhex(sig_hex)
+                        if validate_signature(payload.encode('utf-8'), MEMORY_SECRET_KEY_BYTES, sig_bytes):
+                            valid_memories.append(mem)
+                        else:
+                            logger.warning(f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}...")
+                    except Exception as e:
+                        logger.warning(f"Signature validation error: {e}")
                 else:
-                    # Legacy memory without signature - accept for backward compatibility
-                    validated_memories.append(mem)
+                    # Legacy memory without signature - accept it
+                    valid_memories.append(mem)
             
-            return validated_memories
+            return valid_memories
         except Exception as e:
             logger.error(f"DB Query Error: {e}")
             return []
@@ -766,10 +767,8 @@ class MemoryCore:
                 """, (agent, ts, ide, ego, sup, sa))
                 conn.commit()
         except Exception as e:
-            logger.error(f"DB State Save Error: {e}")
-
-
-# ============================================
+            logger.error(f"DB State Save Error: {e}") 
+      # ============================================
 # EMOTION CORE (CACHED)
 # ============================================
 
@@ -1242,9 +1241,7 @@ def export_gexf_placeholder(path: str, nodes: List[Tuple[str, str]], edges: List
         logger.info(f"GEXF exported: {path}")
     except Exception as e:
         logger.error(f"GEXF Error: {e}")
-
-
-# ============================================
+        # ============================================
 # SESSION MANAGEMENT
 # ============================================
 
@@ -1518,12 +1515,35 @@ def test_fixy_report():
     logger.info("✓ Fixy report tests passed")
 
 
+def test_memory_signatures():
+    """Test memory signature creation and validation."""
+    test_msg = b"test message"
+    test_key = b"test_key_secret"
+    
+    sig = create_signature(test_msg, test_key)
+    assert isinstance(sig, bytes)
+    assert len(sig) == 32  # SHA256 is 32 bytes
+    
+    # Valid signature should pass
+    assert validate_signature(test_msg, test_key, sig) == True
+    
+    # Tampered message should fail
+    tampered_msg = b"tampered message"
+    assert validate_signature(tampered_msg, test_key, sig) == False
+    
+    # Wrong key should fail
+    wrong_key = b"wrong_key"
+    assert validate_signature(test_msg, wrong_key, sig) == False
+    
+    logger.info("✓ Memory signature tests passed")
+
+
 # ============================================
 # MAIN ORCHESTRATOR
 # ============================================
 
 class MainScript:
-    """Main orchestrator for multi-agent dialogue (10-minute timeout)."""
+    """Main orchestrator for multi-agent dialogue (configurable timeout)."""
     def __init__(self, cfg: Config):
         ensure_dirs()
         colorama_init(autoreset=True)
@@ -1771,14 +1791,562 @@ class MainScript:
         print(f"[Cache Hit Rate: {self.metrics.hit_rate():.1%}]")
         print(f"[LLM Calls: {self.metrics.metrics['llm_calls']}, Errors: {self.metrics.metrics['llm_errors']}]")
         logger.info(f"Session {self.session_id} completed: {self.turn_index} turns, {elapsed:.1f}s")
+        # ============================================
+# SESSION MANAGEMENT
+# ============================================
+
+class SessionManager:
+    """Manage dialogue sessions."""
+    def __init__(self, sessions_dir: str):
+        self.sessions_dir = sessions_dir
+        logger.info("SessionManager initialized")
+
+    def save_session(self, session_id: str, dialog: List[Dict[str, str]], metrics: Dict[str, Any]):
+        """Save a complete session."""
+        session_data = {
+            "session_id": session_id,
+            "timestamp": now_iso(),
+            "dialog": dialog,
+            "metrics": metrics,
+        }
+        path = os.path.join(self.sessions_dir, f"session_{session_id}.json")
+        safe_json_dump(path, session_data)
+        logger.info(f"Session saved: {session_id}")
+        return path
+
+    def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Load a session."""
+        path = os.path.join(self.sessions_dir, f"session_{session_id}.json")
+        return load_json(path, default=None)
+
+    def list_sessions(self) -> List[str]:
+        """List all available sessions."""
+        try:
+            files = os.listdir(self.sessions_dir)
+            sessions = [f.replace("session_", "").replace(".json", "") for f in files if f.startswith("session_")]
+            return sorted(sessions)
+        except Exception as e:
+            logger.error(f"Session listing error: {e}")
+            return []
 
 
 # ============================================
+# ASYNC PROCESSING
+# ============================================
+
+class AsyncProcessor:
+    """Async processing for agent tasks."""
+    def __init__(self):
+        self.tasks: List[asyncio.Task] = []
+        logger.info("AsyncProcessor initialized")
+
+    async def process_agents_concurrent(
+        self,
+        agents: List[Agent],
+        seed: str,
+        dialog_tail: List[Dict[str, str]]
+    ) -> Dict[str, str]:
+        """Process multiple agents concurrently."""
+        results = {}
+        for agent in agents:
+            response = agent.speak(seed, dialog_tail)
+            results[agent.name] = response
+            await asyncio.sleep(0.01)
+        return results
+
+
+# ============================================
+# REST API (Optional FastAPI)
+# ============================================
+
+if FASTAPI_AVAILABLE:
+    app = FastAPI(title="Entelgia API", version="1.0")
+
+    class DialogRequest(BaseModel):
+        seed_topic: str = "what would you like to talk about?"
+        max_turns: int = 10
+
+    class DialogResponse(BaseModel):
+        session_id: str
+        turns: int
+        dialog: List[Dict[str, str]]
+        metrics: Dict[str, Any]
+
+    @app.post("/api/dialogue/start", response_model=DialogResponse)
+    async def start_dialogue(request: DialogRequest):
+        """Start a new dialogue session."""
+        try:
+            cfg = Config(max_turns=request.max_turns, seed_topic=request.seed_topic)
+            script = MainScript(cfg)
+            script.run()
+            return DialogResponse(
+                session_id=script.session_id,
+                turns=script.turn_index,
+                dialog=script.dialog,
+                metrics=script.metrics.metrics,
+            )
+        except Exception as e:
+            logger.error(f"API Error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/sessions")
+    async def list_sessions():
+        """List all dialogue sessions."""
+        try:
+            session_mgr = SessionManager(CFG.sessions_dir)
+            sessions = session_mgr.list_sessions()
+            return {"sessions": sessions}
+        except Exception as e:
+            logger.error(f"API Error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/sessions/{session_id}")
+    async def get_session(session_id: str):
+        """Get a specific session."""
+        try:
+            session_mgr = SessionManager(CFG.sessions_dir)
+            session = session_mgr.load_session(session_id)
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
+            return session
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"API Error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/health")
+    async def health_check():
+        """Health check endpoint."""
+        return {"status": "ok", "version": "1.0"}
+
+
+# ============================================
+# UNIT TESTS (pytest)
+# ============================================
+
+def test_config_validation():
+    """Test config validation."""
+    try:
+        Config(cache_size=50)
+        assert False, "Should raise ValueError"
+    except ValueError:
+        pass
+    
+    try:
+        Config(max_turns=0)
+        assert False, "Should raise ValueError"
+    except ValueError:
+        pass
+    
+    cfg = Config(cache_size=100, max_turns=10)
+    assert cfg.cache_size == 100
+    assert cfg.max_turns == 10
+    logger.info("✓ Config validation tests passed")
+
+
+def test_lru_cache():
+    """Test LRU cache."""
+    cache = LRUCache(max_size=3)
+    
+    cache.set("a", 1)
+    cache.set("b", 2)
+    cache.set("c", 3)
+    
+    assert cache.get("a") == 1
+    assert cache.get("b") == 2
+    assert cache.get("c") == 3
+    
+    cache.set("d", 4)
+    assert cache.get("a") is None
+    assert cache.get("d") == 4
+    
+    logger.info("✓ LRU cache tests passed")
+
+
+def test_redaction():
+    """Test PII redaction."""
+    text = "My email is john@example.com and phone is 555-1234"
+    redacted = redact_pii(text)
+    
+    assert "[REDACTED]" in redacted
+    assert "john@example.com" not in redacted
+    
+    logger.info("✓ Redaction tests passed")
+
+
+def test_validation():
+    """Test output validation."""
+    long_text = "a" * 1000
+    validated = validate_output(long_text, max_length=100)
+    
+    assert len(validated) <= 103
+    assert "..." in validated
+    
+    text_with_control = "hello\x00world"
+    validated = validate_output(text_with_control)
+    assert "\x00" not in validated
+    
+    logger.info("✓ Validation tests passed")
+
+
+def test_metrics_tracker():
+    """Test metrics tracking."""
+    metrics = MetricsTracker("test_metrics.json")
+    
+    assert metrics.metrics["llm_calls"] == 0
+    assert metrics.hit_rate() == 0.0
+    
+    metrics.record_llm_call(1.5, success=True)
+    assert metrics.metrics["llm_calls"] == 1
+    
+    metrics.record_cache_hit()
+    metrics.record_cache_miss()
+    assert metrics.hit_rate() == 0.5
+    
+    logger.info("✓ Metrics tracker tests passed")
+
+
+def test_topic_manager():
+    """Test topic cycling."""
+    topics = ["A", "B", "C"]
+    mgr = TopicManager(topics, rotate_every_rounds=1)
+    
+    assert mgr.current() == "A"
+    mgr.advance_round()
+    assert mgr.current() == "B"
+    mgr.advance_round()
+    assert mgr.current() == "C"
+    mgr.advance_round()
+    assert mgr.current() == "A"
+    
+    logger.info("✓ Topic manager tests passed")
+
+
+def test_behavior_core():
+    """Test behavior scoring."""
+    behavior = BehaviorCore(None)
+    
+    score1 = behavior.importance_score("short")
+    score2 = behavior.importance_score("This is a critical breakthrough that fundamentally changes everything!!!")
+    
+    assert score2 > score1
+    assert 0 <= score1 <= 1
+    assert 0 <= score2 <= 1
+    
+    logger.info("✓ Behavior core tests passed")
+
+
+def test_language_core():
+    """Test language selection."""
+    lang = LanguageCore()
+    
+    assert lang.get("Socrates") == "he"
+    
+    lang.set("Socrates", "en")
+    assert lang.get("Socrates") == "en"
+    
+    logger.info("✓ Language core tests passed")
+
+
+def test_fixy_report():
+    """Test Fixy report dataclass."""
+    report = FixyReport(
+        detected_issue=True,
+        issue_summary="Contradiction detected",
+        proposed_patch="FIX: ...",
+        severity="high",
+        rationale="Logic error"
+    )
+    
+    assert report.detected_issue is True
+    assert report.severity == "high"
+    
+    logger.info("✓ Fixy report tests passed")
+
+
+def test_memory_signatures():
+    """Test memory signature creation and validation."""
+    test_msg = b"test message"
+    test_key = b"test_key_secret"
+    
+    sig = create_signature(test_msg, test_key)
+    assert isinstance(sig, bytes)
+    assert len(sig) == 32  # SHA256 is 32 bytes
+    
+    # Valid signature should pass
+    assert validate_signature(test_msg, test_key, sig) == True
+    
+    # Tampered message should fail
+    tampered_msg = b"tampered message"
+    assert validate_signature(tampered_msg, test_key, sig) == False
+    
+    # Wrong key should fail
+    wrong_key = b"wrong_key"
+    assert validate_signature(test_msg, wrong_key, sig) == False
+    
+    logger.info("✓ Memory signature tests passed")
+
+
+# ============================================
+# MAIN ORCHESTRATOR
+# ============================================
+
+class MainScript:
+    """Main orchestrator for multi-agent dialogue (configurable timeout)."""
+    def __init__(self, cfg: Config):
+        ensure_dirs()
+        colorama_init(autoreset=True)
+
+        self.cfg = cfg
+        self.session_id = str(uuid.uuid4())[:8]
+        self.metrics = MetricsTracker(cfg.metrics_path)
+        self.llm = LLM(self.cfg, self.metrics)
+        self.memory = MemoryCore(cfg.db_path)
+        self.emotion = EmotionCore(self.llm)
+        self.language = LanguageCore()
+        self.conscious = ConsciousCore()
+        self.behavior = BehaviorCore(self.llm)
+        self.fixy = ObserverCore(self.llm, cfg.model_fixy)
+        self.vtrack = VersionTracker(cfg.version_dir)
+        self.session_mgr = SessionManager(cfg.sessions_dir)
+        self.async_proc = AsyncProcessor()
+
+        self.dialog: List[Dict[str, str]] = []
+        self.turn_index = 0
+        self.start_time = time.time()
+
+        self.socrates = Agent(
+            name="Socrates",
+            model=cfg.model_socrates,
+            color=Fore.CYAN,
+            llm=self.llm,
+            memory=self.memory,
+            emotion=self.emotion,
+            behavior=self.behavior,
+            language=self.language,
+            conscious=self.conscious,
+            persona="Socratic, curious, probing. Seeks clarity and truth.",
+        )
+        self.athena = Agent(
+            name="Athena",
+            model=cfg.model_athena,
+            color=Fore.MAGENTA,
+            llm=self.llm,
+            memory=self.memory,
+            emotion=self.emotion,
+            behavior=self.behavior,
+            language=self.language,
+            conscious=self.conscious,
+            persona="Strategic, integrative, creative. Builds frameworks and synthesis.",
+        )
+
+        self.language.set("Socrates", "he")
+        self.language.set("Athena", "he")
+        self.language.set("Fixy", "en")
+
+        self.fixy_agent = Agent(
+            name="Fixy",
+            model=cfg.model_fixy,
+            color=Fore.YELLOW,
+            llm=self.llm,
+            memory=self.memory,
+            emotion=self.emotion,
+            behavior=self.behavior,
+            language=self.language,
+            conscious=self.conscious,
+            persona="Observer/fixer. Brief, concrete, points out contradictions.",
+        )
+
+        logger.info(f"MainScript initialized - Session: {self.session_id}")
+
+    def print_agent(self, agent: Agent, text: str):
+        """Print agent message with color."""
+        print(agent.color + f"{agent.name}: " + Style.RESET_ALL + text + "\n")
+
+    def log_turn(self, agent_name: str, text: str, topic: str):
+        """Log dialogue turn to CSV."""
+        row = {
+            "ts": now_iso(),
+            "turn": self.turn_index,
+            "agent": agent_name,
+            "topic": topic,
+            "lang": self.language.get(agent_name),
+            "text": text[:200],
+        }
+        append_csv_row(self.cfg.csv_log_path, row)
+        self.metrics.record_turn()
+
+    def dream_cycle(self, agent: Agent, topic: str):
+        """Execute dream cycle for agent."""
+        stm = self.memory.stm_load(agent.name)
+        if not stm:
+            return
+
+        batch = stm[-60:]
+        reflection = self.behavior.dream_reflection(agent.model, batch, self.llm)
+        agent.conscious.update_reflection(agent.name, reflection)
+
+        emo, inten = self.emotion.infer(agent.model, reflection)
+        imp = self.behavior.importance_score(reflection)
+
+        sensitive = is_sensitive_text(reflection)
+        redacted = redact_pii(reflection)
+
+        if sensitive:
+            content_to_store = safe_ltm_payload(reflection, topic, emo, float(inten), float(imp))
+        else:
+            content_to_store = reflection if self.cfg.store_raw_subconscious_ltm else redacted
+
+        self.memory.ltm_insert(
+            agent=agent.name,
+            layer="subconscious",
+            content=content_to_store[:500],
+            topic=topic,
+            emotion=emo,
+            emotion_intensity=float(inten),
+            importance=float(imp),
+            source="dream",
+        )
+
+        promoted = 0
+        for e in batch[-40:]:
+            ei = float(e.get("emotion_intensity", 0.0))
+            im = float(e.get("importance", 0.0))
+            if (im >= self.cfg.promote_importance_threshold) or (ei >= self.cfg.promote_emotion_threshold):
+                content = str(e.get("text", "")).strip()
+                if not content:
+                    continue
+                self.memory.ltm_insert(
+                    agent=agent.name,
+                    layer="conscious",
+                    content=content[:300],
+                    topic=topic,
+                    emotion=str(e.get("emotion", "neutral")),
+                    emotion_intensity=ei,
+                    importance=im,
+                    source="dream",
+                    promoted_from="subconscious",
+                )
+                promoted += 1
+
+        try:
+            nodes = [("Socrates", "Socrates"), ("Athena", "Athena")]
+            edges = []
+            if promoted > 0:
+                edges.append((str(uuid.uuid4()), agent.name, "conscious_promotions"))
+                nodes.append(("conscious_promotions", "conscious_promotions"))
+            export_gexf_placeholder(self.cfg.gexf_path, nodes, edges)
+        except Exception:
+            pass
+
+        logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
+        print(Fore.YELLOW + f"[DREAM] {agent.name} reflection stored; promoted={promoted}" + Style.RESET_ALL)
+
+    def fixy_check(self, recent_context: str):
+        """Run Fixy observer check."""
+        report = self.fixy.review(recent_context)
+        self.fixy.remember(report)
+
+        msg = self.fixy.commentary(recent_context, report)
+
+        if report.detected_issue:
+            logger.warning(f"Fixy detected issue: {report.issue_summary}")
+            print(Fore.YELLOW + "Fixy detected issue: " + Style.RESET_ALL + report.issue_summary)
+            if report.proposed_patch:
+                print(Fore.YELLOW + "Proposed patch:" + Style.RESET_ALL)
+                print(report.proposed_patch[:100] + "\n")
+
+        if msg:
+            self.dialog.append({"role": "Fixy", "text": msg})
+            self.fixy_agent.store_turn(msg, topic="observer", source="reflection")
+            self.log_turn("Fixy", msg, topic="observer")
+            print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + msg + "\n")
+
+        if report.detected_issue and report.proposed_patch and self.cfg.enable_auto_patch and self.cfg.allow_write_self_file:
+            try:
+                this_file = os.path.abspath(__file__)
+                with open(this_file, "r", encoding="utf-8") as f:
+                    original = f.read()
+                ok, updated = safe_apply_patch(original, report.proposed_patch)
+                if ok and updated != original:
+                    self.vtrack.snapshot_text("before_patch", original)
+                    with open(this_file, "w", encoding="utf-8") as f:
+                        f.write(updated)
+                    self.vtrack.snapshot_text("after_patch", updated)
+                    logger.info("Auto-patch applied successfully")
+                    print(Fore.GREEN + "[AUTO-PATCH] Applied patch." + Style.RESET_ALL)
+            except Exception as ex:
+                logger.error(f"Auto-patch failed: {ex}")
+                print(Fore.RED + f"[AUTO-PATCH] Failed: {ex}" + Style.RESET_ALL)
+
+    def run(self):
+        """Main execution loop (timeout configurable in minutes)."""
+        topicman = TopicManager(TOPIC_CYCLE, rotate_every_rounds=1, shuffle=False)
+
+        self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
+
+        timeout_seconds = self.cfg.timeout_minutes * 60
+        
+        print(Fore.GREEN + f"\n[Session {self.session_id}] Starting {self.cfg.timeout_minutes}-minute dialogue..." + Style.RESET_ALL)
+        logger.info(f"Starting session {self.session_id} with {timeout_seconds}s timeout")
+
+        while time.time() - self.start_time < timeout_seconds:
+            self.turn_index += 1
+
+            speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
+
+            topic_label = topicman.current()
+            seed = f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
+            
+            logger.debug(f"Turn {self.turn_index}: {speaker.name}")
+            out = speaker.speak(seed, self.dialog)
+            self.dialog.append({"role": speaker.name, "text": out})
+
+            speaker.store_turn(out, topic_label, source="stm")
+            self.log_turn(speaker.name, out, topic_label)
+            self.print_agent(speaker, out)
+
+            if self.turn_index % self.cfg.fixy_every_n_turns == 0:
+                tail = self.dialog[-10:]
+                ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
+                self.fixy_check(ctx)
+
+            if self.turn_index % self.cfg.dream_every_n_turns == 0:
+                self.dream_cycle(self.socrates, topic_label)
+                self.dream_cycle(self.athena, topic_label)
+
+            if re.search(r"\b(stop|quit|bye)\b", out.lower()):
+                logger.info("Stop signal received from agent")
+                print(Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL)
+                break
+
+            if self.turn_index % 2 == 0:
+                topicman.advance_round()
+
+            elapsed = time.time() - self.start_time
+            if elapsed >= timeout_seconds:
+                logger.info(f"{self.cfg.timeout_minutes}-minute timeout reached at turn {self.turn_index}")
+                print(Fore.YELLOW + f"\n[TIMEOUT] {self.cfg.timeout_minutes} minutes reached at turn {self.turn_index}" + Style.RESET_ALL)
+                break
+
+            time.sleep(0.02)
+
+        # Save session and metrics
+        self.metrics.save()
+        self.session_mgr.save_session(self.session_id, self.dialog, self.metrics.metrics)
+        
+        elapsed = time.time() - self.start_time
+        print(Fore.GREEN + f"\n[Session Complete: {self.turn_index} turns in {elapsed:.1f}s]" + Style.RESET_ALL)
+        print(f"[Cache Hit Rate: {self.metrics.hit_rate():.1%}]")
+        print(f"[LLM Calls: {self.metrics.metrics['llm_calls']}, Errors: {self.metrics.metrics['llm_errors']}]")
+        logger.info(f"Session {self.session_id} completed: {self.turn_index} turns, {elapsed:.1f}s")
+        # ============================================
 # CLI / API ENTRY POINTS
 # ============================================
 
 def run_cli():
-    """Run command line interface - 30 minute dialogue."""
+    """Run command line interface - configurable timeout dialogue."""
     global CFG
     CFG = Config(max_turns=200, timeout_minutes=30)
 
@@ -1820,6 +2388,7 @@ def run_tests():
         test_behavior_core()
         test_language_core()
         test_fixy_report()
+        test_memory_signatures()
         
         print()
         print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
@@ -1878,7 +2447,7 @@ def main():
             print(Fore.GREEN + "Entelgia Unified – PRODUCTION Edition" + Style.RESET_ALL)
             print()
             print("Usage:")
-            print(f"  python {os.path.basename(__file__)}              Run 10-minute CLI dialogue (default)")
+            print(f"  python {os.path.basename(__file__)}              Run 30-minute CLI dialogue (default)")
             print(f"  python {os.path.basename(__file__)} test         Run unit tests")
             print(f"  python {os.path.basename(__file__)} api          Start FastAPI server")
             print(f"  python {os.path.basename(__file__)} help         Show this help message")
@@ -1889,6 +2458,9 @@ def main():
             print("  • pip install requests colorama")
             print("  • pip install fastapi uvicorn (for API mode)")
             print("  • pip install pytest pytest-mock (for testing)")
+            print()
+            print("Environment Variables:")
+            print("  • MEMORY_SECRET_KEY    Secret key for memory signatures (recommended: 32+ chars)")
             print()
             print("Features:")
             print("  • 30-minute auto-timeout dialogue")
@@ -1902,21 +2474,19 @@ def main():
             print("  • Session persistence & metrics tracking")
             print("  • REST API interface (FastAPI)")
             print("  • Unit tests (pytest)")
+            print("  • 🔐 MEMORY SECURITY with HMAC-SHA256 signatures")
+            print("     - Cryptographic signatures on all memories")
+            print("     - Automatic forgetting of tampered memories")
+            print("     - Constant-time comparison to prevent timing attacks")
             print()
         else:
             print(Fore.RED + f"Unknown mode: {mode}" + Style.RESET_ALL)
             print(f"Run 'python {os.path.basename(__file__)} help' for usage information")
             sys.exit(1)
     else:
-        # Default: Run CLI (10 minutes)
+        # Default: Run CLI (30 minutes)
         run_cli()
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
