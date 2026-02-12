@@ -6,6 +6,12 @@ Memory Security Module - HMAC-SHA256 signatures for memory poisoning protection
 
 This module provides cryptographic functions for signing and validating memory entries
 to prevent tampering and poisoning attacks.
+
+NOTE: This is a standalone module with a string-based API for ease of use.
+The main Entelgia_production_meta.py file has its own bytes-based implementation
+for performance. Both are valid but have different interfaces:
+- This module: string inputs/outputs (hexdigest)
+- Production: bytes inputs/outputs (digest converted to hex when needed)
 """
 
 import hmac
