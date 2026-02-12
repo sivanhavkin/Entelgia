@@ -349,11 +349,11 @@ def now_iso() -> str:
     return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
 
-def ensure_dirs():
+def ensure_dirs(cfg: Config):
     """Create necessary directories."""
-    os.makedirs(CFG.data_dir, exist_ok=True)
-    os.makedirs(CFG.version_dir, exist_ok=True)
-    os.makedirs(CFG.sessions_dir, exist_ok=True)
+    os.makedirs(cfg.data_dir, exist_ok=True)
+    os.makedirs(cfg.version_dir, exist_ok=True)
+    os.makedirs(cfg.sessions_dir, exist_ok=True)
     logger.info("Directories ensured")
 
 
@@ -798,8 +798,9 @@ class MemoryCore:
                 """, (agent, ts, ide, ego, sup, sa))
                 conn.commit()
         except Exception as e:
-            logger.error(f"DB State Save Error: {e}") 
-      # ============================================
+            logger.error(f"DB State Save Error: {e}")
+
+# ============================================
 # EMOTION CORE (CACHED)
 # ============================================
 
@@ -1743,7 +1744,7 @@ def test_session_manager():
 class MainScript:
     """Main orchestrator for multi-agent dialogue (configurable timeout)."""
     def __init__(self, cfg: Config):
-        ensure_dirs()
+        ensure_dirs(cfg)
         colorama_init(autoreset=True)
 
         self.cfg = cfg
