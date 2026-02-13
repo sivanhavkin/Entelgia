@@ -17,6 +17,18 @@ These are changes that have been committed to the repository but have not yet be
 ### 📝 Notes
 > No unreleased changes at this time.
 ---
+## [2.1.1] - 2026-02-13
+
+### Fixed
+- Fixed pyproject.toml configuration issues
+- Applied Black code formatting across all files
+- Resolved CI/CD pipeline failures
+
+### Infrastructure
+- All tests passing on 6 platforms
+- Code quality checks now green
+- Build verification successful
+
 ## [2.1.0] – 2026-02-13 – Testing & Community Infrastructure
 
 This release adds a comprehensive testing infrastructure, build system configuration,
@@ -207,6 +219,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 - 📝 Notes
 - 🔧 Hotfix
 - ⚗️ Experimental
+
 
 
 
