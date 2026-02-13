@@ -70,7 +70,7 @@ and community contribution tools without changing core functionality.
 This is a quality-of-life release focused on developer experience and project
 infrastructure. All core v2.0.1 functionality is preserved.
 
-## [2.0.1] – 2026‑02‑13 – **Superseded**
++ ## [2.0.1] – 2026‑02‑13 – Production Final ⚠️ Superseded
 
 This version finalises the 2.x production rewrite with additional **memory security measures** and licence updates. It retains all features from the 2.0.0 release and adds cryptographic protection for stored memories.
 
@@ -296,5 +296,6 @@ Starting with v2.1.1, we follow a structured release schedule:
 
 **Last Updated:** 2026-02-13  
 **Maintained by:** [Sivan Havkin](https://github.com/sivanhavkin)
+
 
 
