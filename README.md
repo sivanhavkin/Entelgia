@@ -272,7 +272,7 @@ The original creator, **Sivan Havkin**, does not endorse and is not responsible 
 This statement expresses the ethical stance of the author but does not modify the legal permissions granted by the MIT License.
 
 ---
-🧪 Test Suite
+## 🧪 Test Suite
 
 **Entelgia ships with a comprehensive pytest test suite to ensure the reliability and security of its memory‑protection subsystem. The current suite contains 19 tests divided into three categories:**
 
