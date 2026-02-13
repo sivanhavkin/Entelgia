@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [1.0.1] - 2026-02-13
+
+### Changed
+- Replaced custom Entelgia Ethical License with standard MIT License.
+- Updated README license section accordingly.
+
+### Notes
+This change improves compatibility with open-source ecosystems and
+third-party adoption.
+
+
 ## [1.0.0] - 2026-02-11 - Memory Security Release
 
 ### Features
@@ -74,4 +86,5 @@ Unit tests for signature validation
 - Core architecture design
 - Basic agent implementation
 - Memory system skeleton
+
 
