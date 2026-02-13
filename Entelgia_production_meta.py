@@ -58,17 +58,19 @@ Run tests:
 Show help:
   python entelgia_production_meta.py help
 """
+
 from __future__ import annotations  # <-- זה חייב להיות ראשון!
 import sys
 import io
 
 # Fix Windows Unicode encoding
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 #  LOAD .env FIRST - BEFORE logger setup
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
     print("DEBUG: .env loaded successfully")
 except ImportError as e:
@@ -98,6 +100,7 @@ from colorama import Fore, Style, init as colorama_init
 try:
     from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -105,6 +108,7 @@ except ImportError:
 # Optional: pytest
 try:
     import pytest
+
     PYTEST_AVAILABLE = True
 except ImportError:
     PYTEST_AVAILABLE = False
@@ -114,21 +118,22 @@ except ImportError:
 # MEMORY SECURITY - CRYPTOGRAPHIC SIGNATURES
 # ============================================
 
+
 def create_signature(message: bytes, key: bytes) -> bytes:
     """Create HMAC-SHA256 signature for message."""
     if not isinstance(message, bytes):
-        message = message.encode('utf-8')
+        message = message.encode("utf-8")
     if not isinstance(key, bytes):
-        key = key.encode('utf-8')
+        key = key.encode("utf-8")
     return hmac.new(key, message, hashlib.sha256).digest()
 
 
 def validate_signature(message: bytes, key: bytes, signature: bytes) -> bool:
     """Validate HMAC-SHA256 signature using constant-time comparison."""
     if not isinstance(message, bytes):
-        message = message.encode('utf-8')
+        message = message.encode("utf-8")
     if not isinstance(key, bytes):
-        key = key.encode('utf-8')
+        key = key.encode("utf-8")
     expected_sig = hmac.new(key, message, hashlib.sha256).digest()
     return hmac.compare_digest(expected_sig, signature)
 
@@ -137,31 +142,32 @@ def validate_signature(message: bytes, key: bytes, signature: bytes) -> bool:
 # LOGGING SETUP
 # ============================================
 
+
 def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
     """Setup structured logging."""
     logger = logging.getLogger("entelgia")
     logger.setLevel(log_level)
-    
+
     # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
-    
+
     # File handler
     os.makedirs("entelgia_data", exist_ok=True)
     file_handler = logging.FileHandler("entelgia_data/entelgia.log")
     file_handler.setLevel(log_level)
-    
+
     # Formatter
     formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s - %(name)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
-    
+
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
-    
+
     return logger
 
 
@@ -176,17 +182,21 @@ MEMORY_SECRET_KEY = os.getenv("MEMORY_SECRET_KEY")
 if not MEMORY_SECRET_KEY:
     logger.warning(" MEMORY_SECRET_KEY not set in environment! Using insecure dev key.")
     MEMORY_SECRET_KEY = "dev-insecure-key-change-in-production-DANGER"
-MEMORY_SECRET_KEY_BYTES = MEMORY_SECRET_KEY.encode('utf-8')
-logger.info(f" Memory security initialized (key length: {len(MEMORY_SECRET_KEY)} chars)")
+MEMORY_SECRET_KEY_BYTES = MEMORY_SECRET_KEY.encode("utf-8")
+logger.info(
+    f" Memory security initialized (key length: {len(MEMORY_SECRET_KEY)} chars)"
+)
 
 
 # ============================================
 # CONFIG (GLOBAL) WITH VALIDATION
 # ============================================
 
+
 @dataclass
 class Config:
     """Global configuration object with validation."""
+
     ollama_url: str = "http://localhost:11434/api/generate"
     model_socrates: str = "phi3:latest"
     model_athena: str = "phi3:latest"
@@ -231,7 +241,9 @@ class Config:
             raise ValueError("ollama_url must be a valid URL")
         if self.timeout_minutes < 1:
             raise ValueError("timeout_minutes must be >= 1")
-        logger.info(f"Config validated: max_turns={self.max_turns}, timeout={self.timeout_minutes}min")
+        logger.info(
+            f"Config validated: max_turns={self.max_turns}, timeout={self.timeout_minutes}min"
+        )
 
 
 # Global CFG instance
@@ -242,8 +254,10 @@ CFG: Config = None  # type: ignore
 # METRICS TRACKER
 # ============================================
 
+
 class MetricsTracker:
     """Track system metrics for debugging and optimization."""
+
     def __init__(self, metrics_path: str):
         self.metrics_path = metrics_path
         self.metrics: Dict[str, Any] = {
@@ -299,8 +313,10 @@ class MetricsTracker:
 # LRU CACHE
 # ============================================
 
+
 class LRUCache:
     """Simple LRU cache implementation."""
+
     def __init__(self, max_size: int = 5000):
         self.max_size = max_size
         self.cache: OrderedDict = OrderedDict()
@@ -311,13 +327,13 @@ class LRUCache:
         """Get value from cache (check TTL)."""
         if key not in self.cache:
             return None
-        
+
         if key in self.ttl:
             if time.time() - self.ttl[key] > ttl:
                 del self.cache[key]
                 del self.ttl[key]
                 return None
-        
+
         self.cache.move_to_end(key)
         return self.cache[key]
 
@@ -330,7 +346,7 @@ class LRUCache:
                 self.cache.popitem(last=False)
                 if key in self.ttl:
                     del self.ttl[key]
-        
+
         self.cache[key] = value
         self.ttl[key] = time.time()
 
@@ -343,6 +359,7 @@ class LRUCache:
 # ============================================
 # UTILITIES
 # ============================================
+
 
 def now_iso() -> str:
     """Return current timestamp in ISO format."""
@@ -390,7 +407,7 @@ def append_csv_row(path: str, row: Dict[str, Any]):
     """Append a row to CSV file."""
     header_needed = not os.path.exists(path)
     line_keys = list(row.keys())
-    
+
     if header_needed:
         with open(path, "w", encoding="utf-8") as f:
             f.write(",".join(line_keys) + "\n")
@@ -413,15 +430,17 @@ def validate_output(text: str, max_length: int = 500) -> str:
     """Validate and sanitize LLM output."""
     if not text:
         return "[No output]"
-    
+
     if len(text) > max_length:
         text = text[:max_length] + "..."
-    
-    text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    
+
+    text = re.sub(r"[\x00-\x08\x0b-\x0c\x0e-\x1f]", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
     return text.strip()
     # ============================================
+
+
 # PRIVACY / REDACTION
 # ============================================
 
@@ -433,8 +452,15 @@ PII_PATTERNS = [
 ]
 
 SENSITIVE_KEYWORDS = {
-    "password", "passcode", "api key", "secret", "token",
-    "private key", "seed phrase", "credit card", "cvv"
+    "password",
+    "passcode",
+    "api key",
+    "secret",
+    "token",
+    "private key",
+    "seed phrase",
+    "credit card",
+    "cvv",
 }
 
 
@@ -470,27 +496,31 @@ def safe_ltm_payload(text: str, topic: str, emo: str, inten: float, imp: float) 
 # LLM WRAPPER WITH RETRIES & CACHING
 # ============================================
 
+
 class LLM:
     """HTTP wrapper for Ollama with error handling and caching."""
+
     def __init__(self, cfg: Config, metrics: MetricsTracker):
         self.cfg = cfg
         self.metrics = metrics
         self.cache = LRUCache(max_size=cfg.cache_size)
         logger.info(f"LLM initialized: {cfg.ollama_url}")
 
-    def generate(self, model: str, prompt: str, temperature: float = 0.7, use_cache: bool = True) -> str:
+    def generate(
+        self, model: str, prompt: str, temperature: float = 0.7, use_cache: bool = True
+    ) -> str:
         """Generate text using Ollama with retries."""
         cache_key = sha256_text(prompt)[:16]
-        
+
         if use_cache:
             cached = self.cache.get(cache_key, ttl=self.cfg.emotion_cache_ttl)
             if cached is not None:
                 self.metrics.record_cache_hit()
                 logger.debug(f"Cache hit: {cache_key}")
                 return cached
-        
+
         self.metrics.record_cache_miss()
-        
+
         for attempt in range(self.cfg.llm_max_retries):
             try:
                 start_time = time.time()
@@ -503,33 +533,35 @@ class LLM:
                 r = requests.post(
                     self.cfg.ollama_url,
                     json=payload,
-                    timeout=(10, self.cfg.llm_timeout)
+                    timeout=(10, self.cfg.llm_timeout),
                 )
                 r.raise_for_status()
                 data = r.json()
                 result = (data.get("response") or "").strip()
-                
+
                 duration = time.time() - start_time
                 self.metrics.record_llm_call(duration, success=True)
                 logger.debug(f"LLM call success ({model}): {duration:.2f}s")
-                
+
                 if use_cache and result:
                     self.cache.set(cache_key, result)
-                
+
                 return result
-            
+
             except requests.Timeout:
-                logger.warning(f"LLM Timeout (attempt {attempt + 1}/{self.cfg.llm_max_retries})")
+                logger.warning(
+                    f"LLM Timeout (attempt {attempt + 1}/{self.cfg.llm_max_retries})"
+                )
                 self.metrics.record_llm_call(0, success=False)
                 if attempt < self.cfg.llm_max_retries - 1:
-                    time.sleep(2 ** attempt)
-            
+                    time.sleep(2**attempt)
+
             except Exception as e:
                 logger.error(f"LLM Error: {e}")
                 self.metrics.record_llm_call(0, success=False)
                 if attempt < self.cfg.llm_max_retries - 1:
-                    time.sleep(2 ** attempt)
-        
+                    time.sleep(2**attempt)
+
         logger.error(f"LLM failed after {self.cfg.llm_max_retries} retries")
         return ""
 
@@ -553,10 +585,14 @@ TOPIC_CYCLE = [
 
 class TopicManager:
     """Manages topic rotation."""
-    def __init__(self, topics: List[str], rotate_every_rounds: int = 1, shuffle: bool = False):
+
+    def __init__(
+        self, topics: List[str], rotate_every_rounds: int = 1, shuffle: bool = False
+    ):
         self.topics = topics[:]
         if shuffle:
             import random
+
             random.shuffle(self.topics)
         self.i = 0
         self.rounds = 0
@@ -581,8 +617,10 @@ class TopicManager:
 # MEMORY CORE (JSON STM + SQLite LTM)
 # ============================================
 
+
 class MemoryCore:
     """Unified memory system: JSON STM + SQLite LTM with cryptographic signatures."""
+
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._init_db()
@@ -624,10 +662,18 @@ class MemoryCore:
                         signature_hex TEXT DEFAULT NULL
                     );
                 """)
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_mem_agent_ts ON memories(agent, ts DESC);")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_mem_agent_layer ON memories(agent, layer);")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_mem_emotion ON memories(emotion);")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_mem_importance ON memories(importance DESC);")
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_mem_agent_ts ON memories(agent, ts DESC);"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_mem_agent_layer ON memories(agent, layer);"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_mem_emotion ON memories(emotion);"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_mem_importance ON memories(importance DESC);"
+                )
 
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS agent_state (
@@ -664,12 +710,12 @@ class MemoryCore:
     def stm_append(self, agent_name: str, entry: Dict[str, Any]):
         """Append entry to STM with cryptographic signature."""
         entries = self.stm_load(agent_name)
-        
+
         # Create signature for STM entry
         entry_json = json.dumps(entry, sort_keys=True)
-        sig = create_signature(entry_json.encode('utf-8'), MEMORY_SECRET_KEY_BYTES)
-        entry['_signature'] = sig.hex()
-        
+        sig = create_signature(entry_json.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
+        entry["_signature"] = sig.hex()
+
         entries.append(entry)
         self.stm_save(agent_name, entries)
         logger.debug(f"STM entry signed for {agent_name}")
@@ -693,30 +739,48 @@ class MemoryCore:
         """Insert entry to long-term memory with cryptographic signature."""
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
-        
+
         # Create payload for signature
         payload_for_sig = f"{content}|{topic}|{emotion}|{ts}"
-        sig = create_signature(payload_for_sig.encode('utf-8'), MEMORY_SECRET_KEY_BYTES)
+        sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
-        
+
         try:
             with self._conn() as conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO memories
                     (id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
                      promoted_from, intrusive, suppressed, retrain_status, signature_hex)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    mem_id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
-                    promoted_from, intrusive, suppressed, retrain_status, sig_hex
-                ))
+                """,
+                    (
+                        mem_id,
+                        agent,
+                        ts,
+                        layer,
+                        content,
+                        topic,
+                        emotion,
+                        emotion_intensity,
+                        importance,
+                        source,
+                        promoted_from,
+                        intrusive,
+                        suppressed,
+                        retrain_status,
+                        sig_hex,
+                    ),
+                )
                 conn.commit()
                 logger.debug(f"Memory inserted with signature: {mem_id[:8]}...")
         except Exception as e:
             logger.error(f"DB Insert Error: {e}")
         return mem_id
 
-    def ltm_recent(self, agent: str, limit: int = 30, layer: Optional[str] = None) -> List[Dict[str, Any]]:
+    def ltm_recent(
+        self, agent: str, limit: int = 30, layer: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get recent memories from LTM with signature validation."""
         try:
             q = "SELECT * FROM memories WHERE agent = ?"
@@ -728,27 +792,31 @@ class MemoryCore:
             params.append(limit)
             with self._conn() as conn:
                 rows = conn.execute(q, params).fetchall()
-            
+
             valid_memories = []
             for r in rows:
                 mem = dict(r)
-                sig_hex = mem.get('signature_hex')
-                
+                sig_hex = mem.get("signature_hex")
+
                 if sig_hex:
                     # Validate signature
                     payload = f"{mem['content']}|{mem.get('topic', '')}|{mem.get('emotion', '')}|{mem['ts']}"
                     try:
                         sig_bytes = bytes.fromhex(sig_hex)
-                        if validate_signature(payload.encode('utf-8'), MEMORY_SECRET_KEY_BYTES, sig_bytes):
+                        if validate_signature(
+                            payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES, sig_bytes
+                        ):
                             valid_memories.append(mem)
                         else:
-                            logger.warning(f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}...")
+                            logger.warning(
+                                f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                            )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
                 else:
                     # Legacy memory without signature - accept it
                     valid_memories.append(mem)
-            
+
             return valid_memories
         except Exception as e:
             logger.error(f"DB Query Error: {e}")
@@ -758,7 +826,9 @@ class MemoryCore:
         """Get agent's internal drives/state."""
         try:
             with self._conn() as conn:
-                row = conn.execute("SELECT * FROM agent_state WHERE agent = ?", (agent,)).fetchone()
+                row = conn.execute(
+                    "SELECT * FROM agent_state WHERE agent = ?", (agent,)
+                ).fetchone()
             if not row:
                 return {
                     "id_strength": 5.0,
@@ -775,7 +845,12 @@ class MemoryCore:
             }
         except Exception as e:
             logger.error(f"DB State Error: {e}")
-            return {"id_strength": 5.0, "ego_strength": 5.0, "superego_strength": 5.0, "self_awareness": 0.55}
+            return {
+                "id_strength": 5.0,
+                "ego_strength": 5.0,
+                "superego_strength": 5.0,
+                "self_awareness": 0.55,
+            }
 
     def save_agent_state(self, agent: str, state: Dict[str, float]):
         """Save agent's internal state."""
@@ -786,7 +861,8 @@ class MemoryCore:
         sa = float(state.get("self_awareness", 0.55))
         try:
             with self._conn() as conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO agent_state(agent, ts, id_strength, ego_strength, superego_strength, self_awareness)
                     VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(agent) DO UPDATE SET
@@ -795,17 +871,22 @@ class MemoryCore:
                       ego_strength=excluded.ego_strength,
                       superego_strength=excluded.superego_strength,
                       self_awareness=excluded.self_awareness
-                """, (agent, ts, ide, ego, sup, sa))
+                """,
+                    (agent, ts, ide, ego, sup, sa),
+                )
                 conn.commit()
         except Exception as e:
             logger.error(f"DB State Save Error: {e}")
+
 
 # ============================================
 # EMOTION CORE (CACHED)
 # ============================================
 
+
 class EmotionCore:
     """Emotion detection with LLM caching."""
+
     def __init__(self, llm: LLM):
         self.llm = llm
         logger.info("EmotionCore initialized")
@@ -814,18 +895,18 @@ class EmotionCore:
         """Infer emotion and intensity from text (cached)."""
         if not text or len(text) < 5:
             return ("neutral", 0.2)
-        
+
         prompt = (
             "Classify emotion and intensity (0..1).\n"
-            "Return JSON: {\"emotion\": string, \"intensity\": number}\n"
+            'Return JSON: {"emotion": string, "intensity": number}\n'
             f"TEXT:\n{text[:200]}\n"
         )
         raw = self.llm.generate(model, prompt, temperature=0.2, use_cache=True)
-        
+
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if not m:
             return ("neutral", 0.2)
-        
+
         try:
             obj = json.loads(m.group(0))
             emo = str(obj.get("emotion", "neutral")).strip().lower()
@@ -841,8 +922,10 @@ class EmotionCore:
 # LANGUAGE CORE
 # ============================================
 
+
 class LanguageCore:
     """Language selection per agent."""
+
     def __init__(self):
         self.current: Dict[str, str] = {}
         logger.info("LanguageCore initialized")
@@ -863,20 +946,25 @@ class LanguageCore:
 # CONSCIOUS CORE
 # ============================================
 
+
 class ConsciousCore:
     """Self-awareness and intentionality."""
+
     def __init__(self):
         self.state: Dict[str, Dict[str, Any]] = {}
         logger.info("ConsciousCore initialized")
 
     def init_agent(self, agent: str):
         """Initialize agent consciousness."""
-        self.state.setdefault(agent, {
-            "self_awareness": 0.55,
-            "intent": "understand",
-            "goals": ["coherence", "truth-seeking", "growth"],
-            "last_reflection": ""
-        })
+        self.state.setdefault(
+            agent,
+            {
+                "self_awareness": 0.55,
+                "intent": "understand",
+                "goals": ["coherence", "truth-seeking", "growth"],
+                "last_reflection": "",
+            },
+        )
 
     def update_reflection(self, agent: str, reflection: str):
         """Update agent's reflection."""
@@ -888,9 +976,11 @@ class ConsciousCore:
 # OBSERVER / FIXY CORE
 # ============================================
 
+
 @dataclass
 class FixyReport:
     """Report from Fixy observer."""
+
     detected_issue: bool
     issue_summary: str
     proposed_patch: str
@@ -900,6 +990,7 @@ class FixyReport:
 
 class ObserverCore:
     """Meta-cognitive observer (Fixy)."""
+
     def __init__(self, llm: LLM, model: str):
         self.llm = llm
         self.model = model
@@ -910,14 +1001,16 @@ class ObserverCore:
         """Review recent context for issues."""
         prompt = (
             "Review for bugs/contradictions.\n"
-            "Return JSON: {\"detected_issue\": bool, \"issue_summary\": string, "
-            "\"proposed_patch\": string, \"severity\": string, \"rationale\": string}\n"
+            'Return JSON: {"detected_issue": bool, "issue_summary": string, '
+            '"proposed_patch": string, "severity": string, "rationale": string}\n'
             f"CONTEXT:\n{context[:300]}\n"
         )
         raw = self.llm.generate(self.model, prompt, temperature=0.2, use_cache=False)
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if not m:
-            return FixyReport(False, "No structured output.", "", "low", "Parser fallback.")
+            return FixyReport(
+                False, "No structured output.", "", "low", "Parser fallback."
+            )
         try:
             obj = json.loads(m.group(0))
             return FixyReport(
@@ -946,12 +1039,14 @@ class ObserverCore:
     def remember(self, report: FixyReport):
         """Store observation in memory."""
         if report.detected_issue:
-            self.mistake_memory.append({
-                "ts": now_iso(),
-                "issue": report.issue_summary,
-                "severity": report.severity,
-                "rationale": report.rationale,
-            })
+            self.mistake_memory.append(
+                {
+                    "ts": now_iso(),
+                    "issue": report.issue_summary,
+                    "severity": report.severity,
+                    "rationale": report.rationale,
+                }
+            )
             if len(self.mistake_memory) > 5000:
                 self.mistake_memory = self.mistake_memory[-4000:]
 
@@ -960,8 +1055,10 @@ class ObserverCore:
 # BEHAVIOR CORE (HEURISTIC-BASED)
 # ============================================
 
+
 class BehaviorCore:
     """Behavior with heuristic-based importance scoring (less LLM calls)."""
+
     def __init__(self, llm: LLM):
         self.llm = llm
         logger.info("BehaviorCore initialized")
@@ -970,25 +1067,34 @@ class BehaviorCore:
         """Estimate importance using heuristics (no LLM call)."""
         if not text:
             return 0.2
-        
+
         score = 0.3
         score += min(0.2, len(text) / 1000)
-        
-        important_words = ["important", "critical", "key", "essential", "fundamental", "breakthrough"]
+
+        important_words = [
+            "important",
+            "critical",
+            "key",
+            "essential",
+            "fundamental",
+            "breakthrough",
+        ]
         if any(w in text.lower() for w in important_words):
             score += 0.2
-        
+
         intense_words = ["!", "?", "...", "deeply", "profoundly"]
         if any(w in text for w in intense_words):
             score += 0.1
-        
+
         return min(1.0, score)
 
-    def dream_reflection(self, model: str, stm_batch: List[Dict[str, Any]], llm: LLM) -> str:
+    def dream_reflection(
+        self, model: str, stm_batch: List[Dict[str, Any]], llm: LLM
+    ) -> str:
         """Create dream reflection from STM."""
         if not stm_batch:
             return "Dreams of void and silence..."
-        
+
         chunk = "\n".join([f"- {e.get('text', '')[:100]}" for e in stm_batch[-15:]])
         prompt = (
             "Dream-cycle reflection (under 120 words):\n"
@@ -1003,8 +1109,10 @@ class BehaviorCore:
 # AGENT
 # ============================================
 
+
 class Agent:
     """Dialogue agent with memory, emotion, and internal drives."""
+
     def __init__(
         self,
         name: str,
@@ -1045,7 +1153,7 @@ class Agent:
         ego = float(self.drives.get("ego_strength", 5.0))
         sup = float(self.drives.get("superego_strength", 5.0))
         dissent = min(10.0, max(0.0, (ide * 0.45) + (sup * 0.45) - (ego * 0.25)))
-        
+
         if ide >= sup and ide >= ego:
             style = "provocative, desire-driven"
             opening = "Bold counterpoint. Push forward."
@@ -1055,8 +1163,12 @@ class Agent:
         else:
             style = "integrative, Socratic"
             opening = "Precise counterpoint, then synthesis."
-        
-        return {"dissent_level": round(dissent, 2), "style": style, "opening_rule": opening}
+
+        return {
+            "dissent_level": round(dissent, 2),
+            "style": style,
+            "opening_rule": opening,
+        }
 
     def update_drives_after_turn(self, response_kind: str, emo: str, inten: float):
         """Update internal drives after response."""
@@ -1091,11 +1203,13 @@ class Agent:
             "id_strength": ide,
             "ego_strength": ego,
             "superego_strength": sup,
-            "self_awareness": sa
+            "self_awareness": sa,
         }
         self.memory.save_agent_state(self.name, self.drives)
 
-    def _build_compact_prompt(self, user_seed: str, dialog_tail: List[Dict[str, str]]) -> str:
+    def _build_compact_prompt(
+        self, user_seed: str, dialog_tail: List[Dict[str, str]]
+    ) -> str:
         """Build COMPRESSED prompt for LLM generation (optimized tokens)."""
         lang = self.language.get(self.name)
         recent_ltm = self.memory.ltm_recent(self.name, limit=4, layer="conscious")
@@ -1133,8 +1247,11 @@ class Agent:
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
         """Generate dialogue response."""
         prompt = self._build_compact_prompt(seed, dialog_tail)
-        out = self.llm.generate(self.model, prompt, temperature=0.75, use_cache=False) or "[No response]"
-        
+        out = (
+            self.llm.generate(self.model, prompt, temperature=0.75, use_cache=False)
+            or "[No response]"
+        )
+
         out = validate_output(out, max_length=CFG.output_max_length)
 
         emo, inten = self.emotion.infer(self.model, out)
@@ -1195,8 +1312,10 @@ class Agent:
 # VERSION TRACKING
 # ============================================
 
+
 class VersionTracker:
     """Version and snapshot management."""
+
     def __init__(self, version_dir: str):
         self.version_dir = version_dir
         logger.info("VersionTracker initialized")
@@ -1252,7 +1371,10 @@ def safe_apply_patch(original: str, patch: str) -> Tuple[bool, str]:
 # GRAPH EXPORT (GEXF)
 # ============================================
 
-def export_gexf_placeholder(path: str, nodes: List[Tuple[str, str]], edges: List[Tuple[str, str, str]]):
+
+def export_gexf_placeholder(
+    path: str, nodes: List[Tuple[str, str]], edges: List[Tuple[str, str, str]]
+):
     """Export minimal GEXF file."""
     try:
         g = []
@@ -1274,41 +1396,46 @@ def export_gexf_placeholder(path: str, nodes: List[Tuple[str, str]], edges: List
     except Exception as e:
         logger.error(f"GEXF Error: {e}")
         # ============================================
+
+
 # SESSION MANAGEMENT
 # ============================================
 
+
 class SessionManager:
     """Manage dialogue sessions with security and validation."""
-    
+
     def __init__(self, sessions_dir: str):
         self.sessions_dir = sessions_dir
         os.makedirs(sessions_dir, exist_ok=True)
         logger.info("SessionManager initialized")
-    
+
     def _validate_session_id(self, session_id: str) -> bool:
         """Validate session ID (alphanumeric + hyphens only)."""
         if not session_id or len(session_id) > 64:
             return False
-        return bool(re.match(r'^[a-zA-Z0-9_\-]+$', session_id))
-    
+        return bool(re.match(r"^[a-zA-Z0-9_\-]+$", session_id))
+
     def _get_session_path(self, session_id: str) -> Path:
         """Get safe session file path with validation."""
         if not self._validate_session_id(session_id):
             raise ValueError(f"Invalid session_id: {session_id}")
-        
+
         path = Path(self.sessions_dir) / f"session_{session_id}.json"
-        
+
         # Prevent path traversal
         if not str(path.resolve()).startswith(str(Path(self.sessions_dir).resolve())):
             raise ValueError("Path traversal detected!")
-        
+
         return path
-    
-    def save_session(self, session_id: str, dialog: List[Dict[str, str]], metrics: Dict[str, Any]) -> str:
+
+    def save_session(
+        self, session_id: str, dialog: List[Dict[str, str]], metrics: Dict[str, Any]
+    ) -> str:
         """Save a complete session with signature."""
         try:
             path = self._get_session_path(session_id)
-            
+
             session_data = {
                 "session_id": session_id,
                 "timestamp": now_iso(),
@@ -1316,55 +1443,59 @@ class SessionManager:
                 "metrics": metrics,
                 "version": "1.0",
             }
-            
+
             # Sign the session
             session_json = json.dumps(session_data, sort_keys=True)
-            sig = create_signature(session_json.encode('utf-8'), MEMORY_SECRET_KEY_BYTES)
-            session_data['_signature'] = sig.hex()
-            
+            sig = create_signature(
+                session_json.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
+            )
+            session_data["_signature"] = sig.hex()
+
             safe_json_dump(str(path), session_data)
             logger.info(f"Session saved: {session_id}")
             return str(path)
-        
+
         except ValueError as e:
             logger.error(f"Session validation error: {e}")
             raise
         except Exception as e:
             logger.error(f"Session save error: {e}")
             raise
-    
+
     def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Load a session with signature validation."""
         try:
             path = self._get_session_path(session_id)
-            
+
             if not path.exists():
                 logger.warning(f"Session not found: {session_id}")
                 return None
-            
+
             session_data = load_json(str(path), default=None)
             if not session_data:
                 return None
-            
+
             # Validate signature
-            sig_hex = session_data.pop('_signature', None)
+            sig_hex = session_data.pop("_signature", None)
             if sig_hex:
                 session_json = json.dumps(session_data, sort_keys=True)
                 sig_bytes = bytes.fromhex(sig_hex)
-                
-                if not validate_signature(session_json.encode('utf-8'), MEMORY_SECRET_KEY_BYTES, sig_bytes):
+
+                if not validate_signature(
+                    session_json.encode("utf-8"), MEMORY_SECRET_KEY_BYTES, sig_bytes
+                ):
                     logger.warning(f"🚨 INVALID SESSION SIGNATURE: {session_id}")
                     return None
-            
+
             return session_data
-        
+
         except ValueError as e:
             logger.error(f"Session validation error: {e}")
             return None
         except Exception as e:
             logger.error(f"Session load error: {e}")
             return None
-    
+
     def list_sessions(self) -> List[str]:
         """List all available valid sessions."""
         try:
@@ -1372,17 +1503,17 @@ class SessionManager:
             for file in os.listdir(self.sessions_dir):
                 if file.startswith("session_") and file.endswith(".json"):
                     session_id = file.replace("session_", "").replace(".json", "")
-                    
+
                     # Validate before adding to list
                     if self._validate_session_id(session_id):
                         sessions.append(session_id)
-            
+
             return sorted(sessions)
-        
+
         except Exception as e:
             logger.error(f"Session listing error: {e}")
             return []
-    
+
     def delete_session(self, session_id: str) -> bool:
         """Delete a session safely."""
         try:
@@ -1401,17 +1532,16 @@ class SessionManager:
 # ASYNC PROCESSING
 # ============================================
 
+
 class AsyncProcessor:
     """Async processing for agent tasks."""
+
     def __init__(self):
         self.tasks: List[asyncio.Task] = []
         logger.info("AsyncProcessor initialized")
 
     async def process_agents_concurrent(
-        self,
-        agents: List[Agent],
-        seed: str,
-        dialog_tail: List[Dict[str, str]]
+        self, agents: List[Agent], seed: str, dialog_tail: List[Dict[str, str]]
     ) -> Dict[str, str]:
         """Process multiple agents concurrently."""
         results = {}
@@ -1492,6 +1622,7 @@ if FASTAPI_AVAILABLE:
 # UNIT TESTS (pytest)
 # ============================================
 
+
 def test_config_validation():
     """Test config validation."""
     try:
@@ -1499,13 +1630,13 @@ def test_config_validation():
         assert False, "Should raise ValueError"
     except ValueError:
         pass
-    
+
     try:
         Config(max_turns=0)
         assert False, "Should raise ValueError"
     except ValueError:
         pass
-    
+
     cfg = Config(cache_size=100, max_turns=10)
     assert cfg.cache_size == 100
     assert cfg.max_turns == 10
@@ -1515,19 +1646,19 @@ def test_config_validation():
 def test_lru_cache():
     """Test LRU cache."""
     cache = LRUCache(max_size=3)
-    
+
     cache.set("a", 1)
     cache.set("b", 2)
     cache.set("c", 3)
-    
+
     assert cache.get("a") == 1
     assert cache.get("b") == 2
     assert cache.get("c") == 3
-    
+
     cache.set("d", 4)
     assert cache.get("a") is None
     assert cache.get("d") == 4
-    
+
     logger.info("✓ LRU cache tests passed")
 
 
@@ -1535,10 +1666,10 @@ def test_redaction():
     """Test PII redaction."""
     text = "My email is john@example.com and phone is 555-1234"
     redacted = redact_pii(text)
-    
+
     assert "[REDACTED]" in redacted
     assert "john@example.com" not in redacted
-    
+
     logger.info("✓ Redaction tests passed")
 
 
@@ -1546,31 +1677,31 @@ def test_validation():
     """Test output validation."""
     long_text = "a" * 1000
     validated = validate_output(long_text, max_length=100)
-    
+
     assert len(validated) <= 103
     assert "..." in validated
-    
+
     text_with_control = "hello\x00world"
     validated = validate_output(text_with_control)
     assert "\x00" not in validated
-    
+
     logger.info("✓ Validation tests passed")
 
 
 def test_metrics_tracker():
     """Test metrics tracking."""
     metrics = MetricsTracker("test_metrics.json")
-    
+
     assert metrics.metrics["llm_calls"] == 0
     assert metrics.hit_rate() == 0.0
-    
+
     metrics.record_llm_call(1.5, success=True)
     assert metrics.metrics["llm_calls"] == 1
-    
+
     metrics.record_cache_hit()
     metrics.record_cache_miss()
     assert metrics.hit_rate() == 0.5
-    
+
     logger.info("✓ Metrics tracker tests passed")
 
 
@@ -1578,7 +1709,7 @@ def test_topic_manager():
     """Test topic cycling."""
     topics = ["A", "B", "C"]
     mgr = TopicManager(topics, rotate_every_rounds=1)
-    
+
     assert mgr.current() == "A"
     mgr.advance_round()
     assert mgr.current() == "B"
@@ -1586,33 +1717,35 @@ def test_topic_manager():
     assert mgr.current() == "C"
     mgr.advance_round()
     assert mgr.current() == "A"
-    
+
     logger.info("✓ Topic manager tests passed")
 
 
 def test_behavior_core():
     """Test behavior scoring."""
     behavior = BehaviorCore(None)
-    
+
     score1 = behavior.importance_score("short")
-    score2 = behavior.importance_score("This is a critical breakthrough that fundamentally changes everything!!!")
-    
+    score2 = behavior.importance_score(
+        "This is a critical breakthrough that fundamentally changes everything!!!"
+    )
+
     assert score2 > score1
     assert 0 <= score1 <= 1
     assert 0 <= score2 <= 1
-    
+
     logger.info("✓ Behavior core tests passed")
 
 
 def test_language_core():
     """Test language selection."""
     lang = LanguageCore()
-    
+
     assert lang.get("Socrates") == "he"
-    
+
     lang.set("Socrates", "en")
     assert lang.get("Socrates") == "en"
-    
+
     logger.info("✓ Language core tests passed")
 
 
@@ -1623,12 +1756,12 @@ def test_fixy_report():
         issue_summary="Contradiction detected",
         proposed_patch="FIX: ...",
         severity="high",
-        rationale="Logic error"
+        rationale="Logic error",
     )
-    
+
     assert report.detected_issue is True
     assert report.severity == "high"
-    
+
     logger.info("✓ Fixy report tests passed")
 
 
@@ -1636,22 +1769,22 @@ def test_memory_signatures():
     """Test memory signature creation and validation."""
     test_msg = b"test message"
     test_key = b"test_key_secret"
-    
+
     sig = create_signature(test_msg, test_key)
     assert isinstance(sig, bytes)
     assert len(sig) == 32  # SHA256 is 32 bytes
-    
+
     # Valid signature should pass
     assert validate_signature(test_msg, test_key, sig) == True
-    
+
     # Tampered message should fail
     tampered_msg = b"tampered message"
     assert validate_signature(tampered_msg, test_key, sig) == False
-    
+
     # Wrong key should fail
     wrong_key = b"wrong_key"
     assert validate_signature(test_msg, wrong_key, sig) == False
-    
+
     logger.info("✓ Memory signature tests passed")
 
 
@@ -1659,39 +1792,41 @@ def test_session_manager():
     """Test SessionManager with security features."""
     import tempfile
     import shutil
-    
+
     # Create temporary test directory
     test_dir = tempfile.mkdtemp(prefix="test_sessions_")
-    
+
     try:
         sm = SessionManager(test_dir)
-        
+
         # Test 1: Valid session ID
         assert sm._validate_session_id("test-123_abc") == True
         assert sm._validate_session_id("abc123") == True
-        
+
         # Test 2: Invalid session IDs
         assert sm._validate_session_id("") == False
         assert sm._validate_session_id("../evil") == False
         assert sm._validate_session_id("test/path") == False
         assert sm._validate_session_id("a" * 65) == False  # too long
         assert sm._validate_session_id(None) == False
-        
+
         # Test 3: Save and load session with signature
         test_dialog = [{"role": "user", "content": "hello"}]
         test_metrics = {"turns": 1, "time": 10.5}
-        
+
         path = sm.save_session("test123", test_dialog, test_metrics)
         assert os.path.exists(path)
-        
+
         loaded = sm.load_session("test123")
         assert loaded is not None
         assert loaded["session_id"] == "test123"
         assert loaded["dialog"] == test_dialog
         assert loaded["metrics"] == test_metrics
         assert loaded["version"] == "1.0"
-        assert "_signature" not in loaded  # signature should be removed after validation
-        
+        assert (
+            "_signature" not in loaded
+        )  # signature should be removed after validation
+
         # Test 4: Tampered session detection
         # Manually tamper with the session file
         with open(path, "r") as f:
@@ -1699,38 +1834,38 @@ def test_session_manager():
         data["dialog"] = [{"role": "user", "content": "TAMPERED"}]
         with open(path, "w") as f:
             json.dump(data, f)
-        
+
         # Should return None for tampered session
         tampered_result = sm.load_session("test123")
         assert tampered_result is None
-        
+
         # Test 5: List sessions
         sm.save_session("session1", test_dialog, test_metrics)
         sm.save_session("session2", test_dialog, test_metrics)
         sessions = sm.list_sessions()
         assert "session1" in sessions
         assert "session2" in sessions
-        
+
         # Test 6: Delete session
         assert sm.delete_session("session1") == True
         assert sm.delete_session("session1") == False  # already deleted
         sessions = sm.list_sessions()
         assert "session1" not in sessions
         assert "session2" in sessions
-        
+
         # Test 7: Path traversal protection
         try:
             sm._get_session_path("../../../etc/passwd")
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "Invalid session_id" in str(e)
-        
+
         # Test 8: Load non-existent session
         result = sm.load_session("nonexistent")
         assert result is None
-        
+
         logger.info("✓ SessionManager security tests passed")
-    
+
     finally:
         # Cleanup
         if os.path.exists(test_dir):
@@ -1741,8 +1876,10 @@ def test_session_manager():
 # MAIN ORCHESTRATOR
 # ============================================
 
+
 class MainScript:
     """Main orchestrator for multi-agent dialogue (configurable timeout)."""
+
     def __init__(self, cfg: Config):
         ensure_dirs(cfg)
         colorama_init(autoreset=True)
@@ -1843,9 +1980,13 @@ class MainScript:
         redacted = redact_pii(reflection)
 
         if sensitive:
-            content_to_store = safe_ltm_payload(reflection, topic, emo, float(inten), float(imp))
+            content_to_store = safe_ltm_payload(
+                reflection, topic, emo, float(inten), float(imp)
+            )
         else:
-            content_to_store = reflection if self.cfg.store_raw_subconscious_ltm else redacted
+            content_to_store = (
+                reflection if self.cfg.store_raw_subconscious_ltm else redacted
+            )
 
         self.memory.ltm_insert(
             agent=agent.name,
@@ -1862,7 +2003,9 @@ class MainScript:
         for e in batch[-40:]:
             ei = float(e.get("emotion_intensity", 0.0))
             im = float(e.get("importance", 0.0))
-            if (im >= self.cfg.promote_importance_threshold) or (ei >= self.cfg.promote_emotion_threshold):
+            if (im >= self.cfg.promote_importance_threshold) or (
+                ei >= self.cfg.promote_emotion_threshold
+            ):
                 content = str(e.get("text", "")).strip()
                 if not content:
                     continue
@@ -1890,7 +2033,11 @@ class MainScript:
             pass
 
         logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
-        print(Fore.YELLOW + f"[DREAM] {agent.name} reflection stored; promoted={promoted}" + Style.RESET_ALL)
+        print(
+            Fore.YELLOW
+            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
+            + Style.RESET_ALL
+        )
 
     def fixy_check(self, recent_context: str):
         """Run Fixy observer check."""
@@ -1901,7 +2048,12 @@ class MainScript:
 
         if report.detected_issue:
             logger.warning(f"Fixy detected issue: {report.issue_summary}")
-            print(Fore.YELLOW + "Fixy detected issue: " + Style.RESET_ALL + report.issue_summary)
+            print(
+                Fore.YELLOW
+                + "Fixy detected issue: "
+                + Style.RESET_ALL
+                + report.issue_summary
+            )
             if report.proposed_patch:
                 print(Fore.YELLOW + "Proposed patch:" + Style.RESET_ALL)
                 print(report.proposed_patch[:100] + "\n")
@@ -1912,7 +2064,12 @@ class MainScript:
             self.log_turn("Fixy", msg, topic="observer")
             print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + msg + "\n")
 
-        if report.detected_issue and report.proposed_patch and self.cfg.enable_auto_patch and self.cfg.allow_write_self_file:
+        if (
+            report.detected_issue
+            and report.proposed_patch
+            and self.cfg.enable_auto_patch
+            and self.cfg.allow_write_self_file
+        ):
             try:
                 this_file = os.path.abspath(__file__)
                 with open(this_file, "r", encoding="utf-8") as f:
@@ -1936,9 +2093,15 @@ class MainScript:
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
 
         timeout_seconds = self.cfg.timeout_minutes * 60
-        
-        print(Fore.GREEN + f"\n[Session {self.session_id}] Starting {self.cfg.timeout_minutes}-minute dialogue..." + Style.RESET_ALL)
-        logger.info(f"Starting session {self.session_id} with {timeout_seconds}s timeout")
+
+        print(
+            Fore.GREEN
+            + f"\n[Session {self.session_id}] Starting {self.cfg.timeout_minutes}-minute dialogue..."
+            + Style.RESET_ALL
+        )
+        logger.info(
+            f"Starting session {self.session_id} with {timeout_seconds}s timeout"
+        )
 
         while time.time() - self.start_time < timeout_seconds:
             self.turn_index += 1
@@ -1947,7 +2110,7 @@ class MainScript:
 
             topic_label = topicman.current()
             seed = f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
-            
+
             logger.debug(f"Turn {self.turn_index}: {speaker.name}")
             out = speaker.speak(seed, self.dialog)
             self.dialog.append({"role": speaker.name, "text": out})
@@ -1975,25 +2138,44 @@ class MainScript:
 
             elapsed = time.time() - self.start_time
             if elapsed >= timeout_seconds:
-                logger.info(f"{self.cfg.timeout_minutes}-minute timeout reached at turn {self.turn_index}")
-                print(Fore.YELLOW + f"\n[TIMEOUT] {self.cfg.timeout_minutes} minutes reached at turn {self.turn_index}" + Style.RESET_ALL)
+                logger.info(
+                    f"{self.cfg.timeout_minutes}-minute timeout reached at turn {self.turn_index}"
+                )
+                print(
+                    Fore.YELLOW
+                    + f"\n[TIMEOUT] {self.cfg.timeout_minutes} minutes reached at turn {self.turn_index}"
+                    + Style.RESET_ALL
+                )
                 break
 
             time.sleep(0.02)
 
         # Save session and metrics
         self.metrics.save()
-        self.session_mgr.save_session(self.session_id, self.dialog, self.metrics.metrics)
-        
+        self.session_mgr.save_session(
+            self.session_id, self.dialog, self.metrics.metrics
+        )
+
         elapsed = time.time() - self.start_time
-        print(Fore.GREEN + f"\n[Session Complete: {self.turn_index} turns in {elapsed:.1f}s]" + Style.RESET_ALL)
+        print(
+            Fore.GREEN
+            + f"\n[Session Complete: {self.turn_index} turns in {elapsed:.1f}s]"
+            + Style.RESET_ALL
+        )
         print(f"[Cache Hit Rate: {self.metrics.hit_rate():.1%}]")
-        print(f"[LLM Calls: {self.metrics.metrics['llm_calls']}, Errors: {self.metrics.metrics['llm_errors']}]")
-        logger.info(f"Session {self.session_id} completed: {self.turn_index} turns, {elapsed:.1f}s")
+        print(
+            f"[LLM Calls: {self.metrics.metrics['llm_calls']}, Errors: {self.metrics.metrics['llm_errors']}]"
+        )
+        logger.info(
+            f"Session {self.session_id} completed: {self.turn_index} turns, {elapsed:.1f}s"
+        )
 
         # ============================================
+
+
 # CLI / API ENTRY POINTS
 # ============================================
+
 
 def run_cli():
     """Run command line interface - configurable timeout dialogue."""
@@ -2001,11 +2183,15 @@ def run_cli():
     CFG = Config(max_turns=200, timeout_minutes=30)
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
-    print(Fore.GREEN + "Entelgia Unified – PRODUCTION Edition By Sivan Havkin" + Style.RESET_ALL)
+    print(
+        Fore.GREEN
+        + "Entelgia Unified – PRODUCTION Edition By Sivan Havkin"
+        + Style.RESET_ALL
+    )
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print("\nConfiguration:")
     config_dict = asdict(CFG)
-    config_display = {k: v for k, v in config_dict.items() if not k.startswith('_')}
+    config_display = {k: v for k, v in config_dict.items() if not k.startswith("_")}
     print(json.dumps(config_display, ensure_ascii=False, indent=2))
     print()
 
@@ -2014,7 +2200,9 @@ def run_cli():
         app_script.run()
         print(Fore.GREEN + "\n✓ Session completed successfully!" + Style.RESET_ALL)
     except KeyboardInterrupt:
-        print(Fore.YELLOW + "\n[INTERRUPTED] Session cancelled by user" + Style.RESET_ALL)
+        print(
+            Fore.YELLOW + "\n[INTERRUPTED] Session cancelled by user" + Style.RESET_ALL
+        )
         logger.info("Session interrupted by user")
         sys.exit(0)
     except Exception as e:
@@ -2027,7 +2215,7 @@ def run_tests():
     """Run unit tests."""
     print(Fore.GREEN + "Running Entelgia Unit Tests..." + Style.RESET_ALL)
     print()
-    
+
     try:
         test_config_validation()
         test_lru_cache()
@@ -2040,7 +2228,7 @@ def run_tests():
         test_fixy_report()
         test_memory_signatures()
         test_session_manager()
-        
+
         print()
         print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
         print(Fore.GREEN + "✓ All tests passed!" + Style.RESET_ALL)
@@ -2058,14 +2246,14 @@ def run_tests():
 def run_api():
     """Run FastAPI server."""
     global CFG
-    
+
     if not FASTAPI_AVAILABLE:
         print(Fore.RED + "FastAPI not installed." + Style.RESET_ALL)
         print("Run: pip install fastapi uvicorn")
         sys.exit(1)
-    
+
     CFG = Config()
-    
+
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(Fore.GREEN + "Entelgia REST API Server" + Style.RESET_ALL)
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
@@ -2073,9 +2261,10 @@ def run_api():
     print(f"📚 API Docs: http://localhost:8000/docs")
     print(f"🔄 API Spec: http://localhost:8000/redoc")
     print()
-    
+
     try:
         import uvicorn
+
         uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
     except ImportError:
         print(Fore.RED + "uvicorn not installed." + Style.RESET_ALL)
@@ -2086,22 +2275,30 @@ def run_api():
 def main():
     """Main entry point with mode selection."""
     global CFG
-    
+
     if len(sys.argv) > 1:
         mode = sys.argv[1].lower()
-        
+
         if mode == "test":
             run_tests()
         elif mode == "api":
             run_api()
         elif mode in ["help", "-h", "--help"]:
-            print(Fore.GREEN + "Entelgia Unified – PRODUCTION Edition" + Style.RESET_ALL)
+            print(
+                Fore.GREEN + "Entelgia Unified – PRODUCTION Edition" + Style.RESET_ALL
+            )
             print()
             print("Usage:")
-            print(f"  python {os.path.basename(__file__)}              Run 30-minute CLI dialogue (default)")
+            print(
+                f"  python {os.path.basename(__file__)}              Run 30-minute CLI dialogue (default)"
+            )
             print(f"  python {os.path.basename(__file__)} test         Run unit tests")
-            print(f"  python {os.path.basename(__file__)} api          Start FastAPI server")
-            print(f"  python {os.path.basename(__file__)} help         Show this help message")
+            print(
+                f"  python {os.path.basename(__file__)} api          Start FastAPI server"
+            )
+            print(
+                f"  python {os.path.basename(__file__)} help         Show this help message"
+            )
             print()
             print("Requirements:")
             print("  • Python 3.10+")
@@ -2111,7 +2308,9 @@ def main():
             print("  • pip install pytest pytest-mock (for testing)")
             print()
             print("Environment Variables:")
-            print("  • MEMORY_SECRET_KEY    Secret key for memory signatures (recommended: 32+ chars)")
+            print(
+                "  • MEMORY_SECRET_KEY    Secret key for memory signatures (recommended: 32+ chars)"
+            )
             print()
             print("Features:")
             print("  • 30-minute auto-timeout dialogue")
@@ -2132,7 +2331,9 @@ def main():
             print()
         else:
             print(Fore.RED + f"Unknown mode: {mode}" + Style.RESET_ALL)
-            print(f"Run 'python {os.path.basename(__file__)} help' for usage information")
+            print(
+                f"Run 'python {os.path.basename(__file__)} help' for usage information"
+            )
             sys.exit(1)
     else:
         # Default: Run CLI (30 minutes)
@@ -2141,5 +2342,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

@@ -16,24 +16,24 @@ class TestSignatureCreation:
     def test_create_signature_success(self, test_secret_key, sample_message):
         """Test successful signature creation."""
         signature = create_signature(sample_message, test_secret_key)
-        
+
         assert signature is not None
         assert len(signature) == 64  # SHA256 hex = 64 characters
         assert isinstance(signature, str)
-        assert all(c in '0123456789abcdef' for c in signature)
+        assert all(c in "0123456789abcdef" for c in signature)
 
     def test_create_signature_deterministic(self, test_secret_key, sample_message):
         """Test that signature creation is deterministic."""
         sig1 = create_signature(sample_message, test_secret_key)
         sig2 = create_signature(sample_message, test_secret_key)
-        
+
         assert sig1 == sig2
 
     def test_create_signature_different_messages(self, test_secret_key):
         """Test that different messages produce different signatures."""
         sig1 = create_signature("message 1", test_secret_key)
         sig2 = create_signature("message 2", test_secret_key)
-        
+
         assert sig1 != sig2
 
     def test_create_signature_empty_message(self, test_secret_key):
@@ -64,29 +64,31 @@ class TestSignatureValidation:
         """Test successful signature validation."""
         signature = create_signature(sample_message, test_secret_key)
         is_valid = validate_signature(sample_message, test_secret_key, signature)
-        
+
         assert is_valid is True
 
     def test_validate_signature_wrong_key(self, test_secret_key, sample_message):
         """Test that wrong key fails validation."""
         signature = create_signature(sample_message, test_secret_key)
         is_valid = validate_signature(sample_message, "wrong_key", signature)
-        
+
         assert is_valid is False
 
     def test_validate_signature_tampered_message(self, test_secret_key, sample_message):
         """Test that tampered message fails validation."""
         signature = create_signature(sample_message, test_secret_key)
         is_valid = validate_signature("Tampered message!", test_secret_key, signature)
-        
+
         assert is_valid is False
 
-    def test_validate_signature_tampered_signature(self, test_secret_key, sample_message):
+    def test_validate_signature_tampered_signature(
+        self, test_secret_key, sample_message
+    ):
         """Test that tampered signature fails validation."""
         signature = create_signature(sample_message, test_secret_key)
-        tampered_sig = signature[:-1] + 'x'  # Change last character
+        tampered_sig = signature[:-1] + "x"  # Change last character
         is_valid = validate_signature(sample_message, test_secret_key, tampered_sig)
-        
+
         assert is_valid is False
 
     def test_validate_signature_none_message(self, test_secret_key):
@@ -112,7 +114,9 @@ class TestSignatureValidation:
 
     def test_validate_signature_invalid_hex(self, test_secret_key, sample_message):
         """Test that invalid hex signature returns False."""
-        is_valid = validate_signature(sample_message, test_secret_key, "not_hex_string!")
+        is_valid = validate_signature(
+            sample_message, test_secret_key, "not_hex_string!"
+        )
         assert is_valid is False
 
 
@@ -123,7 +127,7 @@ class TestSecurityProperties:
         """Test that different inputs produce different signatures."""
         messages = ["msg1", "msg2", "msg3", "msg4", "msg5"]
         signatures = [create_signature(msg, test_secret_key) for msg in messages]
-        
+
         # All signatures should be unique
         assert len(set(signatures)) == len(signatures)
 
@@ -131,7 +135,7 @@ class TestSecurityProperties:
         """Test that different keys produce different signatures."""
         keys = ["key1", "key2", "key3", "key4", "key5"]
         signatures = [create_signature(sample_message, key) for key in keys]
-        
+
         # All signatures should be unique
         assert len(set(signatures)) == len(signatures)
 
@@ -140,10 +144,10 @@ class TestSecurityProperties:
         messages = [
             "שלום עולם",  # Hebrew
             "Hello 世界",  # Mixed
-            "مرحبا",      # Arabic
-            "🎉🎊✨",      # Emojis
+            "مرحبا",  # Arabic
+            "🎉🎊✨",  # Emojis
         ]
-        
+
         for msg in messages:
             signature = create_signature(msg, test_secret_key)
             assert len(signature) == 64

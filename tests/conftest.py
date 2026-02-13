@@ -27,11 +27,11 @@ def sample_message():
 @pytest.fixture
 def temp_db_path():
     """Provide a temporary database path for testing."""
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
-    
+
     yield db_path
-    
+
     # Cleanup
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -44,7 +44,7 @@ def mock_ollama_response():
         "model": "phi3",
         "response": "This is a test response from the agent.",
         "done": True,
-        "context": []
+        "context": [],
     }
 
 
@@ -56,5 +56,5 @@ def sample_memory_entry():
         "content": "Test memory content",
         "emotion": "neutral",
         "importance": 0.5,
-        "timestamp": "2026-02-13T10:30:00Z"
+        "timestamp": "2026-02-13T10:30:00Z",
     }
