@@ -11,14 +11,6 @@ Unlike stateless chatbots, Entelgia maintains long-term memory, emotional state,
 
 ---
 
-## 🚨 Breaking Change
-
-**Complete rewrite with a production-ready architecture**
-
-This version represents a full architectural overhaul focused on robustness, performance, and long-term extensibility.
-
----
-
 ## ✨ Features
 
 * **Multi-agent dialogue system** (Socrates · Athena · Fixy)
@@ -42,7 +34,11 @@ This version represents a full architectural overhaul focused on robustness, per
 * **🛡️ Memory poisoning protection** - tampered memories are detected and discarded
 
 ---
+## 🚨 Breaking Change
 
+**Complete rewrite with a production-ready architecture**
+
+This version represents a full architectural overhaul focused on robustness, performance, and long-term extensibility.
 ## ⚡ Performance
 
 * **~50% reduction** in LLM calls via caching
