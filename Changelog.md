@@ -221,6 +221,13 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 - ⚗️ Experimental
 
 
+---
 
+## 📊 Quick Reference
+
+- ✅ **Latest stable:** v2.1.1
+- 📅 **Release schedule:** Bi-weekly minor, as-needed patches
+- 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
+---
 
 
