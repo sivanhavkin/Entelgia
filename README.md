@@ -311,7 +311,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 | **Documentation** | Doc integrity checks | Validates documentation consistency |
 
 > 🛡️ Together these jobs ensure that **every commit** adheres to style guidelines, passes vulnerability scans, and produces a valid package and documentation.
- ---
+---
 
 ## 👤 Author
 
