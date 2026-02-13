@@ -272,28 +272,45 @@ The original creator, **Sivan Havkin**, does not endorse and is not responsible 
 This statement expresses the ethical stance of the author but does not modify the legal permissions granted by the MIT License.
 
 ---
+
 ## 🧪 Test Suite
 
 Entelgia ships with a comprehensive pytest test suite to ensure the reliability and security of its memory-protection subsystem. The current suite contains **19 tests** divided into three categories:
 
-### Signature Creation
+### 🔐 Signature Creation
 Tests verify that creating an HMAC-SHA256 signature:
 - Returns a 64-character hex string
 - Behaves deterministically for the same message and key
 - Yields different signatures for different messages
 - Properly raises a `ValueError` when supplied with empty or `None` keys/messages
 
-### Signature Validation
+### ✅ Signature Validation
 Checks that:
 - Valid signatures are accepted
 - Wrong keys, tampered messages/signatures, or `None`/empty values correctly cause validation to fail
 
-### Security Properties
+### 🌐 Security Properties
 Tests assert that:
 - Signatures are unique across multiple inputs and keys
 - The implementation supports Unicode messages (Hebrew, mixed-language, Arabic, and emojis)
 
-> ✅ All tests currently pass, providing confidence that the cryptographic memory-security mechanisms perform as expected.
+> ✅ **All unit tests currently pass**, providing confidence that the cryptographic memory-security mechanisms perform as expected.
+
+---
+
+### 🔄 CI/CD Pipeline
+
+In addition to the unit tests, the continuous-integration (CI/CD) pipeline automatically runs a suite of quality and security checks:
+
+| Category | Tools | Purpose |
+|----------|-------|---------|
+| **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
+| **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
+| **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
+| **Build Verification** | Package build tools | Ensures valid package creation |
+| **Documentation** | Doc integrity checks | Validates documentation consistency |
+
+> 🛡️ Together these jobs ensure that **every commit** adheres to style guidelines, passes vulnerability scans, and produces a valid package and documentation.
  ---
 
 ## 👤 Author
