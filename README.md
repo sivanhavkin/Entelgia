@@ -314,7 +314,46 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 > 🛡️ Together these jobs ensure that **every commit** adheres to style guidelines, passes vulnerability scans and produces a valid package and documentation.
 
 ---
+## 📰 News & Recognition
 
+**January 2026** — Entelgia was featured by **Yutori AI Agents Research & Frameworks Scout** in their article *"New agent SDKs and skills with secure execution"*.
+
+The article tracked six notable releases focused on plug-and-play enterprise integration, covering platform SDKs, multi-agent prototypes, API skill generation, secure execution, and batteries-included frameworks.
+
+### 🌟 What They Said
+
+> **"Entelgia was highlighted as a psychologically inspired multi-agent architecture – a research prototype designed for persistent identity and moral self-regulation through agent dialogue."**
+
+The scout explained that such capabilities make Entelgia a **promising foundation for long-term customer service and personal-assistant contexts**.
+
+---
+
+### 🔬 Research Positioning
+
+Entelgia was positioned alongside:
+- **GitHub's Copilot SDK**
+- **openapi-to-skills**
+- **Bouvet**
+- **antigravity-skills**
+- **Deep Agents**
+
+Together, these projects advance three operational levers:
+
+| Lever | Description |
+|-------|-------------|
+| ⚡ **Faster Integration** | Seamless connection with existing applications |
+| 🛡️ **Safer Execution** | Autonomous operation with security guarantees |
+| 🎁 **Out-of-the-box Capabilities** | Pre-built functionality packs |
+
+**Entelgia specifically represents the research path for stable, ethically consistent agents.**
+
+---
+
+### 📖 Read More
+
+📢 **Full Article:** [New agent SDKs and skills with secure execution](https://scouts.yutori.com)
+
+---
 ## 👤 Author
 
 Conceived and developed by **Sivan Havkin**.
