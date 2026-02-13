@@ -29,7 +29,7 @@ These are changes that have been committed to the repository but have not yet be
 - Code quality checks now green
 - Build verification successful
 
-## [2.1.0] – 2026-02-13 – Testing & Community Infrastructure -Superseded
+## [2.1.0] – 2026-02-13 – **Testing & Community Infrastructure -Superseded**
 
 This release adds a comprehensive testing infrastructure, build system configuration,
 and community contribution tools without changing core functionality.
@@ -70,7 +70,7 @@ and community contribution tools without changing core functionality.
 This is a quality-of-life release focused on developer experience and project
 infrastructure. All core v2.0.1 functionality is preserved.
 
-+ ## [2.0.1] – 2026‑02‑13 – Production Final ⚠️ Superseded
++ ## [2.0.1] – 2026‑02‑13 – **Production Final- Superseded**
 
 This version finalises the 2.x production rewrite with additional **memory security measures** and licence updates. It retains all features from the 2.0.0 release and adds cryptographic protection for stored memories.
 
@@ -91,7 +91,7 @@ This version finalises the 2.x production rewrite with additional **memory secur
 - Requires **8 GB or more of RAM** and a powerful CPU; may experience Ollama HTTP timeouts on low‑resource machines.
 ---
 
-## [2.0.0] – 2026‑02‑11 – **Production V2.0** 🚀 -Superseded
+## [2.0.0] – 2026‑02‑11 – **Production V2.0- Superseded**
 
 Version 2.0.0 represents a **breaking change** and a complete rewrite of the project with a modular, production‑ready architecture. It introduces a multitude of new capabilities, improved performance, and a robust foundation for future development.
 
@@ -296,6 +296,7 @@ Starting with v2.1.1, we follow a structured release schedule:
 
 **Last Updated:** 2026-02-13  
 **Maintained by:** [Sivan Havkin](https://github.com/sivanhavkin)
+
 
 
 
