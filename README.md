@@ -109,45 +109,6 @@ To delete all stored memory and reset the system:
 
 ---
 
-## 🔐 Memory Security
-
-Entelgia implements **cryptographic signatures** for all memory entries to prevent tampering and poisoning attacks.
-
-### Quick Start
-
-1. **Generate a secure key:**
-   ```bash
-   python -c "import secrets; print(secrets.token_hex(32))"
-   ```
-
-2. **Set environment variable:**
-   ```bash
-   export MEMORY_SECRET_KEY="your-generated-key-here"
-   ```
-
-3. **Run Entelgia:**
-   ```bash
-   python Entelgia_production_meta.py
-   ```
-
-### Security Features
-
-* 🔐 **HMAC-SHA256 signatures** for all memory entries
-* 🛡️ **Tampering detection** - invalid memories are automatically filtered out
-* ⚡ **Constant-time comparison** - prevents timing attacks
-* 🔑 **Environment-based keys** - secure key management
-* ↔️ **Backward compatible** - legacy memories still work
-
-### Learn More
-
-See [docs/memory_security.md](docs/memory_security.md) for complete documentation including:
-- Setup instructions
-- Security guarantees
-- Best practices
-- Troubleshooting
-
----
-
 ## 📝 Metaphor Disclaimer
 
 Entelgia uses terms such as *consciousness*, *emotion*, *conflict*, and *self-regulation* as **architectural metaphors**, not claims of biological or phenomenological consciousness.
@@ -280,19 +241,56 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 * Contributors curious about AI systems that do more than respond
 
 ---
-
 ## 📋 Requirements
-   for full list see requirements.txt
 
-**Requirements-**
-* Python **3.10+**
-* **Ollama** with a local LLM (e.g., `phi3`, `mistral`, `neural-chat`)
-* **8GB+ RAM** recommended (16GB+ for larger models)
-* - Install Python dependencies:
+For the full dependency list, see `requirements.txt`.
+
+- Python **3.10+**
+- **Ollama** with a local LLM (e.g., `phi3`, `mistral`)
+- **8GB+ RAM** recommended (16GB+ for larger models)
+
+Install Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+## 🔐 Memory Security
+
+Entelgia implements **cryptographic signatures** for all memory entries to prevent tampering and poisoning attacks.
+
+### Quick Start
+
+1. **Generate a secure key:**
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+
+2. **Set environment variable:**
+   ```bash
+   export MEMORY_SECRET_KEY="your-generated-key-here"
+   ```
+
+3. **Run Entelgia:**
+   ```bash
+   python Entelgia_production_meta.py
+   ```
+
+### Security Features
+
+* 🔐 **HMAC-SHA256 signatures** for all memory entries
+* 🛡️ **Tampering detection** - invalid memories are automatically filtered out
+* ⚡ **Constant-time comparison** - prevents timing attacks
+* 🔑 **Environment-based keys** - secure key management
+* ↔️ **Backward compatible** - legacy memories still work
+
+See [docs/memory_security.md](docs/memory_security.md) for complete documentation including:
+- Setup instructions
+- Security guarantees
+- Best practices
+- Troubleshooting
+
+---
 
 ## 🔧 Installing Ollama (Required)
 
