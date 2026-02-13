@@ -1,0 +1,68 @@
+Requirements-
+
+Python 3.10+
+Ollama with a local LLM (e.g., phi3, mistral, neural-chat)
+8GB+ RAM recommended (16GB+ for larger models)
+Entelgia will automatically attempt to install missing Python dependencies at runtime for convenience.
+Core Dependencies
+
+requests>=2.31.0 # HTTP requests to Ollama
+
+colorama>=0.4.6 # Colored terminal output
+
+python-dotenv>=1.0.0 # Environment variables from .env
+
+API Server
+
+fastapi>=0.104.0 # REST API framework
+
+uvicorn>=0.24.0 # ASGI server
+
+pydantic>=2.0.0 # Data validation
+
+Testing
+
+pytest>=7.4.0 # Testing framework
+
+pytest-mock>=3.12.0 # Mocking for tests
+
+Optional
+
+python-dateutil>=2.8.2 # Date utilities
+
+🔧 Installing Ollama (Required)
+Entelgia runs entirely on a local LLM for privacy, control, and reproducibility. You must install Ollama before running the system.
+
+Step 1: Download Ollama
+Download Ollama for your operating system:
+
+👉 https://ollama.com
+
+Supported platforms:
+
+macOS
+Linux
+Windows (WSL recommended)
+Step 2: Install a Model
+After installing Ollama, pull at least one supported model:
+
+ollama pull phi3
+Recommended models:
+
+phi3 (3.8B) – Fast, low memory, ideal for testing
+mistral (7B) – Balanced reasoning and performance
+neural-chat (7B) – Strong conversational coherence
+openchat (7B) – Fast and stable dialogue
+💡 On systems with 8GB RAM, prefer phi3. Larger models may be slow or unstable.
+
+Step 3: Verify Ollama Is Running
+Run a quick test:
+
+ollama run phi3 "hello"
+If you see a response, Ollama is installed and working correctly.
+
+🚀 Quick Start
+git clone https://github.com/sivanhavkin/Entelgia.git
+cd Entelgia
+ollama serve
+python Entelgia_production_meta.py
