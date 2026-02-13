@@ -3,9 +3,8 @@ Requirements-
 Python 3.10+
 Ollama with a local LLM (e.g., phi3, mistral, neural-chat)
 8GB+ RAM recommended (16GB+ for larger models)
-Entelgia will automatically attempt to install missing Python dependencies at runtime for convenience.
-Core Dependencies
 
+ 
 requests>=2.31.0 # HTTP requests to Ollama
 
 colorama>=0.4.6 # Colored terminal output
@@ -63,6 +62,9 @@ If you see a response, Ollama is installed and working correctly.
 
 🚀 Quick Start
 git clone https://github.com/sivanhavkin/Entelgia.git
+
 cd Entelgia
-ollama serve
+
+ollama serve-if ollama don't start automatically 
+
 python Entelgia_production_meta.py
