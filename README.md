@@ -282,8 +282,8 @@ This statement expresses the ethical stance of the author but does not modify th
 
 -**Security properties – tests assert that signatures are unique across multiple inputs and keys and that the implementation supports Unicode messages (Hebrew, mixed‑language, Arabic, and emojis).**
 
-All tests currently pass, providing confidence that the cryptographic memory‑security mechanisms perform as expected.
----
+ All tests currently pass, providing confidence that the cryptographic memory‑security mechanisms perform as expected.
+ ---
 
 ## 👤 Author
 
