@@ -85,7 +85,59 @@ Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+## 🚀 Installation
 
+### Recommended Version
+
+**Use v2.1.1** - This is the current stable release.
+
+```bash
+# Install from GitHub (recommended)
+pip install git+https://github.com/sivanhavkin/Entelgia.git@v2.1.1
+
+# Or clone and install
+git clone https://github.com/sivanhavkin/Entelgia.git
+cd Entelgia
+pip install -e .
+```
+
+### 📦 Release Information
+
+| Version | Status | Notes |
+|---------|--------|-------|
+| **v2.1.1** | ✅ **Stable** | Current recommended version |
+| v2.1.0 | ⚠️ Superseded | Use v2.1.1 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.1.1 instead |
+| v1.5 | 📦 Legacy | Production v2.0+ recommended |
+
+💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
+
+### 🔄 Upgrading
+
+If you're using an older version:
+
+```bash
+# Upgrade to latest
+pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@v2.1.1
+```
+
+---
+
+## 📋 Release Policy
+
+We follow [Semantic Versioning](https://semver.org/):
+
+- **Major** (v3.0.0): Breaking changes
+- **Minor** (v2.2.0): New features, backward compatible  
+- **Patch** (v2.1.2): Bug fixes only
+
+### Release Schedule
+
+- 🗓️ **Minor releases**: Every 2 weeks (feature batches)
+- 🐛 **Patch releases**: As needed for critical bugs
+- 🚨 **Hotfixes**: Within 24h for security issues
+
+📖 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 ---
 
 ## 🔧 Installing Ollama
