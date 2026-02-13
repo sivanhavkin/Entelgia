@@ -50,16 +50,7 @@ Issues = "https://github.com/sivanhavkin/Entelgia/issues"
 
 [project.scripts]
 entelgia = "Entelgia_production_meta:main"
-[project.scripts]
-entelgia = "entelgia.main:main"
 
-# ← הוסף את זה כאן! 🎯
-[tool.setuptools]
-py-modules = ["Entelgia_production_meta", "memory_security"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-# ← הוסף את זה! 🎯
 [tool.setuptools]
 py-modules = ["Entelgia_production_meta", "memory_security"]
 
