@@ -1,11 +1,9 @@
 # 🧠 Entelgia
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![License](https://img.shields.io/badge/License-Entelgia%20Ethical%20MIT-green)
 ![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)
 [![CI](https://github.com/sivanhavkin/Entelgia/workflows/🧪%20Entelgia%20CI/CD%20Pipeline/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
 [![Tests](https://img.shields.io/badge/tests-4%20passed-brightgreen)](...)
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
