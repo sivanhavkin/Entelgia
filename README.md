@@ -49,7 +49,7 @@ This version represents a full architectural overhaul focused on robustness, per
 
 ## 🏗 Architecture Overview
 
-* ~**1,860 lines** of production-ready code
+* ~**2100 lines** of production-ready code
 * **25+ classes** with full type hints
 * **50+ documented functions**
 * Modular core system:
