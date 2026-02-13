@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)
-[![Tests](https://img.shields.io/badge/tests-6%20passed-brightgreen)](...)
+[![Tests](https://img.shields.io/badge/tests-19%20passed-brightgreen)](...)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
