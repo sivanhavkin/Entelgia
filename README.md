@@ -137,7 +137,8 @@ We follow [Semantic Versioning](https://semver.org/):
 - 🐛 **Patch releases**: As needed for critical bugs
 - 🚨 **Hotfixes**: Within 24h for security issues
 
-📖 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
++ 📖 See [Changelog.md](Changelog.md) for detailed version history.
+
 ---
 
 ## 🔧 Installing Ollama
