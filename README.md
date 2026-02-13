@@ -245,9 +245,9 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 
 For the full dependency list, see `requirements.txt`.
 
-- Python **3.10+**
-- **Ollama** with a local LLM (e.g., `phi3`, `mistral`)
-- **8GB+ RAM** recommended (16GB+ for larger models)
+* Python **3.10+**
+* **Ollama** with a local LLM (e.g., `phi3`, `mistral`)
+* **8GB+ RAM** recommended (16GB+ for larger models)
 
 Install Python dependencies:
 
@@ -255,50 +255,13 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-## 🔐 Memory Security
-
-Entelgia implements **cryptographic signatures** for all memory entries to prevent tampering and poisoning attacks.
-
-### Quick Start
-
-1. **Generate a secure key:**
-   ```bash
-   python -c "import secrets; print(secrets.token_hex(32))"
-   ```
-
-2. **Set environment variable:**
-   ```bash
-   export MEMORY_SECRET_KEY="your-generated-key-here"
-   ```
-
-3. **Run Entelgia:**
-   ```bash
-   python Entelgia_production_meta.py
-   ```
-
-### Security Features
-
-* 🔐 **HMAC-SHA256 signatures** for all memory entries
-* 🛡️ **Tampering detection** - invalid memories are automatically filtered out
-* ⚡ **Constant-time comparison** - prevents timing attacks
-* 🔑 **Environment-based keys** - secure key management
-* ↔️ **Backward compatible** - legacy memories still work
-
-See [docs/memory_security.md](docs/memory_security.md) for complete documentation including:
-- Setup instructions
-- Security guarantees
-- Best practices
-- Troubleshooting
-
 ---
 
 ## 🔧 Installing Ollama (Required)
 
-Entelgia runs **entirely on a local LLM** for privacy, control, and reproducibility. You must install **Ollama** before running the system.
+Entelgia runs entirely on a local LLM for privacy and reproducibility.
 
 ### Step 1: Download Ollama
-
-Download Ollama for your operating system:
 
 👉 [https://ollama.com](https://ollama.com)
 
@@ -308,36 +271,32 @@ Supported platforms:
 * Linux
 * Windows (WSL recommended)
 
-### Step 2: Install a Model
-
-After installing Ollama, pull at least one supported model:
+### Step 2: Pull a Model
 
 ```bash
 ollama pull phi3
 ```
-> If you see `OLLAMA_HTTP_ERROR` or `EOF`, make sure Ollama is running and the model was pulled successfully.
+
+If you see `OLLAMA_HTTP_ERROR` or `EOF`, make sure Ollama is running.
 
 Recommended models:
 
-* **phi3 (3.8B)** – Fast, low memory, ideal for testing
-* **mistral (7B)** – Balanced reasoning and performance
-* **neural-chat (7B)** – Strong conversational coherence
-* **openchat (7B)** – Fast and stable dialogue
+* **phi3 (3.8B)** – Fast, low memory
+* **mistral (7B)** – Balanced reasoning
+* **neural-chat (7B)** – Conversational coherence
+* **openchat (7B)** – Fast dialogue
 
-> 💡 On systems with **8GB RAM**, prefer `phi3`. Larger models may be slow or unstable.
+> 💡 On 8GB RAM systems, prefer `phi3`.
 
-### Step 3: Verify Ollama Is Running
-
-Run a quick test:
+### Step 3: Verify Installation
 
 ```bash
 ollama run phi3 "hello"
 ```
 
-If you see a response, Ollama is installed and working correctly.
+If you see a response, Ollama is working correctly.
 
 ---
-
 
 ## 🚀 Quick Start
 
@@ -346,15 +305,29 @@ git clone https://github.com/sivanhavkin/Entelgia.git
 cd Entelgia
 
 pip install -r requirements.txt
-
 ollama pull phi3
 
-# If Ollama isn't already running:
+# If Ollama is not running:
 # ollama serve
 
 python Entelgia_production_meta.py
 ```
 
+---
+
+## 🔐 Memory Security
+
+Entelgia implements cryptographic integrity protection for memory entries using **HMAC-SHA256**.
+
+To enable memory signing:
+
+```bash
+export MEMORY_SECRET_KEY="your-generated-key"
+```
+
+Full documentation:
+
+See `docs/memory_security.md` for complete setup instructions, security guarantees, and best practices.
 
 ---
 
