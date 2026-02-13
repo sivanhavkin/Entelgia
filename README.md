@@ -3,7 +3,13 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![License](https://img.shields.io/badge/License-Entelgia%20Ethical%20MIT-green)
 ![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)
+[![CI](https://github.com/sivanhavkin/Entelgia/workflows/🧪%20Entelgia%20CI/CD%20Pipeline/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-18%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+<!-- שאר ה-README שלך -->
 ## A Consciousness-Inspired Multi-Agent AI Architecture
 
 **Entelgia** is a multi-agent AI architecture that models persistent identity, internal conflict, and emergent moral regulation through shared long-term memory and structured dialogue.
