@@ -49,14 +49,18 @@ Repository = "https://github.com/sivanhavkin/Entelgia"
 Issues = "https://github.com/sivanhavkin/Entelgia/issues"
 
 [project.scripts]
-entelgia = "entelgia.main:main"
+entelgia = "Entelgia_production_meta:main"
+
+# ← הוסף את זה! 🎯
+[tool.setuptools]
+py-modules = ["Entelgia_production_meta", "memory_security"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=entelgia --cov-report=html --cov-report=term"
+addopts = "-v --cov=. --cov-report=html --cov-report=term"
 
 [tool.black]
 line-length = 88
