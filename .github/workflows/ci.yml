@@ -21,7 +21,7 @@ jobs:
     steps:
     # ── Step 1: Checkout code ──
     - name: 📥 Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     
     # ── Step 2: Set up Python ──
     - name: 🐍 Set up Python ${{ matrix.python-version }}
@@ -68,7 +68,7 @@ jobs:
     
     steps:
     - name: 📥 Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     
     - name: 🐍 Set up Python
       uses: actions/setup-python@v5
@@ -108,7 +108,7 @@ jobs:
     
     steps:
     - name: 📥 Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     
     - name: 🐍 Set up Python
       uses: actions/setup-python@v5
@@ -148,7 +148,7 @@ jobs:
     
     steps:
     - name: 📥 Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     
     - name: 🐍 Set up Python
       uses: actions/setup-python@v5
@@ -184,7 +184,7 @@ jobs:
     
     steps:
     - name: 📥 Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     
     - name: 🔍 Check for broken links in docs
       uses: gaurav-nelson/github-action-markdown-link-check@v1
