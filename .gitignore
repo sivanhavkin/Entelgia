@@ -31,6 +31,17 @@ data/
 outputs/
 runs/
 /Live Dialog.txt
+# IDE
+.vscode/
+.idea/
+
+# Testing  
+.pytest_cache/
+htmlcov/
+
+# Type checking
+.mypy_cache/
+
 
 # Local configs (if any)
 config.local.json
