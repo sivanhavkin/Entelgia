@@ -1,12 +1,13 @@
 # 🧠 Entelgia
+![Python](https://img.shields.io/badge/Python-3.10+-blue)
+![License](https://img.shields.io/badge/License-Entelgia%20Ethical%20MIT-green)
+![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)
 
 ## A Consciousness-Inspired Multi-Agent AI Architecture
 
-**Entelgia** is a psychologically-inspired, multi-agent AI architecture designed to explore **persistent identity**, **emotional regulation**, **internal conflict**, and **moral self-regulation** through dialogue.
+Entelgia is a multi-agent AI architecture that simulates persistent identity, internal conflict, and moral reasoning through shared memory and structured dialogue.
 
-This repository presents Entelgia **not as a chatbot**, but as a **consciousness-inspired system** — one that **remembers**, **reflects**, **struggles**, and **evolves over time**.
-
-Two primary agents engage in continuous, persistent dialogue driven by a **shared memory database**, allowing **emergent internal tension and moral reasoning** to arise naturally — rather than executing pre-defined rules.
+Unlike stateless chatbots, Entelgia maintains long-term memory, emotional state, and internal tension across sessions — enabling emergent regulation and reflective behavior.
 
 ---
 
