@@ -292,8 +292,7 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 
 ```bash
 pip install -r requirements.txt
-
----
+```
 
 ## 🔧 Installing Ollama (Required)
 
