@@ -17,6 +17,8 @@ These are changes that have been committed to the repository but have not yet be
 ### 📝 Notes
 > No unreleased changes at this time.
 
+### ⚠️ Known Limitations
+- Requires **8 GB or more of RAM** and a powerful CPU; may experience Ollama HTTP timeouts on low‑resource machines.
 ---
 
 ## [2.0.1] – 2026‑02‑13 – **Production Final** 🎉
@@ -164,3 +166,4 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 - 📝 Notes
 - 🔧 Hotfix
 - ⚗️ Experimental
+
