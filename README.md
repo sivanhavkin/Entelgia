@@ -41,9 +41,9 @@ Unlike stateless chatbots, Entelgia maintains long-term memory, emotional state,
 This version represents a full architectural overhaul focused on robustness, performance, and long-term extensibility.
 ## ⚡ Performance
 
-* **~50% reduction** in LLM calls via caching
-* **~70% reduction** in token usage via compression
-* **2–3× faster** response times
+* **~Up to 50% reduction** in LLM calls via caching
+* **~Up to 70% reduction** in token usage via compression
+* **Up to 2–3× faster** response times
 
 ---
 
