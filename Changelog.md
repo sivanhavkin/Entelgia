@@ -230,4 +230,70 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
 ---
 
+---
+
+## 📊 Version History Summary
+
+| Version | Release Date | Type | Status | Description |
+|---------|--------------|------|--------|-------------|
+| **v2.1.1** | 2026-02-13 | Patch | ✅ **Current** | Bug fixes + formatting |
+| v2.1.0 | 2026-02-13 | Minor | ⚠️ Superseded | Testing infrastructure |
+| v2.0.01 | 2026-02-13 | Major | ⚠️ Superseded | Production rewrite |
+| v1.5 | 2026-01-31 | Minor | 📦 Legacy | Multi-agent v1.5 |
+| v1.5-HOTFIX | 2026-01-31 | Patch | 📦 Legacy | Model update |
+| v1.0.0 | 2026-01-23 | Major | 📦 Legacy | Initial public release |
+| v0.4.0-exp | 2026-02-06 | Experimental | 🧪 Archive | Research only |
+
+### Status Legend
+- ✅ **Current** - Latest stable release, recommended
+- ⚠️ **Superseded** - Working but upgrade recommended
+- 📦 **Legacy** - Old architecture, no longer maintained
+- 🧪 **Archive** - Experimental, not for production
+
+---
+
+## 🔄 Versioning Guidelines
+
+This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
+```
+MAJOR.MINOR.PATCH (e.g., 2.1.1)
+
+MAJOR version: Incompatible API changes (v2 → v3)
+MINOR version: New features, backward compatible (v2.1 → v2.2)
+PATCH version: Bug fixes only (v2.1.1 → v2.1.2)
+```
+
+### Release Frequency (from v2.1.1 onwards)
+
+Starting with v2.1.1, we follow a structured release schedule:
+
+- **Minor releases (v2.x.0):** Every 2 weeks or when significant features accumulate
+- **Patch releases (v2.x.y):** As needed for critical bugs (no fixed schedule)
+- **Major releases (v3.0.0):** Only when breaking changes are necessary
+- **Hotfixes:** Within 24 hours for security vulnerabilities
+
+**Note:** Not every commit triggers a release. Changes accumulate in the `main` branch and are bundled into meaningful releases.
+
+---
+
+## 📝 Changelog Maintenance
+
+- All notable changes are documented here
+- Format based on [Keep a Changelog](https://keepachangelog.com/)
+- Dates in ISO 8601 format (YYYY-MM-DD)
+- Versions are linked to their GitHub releases
+
+**Categories used:**
+- ➕ **Added** - New features
+- 🔄 **Changed** - Changes in existing functionality
+- 🗑️ **Deprecated** - Soon-to-be removed features
+- ❌ **Removed** - Removed features
+- 🐛 **Fixed** - Bug fixes
+- 🔒 **Security** - Vulnerability fixes
+
+---
+
+**Last Updated:** 2026-02-13  
+**Maintained by:** [Sivan Havkin](https://github.com/sivanhavkin)
 
