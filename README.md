@@ -194,9 +194,26 @@ It does **not** claim biological consciousness or sentience.
 
 ## 📄 License
 
-Released under the **Entelgia License (Ethical MIT Variant with Attribution Clause)**.
+Entelgia is released under the **MIT License**.
 
-The original creator does not endorse or take responsibility for uses that contradict the ethical intent of the system or cause harm to living beings.
+This ensures the project remains open, permissive, and compatible with the broader open‑source ecosystem, encouraging research, experimentation, and collaboration.
+
+For the complete legal terms, see the `LICENSE` file included in this repository.
+
+---
+
+### Ethical Position
+
+While the MIT License permits broad use, Entelgia was created as a **research‑oriented, human‑centered system** exploring reflective dialogue, moral self‑regulation, and internal cognitive structure.
+
+The original creator, **Sivan Havkin**, does not endorse and is not responsible for applications that:
+
+* Intentionally cause harm to human beings or other living creatures
+* Enable coercion, manipulation, or exploitation
+* Promote violence, hatred, or dehumanization
+* Contradict the philosophical intent of the project
+
+This statement expresses the ethical stance of the author but does not modify the legal permissions granted by the MIT License.
 
 ---
 
