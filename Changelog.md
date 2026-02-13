@@ -17,6 +17,46 @@ These are changes that have been committed to the repository but have not yet be
 ### 📝 Notes
 > No unreleased changes at this time.
 ---
+## [2.1.0] – 2026-02-13 – Testing & Community Infrastructure
+
+This release adds a comprehensive testing infrastructure, build system configuration,
+and community contribution tools without changing core functionality.
+
+### Added
+
+- **Testing Suite** 🧪
+  - Complete pytest configuration in pyproject.toml
+  - tests/__init__.py package initialization
+  - conftest.py with reusable fixtures
+  - test_memory_security.py with 18+ unit tests
+  - Test coverage for HMAC-SHA256 signature validation
+
+- **Build System** ⚙️
+  - pyproject.toml with full project metadata
+  - Dependency management (runtime and dev dependencies)
+  - pytest, black, flake8, mypy configurations
+  - Project URLs and classifiers
+
+- **GitHub Templates** 🤝
+  - Bug report template (.github/ISSUE_TEMPLATE/bug_report.md)
+  - Feature request template (.github/ISSUE_TEMPLATE/feature_request.md)
+  - Pull request template (.github/ISSUE_TEMPLATE/PULL_REQUEST_TEMPLATE.md)
+
+- **API Documentation** 📚
+  - Comprehensive API docs (docs/api/README.md)
+  - Quick start guide with examples
+  - Python and cURL usage examples
+  - Error handling documentation
+
+### Fixed
+
+- Fixed file naming conventions (README.md, requirements.txt lowercase)
+- Refactored memory security tests into organized classes
+
+### Notes
+
+This is a quality-of-life release focused on developer experience and project
+infrastructure. All core v2.0.1 functionality is preserved.
 
 ## [2.0.1] – 2026‑02‑13 – **Production Final** 🎉
 
@@ -167,6 +207,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 - 📝 Notes
 - 🔧 Hotfix
 - ⚗️ Experimental
+
 
 
 
