@@ -44,8 +44,8 @@ This version represents a full architectural overhaul focused on robustness, per
 * **Up to 50% fewer LLM calls** through LRU caching
 * **Up to 70% lower token usage** via compression
 * **Up to 2–3× faster** response times
-
 ---
+
 
 ## 🏗 Architecture Overview
 
