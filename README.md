@@ -274,13 +274,13 @@ This statement expresses the ethical stance of the author but does not modify th
 ---
 🧪 Test Suite
 
-Entelgia ships with a comprehensive pytest test suite to ensure the reliability and security of its memory‑protection subsystem. The current suite contains 19 tests divided into three categories:
+**Entelgia ships with a comprehensive pytest test suite to ensure the reliability and security of its memory‑protection subsystem. The current suite contains 19 tests divided into three categories:**
 
-Signature creation – tests verify that creating an HMAC‑SHA256 signature returns a 64‑character hex string, behaves deterministically for the same message and key, yields different signatures for different messages, and properly raises a ValueError when supplied with empty or None keys/messages.
+-**Signature creation** – tests verify that creating an HMAC‑SHA256 signature returns a 64‑character hex string, behaves deterministically for the same message and key, yields different signatures for different messages, and properly raises a ValueError when supplied with empty or None keys/messages.
 
-Signature validation – checks that valid signatures are accepted, while wrong keys, tampered messages/signatures, or None/empty values correctly cause validation to fail.
+-**Signature validation**  – checks that valid signatures are accepted, while wrong keys, tampered messages/signatures, or None/empty values correctly cause validation to fail.
 
-Security properties – tests assert that signatures are unique across multiple inputs and keys and that the implementation supports Unicode messages (Hebrew, mixed‑language, Arabic, and emojis).
+-**Security properties – tests assert that signatures are unique across multiple inputs and keys and that the implementation supports Unicode messages (Hebrew, mixed‑language, Arabic, and emojis).**
 
 All tests currently pass, providing confidence that the cryptographic memory‑security mechanisms perform as expected.
 ---
