@@ -69,6 +69,9 @@ Version 2.0.0 represents a **breaking change** and a complete rewrite of the pro
 - Approximately **1,860 lines of production code** with **25+ classes** and **50+ documented functions**, all with full type hints.
 - **Modular core system** composed of Memory, Emotion, Language, Conscious, Behavior, and Observer modules, promoting separation of concerns and extensibility.
 
+### ⚠️ Known Limitations
+- Requires **8 GB or more of RAM** and a powerful CPU; may experience Ollama HTTP timeouts on low‑resource machines.
+
 ### 📝 Notes
 > This release lays the foundation for all future 2.x versions and is the **first production‑ready version** of Entelgia. All subsequent changes are expected to be backward compatible within the 2.x series.
 
@@ -164,5 +167,6 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 - 📝 Notes
 - 🔧 Hotfix
 - ⚗️ Experimental
+
 
 
