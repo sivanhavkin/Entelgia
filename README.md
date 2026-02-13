@@ -282,40 +282,16 @@ Entelgia explores ethical behavior through **dialogue-based internal tension**, 
 ---
 
 ## 📋 Requirements
+   for full list see requirements.txt
 
 **Requirements-**
 * Python **3.10+**
 * **Ollama** with a local LLM (e.g., `phi3`, `mistral`, `neural-chat`)
 * **8GB+ RAM** recommended (16GB+ for larger models)
-* **Entelgia** will automatically attempt to install missing Python dependencies at runtime for convenience.
-* 
+* - Install Python dependencies:
 
-**Core Dependencies**
-
-requests>=2.31.0          # HTTP requests to Ollama
-
-colorama>=0.4.6           # Colored terminal output
-
-python-dotenv>=1.0.0      # Environment variables from .env
-
-
-**API Server**
-
-fastapi>=0.104.0          # REST API framework
-
-uvicorn>=0.24.0           # ASGI server
-
-pydantic>=2.0.0           # Data validation
-
-**Testing**
-
-pytest>=7.4.0             # Testing framework
-
-pytest-mock>=3.12.0       # Mocking for tests
-
-**Optional**
-
-python-dateutil>=2.8.2    # Date utilities
+```bash
+pip install -r requirements.txt
 
 ---
 
@@ -342,6 +318,7 @@ After installing Ollama, pull at least one supported model:
 ```bash
 ollama pull phi3
 ```
+> If you see `OLLAMA_HTTP_ERROR` or `EOF`, make sure Ollama is running and the model was pulled successfully.
 
 Recommended models:
 
@@ -370,9 +347,17 @@ If you see a response, Ollama is installed and working correctly.
 ```bash
 git clone https://github.com/sivanhavkin/Entelgia.git
 cd Entelgia
-ollama serve
+
+pip install -r requirements.txt
+
+ollama pull phi3
+
+# If Ollama isn't already running:
+# ollama serve
+
 python Entelgia_production_meta.py
-```
+
+
 
 ---
 
