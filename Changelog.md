@@ -28,20 +28,7 @@ These are changes that have been committed to the repository but have not yet be
   - LLM naturally controls response length based on prompt guidance
   - Ensures complete, coherent responses without mid-sentence cuts
 
-### 📝 Documentation
-
-- Added version notes to all modified files indicating unreleased features
-- Latest official release marked as v2.1.1 throughout codebase
-- Added comprehensive comments explaining pronoun feature
-- Hebrew/English documentation for pronoun support
-
----
-
-## [2.1.1] - Current Official Release
-
-### ➕ Added
-
-- **Enhanced Dialogue Module** 🎭
+  **Enhanced Dialogue Module** 🎭
   - `entelgia/` package with modular dialogue components
   - `dialogue_engine.py` - Dynamic speaker selection & seed generation
   - `enhanced_personas.py` - Rich character definitions (Socrates, Athena, Fixy)
@@ -74,6 +61,12 @@ These are changes that have been committed to the repository but have not yet be
     - `max_output_words` (default: 150) - Used in LLM prompt instruction
   - Responses displayed in full without truncation
   - LLM controls response length naturally based on prompt guidance
+### 📝 Documentation
+
+- Added version notes to all modified files indicating unreleased features
+- Latest official release marked as v2.1.1 throughout codebase
+- Added comprehensive comments explaining pronoun feature
+- Hebrew/English documentation for pronoun support
 
 ### 🐛 Fixed
 
@@ -111,12 +104,6 @@ These are changes that have been committed to the repository but have not yet be
   - Removed gender language tracking initialization
   - Cleaner dialogue output without gender pronouns
   - More inclusive and neutral conversation style
-
-### 📝 Notes
-
-> This update maintains backward compatibility. Legacy mode works if `entelgia/` is not present.
-
-> Target release: **v2.2.0** (Minor - new features, backward compatible)
 
 ---
 
@@ -363,3 +350,4 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
