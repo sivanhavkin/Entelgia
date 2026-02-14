@@ -212,13 +212,16 @@ logger.info(
 # ============================================
 
 
-def smart_truncate_response(text: str, max_words: int = 150) -> str:
+def smart_truncate_response(text: str, max_words: int = 150, agent_name: str = "") -> str:
     """
     Truncate response intelligently at sentence boundaries.
+    
+    Special handling for Athena: separates thoughts (20 words max) from response (130 words max).
 
     Args:
         text: The response text to truncate
         max_words: Maximum number of words (default: 150)
+        agent_name: Name of the agent (for special Athena handling)
 
     Returns:
         Truncated text ending at sentence boundary
@@ -226,6 +229,10 @@ def smart_truncate_response(text: str, max_words: int = 150) -> str:
     if not text:
         return ""
 
+    # Special handling for Athena: separate thoughts from main response
+    if agent_name == "Athena":
+        return _smart_truncate_athena_response(text)
+    
     words = text.split()
 
     # If under limit, return as-is
@@ -248,6 +255,95 @@ def smart_truncate_response(text: str, max_words: int = 150) -> str:
         if last_delimiter >= len(truncated_text) * 0.7:  # At least 70% through
             return truncated_text[: last_delimiter + 1].strip() + "..."
 
+    # Last resort: cut at word boundary with ellipsis
+    return truncated_text + "..."
+
+
+def _smart_truncate_athena_response(text: str) -> str:
+    """
+    Smart truncate for Athena's response: separates thoughts from main response.
+    
+    Format: [Athena's thoughts: ...]\n\n[Main response]
+    - Thoughts: max 20 words
+    - Main response: max 130 words
+    - Total: max 150 words combined
+    
+    Args:
+        text: Athena's complete response
+        
+    Returns:
+        Formatted response with truncated thoughts and main response
+    """
+    if not text:
+        return ""
+    
+    # Check if response already has the thoughts format
+    thoughts_match = re.match(r"^\[(?:Athena's thoughts?|מחשבות של אתנה):\s*([^\]]+)\]\s*\n?\s*(.*)", text, re.DOTALL | re.IGNORECASE)
+    
+    if thoughts_match:
+        # Extract thoughts and main response
+        thoughts_text = thoughts_match.group(1).strip()
+        main_response = thoughts_match.group(2).strip()
+    else:
+        # No explicit thoughts section - treat first sentence as thoughts, rest as main
+        sentences = re.split(r'([.!?]\s+)', text)
+        if len(sentences) > 2:
+            thoughts_text = sentences[0] + (sentences[1] if len(sentences) > 1 else "")
+            main_response = "".join(sentences[2:]).strip()
+        else:
+            # Very short response - just use as main response with empty thoughts
+            thoughts_text = ""
+            main_response = text
+    
+    # Truncate thoughts to 20 words at sentence boundary
+    thoughts_truncated = _truncate_at_boundary(thoughts_text, max_words=20)
+    
+    # Truncate main response to 130 words at sentence boundary
+    main_truncated = _truncate_at_boundary(main_response, max_words=130)
+    
+    # Format final output
+    if thoughts_truncated:
+        return f"[Athena's thoughts: {thoughts_truncated}]\n\n{main_truncated}"
+    else:
+        return main_truncated
+
+
+def _truncate_at_boundary(text: str, max_words: int) -> str:
+    """
+    Helper function to truncate text at sentence boundary.
+    
+    Args:
+        text: Text to truncate
+        max_words: Maximum number of words
+        
+    Returns:
+        Truncated text at sentence boundary
+    """
+    if not text:
+        return ""
+    
+    words = text.split()
+    
+    # If under limit, return as-is
+    if len(words) <= max_words:
+        return text
+    
+    # Truncate to max words
+    truncated_words = words[:max_words]
+    truncated_text = " ".join(truncated_words)
+    
+    # Find last sentence-ending punctuation
+    for delimiter in [". ", "! ", "? ", ".\n", "!\n", "?\n"]:
+        last_delimiter = truncated_text.rfind(delimiter)
+        if last_delimiter >= len(truncated_text) * 0.5:  # At least 50% through
+            return truncated_text[: last_delimiter + 1].strip()
+    
+    # Fallback: find last comma or semicolon
+    for delimiter in [", ", "; "]:
+        last_delimiter = truncated_text.rfind(delimiter)
+        if last_delimiter >= len(truncated_text) * 0.7:  # At least 70% through
+            return truncated_text[: last_delimiter + 1].strip() + "..."
+    
     # Last resort: cut at word boundary with ellipsis
     return truncated_text + "..."
 
@@ -1334,8 +1430,11 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
-        # Add 150-word limit instruction for LLM
-        prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
+        # Add word limit instruction for LLM (130 for Athena to leave room for thoughts, 150 for others)
+        if self.name == "Athena":
+            prompt += "\nIMPORTANT: Keep your response concise (under 130 words).\n"
+        else:
+            prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -1410,10 +1509,14 @@ class Agent:
             raw_response, max_length=CFG.output_max_length
         )
 
+        # Special handling for Athena: prepend thoughts
+        if self.name == "Athena":
+            validated_response = self._add_athena_thoughts(validated_response)
+
         # Apply smart truncation if enabled
         if CFG.smart_truncate:
             out = smart_truncate_response(
-                validated_response, max_words=CFG.max_output_words
+                validated_response, max_words=CFG.max_output_words, agent_name=self.name
             )
         else:
             out = validated_response
@@ -1432,6 +1535,45 @@ class Agent:
             out = re.sub(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]\s*", "", out).strip()
 
         return out
+    
+    def _add_athena_thoughts(self, response: str) -> str:
+        """
+        Add thoughts section to Athena's response.
+        
+        Generates a brief thought summary from recent STM entries and prepends
+        it to the response in the format: [Athena's thoughts: ...]\n\nresponse
+        
+        Args:
+            response: The main LLM response
+            
+        Returns:
+            Response with thoughts prepended
+        """
+        # Get recent STM entries for thoughts
+        stm = self.memory.stm_load(self.name)
+        if not stm:
+            return response
+        
+        # Get last few thoughts (2-3 most recent)
+        recent_thoughts = stm[-3:]
+        
+        # Extract thought texts
+        thought_texts = [t.get("text", "") for t in recent_thoughts if t.get("text")]
+        
+        if not thought_texts:
+            return response
+        
+        # Create a condensed thought summary (first ~15 words from recent thoughts)
+        combined = " ".join(thought_texts)
+        words = combined.split()[:15]
+        thoughts_summary = " ".join(words)
+        
+        # Add ellipsis if truncated
+        if len(combined.split()) > 15:
+            thoughts_summary += "..."
+        
+        # Format with thoughts prefix
+        return f"[Athena's thoughts: {thoughts_summary}]\n\n{response}"
 
     def store_turn(self, text: str, topic: str, source: str = "stm"):
         """Store dialogue turn in memory."""

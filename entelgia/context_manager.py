@@ -216,8 +216,11 @@ class ContextManager:
                 marker = "⭐ " if float(importance) > 0.7 else ""
                 prompt += f"{marker}- {content_display}\n"
 
-        # Add 150-word limit instruction for LLM
-        prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
+        # Add word limit instruction for LLM (130 for Athena to leave room for thoughts, 150 for others)
+        if agent_name == "Athena":
+            prompt += "\nIMPORTANT: Keep your response concise (under 130 words).\n"
+        else:
+            prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
         prompt += "\nRespond now:\n"
 
         return prompt
