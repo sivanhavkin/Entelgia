@@ -9,14 +9,88 @@ All notable changes to this project will be documented in this file. The format 
 These are changes that have been committed to the repository but have not yet been packaged as a new release. When a new version is tagged, the contents of this section should be moved under the appropriate version heading below.
 
 ### ➕ Added
-- Placeholder for upcoming features.
+
+- **Enhanced Dialogue Module** 🎭
+  - `entelgia/` package with modular dialogue components
+  - `dialogue_engine.py` - Dynamic speaker selection & seed generation
+  - `enhanced_personas.py` - Rich character definitions (Socrates, Athena, Fixy)
+  - `context_manager.py` - Smart context enrichment with sentence boundaries
+  - `fixy_interactive.py` - Need-based interventions (vs scheduled)
+  - `__init__.py` - Clean package API
+  
+- **Dialogue Features** 💬
+  - Dynamic speaker selection (prevents 3+ consecutive turns)
+  - 6 seed generation strategies:
+    - `introduce_analogy` - Metaphorical thinking
+    - `constructive_disagree` - Respectful challenge
+    - `explore_implication` - Consequence analysis
+    - `question_assumption` - Foundational inquiry
+    - `meta_reflect` - Self-awareness
+    - `agree_and_expand` - Collaborative building
+  - Rich context with 8 dialogue turns, 6 recent thoughts, 5 memories
+  - Smart truncation respecting sentence boundaries
+  - Fixy interventions based on need (circular reasoning, repetition, confusion)
+
+- **Testing & Demo** 🧪
+  - `test_enhanced_dialogue.py` - 5 comprehensive tests for dialogue system
+  - `demo_enhanced_dialogue.py` - 10-turn demonstration script
+  - All tests passing (5 dialogue + 19 security = 24 total)
+
+- **Response Quality Control** ⚡ (v2.2.0-unreleased)
+  - `smart_truncate_response()` function for intelligent text truncation
+  - New Config options:
+    - `max_output_words` (default: 150) - Maximum words per response
+    - `smart_truncate` (default: True) - Enable sentence-boundary truncation
+  - Responses now end at natural sentence boundaries (`.`, `!`, `?`)
+  - Fallback to comma/semicolon boundaries when needed
+
+### 🐛 Fixed
+
+- Fixed `CFG` global initialization in `MainScript.__init__`
+- Resolves `'NoneType' has no attribute 'data_dir'` error
+- Demo scripts now work without `run_cli()` wrapper
+- Added `global CFG` declaration to ensure proper initialization
+- **Response Coherence**: Eliminated incoherent fragments from mid-sentence cuts
+- **Long Responses**: Responses now properly truncated to ~150 words at sentence boundaries
 
 ### 🔄 Changed
-- Placeholder for in‑progress changes.
+
+- **Architecture** 🏗️
+  - Migrated from monolithic to modular dialogue system
+  - Legacy ping-pong alternation preserved as fallback
+  - Enhanced mode auto-detected when `entelgia` package available
+  
+- **Personas** 🎭
+  - Expanded from short strings to rich dataclass definitions
+  - Added traits, speech patterns, intervention triggers
+  - Socrates: Deconstructive, dialectic method
+  - Athena: Integrative, wisdom-seeking
+  - Fixy: Pattern-matching, meta-cognitive
+
+- **Performance** ⚡
+  - Reduced predictability in dialogue flow
+  - Smarter context management (fewer token waste)
+  - Fixy only speaks when needed (not every N turns)
+
+- **Timeouts & Performance** ⚡ (v2.2.0-unreleased)
+  - Reduced `llm_timeout` from 600 seconds (10 minutes) to 60 seconds (1 minute)
+  - Shorter maximum wait times for LLM responses
+  - Faster failure detection when LLM is unresponsive
+  - Better user experience with more predictable response times
+
+- **Gender-Neutral Output** 🌐 (v2.2.0-unreleased)
+  - Removed gender language tracking initialization
+  - Cleaner dialogue output without gender pronouns
+  - More inclusive and neutral conversation style
 
 ### 📝 Notes
-> No unreleased changes at this time.
+
+> This update maintains backward compatibility. Legacy mode works if `entelgia/` is not present.
+
+> Target release: **v2.2.0** (Minor - new features, backward compatible)
+
 ---
+
 ## [2.1.1] - 2026-02-13
 
 ### Fixed
@@ -29,10 +103,11 @@ These are changes that have been committed to the repository but have not yet be
 - Code quality checks now green
 - Build verification successful
 
-## [2.1.0] – 2026-02-13 – **Testing & Community Infrastructure -Superseded**
+---
 
-This release adds a comprehensive testing infrastructure, build system configuration,
-and community contribution tools without changing core functionality.
+## [2.1.0] – 2026-02-13 – **Testing & Community Infrastructure - Superseded**
+
+This release adds a comprehensive testing infrastructure, build system configuration, and community contribution tools without changing core functionality.
 
 ### Added
 
@@ -67,10 +142,11 @@ and community contribution tools without changing core functionality.
 
 ### Notes
 
-This is a quality-of-life release focused on developer experience and project
-infrastructure. All core v2.0.1 functionality is preserved.
+This is a quality-of-life release focused on developer experience and project infrastructure. All core v2.0.1 functionality is preserved.
 
-+ ## [2.0.1] – 2026‑02‑13 – **Production Final- Superseded**
+---
+
+## [2.0.1] – 2026‑02‑13 – **Production Final - Superseded**
 
 This version finalises the 2.x production rewrite with additional **memory security measures** and licence updates. It retains all features from the 2.0.0 release and adds cryptographic protection for stored memories.
 
@@ -87,11 +163,13 @@ This version finalises the 2.x production rewrite with additional **memory secur
 
 ### 📝 Notes
 > This version is considered the **final release** of the 2.x line at the time of publication.
+
 ### ⚠️ Known Limitations
 - Requires **8 GB or more of RAM** and a powerful CPU; may experience Ollama HTTP timeouts on low‑resource machines.
+
 ---
 
-## [2.0.0] – 2026‑02‑11 – **Production V2.0- Superseded**
+## [2.0.0] – 2026‑02‑11 – **Production V2.0 - Superseded**
 
 Version 2.0.0 represents a **breaking change** and a complete rewrite of the project with a modular, production‑ready architecture. It introduces a multitude of new capabilities, improved performance, and a robust foundation for future development.
 
@@ -220,15 +298,14 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 - 🔧 Hotfix
 - ⚗️ Experimental
 
-
 ---
 
 ## 📊 Quick Reference
 
 - ✅ **Latest stable:** v2.1.1
+- 🚧 **Next release:** v2.2.0 (Enhanced Dialogue - coming soon)
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
----
 
 ---
 
@@ -236,6 +313,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
+| **v2.2.0** | TBD | Minor | 🚧 **Coming Soon** | Enhanced dialogue system |
 | **v2.1.1** | 2026-02-13 | Patch | ✅ **Current** | Bug fixes + formatting |
 | v2.1.0 | 2026-02-13 | Minor | ⚠️ Superseded | Testing infrastructure |
 | v2.0.01 | 2026-02-13 | Major | ⚠️ Superseded | Production rewrite |
@@ -245,6 +323,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 | v0.4.0-exp | 2026-02-06 | Experimental | 🧪 Archive | Research only |
 
 ### Status Legend
+- 🚧 **Coming Soon** - In development
 - ✅ **Current** - Latest stable release, recommended
 - ⚠️ **Superseded** - Working but upgrade recommended
 - 📦 **Legacy** - Old architecture, no longer maintained
@@ -255,48 +334,3 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
-
-```
-MAJOR.MINOR.PATCH (e.g., 2.1.1)
-
-MAJOR version: Incompatible API changes (v2 → v3)
-MINOR version: New features, backward compatible (v2.1 → v2.2)
-PATCH version: Bug fixes only (v2.1.1 → v2.1.2)
-```
-
-### Release Frequency (from v2.1.1 onwards)
-
-Starting with v2.1.1, we follow a structured release schedule:
-
-- **Minor releases (v2.x.0):** Every 2 weeks or when significant features accumulate
-- **Patch releases (v2.x.y):** As needed for critical bugs (no fixed schedule)
-- **Major releases (v3.0.0):** Only when breaking changes are necessary
-- **Hotfixes:** Within 24 hours for security vulnerabilities
-
-**Note:** Not every commit triggers a release. Changes accumulate in the `main` branch and are bundled into meaningful releases.
-
----
-
-## 📝 Changelog Maintenance
-
-- All notable changes are documented here
-- Format based on [Keep a Changelog](https://keepachangelog.com/)
-- Dates in ISO 8601 format (YYYY-MM-DD)
-- Versions are linked to their GitHub releases
-
-**Categories used:**
-- ➕ **Added** - New features
-- 🔄 **Changed** - Changes in existing functionality
-- 🗑️ **Deprecated** - Soon-to-be removed features
-- ❌ **Removed** - Removed features
-- 🐛 **Fixed** - Bug fixes
-- 🔒 **Security** - Vulnerability fixes
-
----
-
-**Last Updated:** 2026-02-13  
-**Maintained by:** [Sivan Havkin](https://github.com/sivanhavkin)
-
-
-
-

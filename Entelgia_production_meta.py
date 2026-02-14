@@ -209,6 +209,46 @@ logger.info(
 # ============================================
 
 
+def smart_truncate_response(text: str, max_words: int = 150) -> str:
+    """
+    Truncate response intelligently at sentence boundaries.
+    
+    Args:
+        text: The response text to truncate
+        max_words: Maximum number of words (default: 150)
+    
+    Returns:
+        Truncated text ending at sentence boundary
+    """
+    if not text:
+        return ""
+    
+    words = text.split()
+    
+    # If under limit, return as-is
+    if len(words) <= max_words:
+        return text
+    
+    # Find last sentence boundary within limit
+    truncated_words = words[:max_words]
+    truncated_text = " ".join(truncated_words)
+    
+    # Find last sentence-ending punctuation
+    for delimiter in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
+        last_delimiter = truncated_text.rfind(delimiter)
+        if last_delimiter >= len(truncated_text) * 0.5:  # At least 50% through
+            return truncated_text[:last_delimiter + 1].strip()
+    
+    # Fallback: find last comma or semicolon
+    for delimiter in [', ', '; ']:
+        last_delimiter = truncated_text.rfind(delimiter)
+        if last_delimiter >= len(truncated_text) * 0.7:  # At least 70% through
+            return truncated_text[:last_delimiter + 1].strip() + "..."
+    
+    # Last resort: cut at word boundary with ellipsis
+    return truncated_text + "..."
+
+
 @dataclass
 class Config:
     """Global configuration object with validation."""
@@ -239,9 +279,11 @@ class Config:
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
-    llm_timeout: int = 600
+    llm_timeout: int = 60  # Reduced from 600 to 60 seconds for faster responses
     max_prompt_tokens: int = 800
-    output_max_length: int = 500
+    output_max_length: int = 500  # Legacy fallback
+    max_output_words: int = 150  # Maximum words in response for smart truncation
+    smart_truncate: bool = True  # Truncate at sentence boundaries
     log_level: int = logging.INFO
     timeout_minutes: int = 30
 
@@ -454,9 +496,9 @@ def validate_output(text: str, max_length: int = 500) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
-    # ============================================
-
-
+    
+      
+# ============================================
 # PRIVACY / REDACTION
 # ============================================
 
@@ -1338,12 +1380,21 @@ class Agent:
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
         """Generate dialogue response."""
         prompt = self._build_compact_prompt(seed, dialog_tail)
-        out = (
+        raw_response = (
             self.llm.generate(self.model, prompt, temperature=0.75, use_cache=False)
             or "[No response]"
         )
 
-        out = validate_output(out, max_length=CFG.output_max_length)
+        # Validate output first (important for security and quality)
+        validated_response = validate_output(raw_response, max_length=CFG.output_max_length)
+
+        # Apply smart truncation if enabled
+        if CFG.smart_truncate:
+            out = smart_truncate_response(
+                validated_response, max_words=CFG.max_output_words
+            )
+        else:
+            out = validated_response
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
@@ -2020,9 +2071,13 @@ class MainScript:
             persona="Strategic, integrative, creative. Builds frameworks and synthesis.",
         )
 
-        self.language.set("Socrates", "he")
-        self.language.set("Athena", "he")
-        self.language.set("Fixy", "en")
+        # Language tracking removed for gender-neutral output
+        # Previously set language codes for agents, but this cluttered
+        # dialogue output with "(he)" gender pronouns after names.
+        # Removed to ensure cleaner, more inclusive conversation style.
+        # self.language.set("Socrates", "he")
+        # self.language.set("Athena", "he")  # Note: was "he" for consistency, not "she"
+        # self.language.set("Fixy", "en")
 
         self.fixy_agent = Agent(
             name="Fixy",
