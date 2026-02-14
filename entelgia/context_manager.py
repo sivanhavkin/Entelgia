@@ -5,7 +5,7 @@
 Context Manager for Entelgia
 Manages intelligent context windowing and memory integration.
 
-Version Note: Pronoun support and 150-word limit features added for v2.2.0 
+Version Note: Pronoun support and 150-word limit features added for v2.2.0
 Latest official release: v2.2.0
 """
 
