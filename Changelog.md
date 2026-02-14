@@ -59,7 +59,7 @@ These are changes that have been committed to the repository but have not yet be
     - `meta_reflect` - Self-awareness
     - `agree_and_expand` - Collaborative building
   - Rich context with 8 dialogue turns, 6 recent thoughts, 5 memories
-  - Smart truncation respecting sentence boundaries
+  - Context enrichment with intelligent text management
   - Fixy interventions based on need (circular reasoning, repetition, confusion)
 
 - **Testing & Demo** 🧪
