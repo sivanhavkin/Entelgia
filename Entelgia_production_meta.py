@@ -211,45 +211,8 @@ logger.info(
 # CONFIG (GLOBAL) WITH VALIDATION
 # ============================================
 
-
-def smart_truncate_response(text: str, max_words: int = 150) -> str:
-    """
-    Truncate response intelligently at sentence boundaries.
-
-    Args:
-        text: The response text to truncate
-        max_words: Maximum number of words (default: 150)
-
-    Returns:
-        Truncated text ending at sentence boundary
-    """
-    if not text:
-        return ""
-
-    words = text.split()
-
-    # If under limit, return as-is
-    if len(words) <= max_words:
-        return text
-
-    # Find last sentence boundary within limit
-    truncated_words = words[:max_words]
-    truncated_text = " ".join(truncated_words)
-
-    # Find last sentence-ending punctuation
-    for delimiter in [". ", "! ", "? ", ".\n", "!\n", "?\n"]:
-        last_delimiter = truncated_text.rfind(delimiter)
-        if last_delimiter >= len(truncated_text) * 0.5:  # At least 50% through
-            return truncated_text[: last_delimiter + 1].strip()
-
-    # Fallback: find last comma or semicolon
-    for delimiter in [", ", "; "]:
-        last_delimiter = truncated_text.rfind(delimiter)
-        if last_delimiter >= len(truncated_text) * 0.7:  # At least 70% through
-            return truncated_text[: last_delimiter + 1].strip() + "..."
-
-    # Last resort: cut at word boundary with ellipsis
-    return truncated_text + "..."
+# LLM Response Length Instruction - used in all agent prompts
+LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 
 
 @dataclass
@@ -284,9 +247,6 @@ class Config:
     llm_max_retries: int = 3
     llm_timeout: int = 60  # Reduced from 600 to 60 seconds for faster responses
     max_prompt_tokens: int = 800
-    output_max_length: int = 500  # Legacy fallback
-    max_output_words: int = 150  # Maximum words in response for smart truncation
-    smart_truncate: bool = True  # Truncate at sentence boundaries
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     log_level: int = logging.INFO
     timeout_minutes: int = 30
@@ -488,15 +448,22 @@ def append_csv_row(path: str, row: Dict[str, Any]):
         logger.error(f"CSV Error: {e}")
 
 
-def validate_output(text: str, max_length: int = 500) -> str:
-    """Validate and sanitize LLM output."""
+def validate_output(text: str) -> str:
+    """
+    Validate and sanitize LLM output.
+    
+    Performs sanitization only (no truncation):
+    - Removes control characters
+    - Normalizes excessive newlines
+    
+    Note: Response length is controlled by LLM prompt instructions, not by this function.
+    """
     if not text:
         return "[No output]"
 
-    if len(text) > max_length:
-        text = text[:max_length] + "..."
-
+    # Remove control characters
     text = re.sub(r"[\x00-\x08\x0b-\x0c\x0e-\x1f]", "", text)
+    # Normalize excessive newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
@@ -1094,9 +1061,10 @@ class ObserverCore:
             "If no issue: suggest ONE way to increase depth.\n"
             f"ISSUE: {report.detected_issue}\n"
             f"CONTEXT:\n{context[:250]}\n"
+            f"{LLM_RESPONSE_LIMIT}\n"
         )
         msg = self.llm.generate(self.model, prompt, temperature=0.3, use_cache=False)
-        return validate_output(msg, max_length=200)
+        return validate_output(msg)
 
     def remember(self, report: FixyReport):
         """Store observation in memory."""
@@ -1159,12 +1127,13 @@ class BehaviorCore:
 
         chunk = "\n".join([f"- {e.get('text', '')[:100]}" for e in stm_batch[-15:]])
         prompt = (
-            "Dream-cycle reflection (under 120 words):\n"
+            "Dream-cycle reflection:\n"
             "Synthesize patterns from memories.\n"
             f"RECENT:\n{chunk}\n"
+            f"{LLM_RESPONSE_LIMIT}\n"
         )
         result = llm.generate(model, prompt, temperature=0.6, use_cache=False)
-        return validate_output(result, max_length=300)
+        return validate_output(result)
 
 
 # ============================================
@@ -1335,7 +1304,7 @@ class Agent:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
         # Add 150-word limit instruction for LLM
-        prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
+        prompt += f"\n{LLM_RESPONSE_LIMIT}\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -1405,18 +1374,8 @@ class Agent:
             or "[No response]"
         )
 
-        # Validate output first (important for security and quality)
-        validated_response = validate_output(
-            raw_response, max_length=CFG.output_max_length
-        )
-
-        # Apply smart truncation if enabled
-        if CFG.smart_truncate:
-            out = smart_truncate_response(
-                validated_response, max_words=CFG.max_output_words
-            )
-        else:
-            out = validated_response
+        # Validate output (sanitization only, no truncation)
+        out = validate_output(raw_response)
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
@@ -1840,10 +1799,11 @@ def test_redaction():
 def test_validation():
     """Test output validation."""
     long_text = "a" * 1000
-    validated = validate_output(long_text, max_length=100)
+    validated = validate_output(long_text)
 
-    assert len(validated) <= 103
-    assert "..." in validated
+    # Should not truncate anymore, just sanitize
+    assert len(validated) == 1000
+    assert "..." not in validated
 
     text_with_control = "hello\x00world"
     validated = validate_output(text_with_control)
