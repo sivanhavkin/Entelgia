@@ -17,6 +17,9 @@ Advanced Multi-Agent Dialogue System with:
 - 10-MINUTE AUTO-TIMEOUT
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
+Version Note: Pronoun support and 150-word limit features added for v2.2.0 (Unreleased).
+Latest official release: v2.1.1
+
 Requirements:
 - Python 3.10+
 - Ollama running locally (http://localhost:11434)
@@ -284,6 +287,7 @@ class Config:
     output_max_length: int = 500  # Legacy fallback
     max_output_words: int = 150  # Maximum words in response for smart truncation
     smart_truncate: bool = True  # Truncate at sentence boundaries
+    show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     log_level: int = logging.INFO
     timeout_minutes: int = 30
 
@@ -1296,13 +1300,17 @@ class Agent:
             return self._build_enhanced_prompt(user_seed, dialog_tail)
 
         # Legacy prompt building
-        lang = self.language.get(self.name)
         recent_ltm = self.memory.ltm_recent(self.name, limit=4, layer="conscious")
         stm = self.memory.stm_load(self.name)[-6:]
 
+        # Format agent name with optional pronoun
+        if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
+            agent_header = f"{self.name} ({self.persona_dict['pronoun']}):\n"
+        else:
+            agent_header = f"{self.name}:\n"
+
         prompt = (
-            f"{self.name} ({lang}):\n"
-            f"PERSONA: {self.persona}\n\n"
+            agent_header + f"PERSONA: {self.persona}\n\n"
             f"SEED: {user_seed}\n\n"
             "RECENT DIALOG:\n"
         )
@@ -1326,6 +1334,8 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
+        # Add 150-word limit instruction for LLM
+        prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -1333,8 +1343,6 @@ class Agent:
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
         """Build ENHANCED prompt using ContextManager (8 turns, 6 thoughts, 5 memories)."""
-        lang = self.language.get(self.name)
-
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
@@ -1358,9 +1366,19 @@ class Agent:
 
         # Format persona based on drives if we have persona_dict
         if self.persona_dict:
-            persona_text = format_persona_for_prompt(self.persona_dict, self.drives)
+            persona_text = format_persona_for_prompt(
+                self.persona_dict, self.drives, show_pronoun=CFG.show_pronoun
+            )
         else:
             persona_text = self.persona
+
+        # Get agent language (parameter required but not used in gender-neutral prompts)
+        lang = self.language.get(self.name)
+
+        # Get pronoun if available
+        agent_pronoun = None
+        if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
+            agent_pronoun = self.persona_dict["pronoun"]
 
         # Use ContextManager to build enriched prompt
         prompt = self.context_mgr.build_enriched_context(
@@ -1373,6 +1391,8 @@ class Agent:
             stm=stm,
             ltm=ltm,
             debate_profile=self.debate_profile(),
+            show_pronoun=CFG.show_pronoun,
+            agent_pronoun=agent_pronoun,
         )
 
         return prompt
