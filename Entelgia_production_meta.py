@@ -275,6 +275,9 @@ def get_display_name(name: str, pronoun: str = None) -> str:
 class Config:
     """Global configuration object with validation."""
 
+    # LLM prompt constants
+    LLM_LENGTH_INSTRUCTION: str = "Please answer in no more than 150 words. End your response at the nearest sentence."
+
     ollama_url: str = "http://localhost:11434/api/generate"
     model_socrates: str = "phi3:latest"
     model_athena: str = "phi3:latest"
@@ -1256,6 +1259,7 @@ class Agent:
         
         .. deprecated:: 2.2.0
             Use the `display_name` property instead.
+            This method will be removed in v3.0.0.
         """
         return self.display_name
 
@@ -1364,7 +1368,7 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
-        prompt += "\nPlease answer in no more than 150 words. End your response at the nearest sentence.\n"
+        prompt += f"\n{Config.LLM_LENGTH_INSTRUCTION}\n"
         prompt += "\nRespond now:\n"
         return prompt
 

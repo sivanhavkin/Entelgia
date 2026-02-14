@@ -13,6 +13,9 @@ from typing import Dict, List, Any, Optional
 class ContextManager:
     """Manages intelligent context windowing and summarization."""
 
+    # LLM instruction constants
+    LLM_LENGTH_INSTRUCTION = "Please answer in no more than 150 words. End your response at the nearest sentence."
+
     def __init__(self):
         pass
 
@@ -198,7 +201,7 @@ class ContextManager:
                 prompt += f"{marker}- {content_display}\n"
 
         # Add length instruction for LLM
-        prompt += "\nPlease answer in no more than 150 words. End your response at the nearest sentence.\n"
+        prompt += f"\n{self.LLM_LENGTH_INSTRUCTION}\n"
 
         prompt += "\nRespond now:\n"
 

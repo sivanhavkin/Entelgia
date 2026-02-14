@@ -62,18 +62,24 @@ def demo_pronoun_support():
         ("Fixy", "he", "Observer who detects circular reasoning"),
     ]
     
+    # Pre-compute display names for both modes to avoid state toggling
     for name, pronoun, description in characters:
+        # Compute both display formats
+        Entelgia_production_meta.CFG = cfg_disabled
         display_disabled = get_display_name(name, pronoun)
         Entelgia_production_meta.CFG = cfg_enabled
         display_enabled = get_display_name(name, pronoun)
-        Entelgia_production_meta.CFG = cfg_disabled
         
+        # Display information
         print(f"  • {name}")
         print(f"    Pronoun: {pronoun}")
         print(f"    Role: {description}")
         print(f"    Display (disabled): {display_disabled}")
         print(f"    Display (enabled): {display_enabled}")
         print()
+    
+    # Reset to default
+    Entelgia_production_meta.CFG = cfg_disabled
     
     # Demo 4: Configuration examples
     print(Fore.CYAN + "=== Configuration Examples ===" + Style.RESET_ALL)
