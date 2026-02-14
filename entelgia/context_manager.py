@@ -4,6 +4,9 @@
 """
 Context Manager for Entelgia
 Manages intelligent context windowing, smart truncation, and memory integration.
+
+Version Note: Pronoun support and 150-word limit features added for v2.2.0 (Unreleased).
+Latest official release: v2.1.1
 """
 
 import re
@@ -27,6 +30,8 @@ class ContextManager:
         stm: List[Dict[str, Any]],
         ltm: List[Dict[str, Any]],
         debate_profile: Dict[str, Any],
+        show_pronoun: bool = False,
+        agent_pronoun: Optional[str] = None,
     ) -> str:
         """
         Build rich context with smart truncation and memory integration.
@@ -41,6 +46,8 @@ class ContextManager:
             stm: Short-term memory entries
             ltm: Long-term memory entries
             debate_profile: Debate style profile
+            show_pronoun: Whether to display pronoun after agent name
+            agent_pronoun: Pronoun to display (e.g., "he", "she") if show_pronoun is True
 
         Returns:
             Formatted prompt string
@@ -74,6 +81,8 @@ class ContextManager:
             dialog_lines=dialog_lines,
             recent_thoughts=recent_thoughts,
             important_memories=important_memories,
+            show_pronoun=show_pronoun,
+            agent_pronoun=agent_pronoun,
         )
 
         return prompt
@@ -138,6 +147,8 @@ class ContextManager:
         dialog_lines: List[str],
         recent_thoughts: List[Dict[str, Any]],
         important_memories: List[Dict[str, Any]],
+        show_pronoun: bool = False,
+        agent_pronoun: Optional[str] = None,
     ) -> str:
         """
         Format enriched prompt with all context.
@@ -151,11 +162,19 @@ class ContextManager:
             dialog_lines: Formatted dialogue lines
             recent_thoughts: Recent STM entries
             important_memories: Important LTM entries
+            show_pronoun: Whether to display pronoun after agent name
+            agent_pronoun: Pronoun to display (e.g., "he", "she")
 
         Returns:
             Formatted prompt
         """
-        prompt = f"{agent_name}:\n"
+        # Format agent name with optional pronoun
+        if show_pronoun and agent_pronoun:
+            agent_header = f"{agent_name} ({agent_pronoun}):\n"
+        else:
+            agent_header = f"{agent_name}:\n"
+        
+        prompt = agent_header
         prompt += f"PERSONA: {persona}\n\n"
 
         # Add drive info
@@ -197,6 +216,8 @@ class ContextManager:
                 marker = "⭐ " if float(importance) > 0.7 else ""
                 prompt += f"{marker}- {content_display}\n"
 
+        # Add 150-word limit instruction for LLM
+        prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
         prompt += "\nRespond now:\n"
 
         return prompt

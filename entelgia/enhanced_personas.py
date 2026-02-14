@@ -4,12 +4,22 @@
 """
 Enhanced Personas for Entelgia Dialogue System
 Rich, distinctive agent personalities with speech patterns, thinking styles, and drive-based modulation.
+
+Version Note: Pronoun support feature added for v2.2.0 (Unreleased).
+Latest official release: v2.1.1
 """
 
 from typing import Dict, List, Any
 
+# Global pronoun display control
+# When True, pronouns like (he), (she) are shown after agent names
+# When False, maintains gender-neutral display
+# Default: False for backwards compatibility
+is_global_show_pronouns: bool = False
+
 SOCRATES_PERSONA = {
     "name": "Socrates",
+    "pronoun": "he",  # Gender pronoun for display (controlled by show_pronoun flag)
     "core_traits": [
         "Relentlessly curious and questioning",
         "Challenges assumptions and definitions",
@@ -42,6 +52,7 @@ SOCRATES_PERSONA = {
 
 ATHENA_PERSONA = {
     "name": "Athena",
+    "pronoun": "she",  # Gender pronoun for display (controlled by show_pronoun flag)
     "core_traits": [
         "Strategic and systems-thinking oriented",
         "Seeks integration and synthesis of ideas",
@@ -74,6 +85,7 @@ ATHENA_PERSONA = {
 
 FIXY_PERSONA = {
     "name": "Fixy",
+    "pronoun": "he",  # Gender pronoun for display (controlled by show_pronoun flag)
     "core_traits": [
         "Meta-cognitive observer with pattern detection",
         "Direct and concrete communicator",
@@ -108,7 +120,7 @@ FIXY_PERSONA = {
 
 
 def format_persona_for_prompt(
-    persona_dict: Dict[str, Any], drives: Dict[str, float]
+    persona_dict: Dict[str, Any], drives: Dict[str, float], show_pronoun: bool = False
 ) -> str:
     """
     Format persona dictionary into a rich prompt string.
@@ -116,6 +128,7 @@ def format_persona_for_prompt(
     Args:
         persona_dict: Persona configuration dictionary
         drives: Current drive levels (id_strength, ego_strength, superego_strength)
+        show_pronoun: Whether to include pronoun in output (controlled by global flag)
 
     Returns:
         Formatted persona description for LLM prompt

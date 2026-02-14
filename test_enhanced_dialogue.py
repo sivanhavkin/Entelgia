@@ -162,8 +162,8 @@ def test_context_enrichment():
         for i in range(10)
     ]
 
-    # Build enriched context
-    prompt = mgr.build_enriched_context(
+    # Test 1: Default (no pronoun)
+    prompt_no_pronoun = mgr.build_enriched_context(
         agent_name="Socrates",
         agent_lang="he",
         persona="Test persona",
@@ -173,17 +173,35 @@ def test_context_enrichment():
         stm=stm,
         ltm=ltm,
         debate_profile=debate_profile,
+        show_pronoun=False,
+    )
+
+    # Test 2: With pronoun
+    prompt_with_pronoun = mgr.build_enriched_context(
+        agent_name="Socrates",
+        agent_lang="he",
+        persona="Test persona",
+        drives=drives,
+        user_seed="TOPIC: Test\nQUESTION assumptions",
+        dialog_tail=dialog_tail,
+        stm=stm,
+        ltm=ltm,
+        debate_profile=debate_profile,
+        show_pronoun=True,
+        agent_pronoun="he",
     )
 
     # Check for key elements
     checks = {
-        "Full speaker names": "Socrates:" in prompt,
-        "8 dialogue turns": prompt.count("This is turn") >= 8,
-        "6 recent thoughts": prompt.count("Thought") >= 6,
-        "5 memories": prompt.count("Memory") >= 5,
-        "Drive information": "id=" in prompt and "ego=" in prompt,
-        "Smart truncation": "..." in prompt,  # Should have truncation markers
-        "No gender pronouns": "(he)" not in prompt and "(she)" not in prompt,
+        "Full speaker names": "Socrates:" in prompt_no_pronoun or "Socrates (he):" in prompt_no_pronoun,
+        "8 dialogue turns": prompt_no_pronoun.count("This is turn") >= 8,
+        "6 recent thoughts": prompt_no_pronoun.count("Thought") >= 6,
+        "5 memories": prompt_no_pronoun.count("Memory") >= 5,
+        "Drive information": "id=" in prompt_no_pronoun and "ego=" in prompt_no_pronoun,
+        "Smart truncation": "..." in prompt_no_pronoun,  # Should have truncation markers
+        "No gender pronouns (default)": "(he)" not in prompt_no_pronoun and "(she)" not in prompt_no_pronoun,
+        "Gender pronoun shown when enabled": "Socrates (he):" in prompt_with_pronoun,
+        "150-word limit instruction": "150 words" in prompt_no_pronoun and "150 words" in prompt_with_pronoun,
     }
 
     print("Context checks:")
@@ -307,6 +325,32 @@ def test_persona_formatting():
     return all_passed
 
 
+def test_persona_pronouns():
+    """Test that persona data includes correct pronouns."""
+    print("\n=== Test 6: Persona Pronouns ===")
+
+    from entelgia import SOCRATES_PERSONA, ATHENA_PERSONA, FIXY_PERSONA
+
+    checks = {
+        "Socrates has 'he' pronoun": SOCRATES_PERSONA.get("pronoun") == "he",
+        "Athena has 'she' pronoun": ATHENA_PERSONA.get("pronoun") == "she",
+        "Fixy has 'he' pronoun": FIXY_PERSONA.get("pronoun") == "he",
+    }
+
+    print("Pronoun checks:")
+    for check, passed in checks.items():
+        status = "✓" if passed else "✗"
+        print(f"  {status} {check}")
+
+    all_passed = all(checks.values())
+    if all_passed:
+        print("✓ PASS: All pronoun checks passed")
+    else:
+        print("✗ FAIL: Some pronoun checks failed")
+
+    return all_passed
+
+
 def main():
     """Run all tests."""
     print("=" * 70)
@@ -319,6 +363,7 @@ def main():
         test_context_enrichment,
         test_fixy_interventions,
         test_persona_formatting,
+        test_persona_pronouns,
     ]
 
     results = []
