@@ -109,8 +109,8 @@ When `show_pronoun=False` (default):
 
 ## Version Information / מידע גרסה
 
-- **Feature Version:** v2.2.0 (Unreleased)
-- **Latest Official Release:** v2.1.1
+- **Feature Version:** v2.2.0 
+- **Latest Official Release:** v2.2.0
 - **Status:** In development / בפיתוח
 
 ---
