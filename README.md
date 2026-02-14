@@ -1,7 +1,7 @@
 # 🧠 Entelgia
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
-[![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-research-positioning)
+[![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
 [![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
@@ -494,3 +494,17 @@ Conceived and developed by **Sivan Havkin**.
 * **Status:** Research / Production Hybrid
 * **Version:** v2.1.1 (v2.2.0 coming soon with enhanced dialogue)
 * **Last Updated:** 14 February 2026
+
+### What is "Research Hybrid"?
+
+The "Research Hybrid" status signals that Entelgia is both a forward-looking research project and a robust, production-grade system.  
+It sits at the intersection between academic experimentation and real-world application, blending innovative multi-agent algorithms and theoretical ideas with practical engineering, reliability and developer-friendly workflows. 
+
+**This means:**
+- Some modules (e.g. the dialogue engine, memory security, or agent persona modeling) feature experimental, cutting-edge methods that may evolve rapidly.
+- At the same time, the system is designed to be stable, usable out-of-the-box, and robust enough for integration in real settings.
+- Breaking changes and new features are introduced in a controlled way to balance innovation with stability.
+- The project actively solicits both contributors interested in AI/agent research and users who need a dependable foundation for projects that require persistent, moral, and reflective AI agents.
+
+This "hybrid" approach allows Entelgia to bridge the gap between the rapid pace of AI research and the needs of production-grade software.
+  
