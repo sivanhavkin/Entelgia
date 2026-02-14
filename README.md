@@ -93,7 +93,7 @@ pip install -r requirements.txt
 
 ```bash
 # Install from GitHub (recommended)
-pip install git+https://github.com/sivanhavkin/Entelgia.git@v2.1.1
+pip install git+https://github.com/sivanhavkin/Entelgia.git@2.1.1
 
 # Or clone and install
 git clone https://github.com/sivanhavkin/Entelgia.git
@@ -118,7 +118,7 @@ If you're using an older version:
 
 ```bash
 # Upgrade to latest
-pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@v2.1.1
+pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@2.1.1
 ```
 
 ---
