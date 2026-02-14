@@ -1,10 +1,10 @@
 # 🧠 Entelgia
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
+[![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#project-status)
 [![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
 [![Flake8](https://img.shields.io/badge/lint-flake8-green)](https://flake8.pycqa.org/)  
 [![Last Commit](https://img.shields.io/github/last-commit/sivanhavkin/Entelgia)](https://github.com/sivanhavkin/Entelgia/commits/main)
