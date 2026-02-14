@@ -9,7 +9,7 @@
 [![Flake8](https://img.shields.io/badge/lint-flake8-green)](https://flake8.pycqa.org/)  
 [![Last Commit](https://img.shields.io/github/last-commit/sivanhavkin/Entelgia)](https://github.com/sivanhavkin/Entelgia/commits/main)
 [![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/sivanhavkin/Entelgia)
-[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/blob/main/README.md)
+[![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 
 
 ## A Consciousness-Inspired Multi-Agent AI Architecture
