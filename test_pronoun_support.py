@@ -56,8 +56,8 @@ def test_get_display_name_function():
 
 
 def test_agent_display_name():
-    """Test that Agent.get_display_name() works correctly."""
-    print("\n=== Test 2: Agent.get_display_name() Method ===")
+    """Test that Agent display name property and method work correctly."""
+    print("\n=== Test 2: Agent Display Name (Property & Method) ===")
     
     # Initialize minimal agent
     cfg = Config(show_pronouns=False)
@@ -86,17 +86,27 @@ def test_agent_display_name():
         pronoun="he"
     )
     
-    # Test with show_pronouns=False
+    # Test property with show_pronouns=False
+    result = agent_socrates.display_name
+    assert result == "Socrates", f"Expected 'Socrates', got '{result}'"
+    print("✓ Agent property with show_pronouns=False: Returns name only")
+    
+    # Test deprecated method with show_pronouns=False
     result = agent_socrates.get_display_name()
     assert result == "Socrates", f"Expected 'Socrates', got '{result}'"
-    print("✓ Agent with show_pronouns=False: Returns name only")
+    print("✓ Agent method (deprecated) with show_pronouns=False: Returns name only")
     
-    # Test with show_pronouns=True
+    # Test property with show_pronouns=True
     cfg_enabled = Config(show_pronouns=True)
     Entelgia_production_meta.CFG = cfg_enabled
+    result = agent_socrates.display_name
+    assert result == "Socrates (he)", f"Expected 'Socrates (he)', got '{result}'"
+    print("✓ Agent property with show_pronouns=True: Returns name with pronoun")
+    
+    # Test deprecated method with show_pronouns=True
     result = agent_socrates.get_display_name()
     assert result == "Socrates (he)", f"Expected 'Socrates (he)', got '{result}'"
-    print("✓ Agent with show_pronouns=True: Returns name with pronoun")
+    print("✓ Agent method (deprecated) with show_pronouns=True: Returns name with pronoun")
     
     # Create agent without pronoun
     agent_no_pronoun = Agent(
@@ -114,9 +124,9 @@ def test_agent_display_name():
         pronoun=None
     )
     
-    result = agent_no_pronoun.get_display_name()
+    result = agent_no_pronoun.display_name
     assert result == "Test", f"Expected 'Test', got '{result}'"
-    print("✓ Agent without pronoun: Returns name only")
+    print("✓ Agent property without pronoun: Returns name only")
     
     return True
 

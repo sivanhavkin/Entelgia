@@ -1245,9 +1245,19 @@ class Agent:
         self.drives = self.memory.get_agent_state(self.name)
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
-    def get_display_name(self) -> str:
+    @property
+    def display_name(self) -> str:
         """Get display name for this agent (with pronoun if enabled)."""
         return get_display_name(self.name, self.pronoun)
+
+    def get_display_name(self) -> str:
+        """
+        Get display name for this agent (with pronoun if enabled).
+        
+        .. deprecated:: 2.2.0
+            Use the `display_name` property instead.
+        """
+        return self.display_name
 
     def conflict_index(self) -> float:
         """Calculate internal conflict level."""
@@ -1329,7 +1339,7 @@ class Agent:
         stm = self.memory.stm_load(self.name)[-6:]
 
         prompt = (
-            f"{self.get_display_name()}:\n"
+            f"{self.display_name}:\n"
             f"PERSONA: {self.persona}\n\n"
             f"SEED: {user_seed}\n\n"
             "RECENT DIALOG:\n"
@@ -2140,7 +2150,7 @@ class MainScript:
 
     def print_agent(self, agent: Agent, text: str):
         """Print agent message with color."""
-        print(agent.color + f"{agent.get_display_name()}: " + Style.RESET_ALL + text + "\n")
+        print(agent.color + f"{agent.display_name}: " + Style.RESET_ALL + text + "\n")
 
     def log_turn(self, agent_name: str, text: str, topic: str):
         """Log dialogue turn to CSV."""
