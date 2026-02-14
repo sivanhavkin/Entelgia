@@ -29,12 +29,12 @@ These are changes that have been committed to the repository but have not yet be
   - Ensures complete, coherent responses without mid-sentence cuts
 
  - **Enhanced Dialogue Module** 🎭
-  - `entelgia/` package with modular dialogue components
-  - `dialogue_engine.py` - Dynamic speaker selection & seed generation
-  - `enhanced_personas.py` - Rich character definitions (Socrates, Athena, Fixy)
-  - `context_manager.py` - Smart context enrichment with sentence boundaries
-  - `fixy_interactive.py` - Need-based interventions (vs scheduled)
-  - `__init__.py` - Clean package API
+  -  entelgia/` package with modular dialogue components
+  -  dialogue_engine.py` - Dynamic speaker selection & seed generation
+  -  enhanced_personas.py` - Rich character definitions (Socrates, Athena, Fixy)
+  -  context_manager.py` - Smart context enrichment with sentence boundaries
+  -  fixy_interactive.py` - Need-based interventions (vs scheduled)
+  -  __init__.py` - Clean package API
   
 - **Dialogue Features** 💬
   - Dynamic speaker selection (prevents 3+ consecutive turns)
@@ -349,6 +349,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
