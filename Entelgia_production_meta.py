@@ -249,6 +249,28 @@ def smart_truncate_response(text: str, max_words: int = 150) -> str:
     return truncated_text + "..."
 
 
+def get_display_name(name: str, pronoun: str = None) -> str:
+    """
+    Get display name for a character, optionally with pronoun.
+    
+    Args:
+        name: Character name (e.g., "Socrates", "Athena", "Fixy")
+        pronoun: Optional pronoun (e.g., "he", "she", "they")
+    
+    Returns:
+        Display name with pronoun if show_pronouns is enabled and pronoun is provided
+        
+    Examples:
+        >>> get_display_name("Socrates", "he")  # when show_pronouns=True
+        "Socrates (he)"
+        >>> get_display_name("Socrates", "he")  # when show_pronouns=False
+        "Socrates"
+    """
+    if CFG and CFG.show_pronouns and pronoun:
+        return f"{name} ({pronoun})"
+    return name
+
+
 @dataclass
 class Config:
     """Global configuration object with validation."""
@@ -284,6 +306,7 @@ class Config:
     output_max_length: int = 500  # Legacy fallback
     max_output_words: int = 150  # Maximum words in response for smart truncation
     smart_truncate: bool = True  # Truncate at sentence boundaries
+    show_pronouns: bool = False  # Show character pronouns (he/she) in display names
     log_level: int = logging.INFO
     timeout_minutes: int = 30
 
@@ -1184,6 +1207,7 @@ class Agent:
         conscious: ConsciousCore,
         persona: str,
         use_enhanced: bool = True,
+        pronoun: str = None,
     ):
         self.name = name
         self.model = model
@@ -1195,6 +1219,7 @@ class Agent:
         self.language = language
         self.conscious = conscious
         self.use_enhanced = use_enhanced and ENTELGIA_ENHANCED
+        self.pronoun = pronoun  # Character pronoun (e.g., "he", "she", "they")
 
         # Set persona - either rich dict or simple string
         if self.use_enhanced:
@@ -1219,6 +1244,10 @@ class Agent:
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
+
+    def get_display_name(self) -> str:
+        """Get display name for this agent (with pronoun if enabled)."""
+        return get_display_name(self.name, self.pronoun)
 
     def conflict_index(self) -> float:
         """Calculate internal conflict level."""
@@ -1300,7 +1329,7 @@ class Agent:
         stm = self.memory.stm_load(self.name)[-6:]
 
         prompt = (
-            f"{self.name}:\n"
+            f"{self.get_display_name()}:\n"
             f"PERSONA: {self.persona}\n\n"
             f"SEED: {user_seed}\n\n"
             "RECENT DIALOG:\n"
@@ -1325,6 +1354,7 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
+        prompt += "\nPlease answer in no more than 150 words. End your response at the nearest sentence.\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -2059,6 +2089,7 @@ class MainScript:
             language=self.language,
             conscious=self.conscious,
             persona="Socratic, curious, probing. Seeks clarity and truth.",
+            pronoun="he",
         )
         self.athena = Agent(
             name="Athena",
@@ -2071,12 +2102,13 @@ class MainScript:
             language=self.language,
             conscious=self.conscious,
             persona="Strategic, integrative, creative. Builds frameworks and synthesis.",
+            pronoun="she",
         )
 
         # Language tracking removed for gender-neutral output
         # Previously set language codes for agents, but this cluttered
         # dialogue output with "(he)" gender pronouns after names.
-        # Removed to ensure cleaner, more inclusive conversation style.
+        # Now controlled via CFG.show_pronouns global setting.
         # self.language.set("Socrates", "he")
         # self.language.set("Athena", "he")  # Note: was "he" for consistency, not "she"
         # self.language.set("Fixy", "en")
@@ -2092,6 +2124,7 @@ class MainScript:
             language=self.language,
             conscious=self.conscious,
             persona="Observer/fixer. Brief, concrete, points out contradictions.",
+            pronoun="he",
         )
 
         # Initialize enhanced dialogue components if available
@@ -2107,7 +2140,7 @@ class MainScript:
 
     def print_agent(self, agent: Agent, text: str):
         """Print agent message with color."""
-        print(agent.color + f"{agent.name}: " + Style.RESET_ALL + text + "\n")
+        print(agent.color + f"{agent.get_display_name()}: " + Style.RESET_ALL + text + "\n")
 
     def log_turn(self, agent_name: str, text: str, topic: str):
         """Log dialogue turn to CSV."""

@@ -197,6 +197,9 @@ class ContextManager:
                 marker = "⭐ " if float(importance) > 0.7 else ""
                 prompt += f"{marker}- {content_display}\n"
 
+        # Add length instruction for LLM
+        prompt += "\nPlease answer in no more than 150 words. End your response at the nearest sentence.\n"
+
         prompt += "\nRespond now:\n"
 
         return prompt
