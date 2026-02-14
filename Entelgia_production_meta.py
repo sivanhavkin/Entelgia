@@ -451,11 +451,11 @@ def append_csv_row(path: str, row: Dict[str, Any]):
 def validate_output(text: str) -> str:
     """
     Validate and sanitize LLM output.
-    
+
     Performs sanitization only (no truncation):
     - Removes control characters
     - Normalizes excessive newlines
-    
+
     Note: Response length is controlled by LLM prompt instructions, not by this function.
     """
     if not text:
