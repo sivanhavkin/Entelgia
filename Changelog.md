@@ -73,7 +73,7 @@ These are changes that have been committed to the repository but have not yet be
   - Fixy only speaks when needed (not every N turns)
 
 - **Timeouts & Performance** ⚡ (v2.2.0-unreleased)
-  - Reduced `llm_timeout` from 600s (10 min) to 60s (1 min)
+  - Reduced `llm_timeout` from 600 seconds (10 minutes) to 60 seconds (1 minute)
   - Shorter maximum wait times for LLM responses
   - Faster failure detection when LLM is unresponsive
   - Better user experience with more predictable response times
