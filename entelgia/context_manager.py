@@ -9,9 +9,7 @@ Manages intelligent context windowing, smart truncation, and memory integration.
 import re
 from typing import Dict, List, Any, Optional
 
-# LLM Response Length Instruction
-# Added to all prompts to guide LLM to produce bounded responses
-LLM_LENGTH_INSTRUCTION = "Please answer in no more than 150 words. End your response at a natural sentence boundary."
+from .constants import LLM_LENGTH_INSTRUCTION
 
 
 class ContextManager:

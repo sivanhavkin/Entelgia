@@ -6,6 +6,7 @@ Entelgia Enhanced Dialogue Package
 Provides improved dialogue quality through dynamic speaker selection, rich personas, and intelligent context management.
 """
 
+from .constants import LLM_LENGTH_INSTRUCTION
 from .dialogue_engine import DialogueEngine, SeedGenerator
 from .enhanced_personas import (
     SOCRATES_PERSONA,
@@ -19,6 +20,7 @@ from .context_manager import ContextManager, EnhancedMemoryIntegration
 from .fixy_interactive import InteractiveFixy
 
 __all__ = [
+    "LLM_LENGTH_INSTRUCTION",
     "DialogueEngine",
     "SeedGenerator",
     "SOCRATES_PERSONA",
