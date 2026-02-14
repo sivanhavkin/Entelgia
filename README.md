@@ -2,13 +2,13 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)
-[![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen)](...)
+[![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)
-![Flake8](https://img.shields.io/badge/lint-flake8-green)
-![Last Commit](https://img.shields.io/github/last-commit/sivanhavkin/Entelgia)
-![Maintenance](https://img.shields.io/maintenance/yes/2026)
+[![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Flake8](https://img.shields.io/badge/lint-flake8-green)](https://flake8.pycqa.org/)  
+[![Last Commit](https://img.shields.io/github/last-commit/sivanhavkin/Entelgia)](https://github.com/sivanhavkin/Entelgia/commits/main)
+[![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/sivanhavkin/Entelgia)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/blob/main/README.md)
 
 
