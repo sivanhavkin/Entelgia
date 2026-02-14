@@ -1310,7 +1310,7 @@ class Agent:
             agent_header = f"{self.name}:\n"
 
         prompt = (
-            f"{agent_header}"
+            agent_header +
             f"PERSONA: {self.persona}\n\n"
             f"SEED: {user_seed}\n\n"
             "RECENT DIALOG:\n"

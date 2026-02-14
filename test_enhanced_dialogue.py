@@ -193,7 +193,7 @@ def test_context_enrichment():
 
     # Check for key elements
     checks = {
-        "Full speaker names": "Socrates:" in prompt_no_pronoun or "Socrates (he):" in prompt_no_pronoun,
+        "Full speaker names": "Socrates:" in prompt_no_pronoun,
         "8 dialogue turns": prompt_no_pronoun.count("This is turn") >= 8,
         "6 recent thoughts": prompt_no_pronoun.count("Thought") >= 6,
         "5 memories": prompt_no_pronoun.count("Memory") >= 5,

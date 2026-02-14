@@ -173,7 +173,7 @@ class ContextManager:
             agent_header = f"{agent_name} ({agent_pronoun}):\n"
         else:
             agent_header = f"{agent_name}:\n"
-        
+
         prompt = agent_header
         prompt += f"PERSONA: {persona}\n\n"
 
