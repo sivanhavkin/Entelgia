@@ -270,6 +270,14 @@ config.llm_timeout = 60             # Seconds to wait for LLM response (default:
 - Default to ~150 words for faster, more focused dialogue
 - Fallback to comma/semicolon boundaries if no sentence ending found
 
+**Special Athena Response Format** (v2.2.0+):
+- Athena's responses include two sections: thoughts and main response
+- Thoughts section: limited to 20 words (brief internal reflections)
+- Main response: limited to 130 words (actual dialogue)
+- Format: `[Athena's thoughts: ...]\n\n[Main response]`
+- Total combined: ~150 words maximum
+- Automatic truncation respects both sections independently
+
 **Reduced Timeout** improves responsiveness:
 - Maximum timeout reduced from 10 minutes to 60 seconds
 - Faster failure detection when LLM is unresponsive

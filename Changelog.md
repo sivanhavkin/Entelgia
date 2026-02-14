@@ -25,6 +25,15 @@ These are changes that have been committed to the repository but have not yet be
   - Works in conjunction with existing smart_truncate_response() fallback
   - Maintains sentence boundary preservation for natural cutoffs
 
+- **Athena Response Format** 💭
+  - Athena's responses now include separate "thoughts" section
+  - Thoughts section: automatically generated from recent STM entries (20 words max)
+  - Main response: dialogue content (130 words max)
+  - Format: `[Athena's thoughts: ...]\n\n[Main response]`
+  - Smart truncation respects both sections independently
+  - Total combined: ~150 words maximum
+  - Enhances Athena's strategic and reflective persona
+
 ### 📝 Documentation
 
 - Added version notes to all modified files indicating unreleased features

@@ -1552,6 +1552,7 @@ class Agent:
         # Get recent STM entries for thoughts
         stm = self.memory.stm_load(self.name)
         if not stm:
+            logger.debug(f"No STM entries available for {self.name}, returning response without thoughts")
             return response
         
         # Get last few thoughts (2-3 most recent)
@@ -1561,15 +1562,17 @@ class Agent:
         thought_texts = [t.get("text", "") for t in recent_thoughts if t.get("text")]
         
         if not thought_texts:
+            logger.debug(f"No thought texts found in STM for {self.name}, returning response without thoughts")
             return response
         
         # Create a condensed thought summary (first ~15 words from recent thoughts)
         combined = " ".join(thought_texts)
-        words = combined.split()[:15]
+        combined_words = combined.split()
+        words = combined_words[:15]
         thoughts_summary = " ".join(words)
         
         # Add ellipsis if truncated
-        if len(combined.split()) > 15:
+        if len(combined_words) > 15:
             thoughts_summary += "..."
         
         # Format with thoughts prefix

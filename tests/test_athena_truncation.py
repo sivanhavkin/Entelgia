@@ -208,7 +208,3 @@ class TestWordCountLimits:
         # Should be around 130 (allow slight variance)
         assert main_words <= 135
         assert main_words >= 100  # Should have substantial content
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
