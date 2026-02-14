@@ -123,7 +123,7 @@ pip install -r requirements.txt
 
 ### Recommended Version
 
-**Use v2.1.1** - This is the current stable release (v2.2.0 coming soon).
+**Use v2.2.0** - This is the current stable release.
 
 ```bash
 # Install from GitHub (recommended)
