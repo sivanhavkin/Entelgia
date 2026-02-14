@@ -139,8 +139,8 @@ pip install -e .
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.2.0** | 🚧 **Coming Soon** | Enhanced dialogue system |
-| **v2.1.1** | ✅ **Stable** | Current recommended version |
+| **v2.2.0** | ✅ **Stable** | Enhanced dialogue system |
+| **v2.1.1** |⚠️ Superseded | Use v2.2.0 instead |
 | v2.1.0 | ⚠️ Superseded | Use v2.1.1 instead |
 | v2.0.01 | ⚠️ Superseded | Use v2.1.1 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
