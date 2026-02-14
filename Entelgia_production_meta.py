@@ -1359,9 +1359,13 @@ class Agent:
         else:
             persona_text = self.persona
 
+        # Get agent language (parameter required but not used in gender-neutral prompts)
+        lang = self.language.get(self.name)
+
         # Use ContextManager to build enriched prompt
         prompt = self.context_mgr.build_enriched_context(
             agent_name=self.name,
+            agent_lang=lang,
             persona=persona_text,
             drives=self.drives,
             user_seed=user_seed,
