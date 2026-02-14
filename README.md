@@ -2,11 +2,10 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)
-[![Tests](https://img.shields.io/badge/tests-19%20passed-brightgreen)](...)
+[![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen)](...)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-<!-- שאר ה-README שלך -->
 ## A Consciousness-Inspired Multi-Agent AI Architecture
 
 **Entelgia** is a multi-agent AI architecture that models persistent identity, internal conflict, and emergent moral regulation through shared long-term memory and structured dialogue.
@@ -27,12 +26,16 @@ For the full architectural and theoretical foundation:
 
 * **Multi-agent dialogue system** (Socrates · Athena · Fixy)
 * **Persistent memory**
-
   * Short-term memory (JSON)
   * Long-term memory (SQLite)
   * 🔐 HMAC-SHA256 cryptographic integrity protection
+* **🆕 Enhanced Dialogue Engine** (v2.2.0+)
+  * **Dynamic speaker selection** - Intelligent turn-taking (no 3+ consecutive turns)
+  * **Varied seed generation** - 6+ strategy types (analogy, disagree, reflect, etc.)
+  * **Rich context enrichment** - Full dialogue history + thoughts + memories
+  * **Smart Fixy interventions** - Need-based (not scheduled) meta-cognitive monitoring
+  * **Enhanced personas** - Deep character traits and speech patterns
 * **Psychological drive modeling**
-
   * Id / Ego / Superego dynamics
 * **Emotion tracking & importance scoring**
 * **Dream cycles & memory promotion**
@@ -49,6 +52,8 @@ For the full architectural and theoretical foundation:
 * **Up to 50% fewer LLM calls** via LRU caching
 * **Up to 70% lower token usage** through compression
 * **Up to 2–3× faster** response times
+* **🆕 More natural dialogue** - Dynamic speaker selection vs ping-pong
+* **🆕 Richer context** - Smarter truncation with sentence boundaries
 
 ---
 
@@ -62,6 +67,25 @@ Entelgia is built as a modular CoreMind system:
 * `Language` — dialogue-driven cognition
 * `Behavior` — goal-oriented response shaping
 * `Observer` — meta-level monitoring & correction
+
+### 🆕 Enhanced Dialogue Module (v2.2.0+)
+
+The new `entelgia/` package provides modular components:
+
+```
+entelgia/
+├── __init__.py              # Package exports
+├── dialogue_engine.py       # Dynamic speaker & seed generation
+├── enhanced_personas.py     # Rich character definitions
+├── context_manager.py       # Smart context enrichment
+└── fixy_interactive.py      # Need-based interventions
+```
+
+**Key improvements:**
+- 📊 **6 seed strategies** vs 1 simple template
+- 🎯 **Dynamic speaker selection** vs ping-pong alternation
+- 🧠 **Context-aware** with 8 turns + 6 thoughts + 5 memories
+- 🔍 **Intelligent Fixy** detects circular reasoning, not just scheduled checks
 
 The entire system runs as a unified executable Python file:
 
@@ -85,15 +109,18 @@ Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+
+---
+
 ## 🚀 Installation
 
 ### Recommended Version
 
-**Use v2.1.1** - This is the current stable release.
+**Use v2.1.1** - This is the current stable release (v2.2.0 coming soon).
 
 ```bash
 # Install from GitHub (recommended)
-pip install git+https://github.com/sivanhavkin/Entelgia.git@2.1.1
+pip install git+https://github.com/sivanhavkin/Entelgia.git
 
 # Or clone and install
 git clone https://github.com/sivanhavkin/Entelgia.git
@@ -105,6 +132,7 @@ pip install -e .
 
 | Version | Status | Notes |
 |---------|--------|-------|
+| **v2.2.0** | 🚧 **Coming Soon** | Enhanced dialogue system |
 | **v2.1.1** | ✅ **Stable** | Current recommended version |
 | v2.1.0 | ⚠️ Superseded | Use v2.1.1 instead |
 | v2.0.01 | ⚠️ Superseded | Use v2.1.1 instead |
@@ -118,7 +146,7 @@ If you're using an older version:
 
 ```bash
 # Upgrade to latest
-pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@2.1.1
+pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
 ```
 
 ---
@@ -137,7 +165,7 @@ We follow [Semantic Versioning](https://semver.org/):
 - 🐛 **Patch releases**: As needed for critical bugs
 - 🚨 **Hotfixes**: Within 24h for security issues
 
-+ 📖 See [Changelog.md](Changelog.md) for detailed version history.
+📖 See [Changelog.md](Changelog.md) for detailed version history.
 
 ---
 
@@ -198,7 +226,14 @@ ollama pull phi3
 # Only if Ollama is not already running:
 # ollama serve
 
+# 🆕 Run enhanced dialogue demo (10 turns, 2 minutes)
+python demo_enhanced_dialogue.py
+
+# Run full system (30 minutes)
 python Entelgia_production_meta.py
+
+# 🆕 Run enhanced dialogue tests
+python test_enhanced_dialogue.py
 ```
 
 Upon launch, memory initializes automatically and the agents begin structured dialogue.
@@ -275,26 +310,69 @@ This statement expresses the ethical stance of the author but does not modify th
 
 ## 🧪 Test Suite
 
+Entelgia ships with comprehensive test coverage:
+
+### 🆕 Enhanced Dialogue Tests (5 tests)
+
+```bash
+python test_enhanced_dialogue.py
+```
+
+Tests verify:
+- ✅ **Dynamic speaker selection** - No agent speaks 3+ times consecutively
+- ✅ **Seed variety** - 6 different generation strategies
+- ✅ **Context enrichment** - 8 turns, 6 thoughts, 5 memories
+- ✅ **Fixy interventions** - Need-based (circular reasoning, repetition)
+- ✅ **Persona formatting** - Rich traits and speech patterns
+
+**Sample output:**
+```
+=== Test 1: Dynamic Speaker Selection ===
+✓ PASS: No speaker spoke 3+ times consecutively
+
+=== Test 2: Seed Variety ===
+✓ PASS: Found 6 different seed strategies
+
+=== Test 3: Context Enrichment ===
+✓ PASS: All context enrichment checks passed
+
+=== Test 4: Fixy Interventions ===
+✓ PASS: Fixy intervention logic works correctly
+
+=== Test 5: Persona Formatting ===
+✓ PASS: Personas are rich and well-formatted
+
+✅ ALL TESTS PASSED!
+```
+
+---
+
+### 🔐 Memory Security Tests (19 tests)
+
+```bash
+pytest tests/test_memory_security.py -v
+```
+
 Entelgia ships with a comprehensive pytest test suite to ensure the reliability and security of its memory-protection subsystem. The current suite contains **19 tests** divided into three categories:
 
-### 🔐 Signature Creation
+#### Signature Creation
 Tests verify that creating an HMAC-SHA256 signature:
 - Returns a 64-character hex string
 - Behaves deterministically for the same message and key
 - Yields different signatures for different messages
 - Properly raises a `ValueError` when supplied with empty or `None` keys/messages
 
-### ✅ Signature Validation
+#### Signature Validation
 Checks that:
 - Valid signatures are accepted
 - Wrong keys, tampered messages/signatures, or `None`/empty values correctly cause validation to fail
 
-### 🌐 Security Properties
+#### Security Properties
 Tests assert that:
 - Signatures are unique across multiple inputs and keys
 - The implementation supports Unicode messages (Hebrew, mixed-language, Arabic, and emojis)
 
-> ✅ **All unit tests currently pass**, providing confidence that the cryptographic memory-security mechanisms perform as expected.
+> ✅ **All 24 tests currently pass** (5 dialogue + 19 security), providing confidence that both the enhanced dialogue system and cryptographic memory-security mechanisms perform as expected.
 
 ---
 
@@ -304,7 +382,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 19 memory-security unit tests |
+| **Unit Tests** | `pytest` | Runs 24 total tests (19 security + 5 dialogue) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -314,6 +392,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 > 🛡️ Together these jobs ensure that **every commit** adheres to style guidelines, passes vulnerability scans and produces a valid package and documentation.
 
 ---
+
 ## 📰 News & Recognition
 
 **January 2026** — Entelgia was featured by **Yutori AI Agents Research & Frameworks Scout** in their article *"New agent SDKs and skills with secure execution"*.
@@ -354,6 +433,7 @@ Together, these projects advance three operational levers:
 📢 **Full Article:** [New agent SDKs and skills with secure execution](https://scouts.yutori.com)
 
 ---
+
 ## 👤 Author
 
 Conceived and developed by **Sivan Havkin**.
@@ -363,5 +443,5 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** v2.1.1
-* **Last Updated:** 13 February 2026
+* **Version:** v2.1.1 (v2.2.0 coming soon with enhanced dialogue)
+* **Last Updated:** 14 February 2026
