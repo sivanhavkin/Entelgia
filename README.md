@@ -50,6 +50,7 @@ For the full architectural and theoretical foundation:
 * **PII redaction & privacy safeguards**
 * **Resilient error handling (exponential backoff)**
 * **Structured logging**
+* **🆕 Response length guidance** - All LLM prompts include instruction to limit responses to 150 words at natural sentence boundaries
 
 ---
 
@@ -60,6 +61,7 @@ For the full architectural and theoretical foundation:
 * **Up to 2–3× faster** response times
 * **🆕 More natural dialogue** - Dynamic speaker selection vs ping-pong
 * **🆕 Richer context** - Smarter truncation with sentence boundaries
+* **🆕 Bounded responses** - LLM prompts include length guidance (150 words max) with fallback truncation
 
 ---
 
@@ -264,7 +266,14 @@ config.output_max_length = 500      # Legacy character limit (used when smart_tr
 config.llm_timeout = 60             # Seconds to wait for LLM response (default: 60, reduced from 600)
 ```
 
-**Smart Truncation** ensures responses:
+**Response Length Guidance** (Added in latest version):
+- All LLM prompts now include the instruction: "Please answer in no more than 150 words. End your response at a natural sentence boundary."
+- This guides the LLM to generate appropriately-sized responses at the source
+- The `smart_truncate_response()` function remains as a fallback safety mechanism
+- Applied to all prompt types: agent dialogue, Fixy interventions, and emotion inference
+- Ensures backward compatibility while improving response quality
+
+**Smart Truncation Fallback** ensures responses:
 - End at natural sentence boundaries (`.`, `!`, `?`)
 - Avoid mid-sentence cuts and incoherent fragments
 - Default to ~150 words for faster, more focused dialogue

@@ -208,6 +208,10 @@ logger.info(
 # CONFIG (GLOBAL) WITH VALIDATION
 # ============================================
 
+# LLM Response Length Instruction
+# Added to all prompts to guide LLM to produce bounded responses
+LLM_LENGTH_INSTRUCTION = "Please answer in no more than 150 words. End your response at a natural sentence boundary."
+
 
 def smart_truncate_response(text: str, max_words: int = 150) -> str:
     """
@@ -957,6 +961,7 @@ class EmotionCore:
         prompt = (
             "Classify emotion and intensity (0..1).\n"
             'Return JSON: {"emotion": string, "intensity": number}\n'
+            f"{LLM_LENGTH_INSTRUCTION}\n"
             f"TEXT:\n{text[:200]}\n"
         )
         raw = self.llm.generate(model, prompt, temperature=0.2, use_cache=True)
@@ -1325,7 +1330,7 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
-        prompt += "\nRespond now:\n"
+        prompt += f"\n{LLM_LENGTH_INSTRUCTION}\n\nRespond now:\n"
         return prompt
 
     def _build_enhanced_prompt(

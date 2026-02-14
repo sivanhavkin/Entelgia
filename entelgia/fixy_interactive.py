@@ -9,6 +9,10 @@ Need-based interventions rather than scheduled interventions.
 import re
 from typing import Dict, List, Tuple, Any, Optional
 
+# LLM Response Length Instruction
+# Added to all prompts to guide LLM to produce bounded responses
+LLM_LENGTH_INSTRUCTION = "Please answer in no more than 150 words. End your response at a natural sentence boundary."
+
 
 class InteractiveFixy:
     """Fixy as active dialogue participant with intelligent interventions."""
@@ -94,6 +98,8 @@ class InteractiveFixy:
 
 RECENT DIALOGUE:
 {context}
+
+{LLM_LENGTH_INSTRUCTION}
 
 Generate your intervention (2-4 sentences, direct and concrete):"""
 
