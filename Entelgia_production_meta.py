@@ -89,9 +89,10 @@ import datetime as dt
 import logging
 import asyncio
 from dataclasses import dataclass, asdict, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, ClassVar
 from collections import OrderedDict
 from pathlib import Path
+import warnings
 
 import requests
 from colorama import Fore, Style, init as colorama_init
@@ -275,8 +276,8 @@ def get_display_name(name: str, pronoun: str = None) -> str:
 class Config:
     """Global configuration object with validation."""
 
-    # LLM prompt constants
-    LLM_LENGTH_INSTRUCTION: str = "Please answer in no more than 150 words. End your response at the nearest sentence."
+    # LLM prompt constants (class-level, not per-instance)
+    LLM_LENGTH_INSTRUCTION: ClassVar[str] = "Please answer in no more than 150 words. End your response at the nearest sentence."
 
     ollama_url: str = "http://localhost:11434/api/generate"
     model_socrates: str = "phi3:latest"
@@ -1261,6 +1262,12 @@ class Agent:
             Use the `display_name` property instead.
             This method will be removed in v3.0.0.
         """
+        warnings.warn(
+            "Agent.get_display_name() is deprecated as of v2.2.0 and will be removed in v3.0.0. "
+            "Use the 'display_name' property instead (e.g., agent.display_name).",
+            DeprecationWarning,
+            stacklevel=2
+        )
         return self.display_name
 
     def conflict_index(self) -> float:

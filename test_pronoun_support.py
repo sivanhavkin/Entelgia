@@ -10,7 +10,17 @@ import sys
 
 sys.path.insert(0, ".")
 
-from Entelgia_production_meta import Config, get_display_name, Agent, LLM, MemoryCore, EmotionCore, BehaviorCore, LanguageCore, ConsciousCore
+from Entelgia_production_meta import (
+    Config,
+    get_display_name,
+    Agent,
+    LLM,
+    MemoryCore,
+    EmotionCore,
+    BehaviorCore,
+    LanguageCore,
+    ConsciousCore
+)
 import Entelgia_production_meta
 
 
