@@ -240,6 +240,48 @@ Upon launch, memory initializes automatically and the agents begin structured di
 
 ---
 
+## ⚙️ Configuration
+
+Entelgia can be customized through the `Config` class in `Entelgia_production_meta.py`. Key configuration options:
+
+### Response Quality Settings (v2.2.0+)
+
+```python
+config = Config()
+
+# Smart response truncation
+config.smart_truncate = True        # Enable intelligent truncation at sentence boundaries
+config.max_output_words = 150       # Maximum words in agent responses (default: 150)
+config.output_max_length = 500      # Legacy character limit (used when smart_truncate=False)
+
+# LLM timeout
+config.llm_timeout = 60             # Seconds to wait for LLM response (default: 60, reduced from 600)
+```
+
+**Smart Truncation** ensures responses:
+- End at natural sentence boundaries (`.`, `!`, `?`)
+- Avoid mid-sentence cuts and incoherent fragments
+- Default to ~150 words for faster, more focused dialogue
+- Fallback to comma/semicolon boundaries if no sentence ending found
+
+**Reduced Timeout** improves performance:
+- Faster turn completion (1-2 minutes vs 10+ minutes)
+- Better user experience
+- Prevents extremely long responses
+
+### Other Key Settings
+
+```python
+config.max_turns = 200              # Maximum dialogue turns
+config.timeout_minutes = 30         # Session timeout in minutes
+config.fixy_every_n_turns = 3      # Fixy observation frequency (legacy mode)
+config.dream_every_n_turns = 7     # Dream cycle frequency
+```
+
+For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
+
+---
+
 ## 🔐 Memory Security
 
 Entelgia supports cryptographic integrity protection for memory entries.
