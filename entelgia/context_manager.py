@@ -19,6 +19,7 @@ class ContextManager:
     def build_enriched_context(
         self,
         agent_name: str,
+        agent_lang: str,
         persona: str,
         drives: Dict[str, float],
         user_seed: str,
@@ -32,6 +33,7 @@ class ContextManager:
 
         Args:
             agent_name: Name of the agent
+            agent_lang: Language code for the agent (e.g., 'he', 'en') - currently unused, reserved for future use
             persona: Persona description
             drives: Drive levels (id, ego, superego, self_awareness)
             user_seed: Seed instruction

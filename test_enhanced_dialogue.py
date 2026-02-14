@@ -165,6 +165,7 @@ def test_context_enrichment():
     # Build enriched context
     prompt = mgr.build_enriched_context(
         agent_name="Socrates",
+        agent_lang="he",
         persona="Test persona",
         drives=drives,
         user_seed="TOPIC: Test\nQUESTION assumptions",
