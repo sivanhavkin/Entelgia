@@ -96,6 +96,21 @@ from pathlib import Path
 import requests
 from colorama import Fore, Style, init as colorama_init
 
+# Enhanced dialogue modules
+try:
+    from entelgia import (
+        DialogueEngine,
+        ContextManager,
+        EnhancedMemoryIntegration,
+        InteractiveFixy,
+        format_persona_for_prompt,
+        get_persona,
+    )
+    ENTELGIA_ENHANCED = True
+except ImportError:
+    ENTELGIA_ENHANCED = False
+    print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
 # Optional: FastAPI for REST API
 try:
     from fastapi import FastAPI, HTTPException
@@ -1125,6 +1140,7 @@ class Agent:
         language: LanguageCore,
         conscious: ConsciousCore,
         persona: str,
+        use_enhanced: bool = True,
     ):
         self.name = name
         self.model = model
@@ -1135,10 +1151,31 @@ class Agent:
         self.behavior = behavior
         self.language = language
         self.conscious = conscious
-        self.persona = persona
+        self.use_enhanced = use_enhanced and ENTELGIA_ENHANCED
+        
+        # Set persona - either rich dict or simple string
+        if self.use_enhanced:
+            try:
+                self.persona_dict = get_persona(name)
+                self.persona = self.persona_dict.get("description", persona)
+            except:
+                self.persona = persona
+                self.persona_dict = None
+        else:
+            self.persona = persona
+            self.persona_dict = None
+        
+        # Initialize context manager if enhanced mode
+        if self.use_enhanced:
+            self.context_mgr = ContextManager()
+            self.memory_integration = EnhancedMemoryIntegration()
+        else:
+            self.context_mgr = None
+            self.memory_integration = None
+        
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
-        logger.info(f"Agent initialized: {name}")
+        logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
         """Calculate internal conflict level."""
@@ -1210,7 +1247,12 @@ class Agent:
     def _build_compact_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
-        """Build COMPRESSED prompt for LLM generation (optimized tokens)."""
+        """Build prompt for LLM generation (enhanced if available)."""
+        # Use enhanced context manager if available
+        if self.use_enhanced and self.context_mgr:
+            return self._build_enhanced_prompt(user_seed, dialog_tail)
+        
+        # Legacy prompt building
         lang = self.language.get(self.name)
         recent_ltm = self.memory.ltm_recent(self.name, limit=4, layer="conscious")
         stm = self.memory.stm_load(self.name)[-6:]
@@ -1242,6 +1284,54 @@ class Agent:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
         prompt += "\nRespond now:\n"
+        return prompt
+    
+    def _build_enhanced_prompt(
+        self, user_seed: str, dialog_tail: List[Dict[str, str]]
+    ) -> str:
+        """Build ENHANCED prompt using ContextManager (8 turns, 6 thoughts, 5 memories)."""
+        lang = self.language.get(self.name)
+        
+        # Get more LTM entries for better selection
+        all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
+        
+        # Use enhanced memory integration if available
+        if self.memory_integration and all_ltm:
+            # Extract topic from seed
+            topic_match = re.search(r'TOPIC:\s*([^\n]+)', user_seed)
+            topic = topic_match.group(1) if topic_match else ""
+            
+            ltm = self.memory_integration.retrieve_relevant_memories(
+                agent_name=self.name,
+                current_topic=topic,
+                recent_dialog=dialog_tail[-5:],
+                ltm_entries=all_ltm,
+                limit=8
+            )
+        else:
+            ltm = all_ltm[:5] if all_ltm else []
+        
+        stm = self.memory.stm_load(self.name)
+        
+        # Format persona based on drives if we have persona_dict
+        if self.persona_dict:
+            persona_text = format_persona_for_prompt(self.persona_dict, self.drives)
+        else:
+            persona_text = self.persona
+        
+        # Use ContextManager to build enriched prompt
+        prompt = self.context_mgr.build_enriched_context(
+            agent_name=self.name,
+            agent_lang=lang,
+            persona=persona_text,
+            drives=self.drives,
+            user_seed=user_seed,
+            dialog_tail=dialog_tail,
+            stm=stm,
+            ltm=ltm,
+            debate_profile=self.debate_profile()
+        )
+        
         return prompt
 
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
@@ -1943,6 +2033,15 @@ class MainScript:
             conscious=self.conscious,
             persona="Observer/fixer. Brief, concrete, points out contradictions.",
         )
+        
+        # Initialize enhanced dialogue components if available
+        if ENTELGIA_ENHANCED:
+            self.dialogue_engine = DialogueEngine()
+            self.interactive_fixy = InteractiveFixy(self.llm, cfg.model_fixy)
+            logger.info("Enhanced dialogue components initialized")
+        else:
+            self.dialogue_engine = None
+            self.interactive_fixy = None
 
         logger.info(f"MainScript initialized - Session: {self.session_id}")
 
@@ -2106,10 +2205,46 @@ class MainScript:
         while time.time() - self.start_time < timeout_seconds:
             self.turn_index += 1
 
-            speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
+            # Dynamic speaker selection (if enhanced mode available)
+            if self.dialogue_engine:
+                # Check if Fixy should be allowed to speak
+                allow_fixy, fixy_prob = self.dialogue_engine.should_allow_fixy(
+                    self.dialog, self.turn_index
+                )
+                
+                # Select next speaker dynamically
+                if self.turn_index == 1:
+                    speaker = self.socrates  # Start with Socrates
+                else:
+                    last_speaker = self.socrates if self.dialog[-1].get("role") == "Socrates" else self.athena
+                    agents = [self.socrates, self.athena]
+                    if allow_fixy:
+                        agents.append(self.fixy_agent)
+                    
+                    speaker = self.dialogue_engine.select_next_speaker(
+                        current_speaker=last_speaker,
+                        dialog_history=self.dialog,
+                        agents=agents,
+                        allow_fixy=allow_fixy,
+                        fixy_probability=fixy_prob
+                    )
+            else:
+                # Legacy: simple alternation
+                speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
             topic_label = topicman.current()
-            seed = f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
+            
+            # Dynamic seed generation (if enhanced mode available)
+            if self.dialogue_engine and speaker.name != "Fixy":
+                seed = self.dialogue_engine.generate_seed(
+                    topic=topic_label,
+                    dialog_history=self.dialog,
+                    speaker=speaker,
+                    turn_count=self.turn_index
+                )
+            else:
+                # Legacy or Fixy seed
+                seed = f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
 
             logger.debug(f"Turn {self.turn_index}: {speaker.name}")
             out = speaker.speak(seed, self.dialog)
@@ -2119,7 +2254,22 @@ class MainScript:
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
-            if self.turn_index % self.cfg.fixy_every_n_turns == 0:
+            # Interactive Fixy (need-based) or legacy scheduled Fixy
+            if self.interactive_fixy and speaker.name != "Fixy":
+                should_intervene, reason = self.interactive_fixy.should_intervene(
+                    self.dialog, self.turn_index
+                )
+                if should_intervene:
+                    intervention = self.interactive_fixy.generate_intervention(
+                        self.dialog, reason
+                    )
+                    self.dialog.append({"role": "Fixy", "text": intervention})
+                    self.fixy_agent.store_turn(intervention, topic_label, source="reflection")
+                    self.log_turn("Fixy", intervention, topic_label)
+                    print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n")
+                    logger.info(f"Fixy intervention: {reason}")
+            elif self.turn_index % self.cfg.fixy_every_n_turns == 0:
+                # Legacy scheduled Fixy
                 tail = self.dialog[-10:]
                 ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
                 self.fixy_check(ctx)
