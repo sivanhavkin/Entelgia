@@ -19,11 +19,14 @@ These are changes that have been committed to the repository but have not yet be
   - When enabled, pronouns appear as "AgentName (pronoun):" in prompts
   - Gender-neutral by default to maintain inclusive conversation style
 
-- **LLM Response Quality** ⚡
-  - 150-word limit instruction explicitly added to all LLM prompts
-  - Ensures concise, focused responses from language models
-  - Works in conjunction with existing smart_truncate_response() fallback
-  - Maintains sentence boundary preservation for natural cutoffs
+- **Response Handling Without Truncation** ✨
+  - All truncation/cutting limits on agent responses removed
+  - Explicit LLM instruction added to prompts: "Please answer in maximum 150 words"
+  - All responses displayed in full without any cutting or truncation
+  - Role-playing maintains 150-word request for conciseness without enforced truncation
+  - `validate_output()` function performs sanitization only (removes control chars, normalizes newlines)
+  - LLM naturally controls response length based on prompt guidance
+  - Ensures complete, coherent responses without mid-sentence cuts
 
 ### 📝 Documentation
 
@@ -64,13 +67,13 @@ These are changes that have been committed to the repository but have not yet be
   - `demo_enhanced_dialogue.py` - 10-turn demonstration script
   - All tests passing (5 dialogue + 19 security = 24 total)
 
-- **Response Quality Control** ⚡ (v2.2.0-unreleased)
-  - `smart_truncate_response()` function for intelligent text truncation
+- **Response Length Control** ⚡ (v2.2.0-unreleased)
+  - Explicit 150-word limit instruction added to all LLM prompts
+  - `validate_output()` function for sanitization (no truncation)
   - New Config options:
-    - `max_output_words` (default: 150) - Maximum words per response
-    - `smart_truncate` (default: True) - Enable sentence-boundary truncation
-  - Responses now end at natural sentence boundaries (`.`, `!`, `?`)
-  - Fallback to comma/semicolon boundaries when needed
+    - `max_output_words` (default: 150) - Used in LLM prompt instruction
+  - Responses displayed in full without truncation
+  - LLM controls response length naturally based on prompt guidance
 
 ### 🐛 Fixed
 
@@ -78,8 +81,6 @@ These are changes that have been committed to the repository but have not yet be
 - Resolves `'NoneType' has no attribute 'data_dir'` error
 - Demo scripts now work without `run_cli()` wrapper
 - Added `global CFG` declaration to ensure proper initialization
-- **Response Coherence**: Eliminated incoherent fragments from mid-sentence cuts
-- **Long Responses**: Responses now properly truncated to ~150 words at sentence boundaries
 
 ### 🔄 Changed
 

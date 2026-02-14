@@ -59,7 +59,7 @@ For the full architectural and theoretical foundation:
 * **Up to 70% lower token usage** through compression
 * **Up to 2–3× faster** response times
 * **🆕 More natural dialogue** - Dynamic speaker selection vs ping-pong
-* **🆕 Richer context** - Smarter truncation with sentence boundaries
+* **🆕 Full responses** - No truncation, LLM guidance ensures concise ~150-word answers
 
 ---
 
@@ -255,20 +255,25 @@ Entelgia can be customized through the `Config` class in `Entelgia_production_me
 ```python
 config = Config()
 
-# Smart response truncation
-config.smart_truncate = True        # Enable intelligent truncation at sentence boundaries
-config.max_output_words = 150       # Maximum words in agent responses (default: 150)
-config.output_max_length = 500      # Legacy character limit (used when smart_truncate=False)
+# Response length control (via LLM prompt instruction)
+config.max_output_words = 150       # LLM prompt asks for maximum 150 words (default: 150)
 
 # LLM timeout
 config.llm_timeout = 60             # Seconds to wait for LLM response (default: 60, reduced from 600)
 ```
 
-**Smart Truncation** ensures responses:
-- End at natural sentence boundaries (`.`, `!`, `?`)
-- Avoid mid-sentence cuts and incoherent fragments
-- Default to ~150 words for faster, more focused dialogue
-- Fallback to comma/semicolon boundaries if no sentence ending found
+**Response Length Control** (v2.2.0+):
+- ✅ **No truncation/cutting** - All agent responses are displayed in full without any cutting
+- 📝 **LLM guidance** - Explicit instruction added to LLM prompts: "Please answer in maximum 150 words"
+- 🎭 **Role-playing maintained** - Agents receive the 150-word request but responses are never truncated
+- 🔍 **Sanitization only** - `validate_output()` removes control characters and normalizes newlines, without any length limits
+- 🎯 **Natural responses** - LLM decides the response length naturally within the 150-word guidance
+
+This approach ensures:
+- Agent responses are complete and coherent (no mid-sentence cuts)
+- LLM maintains focus and conciseness through prompt instructions
+- Role-playing dynamic remains authentic with requested brevity
+- Users see full responses without artificial truncation
 
 **Reduced Timeout** improves responsiveness:
 - Maximum timeout reduced from 10 minutes to 60 seconds
