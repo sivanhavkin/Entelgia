@@ -111,7 +111,7 @@ When `show_pronoun=False` (default):
 
 - **Feature Version:** v2.2.0 
 - **Latest Official Release:** v2.2.0
-- **Status:** In development / בפיתוח
+- **Status:**י Stable
 
 ---
 
