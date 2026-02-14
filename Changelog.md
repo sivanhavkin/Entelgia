@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [Unreleased] - v2.2.0
+## [Unreleased] 
+
+<!-- No changes yet -->
+
+---
+
+## [2.2.0] - 2026-02-14
+
 
 These are changes that have been committed to the repository but have not yet been packaged as a new release. When a new version is tagged, the contents of this section should be moved under the appropriate version heading below.
 
@@ -349,6 +356,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
