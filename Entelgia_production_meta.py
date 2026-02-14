@@ -236,13 +236,13 @@ def smart_truncate_response(text: str, max_words: int = 150) -> str:
     # Find last sentence-ending punctuation
     for delimiter in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
         last_delimiter = truncated_text.rfind(delimiter)
-        if last_delimiter > len(truncated_text) * 0.5:  # At least 50% through
+        if last_delimiter >= len(truncated_text) * 0.5:  # At least 50% through
             return truncated_text[:last_delimiter + 1].strip()
     
     # Fallback: find last comma or semicolon
     for delimiter in [', ', '; ']:
         last_delimiter = truncated_text.rfind(delimiter)
-        if last_delimiter > len(truncated_text) * 0.7:  # At least 70% through
+        if last_delimiter >= len(truncated_text) * 0.7:  # At least 70% through
             return truncated_text[:last_delimiter + 1].strip() + "..."
     
     # Last resort: cut at word boundary with ellipsis
