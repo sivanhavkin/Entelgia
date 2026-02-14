@@ -40,8 +40,9 @@ This journey involves acknowledging biases, questioning the roots of our beliefs
 ---
 
 
-**Session ID:** `68070fd2`
-**Topic:** Memory, Identity, and Ethical Science
+**Session ID:**  `68070fd2`
+
+**Topic:**  Memory, Identity, and Ethical Science
 ---
 
 **Socrates:**  
