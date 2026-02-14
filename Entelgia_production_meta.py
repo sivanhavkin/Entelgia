@@ -282,7 +282,7 @@ class Config:
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
-    llm_timeout: int = 60  # Reduced from 600 to 60 seconds for faster responses
+    llm_timeout: int = 600  # Reduced from 600 to 60 seconds for faster responses
     max_prompt_tokens: int = 800
     output_max_length: int = 500  # Legacy fallback
     max_output_words: int = 150  # Maximum words in response for smart truncation
