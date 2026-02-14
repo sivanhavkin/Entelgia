@@ -28,7 +28,7 @@ These are changes that have been committed to the repository but have not yet be
   - LLM naturally controls response length based on prompt guidance
   - Ensures complete, coherent responses without mid-sentence cuts
 
-  **Enhanced Dialogue Module** 🎭
+ - **Enhanced Dialogue Module** 🎭
   - `entelgia/` package with modular dialogue components
   - `dialogue_engine.py` - Dynamic speaker selection & seed generation
   - `enhanced_personas.py` - Rich character definitions (Socrates, Athena, Fixy)
@@ -349,5 +349,6 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
