@@ -37,4 +37,4 @@ __all__ = [
     "is_global_show_pronouns",
 ]
 
-__version__ = "2.2.0  # Latest official: 2.2.0
+__version__ = "2.2.0"  # Latest official: 2.2.0
