@@ -212,39 +212,39 @@ logger.info(
 def smart_truncate_response(text: str, max_words: int = 150) -> str:
     """
     Truncate response intelligently at sentence boundaries.
-    
+
     Args:
         text: The response text to truncate
         max_words: Maximum number of words (default: 150)
-    
+
     Returns:
         Truncated text ending at sentence boundary
     """
     if not text:
         return ""
-    
+
     words = text.split()
-    
+
     # If under limit, return as-is
     if len(words) <= max_words:
         return text
-    
+
     # Find last sentence boundary within limit
     truncated_words = words[:max_words]
     truncated_text = " ".join(truncated_words)
-    
+
     # Find last sentence-ending punctuation
-    for delimiter in ['. ', '! ', '? ', '.\n', '!\n', '?\n']:
+    for delimiter in [". ", "! ", "? ", ".\n", "!\n", "?\n"]:
         last_delimiter = truncated_text.rfind(delimiter)
         if last_delimiter >= len(truncated_text) * 0.5:  # At least 50% through
-            return truncated_text[:last_delimiter + 1].strip()
-    
+            return truncated_text[: last_delimiter + 1].strip()
+
     # Fallback: find last comma or semicolon
-    for delimiter in [', ', '; ']:
+    for delimiter in [", ", "; "]:
         last_delimiter = truncated_text.rfind(delimiter)
         if last_delimiter >= len(truncated_text) * 0.7:  # At least 70% through
-            return truncated_text[:last_delimiter + 1].strip() + "..."
-    
+            return truncated_text[: last_delimiter + 1].strip() + "..."
+
     # Last resort: cut at word boundary with ellipsis
     return truncated_text + "..."
 
@@ -496,8 +496,8 @@ def validate_output(text: str, max_length: int = 500) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
-    
-      
+
+
 # ============================================
 # PRIVACY / REDACTION
 # ============================================
@@ -1386,7 +1386,9 @@ class Agent:
         )
 
         # Validate output first (important for security and quality)
-        validated_response = validate_output(raw_response, max_length=CFG.output_max_length)
+        validated_response = validate_output(
+            raw_response, max_length=CFG.output_max_length
+        )
 
         # Apply smart truncation if enabled
         if CFG.smart_truncate:
