@@ -4,6 +4,9 @@
 """
 Entelgia Enhanced Dialogue Package
 Provides improved dialogue quality through dynamic speaker selection, rich personas, and intelligent context management.
+
+Version Note: Pronoun support feature added for v2.2.0 (Unreleased).
+Latest official release: v2.1.1
 """
 
 from .dialogue_engine import DialogueEngine, SeedGenerator
@@ -14,6 +17,7 @@ from .enhanced_personas import (
     format_persona_for_prompt,
     get_persona,
     get_typical_opening,
+    is_global_show_pronouns,
 )
 from .context_manager import ContextManager, EnhancedMemoryIntegration
 from .fixy_interactive import InteractiveFixy
@@ -30,6 +34,7 @@ __all__ = [
     "ContextManager",
     "EnhancedMemoryIntegration",
     "InteractiveFixy",
+    "is_global_show_pronouns",
 ]
 
-__version__ = "1.0.0"
+__version__ = "2.2.0-unreleased"  # Latest official: 2.1.1
