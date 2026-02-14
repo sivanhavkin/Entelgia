@@ -95,7 +95,9 @@ class InteractiveFixy:
 RECENT DIALOGUE:
 {context}
 
-Generate your intervention (2-4 sentences, direct and concrete):"""
+Generate your intervention (2-4 sentences, direct and concrete).
+IMPORTANT: Please answer in maximum 150 words.
+"""
 
         intervention = self.llm.generate(
             self.model, full_prompt, temperature=0.4, use_cache=False
@@ -127,9 +129,7 @@ Generate your intervention (2-4 sentences, direct and concrete):"""
         for turn in recent:
             role = turn.get("role", "")
             text = turn.get("text", "")
-            # Truncate to 200 chars for context
-            text_short = text[:200] + "..." if len(text) > 200 else text
-            context_lines.append(f"{role}: {text_short}")
+            context_lines.append(f"{role}: {text}")
 
         return "\n".join(context_lines)
 

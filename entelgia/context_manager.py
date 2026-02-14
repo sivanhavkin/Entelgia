@@ -55,15 +55,12 @@ class ContextManager:
         # Take last 8 turns (up from 5)
         recent_dialog = dialog_tail[-8:] if len(dialog_tail) >= 8 else dialog_tail
 
-        # Smart truncation for dialogue
+        # Smart display for dialogue - show full content
         dialog_lines = []
         for turn in recent_dialog:
             role = turn.get("role", "")  # Full name, not abbreviated
             text = turn.get("text", "")
-
-            # Truncate at sentence boundary if needed
-            text_display = self._truncate_at_sentence(text, max_len=500)
-            dialog_lines.append(f"{role}: {text_display}")
+            dialog_lines.append(f"{role}: {text}")
 
         # Take last 6 STM entries (up from 3)
         recent_thoughts = stm[-6:] if len(stm) >= 6 else stm
@@ -86,33 +83,6 @@ class ContextManager:
         )
 
         return prompt
-
-    def _truncate_at_sentence(self, text: str, max_len: int) -> str:
-        """
-        Truncate at sentence boundary, not mid-sentence.
-
-        Args:
-            text: Text to truncate
-            max_len: Maximum length
-
-        Returns:
-            Truncated text ending at sentence boundary
-        """
-        if len(text) <= max_len:
-            return text
-
-        # Find last sentence ending before max_len
-        for sep in [". ", "! ", "? ", ".\n", "!\n", "?\n"]:
-            pos = text[:max_len].rfind(sep)
-            if pos > max_len * 0.7:  # At least 70% of target length
-                return text[: pos + 1] + "..."
-
-        # Fallback: word boundary
-        words = text[:max_len].rsplit(" ", 1)
-        if len(words) > 1:
-            return words[0] + "..."
-
-        return text[:max_len] + "..."
 
     def _prioritize_memories(
         self, ltm: List[Dict[str, Any]], limit: int
@@ -196,28 +166,26 @@ class ContextManager:
         for line in dialog_lines:
             prompt += f"{line}\n"
 
-        # Add recent thoughts if available
+        # Add recent thoughts if available - display in full
         if recent_thoughts:
             prompt += "\nRecent thoughts:\n"
             for thought in recent_thoughts:
                 text = thought.get("text", "")
-                text_display = self._truncate_at_sentence(text, max_len=400)
-                prompt += f"- {text_display}\n"
+                prompt += f"- {text}\n"
 
-        # Add important memories if available
+        # Add important memories if available - display in full
         if important_memories:
             prompt += "\nKey memories:\n"
             for memory in important_memories:
                 content = memory.get("content", "")
                 importance = memory.get("importance", 0.0)
-                content_display = self._truncate_at_sentence(content, max_len=600)
 
                 # Add star marker for very important memories
                 marker = "⭐ " if float(importance) > 0.7 else ""
-                prompt += f"{marker}- {content_display}\n"
+                prompt += f"{marker}- {content}\n"
 
         # Add 150-word limit instruction for LLM
-        prompt += "\nIMPORTANT: Keep your response concise (under 150 words).\n"
+        prompt += "\nIMPORTANT: Please answer in maximum 150 words.\n"
         prompt += "\nRespond now:\n"
 
         return prompt
