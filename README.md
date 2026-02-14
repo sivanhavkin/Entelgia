@@ -1,3 +1,5 @@
+📖 [See a conscious awareness demo](./DEMO_CONSCIOUS_DIALOGUE.md)
+
 # 🧠 Entelgia
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
@@ -10,7 +12,6 @@
 [![Last Commit](https://img.shields.io/github/last-commit/sivanhavkin/Entelgia)](https://github.com/sivanhavkin/Entelgia/commits/main)
 [![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/sivanhavkin/Entelgia)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
-📖 [See a conscious awareness demo](./DEMO_CONSCIOUS_DIALOGUE.md)
 
 ## A Consciousness-Inspired Multi-Agent AI Architecture
 
