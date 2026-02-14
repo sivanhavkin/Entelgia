@@ -54,19 +54,13 @@ These are changes that have been committed to the repository but have not yet be
   - `demo_enhanced_dialogue.py` - 10-turn demonstration script
   - All tests passing (5 dialogue + 19 security = 24 total)
 
-- **Response Length Control** ⚡ (v2.2.0-unreleased)
+- **Response Length Control** ⚡
   - Explicit 150-word limit instruction added to all LLM prompts
   - `validate_output()` function for sanitization (no truncation)
   - New Config options:
     - `max_output_words` (default: 150) - Used in LLM prompt instruction
   - Responses displayed in full without truncation
   - LLM controls response length naturally based on prompt guidance
-### 📝 Documentation
-
-- Added version notes to all modified files indicating unreleased features
-- Latest official release marked as v2.1.1 throughout codebase
-- Added comprehensive comments explaining pronoun feature
-- Hebrew/English documentation for pronoun support
 
 ### 🐛 Fixed
 
@@ -100,11 +94,16 @@ These are changes that have been committed to the repository but have not yet be
   - Faster failure detection when LLM is unresponsive
   - Better user experience with more predictable response times
 
-- **Gender-Neutral Output** 🌐 (v2.2.0-unreleased)
+- **Gender-Neutral Output** 🌐 
   - Removed gender language tracking initialization
   - Cleaner dialogue output without gender pronouns
   - More inclusive and neutral conversation style
 
+### 📝 Documentation
+
+- Added version notes to all modified files indicating unreleased features
+- Latest official release marked as v2.1.1 throughout codebase
+- Added comprehensive comments explaining pronoun feature
 ---
 
 ## [2.1.1] - 2026-02-13
@@ -350,4 +349,5 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
