@@ -2068,9 +2068,12 @@ class MainScript:
             persona="Strategic, integrative, creative. Builds frameworks and synthesis.",
         )
 
-        # Language tracking removed - gender-neutral output
+        # Language tracking removed for gender-neutral output
+        # Previously set language codes for agents, but this cluttered
+        # dialogue output with "(he)" gender pronouns after names.
+        # Removed to ensure cleaner, more inclusive conversation style.
         # self.language.set("Socrates", "he")
-        # self.language.set("Athena", "he")
+        # self.language.set("Athena", "he")  # Note: was "he" for consistency, not "she"
         # self.language.set("Fixy", "en")
 
         self.fixy_agent = Agent(

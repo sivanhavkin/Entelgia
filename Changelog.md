@@ -74,8 +74,9 @@ These are changes that have been committed to the repository but have not yet be
 
 - **Timeouts & Performance** ⚡ (v2.2.0-unreleased)
   - Reduced `llm_timeout` from 600s (10 min) to 60s (1 min)
-  - 5-10x faster dialogue turn completion
-  - Better user experience with shorter wait times
+  - Shorter maximum wait times for LLM responses
+  - Faster failure detection when LLM is unresponsive
+  - Better user experience with more predictable response times
 
 - **Gender-Neutral Output** 🌐 (v2.2.0-unreleased)
   - Removed gender language tracking initialization
