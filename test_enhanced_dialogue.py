@@ -165,7 +165,6 @@ def test_context_enrichment():
     # Build enriched context
     prompt = mgr.build_enriched_context(
         agent_name="Socrates",
-        agent_lang="he",
         persona="Test persona",
         drives=drives,
         user_seed="TOPIC: Test\nQUESTION assumptions",
@@ -183,6 +182,7 @@ def test_context_enrichment():
         "5 memories": prompt.count("Memory") >= 5,
         "Drive information": "id=" in prompt and "ego=" in prompt,
         "Smart truncation": "..." in prompt,  # Should have truncation markers
+        "No gender pronouns": "(he)" not in prompt and "(she)" not in prompt,
     }
 
     print("Context checks:")

@@ -19,7 +19,6 @@ class ContextManager:
     def build_enriched_context(
         self,
         agent_name: str,
-        agent_lang: str,
         persona: str,
         drives: Dict[str, float],
         user_seed: str,
@@ -33,7 +32,6 @@ class ContextManager:
 
         Args:
             agent_name: Name of the agent
-            agent_lang: Language code for agent
             persona: Persona description
             drives: Drive levels (id, ego, superego, self_awareness)
             user_seed: Seed instruction
@@ -67,7 +65,6 @@ class ContextManager:
         # Build prompt
         prompt = self._format_prompt(
             agent_name=agent_name,
-            agent_lang=agent_lang,
             persona=persona,
             drives=drives,
             debate_profile=debate_profile,
@@ -132,7 +129,6 @@ class ContextManager:
     def _format_prompt(
         self,
         agent_name: str,
-        agent_lang: str,
         persona: str,
         drives: Dict[str, float],
         debate_profile: Dict[str, Any],
@@ -146,7 +142,6 @@ class ContextManager:
 
         Args:
             agent_name: Agent name
-            agent_lang: Language code
             persona: Persona description
             drives: Drive levels
             debate_profile: Debate style
@@ -158,7 +153,7 @@ class ContextManager:
         Returns:
             Formatted prompt
         """
-        prompt = f"{agent_name} ({agent_lang}):\n"
+        prompt = f"{agent_name}:\n"
         prompt += f"PERSONA: {persona}\n\n"
 
         # Add drive info
