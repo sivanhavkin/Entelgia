@@ -496,9 +496,9 @@ def validate_output(text: str, max_length: int = 500) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
-    # ============================================
-
-
+    
+      
+# ============================================
 # PRIVACY / REDACTION
 # ============================================
 
@@ -2560,3 +2560,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
