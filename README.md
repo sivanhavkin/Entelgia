@@ -59,7 +59,7 @@ For the full architectural and theoretical foundation:
 * **Up to 70% lower token usage** through compression
 * **Up to 2–3× faster** response times
 * **🆕 More natural dialogue** - Dynamic speaker selection vs ping-pong
-* **🆕 Full responses** - No truncation, LLM guidance ensures concise ~150-word answers
+* **🆕 Full responses** - No truncation; LLM guidance ensures concise ~150-word answers
 
 ---
 
@@ -263,7 +263,7 @@ config.llm_timeout = 60             # Seconds to wait for LLM response (default:
 ```
 
 **Response Length Control** (v2.2.0+):
-- ✅ **No truncation/cutting** - All agent responses are displayed in full without any cutting
+- ✅ **No truncation/cutting** - All agent responses are displayed in full
 - 📝 **LLM guidance** - Explicit instruction added to LLM prompts: "Please answer in maximum 150 words"
 - 🎭 **Role-playing maintained** - Agents receive the 150-word request but responses are never truncated
 - 🔍 **Sanitization only** - `validate_output()` removes control characters and normalizes newlines, without any length limits
