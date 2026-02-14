@@ -498,7 +498,7 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** v2.1.1 (v2.2.0 coming soon with enhanced dialogue)
+* **Version:** 2.2.0 
 * **Last Updated:** 14 February 2026
 
 ### What is "Research Hybrid"?
