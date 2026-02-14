@@ -36,12 +36,22 @@ These are changes that have been committed to the repository but have not yet be
   - `demo_enhanced_dialogue.py` - 10-turn demonstration script
   - All tests passing (5 dialogue + 19 security = 24 total)
 
+- **Response Quality Control** ⚡ (v2.2.0-unreleased)
+  - `smart_truncate_response()` function for intelligent text truncation
+  - New Config options:
+    - `max_output_words` (default: 150) - Maximum words per response
+    - `smart_truncate` (default: True) - Enable sentence-boundary truncation
+  - Responses now end at natural sentence boundaries (`.`, `!`, `?`)
+  - Fallback to comma/semicolon boundaries when needed
+
 ### 🐛 Fixed
 
 - Fixed `CFG` global initialization in `MainScript.__init__`
 - Resolves `'NoneType' has no attribute 'data_dir'` error
 - Demo scripts now work without `run_cli()` wrapper
 - Added `global CFG` declaration to ensure proper initialization
+- **Response Coherence**: Eliminated incoherent fragments from mid-sentence cuts
+- **Long Responses**: Responses now properly truncated to ~150 words at sentence boundaries
 
 ### 🔄 Changed
 
@@ -61,6 +71,17 @@ These are changes that have been committed to the repository but have not yet be
   - Reduced predictability in dialogue flow
   - Smarter context management (fewer token waste)
   - Fixy only speaks when needed (not every N turns)
+
+- **Timeouts & Performance** ⚡ (v2.2.0-unreleased)
+  - Reduced `llm_timeout` from 600 seconds (10 minutes) to 60 seconds (1 minute)
+  - Shorter maximum wait times for LLM responses
+  - Faster failure detection when LLM is unresponsive
+  - Better user experience with more predictable response times
+
+- **Gender-Neutral Output** 🌐 (v2.2.0-unreleased)
+  - Removed gender language tracking initialization
+  - Cleaner dialogue output without gender pronouns
+  - More inclusive and neutral conversation style
 
 ### 📝 Notes
 
