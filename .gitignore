@@ -38,6 +38,9 @@ runs/
 # Testing  
 .pytest_cache/
 htmlcov/
+.coverage
+*.coverage
+coverage.xml
 
 # Type checking
 .mypy_cache/

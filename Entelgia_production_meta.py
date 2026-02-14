@@ -1296,12 +1296,11 @@ class Agent:
             return self._build_enhanced_prompt(user_seed, dialog_tail)
 
         # Legacy prompt building
-        lang = self.language.get(self.name)
         recent_ltm = self.memory.ltm_recent(self.name, limit=4, layer="conscious")
         stm = self.memory.stm_load(self.name)[-6:]
 
         prompt = (
-            f"{self.name} ({lang}):\n"
+            f"{self.name}:\n"
             f"PERSONA: {self.persona}\n\n"
             f"SEED: {user_seed}\n\n"
             "RECENT DIALOG:\n"
@@ -1333,8 +1332,6 @@ class Agent:
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
         """Build ENHANCED prompt using ContextManager (8 turns, 6 thoughts, 5 memories)."""
-        lang = self.language.get(self.name)
-
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
@@ -1365,7 +1362,6 @@ class Agent:
         # Use ContextManager to build enriched prompt
         prompt = self.context_mgr.build_enriched_context(
             agent_name=self.name,
-            agent_lang=lang,
             persona=persona_text,
             drives=self.drives,
             user_seed=user_seed,
