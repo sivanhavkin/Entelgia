@@ -211,8 +211,8 @@ logger.info(
 # CONFIG (GLOBAL) WITH VALIDATION
 # ============================================
 
-
-
+# LLM Response Length Instruction - used in all agent prompts
+LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 
 
 @dataclass
@@ -449,7 +449,15 @@ def append_csv_row(path: str, row: Dict[str, Any]):
 
 
 def validate_output(text: str) -> str:
-    """Validate and sanitize LLM output without truncation."""
+    """
+    Validate and sanitize LLM output.
+    
+    Performs sanitization only (no truncation):
+    - Removes control characters
+    - Normalizes excessive newlines
+    
+    Note: Response length is controlled by LLM prompt instructions, not by this function.
+    """
     if not text:
         return "[No output]"
 
@@ -1053,7 +1061,7 @@ class ObserverCore:
             "If no issue: suggest ONE way to increase depth.\n"
             f"ISSUE: {report.detected_issue}\n"
             f"CONTEXT:\n{context[:250]}\n"
-            "IMPORTANT: Please answer in maximum 150 words.\n"
+            f"{LLM_RESPONSE_LIMIT}\n"
         )
         msg = self.llm.generate(self.model, prompt, temperature=0.3, use_cache=False)
         return validate_output(msg)
@@ -1122,7 +1130,7 @@ class BehaviorCore:
             "Dream-cycle reflection:\n"
             "Synthesize patterns from memories.\n"
             f"RECENT:\n{chunk}\n"
-            "IMPORTANT: Please answer in maximum 150 words.\n"
+            f"{LLM_RESPONSE_LIMIT}\n"
         )
         result = llm.generate(model, prompt, temperature=0.6, use_cache=False)
         return validate_output(result)
@@ -1296,7 +1304,7 @@ class Agent:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
         # Add 150-word limit instruction for LLM
-        prompt += "\nIMPORTANT: Please answer in maximum 150 words.\n"
+        prompt += f"\n{LLM_RESPONSE_LIMIT}\n"
         prompt += "\nRespond now:\n"
         return prompt
 

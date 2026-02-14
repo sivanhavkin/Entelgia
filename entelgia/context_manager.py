@@ -3,7 +3,7 @@
 
 """
 Context Manager for Entelgia
-Manages intelligent context windowing, smart truncation, and memory integration.
+Manages intelligent context windowing and memory integration.
 
 Version Note: Pronoun support and 150-word limit features added for v2.2.0 (Unreleased).
 Latest official release: v2.1.1
@@ -11,6 +11,9 @@ Latest official release: v2.1.1
 
 import re
 from typing import Dict, List, Any, Optional
+
+# LLM Response Length Instruction
+LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 
 
 class ContextManager:
@@ -185,7 +188,7 @@ class ContextManager:
                 prompt += f"{marker}- {content}\n"
 
         # Add 150-word limit instruction for LLM
-        prompt += "\nIMPORTANT: Please answer in maximum 150 words.\n"
+        prompt += f"\n{LLM_RESPONSE_LIMIT}\n"
         prompt += "\nRespond now:\n"
 
         return prompt
