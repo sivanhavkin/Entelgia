@@ -13,23 +13,23 @@ from .enhanced_personas import (
     FIXY_PERSONA,
     format_persona_for_prompt,
     get_persona,
-    get_typical_opening
+    get_typical_opening,
 )
 from .context_manager import ContextManager, EnhancedMemoryIntegration
 from .fixy_interactive import InteractiveFixy
 
 __all__ = [
-    'DialogueEngine',
-    'SeedGenerator',
-    'SOCRATES_PERSONA',
-    'ATHENA_PERSONA',
-    'FIXY_PERSONA',
-    'format_persona_for_prompt',
-    'get_persona',
-    'get_typical_opening',
-    'ContextManager',
-    'EnhancedMemoryIntegration',
-    'InteractiveFixy',
+    "DialogueEngine",
+    "SeedGenerator",
+    "SOCRATES_PERSONA",
+    "ATHENA_PERSONA",
+    "FIXY_PERSONA",
+    "format_persona_for_prompt",
+    "get_persona",
+    "get_typical_opening",
+    "ContextManager",
+    "EnhancedMemoryIntegration",
+    "InteractiveFixy",
 ]
 
-__version__ = '1.0.0'
+__version__ = "1.0.0"

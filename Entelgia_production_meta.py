@@ -106,6 +106,7 @@ try:
         format_persona_for_prompt,
         get_persona,
     )
+
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
@@ -1152,7 +1153,7 @@ class Agent:
         self.language = language
         self.conscious = conscious
         self.use_enhanced = use_enhanced and ENTELGIA_ENHANCED
-        
+
         # Set persona - either rich dict or simple string
         if self.use_enhanced:
             try:
@@ -1164,7 +1165,7 @@ class Agent:
         else:
             self.persona = persona
             self.persona_dict = None
-        
+
         # Initialize context manager if enhanced mode
         if self.use_enhanced:
             self.context_mgr = ContextManager()
@@ -1172,7 +1173,7 @@ class Agent:
         else:
             self.context_mgr = None
             self.memory_integration = None
-        
+
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
@@ -1251,7 +1252,7 @@ class Agent:
         # Use enhanced context manager if available
         if self.use_enhanced and self.context_mgr:
             return self._build_enhanced_prompt(user_seed, dialog_tail)
-        
+
         # Legacy prompt building
         lang = self.language.get(self.name)
         recent_ltm = self.memory.ltm_recent(self.name, limit=4, layer="conscious")
@@ -1285,40 +1286,40 @@ class Agent:
 
         prompt += "\nRespond now:\n"
         return prompt
-    
+
     def _build_enhanced_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
         """Build ENHANCED prompt using ContextManager (8 turns, 6 thoughts, 5 memories)."""
         lang = self.language.get(self.name)
-        
+
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
-        
+
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
             # Extract topic from seed
-            topic_match = re.search(r'TOPIC:\s*([^\n]+)', user_seed)
+            topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
             topic = topic_match.group(1) if topic_match else ""
-            
+
             ltm = self.memory_integration.retrieve_relevant_memories(
                 agent_name=self.name,
                 current_topic=topic,
                 recent_dialog=dialog_tail[-5:],
                 ltm_entries=all_ltm,
-                limit=8
+                limit=8,
             )
         else:
             ltm = all_ltm[:5] if all_ltm else []
-        
+
         stm = self.memory.stm_load(self.name)
-        
+
         # Format persona based on drives if we have persona_dict
         if self.persona_dict:
             persona_text = format_persona_for_prompt(self.persona_dict, self.drives)
         else:
             persona_text = self.persona
-        
+
         # Use ContextManager to build enriched prompt
         prompt = self.context_mgr.build_enriched_context(
             agent_name=self.name,
@@ -1329,9 +1330,9 @@ class Agent:
             dialog_tail=dialog_tail,
             stm=stm,
             ltm=ltm,
-            debate_profile=self.debate_profile()
+            debate_profile=self.debate_profile(),
         )
-        
+
         return prompt
 
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
@@ -2033,7 +2034,7 @@ class MainScript:
             conscious=self.conscious,
             persona="Observer/fixer. Brief, concrete, points out contradictions.",
         )
-        
+
         # Initialize enhanced dialogue components if available
         if ENTELGIA_ENHANCED:
             self.dialogue_engine = DialogueEngine()
@@ -2211,40 +2212,46 @@ class MainScript:
                 allow_fixy, fixy_prob = self.dialogue_engine.should_allow_fixy(
                     self.dialog, self.turn_index
                 )
-                
+
                 # Select next speaker dynamically
                 if self.turn_index == 1:
                     speaker = self.socrates  # Start with Socrates
                 else:
-                    last_speaker = self.socrates if self.dialog[-1].get("role") == "Socrates" else self.athena
+                    last_speaker = (
+                        self.socrates
+                        if self.dialog[-1].get("role") == "Socrates"
+                        else self.athena
+                    )
                     agents = [self.socrates, self.athena]
                     if allow_fixy:
                         agents.append(self.fixy_agent)
-                    
+
                     speaker = self.dialogue_engine.select_next_speaker(
                         current_speaker=last_speaker,
                         dialog_history=self.dialog,
                         agents=agents,
                         allow_fixy=allow_fixy,
-                        fixy_probability=fixy_prob
+                        fixy_probability=fixy_prob,
                     )
             else:
                 # Legacy: simple alternation
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
             topic_label = topicman.current()
-            
+
             # Dynamic seed generation (if enhanced mode available)
             if self.dialogue_engine and speaker.name != "Fixy":
                 seed = self.dialogue_engine.generate_seed(
                     topic=topic_label,
                     dialog_history=self.dialog,
                     speaker=speaker,
-                    turn_count=self.turn_index
+                    turn_count=self.turn_index,
                 )
             else:
                 # Legacy or Fixy seed
-                seed = f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
+                seed = (
+                    f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
+                )
 
             logger.debug(f"Turn {self.turn_index}: {speaker.name}")
             out = speaker.speak(seed, self.dialog)
@@ -2264,9 +2271,13 @@ class MainScript:
                         self.dialog, reason
                     )
                     self.dialog.append({"role": "Fixy", "text": intervention})
-                    self.fixy_agent.store_turn(intervention, topic_label, source="reflection")
+                    self.fixy_agent.store_turn(
+                        intervention, topic_label, source="reflection"
+                    )
                     self.log_turn("Fixy", intervention, topic_label)
-                    print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n")
+                    print(
+                        Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
+                    )
                     logger.info(f"Fixy intervention: {reason}")
             elif self.turn_index % self.cfg.fixy_every_n_turns == 0:
                 # Legacy scheduled Fixy
