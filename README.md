@@ -264,10 +264,11 @@ config.llm_timeout = 60             # Seconds to wait for LLM response (default:
 - Default to ~150 words for faster, more focused dialogue
 - Fallback to comma/semicolon boundaries if no sentence ending found
 
-**Reduced Timeout** improves performance:
-- Faster turn completion (~60 seconds or less vs 10 minutes)
-- Better user experience with shorter maximum wait times
-- Prevents extremely long responses
+**Reduced Timeout** improves responsiveness:
+- Maximum timeout reduced from 10 minutes to 60 seconds
+- Faster failure detection when LLM is unresponsive
+- Better user experience with more predictable behavior
+- Most responses complete much faster than the timeout limit
 
 ### Other Key Settings
 

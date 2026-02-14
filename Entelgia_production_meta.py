@@ -1385,13 +1385,16 @@ class Agent:
             or "[No response]"
         )
 
+        # Validate output first (important for security and quality)
+        validated_response = validate_output(raw_response, max_length=CFG.output_max_length)
+
         # Apply smart truncation if enabled
         if CFG.smart_truncate:
             out = smart_truncate_response(
-                raw_response, max_words=CFG.max_output_words
+                validated_response, max_words=CFG.max_output_words
             )
         else:
-            out = validate_output(raw_response, max_length=CFG.output_max_length)
+            out = validated_response
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
