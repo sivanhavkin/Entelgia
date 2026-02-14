@@ -1972,6 +1972,8 @@ class MainScript:
     """Main orchestrator for multi-agent dialogue (configurable timeout)."""
 
     def __init__(self, cfg: Config):
+        global CFG  # ← הוסף שורה זו
+        CFG = cfg  # ← הוסף שורה זו
         ensure_dirs(cfg)
         colorama_init(autoreset=True)
 
