@@ -270,6 +270,14 @@ config.llm_timeout = 60             # Seconds to wait for LLM response (default:
 - Default to ~150 words for faster, more focused dialogue
 - Fallback to comma/semicolon boundaries if no sentence ending found
 
+**LLM Length Instructions (v2.2.0+):**
+- Every LLM prompt now includes: `"Please answer in no more than 150 words. End your response at the nearest sentence."`
+- Primary mechanism for controlling response length directly at LLM level
+- `smart_truncate_response()` still active as **fallback** for responses exceeding the limit
+- Dual-layer approach ensures clean, complete responses:
+  1. **Layer 1:** LLM self-limits based on prompt instruction (preferred)
+  2. **Layer 2:** Post-processing truncation if needed (fallback)
+
 **Reduced Timeout** improves responsiveness:
 - Maximum timeout reduced from 10 minutes to 60 seconds
 - Faster failure detection when LLM is unresponsive
@@ -286,6 +294,48 @@ config.dream_every_n_turns = 7     # Dream cycle frequency
 ```
 
 For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
+
+### Character Pronoun Display (v2.2.0+)
+
+Entelgia now supports optional display of character pronouns for enhanced clarity and inclusivity:
+
+```python
+config = Config()
+config.show_pronouns = False  # Default: disabled for gender-neutral display
+```
+
+**Characters and their pronouns:**
+- **Socrates** - `he`
+- **Athena** - `she` 
+- **Fixy** - `he`
+
+**When enabled (`show_pronouns=True`):**
+- Character names appear with pronouns in dialogue output: `Socrates (he):`, `Athena (she):`
+- LLM prompts include pronoun information for better contextual understanding
+- Helps LLM understand character identity and relationships more clearly
+
+**When disabled (`show_pronouns=False`, default):**
+- Character names appear without pronouns: `Socrates:`, `Athena:`
+- Gender-neutral presentation for more inclusive conversation style
+- Backward compatible with previous behavior
+
+**Impact on LLM behavior:**
+- **With pronouns enabled:** LLMs may produce more naturally gendered references in responses (e.g., "he argued", "she proposed")
+- **Without pronouns:** LLMs maintain more neutral language, referring to characters by name rather than gendered pronouns
+- Both modes preserve full character personality and dialogue quality
+
+**Usage example:**
+```python
+# Enable pronoun display
+cfg = Config(show_pronouns=True)
+
+# Characters will display as:
+# "Socrates (he): ..."
+# "Athena (she): ..."
+# "Fixy (he): ..."
+```
+
+The system uses the `get_display_name()` helper function throughout to ensure consistent pronoun handling across all output and prompts.
 
 ---
 

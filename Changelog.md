@@ -10,6 +10,26 @@ These are changes that have been committed to the repository but have not yet be
 
 ### ➕ Added
 
+- **Character Pronoun Support** 🏷️ (v2.2.0-unreleased)
+  - New `show_pronouns` global configuration option (default: `False`)
+  - `pronoun` field added to Agent class for character pronouns
+  - Character pronouns defined:
+    - Socrates: `he`
+    - Athena: `she`
+    - Fixy: `he`
+  - `get_display_name()` helper function for consistent pronoun handling
+  - Pronouns displayed in dialogue when `show_pronouns=True` (e.g., "Socrates (he):")
+  - Gender-neutral by default for backward compatibility
+  - Documentation updated explaining impact on LLM behavior
+  
+- **LLM Response Length Control** 📏 (v2.2.0-unreleased)
+  - All LLM prompts now include explicit length instruction: "Please answer in no more than 150 words. End your response at the nearest sentence."
+  - Dual-layer length control:
+    - Primary: LLM self-limits based on prompt instruction
+    - Fallback: `smart_truncate_response()` post-processing
+  - Cleaner, more complete responses at sentence boundaries
+  - Better control over dialogue pacing and focus
+
 - **Enhanced Dialogue Module** 🎭
   - `entelgia/` package with modular dialogue components
   - `dialogue_engine.py` - Dynamic speaker selection & seed generation
