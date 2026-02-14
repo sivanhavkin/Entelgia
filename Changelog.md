@@ -4,9 +4,37 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [Unreleased]
+## [Unreleased] - v2.2.0
 
 These are changes that have been committed to the repository but have not yet been packaged as a new release. When a new version is tagged, the contents of this section should be moved under the appropriate version heading below.
+
+### ➕ Added
+
+- **Pronoun Support** 🏷️
+  - Official support for gender pronouns (he/she) for agents
+  - `show_pronoun` flag in Config (default: False for backwards compatibility)
+  - `is_global_show_pronouns` global control variable in enhanced_personas module
+  - Pronoun data added to personas: Socrates (he), Athena (she), Fixy (he)
+  - Uniform display control in user and LLM prompts
+  - When enabled, pronouns appear as "AgentName (pronoun):" in prompts
+  - Gender-neutral by default to maintain inclusive conversation style
+
+- **LLM Response Quality** ⚡
+  - 150-word limit instruction explicitly added to all LLM prompts
+  - Ensures concise, focused responses from language models
+  - Works in conjunction with existing smart_truncate_response() fallback
+  - Maintains sentence boundary preservation for natural cutoffs
+
+### 📝 Documentation
+
+- Added version notes to all modified files indicating unreleased features
+- Latest official release marked as v2.1.1 throughout codebase
+- Added comprehensive comments explaining pronoun feature
+- Hebrew/English documentation for pronoun support
+
+---
+
+## [2.1.1] - Current Official Release
 
 ### ➕ Added
 

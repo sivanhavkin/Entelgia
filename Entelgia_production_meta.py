@@ -17,8 +17,8 @@ Advanced Multi-Agent Dialogue System with:
 - 10-MINUTE AUTO-TIMEOUT
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Pronoun support and 150-word limit features added for v2.2.0 (Unreleased).
-Latest official release: v2.1.1
+Version Note: Latest release: 2.1.1. Unreleased changes pending as 2.2.0.
+(Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
 - Python 3.10+
