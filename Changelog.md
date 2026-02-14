@@ -10,7 +10,7 @@ These are changes that have been committed to the repository but have not yet be
 
 ### ➕ Added
 
-- **Character Pronoun Support** 🏷️ (v2.2.0-unreleased)
+- **Character Pronoun Support** 🏷️
   - New `show_pronouns` global configuration option (default: `False`)
   - `pronoun` field added to Agent class for character pronouns
   - Character pronouns defined:
@@ -18,12 +18,14 @@ These are changes that have been committed to the repository but have not yet be
     - Athena: `she`
     - Fixy: `he`
   - `get_display_name()` helper function for consistent pronoun handling
+  - `display_name` property on Agent class for clean API access
   - Pronouns displayed in dialogue when `show_pronouns=True` (e.g., "Socrates (he):")
   - Gender-neutral by default for backward compatibility
   - Documentation updated explaining impact on LLM behavior
   
-- **LLM Response Length Control** 📏 (v2.2.0-unreleased)
+- **LLM Response Length Control** 📏
   - All LLM prompts now include explicit length instruction: "Please answer in no more than 150 words. End your response at the nearest sentence."
+  - `LLM_LENGTH_INSTRUCTION` defined as ClassVar constant for consistency
   - Dual-layer length control:
     - Primary: LLM self-limits based on prompt instruction
     - Fallback: `smart_truncate_response()` post-processing
@@ -54,9 +56,11 @@ These are changes that have been committed to the repository but have not yet be
 - **Testing & Demo** 🧪
   - `test_enhanced_dialogue.py` - 5 comprehensive tests for dialogue system
   - `demo_enhanced_dialogue.py` - 10-turn demonstration script
-  - All tests passing (5 dialogue + 19 security = 24 total)
+  - `test_pronoun_support.py` - 4 tests for pronoun functionality
+  - `demo_pronoun_support.py` - Interactive pronoun demonstration
+  - All tests passing (28 total: 19 security + 5 dialogue + 4 pronoun)
 
-- **Response Quality Control** ⚡ (v2.2.0-unreleased)
+- **Response Quality Control** ⚡
   - `smart_truncate_response()` function for intelligent text truncation
   - New Config options:
     - `max_output_words` (default: 150) - Maximum words per response
@@ -92,20 +96,30 @@ These are changes that have been committed to the repository but have not yet be
   - Smarter context management (fewer token waste)
   - Fixy only speaks when needed (not every N turns)
 
-- **Timeouts & Performance** ⚡ (v2.2.0-unreleased)
+- **Timeouts & Performance** ⚡
   - Reduced `llm_timeout` from 600 seconds (10 minutes) to 60 seconds (1 minute)
   - Shorter maximum wait times for LLM responses
   - Faster failure detection when LLM is unresponsive
   - Better user experience with more predictable response times
 
-- **Gender-Neutral Output** 🌐 (v2.2.0-unreleased)
+- **Gender-Neutral Output** 🌐
   - Removed gender language tracking initialization
-  - Cleaner dialogue output without gender pronouns
+  - Cleaner dialogue output without gender pronouns by default
+  - Configurable pronoun display via `show_pronouns` flag
   - More inclusive and neutral conversation style
+
+### ⚠️ Deprecated
+
+- `Agent.get_display_name()` method deprecated in favor of `display_name` property
+  - Will be removed in v3.0.0
+  - Emits `DeprecationWarning` when called
+  - Use `agent.display_name` property instead
 
 ### 📝 Notes
 
 > This update maintains backward compatibility. Legacy mode works if `entelgia/` is not present.
+
+> All new features are opt-in and default to backward-compatible behavior.
 
 > Target release: **v2.2.0** (Minor - new features, backward compatible)
 
