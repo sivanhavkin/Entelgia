@@ -6,9 +6,16 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased] 
 
+### Changed
+- Removed all Unicode icons (such as ✔, ✓, 🚨, etc.) from logger messages in all main execution files and test/demo scripts.
+  - This improves compatibility with Windows consoles and environments that do not support extended Unicode in standard output.
+- Logger outputs are now ASCII-only for maximum readability on all platforms.
+- No changes made to documentation, README, or markdown files – decorative icons remain.
 
-<-- No changes yet -->
+### Fixed
+- UnicodeEncodeError warnings no longer appear when running on Windows terminal.
 
+---
 ---
 
 ## [2.2.0] - 2026-02-14
@@ -354,6 +361,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
