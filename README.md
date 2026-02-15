@@ -31,10 +31,12 @@ For the full architectural and theoretical foundation:
 📘 [whitepaper.md](whitepaper.md)
 
 ---
-## 📘 System Specification
 
+## 📘 System Specification
 See the full architecture specification here:  
+
 👉 [System Specification (SPEC.md)](./SPEC.md)
+
 ---
 ## ✨ Core Features
 
