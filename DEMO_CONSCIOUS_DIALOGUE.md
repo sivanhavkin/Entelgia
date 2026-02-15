@@ -92,4 +92,4 @@ Fixy concurs: Memory shapes identity through dynamic reconstruction under the in
 
 ---
 
-> For more conversation demos or test scripts, see `/examples` or open a new discussion.
+> For more conversation demos or test scripts, open a new discussion.
