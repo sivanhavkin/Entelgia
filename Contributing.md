@@ -1,82 +1,86 @@
-# Contributing to Entelgia
+# 🤝 Contributing to Entelgia
 
-I appreciate your interest in Entelgia.
+Thank you for your interest in Entelgia!
 
-Entelgia is a research-oriented, consciousness-inspired AI architecture.
-Contributions are welcome — but they should respect the system’s core principles.
-
----
-
-## What This Project Values
-
-Before contributing, please understand that Entelgia prioritizes:
-
-- Internal regulation through dialogue and conflict
-- Persistent memory and identity continuity
-- Reflection, correction, and moral tension over hard-coded rules
-- Clarity of intent over technical cleverness
-
-Contributions that improve performance **without preserving these principles**
-may be declined.
+Entelgia is a research-oriented, consciousness-inspired AI architecture.  
+**Contributions are welcome—especially when aligned with the project’s core principles.**
 
 ---
 
-## Ways to Contribute
+## 💡 What This Project Values
+
+Before contributing, please consider that Entelgia prioritizes:
+
+- **Internal regulation** through dialogue and conflict  
+- **Persistent memory** and identity continuity  
+- **Reflection, correction, and moral tension** over hard-coded rules  
+- **Clarity of intent** over technical cleverness
+
+> _Performance improvements are valued only when these principles are preserved._  
+> **Changes that undermine core philosophy may be declined.**
+
+---
+
+## 🛠️ Ways to Contribute
 
 You are welcome to contribute by:
 
 - Reporting bugs or unexpected behaviors
 - Suggesting architectural improvements
-- Improving documentation or clarity
-- Proposing experiments or research directions
 - Refining prompts, observer logic, or memory dynamics
-- Improving safety, transparency, or reproducibility
+- Improving documentation and clarity
+- Proposing experiments or research directions
+- Enhancing safety, transparency, or reproducibility
 
-Small, focused contributions are preferred.
-
----
-
-## Before Submitting a Pull Request
-
-Please ensure that:
-
-- Your change aligns with Entelgia’s conceptual goals
-- Code is readable and intentionally written
-- New behavior is explained (what changed and why)
-- Experimental or speculative changes are clearly labeled
-
-If you are unsure whether a change fits, open an issue first.
+_Small, focused contributions are especially appreciated._
 
 ---
 
-## Style & Philosophy
+## ✅ Before Submitting a Pull Request
 
-- Favor clarity over abstraction
-- Avoid unnecessary frameworks or indirection
-- Do not optimize away meaningful internal tension
-- Do not remove observer or reflective mechanisms for simplicity
+Make sure that:
 
-This is not a chatbot framework — it is an exploratory system.
+- Your change **aligns with Entelgia’s conceptual goals**
+- Code is *readable* and *intentionally written*
+- New behavior is explained (**what changed and why**)
+- Experimental or speculative changes are **clearly labeled**
 
----
-
-## Ethics & Conduct
-
-All contributors are expected to follow the Code of Conduct.
-
-Entelgia is a human-centered research project.
-Contributions that promote harm, abuse, or deceptive practices will not be accepted.
+_If unsure, please open an issue first to discuss!_
 
 ---
 
-## Questions & Discussion
+## ✨ Style & Philosophy
 
-If you want to discuss ideas, philosophy, or experiments:
-- Open an issue
-- Or start a discussion thread
+- **Clarity over abstraction**—favor understandable solutions.
+- Avoid unnecessary frameworks or indirection.
+- **Do not optimize away meaningful internal “tension.”**
+- Do **not** remove observer or reflective mechanisms for simplicity.
 
-Curiosity is welcome. Certainty is not required.
+_Entelgia is an **exploratory system**, not just a chatbot framework._
 
 ---
 
-Thank you for contributing to the evolution of Entelgia.
+## 🌱 Ethics & Conduct
+
+All contributors must follow the **Code of Conduct**.
+
+Entelgia is a human-centered research project:  
+Contributions that promote harm, abuse, or deceptive practices are not welcome and will be rejected.
+
+---
+
+## 💬 Questions & Discussion
+
+- Open an **issue** to discuss ideas, philosophy, or experiments.
+- Or start a **discussion thread**.
+
+> _Curiosity is welcome—certainty is not required._
+
+---
+
+## 🙏 Thank You
+
+Thank you for contributing to the evolution of Entelgia!  
+Your ideas and efforts help push the boundaries of what AI architecture can become.
+
+---
