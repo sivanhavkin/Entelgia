@@ -102,6 +102,8 @@ while session_active:
     maybe_fixy_intervene(dialog_history, turn)
 
     maybe_dream_cycle(turn)
+```
+
 ## 3) Modes: Enhanced vs Legacy
 
 ### Enhanced Mode
