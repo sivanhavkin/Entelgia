@@ -1607,7 +1607,7 @@ class SessionManager:
                 if not validate_signature(
                     session_json.encode("utf-8"), MEMORY_SECRET_KEY_BYTES, sig_bytes
                 ):
-                    logger.warning(f"🚨 INVALID SESSION SIGNATURE: {session_id}")
+                    logger.warning(f"INVALID SESSION SIGNATURE: {session_id}")
                     return None
 
             return session_data
@@ -1763,7 +1763,7 @@ def test_config_validation():
     cfg = Config(cache_size=100, max_turns=10)
     assert cfg.cache_size == 100
     assert cfg.max_turns == 10
-    logger.info("✓ Config validation tests passed")
+    logger.info("Config validation tests passed")
 
 
 def test_lru_cache():
@@ -1782,7 +1782,7 @@ def test_lru_cache():
     assert cache.get("a") is None
     assert cache.get("d") == 4
 
-    logger.info("✓ LRU cache tests passed")
+    logger.info("LRU cache tests passed")
 
 
 def test_redaction():
@@ -1793,7 +1793,7 @@ def test_redaction():
     assert "[REDACTED]" in redacted
     assert "john@example.com" not in redacted
 
-    logger.info("✓ Redaction tests passed")
+    logger.info("Redaction tests passed")
 
 
 def test_validation():
@@ -1809,7 +1809,7 @@ def test_validation():
     validated = validate_output(text_with_control)
     assert "\x00" not in validated
 
-    logger.info("✓ Validation tests passed")
+    logger.info("Validation tests passed")
 
 
 def test_metrics_tracker():
@@ -1826,7 +1826,7 @@ def test_metrics_tracker():
     metrics.record_cache_miss()
     assert metrics.hit_rate() == 0.5
 
-    logger.info("✓ Metrics tracker tests passed")
+    logger.info("Metrics tracker tests passed")
 
 
 def test_topic_manager():
@@ -1842,7 +1842,7 @@ def test_topic_manager():
     mgr.advance_round()
     assert mgr.current() == "A"
 
-    logger.info("✓ Topic manager tests passed")
+    logger.info("Topic manager tests passed")
 
 
 def test_behavior_core():
@@ -1858,7 +1858,7 @@ def test_behavior_core():
     assert 0 <= score1 <= 1
     assert 0 <= score2 <= 1
 
-    logger.info("✓ Behavior core tests passed")
+    logger.info("Behavior core tests passed")
 
 
 def test_language_core():
@@ -1870,7 +1870,7 @@ def test_language_core():
     lang.set("Socrates", "en")
     assert lang.get("Socrates") == "en"
 
-    logger.info("✓ Language core tests passed")
+    logger.info("Language core tests passed")
 
 
 def test_fixy_report():
@@ -1886,7 +1886,7 @@ def test_fixy_report():
     assert report.detected_issue is True
     assert report.severity == "high"
 
-    logger.info("✓ Fixy report tests passed")
+    logger.info("Fixy report tests passed")
 
 
 def test_memory_signatures():
@@ -1909,7 +1909,7 @@ def test_memory_signatures():
     wrong_key = b"wrong_key"
     assert validate_signature(test_msg, wrong_key, sig) == False
 
-    logger.info("✓ Memory signature tests passed")
+    logger.info("Memory signature tests passed")
 
 
 def test_session_manager():
@@ -1988,7 +1988,7 @@ def test_session_manager():
         result = sm.load_session("nonexistent")
         assert result is None
 
-        logger.info("✓ SessionManager security tests passed")
+        logger.info("SessionManager security tests passed")
 
     finally:
         # Cleanup
