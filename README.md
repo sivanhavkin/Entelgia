@@ -1,4 +1,6 @@
 📖 [See a conscious awareness demo](./DEMO_CONSCIOUS_DIALOGUE.md)
+📘 System Specification: see SPEC.md
+
 
 # 🧠 Entelgia
 
