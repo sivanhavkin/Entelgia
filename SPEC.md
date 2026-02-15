@@ -4,7 +4,7 @@
 
 This document defines the **“laws of physics”** of Entelgia: the runtime loop, state model, dialogue policy, observer policy (Fixy), and the signals we can measure.
 
----
+
 
 ## 0) Scope & Non-goals
 
@@ -63,7 +63,7 @@ Need-based intervention:
 - decides *if* and *why* to intervene
 - generates a short actionable intervention message
 
----
+
 
 ## 2) Runtime Loop (“Physics Loop”)
 
