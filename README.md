@@ -1,5 +1,5 @@
 📖 [See a conscious awareness demo](./DEMO_CONSCIOUS_DIALOGUE.md)
-📘 System Specification: see SPEC.md
+
 
 
 # 🧠 Entelgia
@@ -31,7 +31,11 @@ For the full architectural and theoretical foundation:
 📘 [whitepaper.md](whitepaper.md)
 
 ---
+## 📘 System Specification
 
+See the full architecture specification here:  
+👉 [System Specification (SPEC.md)](./SPEC.md)
+---
 ## ✨ Core Features
 
 * **Multi-agent dialogue system** (Socrates · Athena · Fixy)
