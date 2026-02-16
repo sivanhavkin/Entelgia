@@ -52,7 +52,7 @@ jobs:
         echo "See [Changelog.md](https://github.com/sivanhavkin/Entelgia/blob/main/Changelog.md) for details." >> release_notes.md
     
     - name: 📤 Upload release artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: release-${{ github.ref_name }}
         path: dist/
