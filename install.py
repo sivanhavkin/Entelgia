@@ -267,7 +267,7 @@ def update_api_key():
 
     if response == "y":
         api_key = generate_secure_key(48)
-        print_success(f"Generated secure key: {api_key[:20]}...{api_key[-8:]}")
+        print_success("Generated secure 48-character key (saved to .env file)")
     else:
         manual_response = (
             input("Would you like to enter a custom MEMORY_SECRET_KEY? (y/n): ")
