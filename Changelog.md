@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased] 
 
+### Installation & Documentation Improvements
+- Added a new `install.py` script for automated setup: installs all Python dependencies, creates the `.env` file, prompts for API key, and checks/installs Ollama (where supported).
+- Refactored README: unified all installation steps into a single "Quick Install" section, including a direct link to `install.py`.
+- Removed duplicate/manual install instructions and clarified the process for installing Ollama, with consistent formatting and messaging.
 ### Changed
 - Removed all Unicode icons (such as ✔, ✓, 🚨, etc.) from logger messages in all main execution files and test/demo scripts.
   - This improves compatibility with Windows consoles and environments that do not support extended Unicode in standard output.
@@ -361,6 +365,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
