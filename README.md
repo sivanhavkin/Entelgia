@@ -18,9 +18,10 @@
 
 ## Entelgia — A Dialogue-Governed Multi-Agent AI Architecture
 
-**Entelgia** is a multi-agent AI architecture that models persistent identity, internal conflict, and emergent moral regulation through shared long-term memory and structured dialogue.
+**Entelgia is an experimental multi-agent AI architecture designed to explore persistent identity, internal conflict dynamics, and emergent behavioral regulation through shared long-term memory and structured dialogue.
 
-Unlike stateless chatbot systems, Entelgia maintains evolving internal state across sessions — enabling identity continuity, persistence, and reflective behavioral coherence.
+  Unlike stateless chatbot systems, Entelgia maintains an evolving internal state across sessions, enabling continuity of identity, memory persistence, and more coherent reflective behavior over time.
+
 
 ---
 
