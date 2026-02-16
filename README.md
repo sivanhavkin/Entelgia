@@ -1,9 +1,5 @@
 📖 [See a conscious awareness demo](./DEMO_CONSCIOUS_DIALOGUE.md)
 
-[install.py](https://github.com/sivanhavkin/Entelgia/blob/main/install.py)
-
-
-
 # 🧠 Entelgia
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
@@ -132,85 +128,134 @@ pip install -r requirements.txt
 
 ## ⚡ Quick Install
 
-For a streamlined installation experience, use the automated installer script:
+The fastest way to get started is using the automated installer:
 
 ```bash
 # Clone the repository
 git clone https://github.com/sivanhavkin/Entelgia.git
 cd Entelgia
 
-# Run the installer
+# Run the automated installer
 python install.py
 ```
 
-The installer will:
-1. ✅ Check for Ollama installation (auto-install on macOS via Homebrew)
-2. ✅ Pull the phi3 model (or let you choose to skip)
-3. ✅ Create `.env` configuration from `.env.example`
-4. ✅ **Auto-generate secure `MEMORY_SECRET_KEY`** (or let you enter custom key)
-5. ✅ Install Python dependencies from `requirements.txt`
+📄 **See the installer script:** [`install.py`](https://github.com/sivanhavkin/Entelgia/blob/main/install.py)
 
-### 📝 Platform-Specific Notes
+The installer automates the entire setup process:
+1. ✅ Detects and installs Ollama (macOS via Homebrew; manual instructions for Linux/Windows)
+2. ✅ Pulls the `phi3` model (or lets you skip)
+3. ✅ Creates `.env` configuration from `.env.example`
+4. ✅ Generates secure `MEMORY_SECRET_KEY` (or accepts custom key)
+5. ✅ Installs Python dependencies from `requirements.txt`
 
-**macOS:**
-- The installer can automatically install Ollama via Homebrew
-- If Homebrew is not installed, visit [brew.sh](https://brew.sh) first
-
-**Linux:**
-- Manual Ollama installation required:
-  ```bash
-  curl -fsSL https://ollama.com/install.sh | sh
-  ```
-- Or visit: [ollama.com/download/linux](https://ollama.com/download/linux)
-
-**Windows:**
-- Manual Ollama installation required
-- Download from: [ollama.com/download/windows](https://ollama.com/download/windows)
-- Or use WSL2 with Linux installation method
-
-After running the installer, follow the on-screen instructions to:
+After installation completes, follow the on-screen instructions to:
 - Start Ollama: `ollama serve`
-- Pull a model (if you skipped it): `ollama pull phi3`
 - Run Entelgia: `python demo_enhanced_dialogue.py`
 
 ---
 
-## 🚀 Installation
+## 🔧 Manual Installation
 
-### Recommended Version
+If automatic installation isn't possible, follow these steps:
 
-**Use v2.2.0** - This is the current stable release.
+### 1️⃣ Install Ollama
+
+Entelgia requires **Ollama** for local LLM execution.
+
+**macOS:**
+```bash
+brew install ollama
+```
+
+**Linux:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+**Windows:**
+- Download installer from [ollama.com/download/windows](https://ollama.com/download/windows)
+- Or use WSL2 with the Linux installation method
+
+👉 More info: [ollama.com](https://ollama.com)
+
+### 2️⃣ Pull an LLM Model
+
+```bash
+ollama pull phi3
+```
+
+Recommended models (8GB+ RAM recommended):
+* **phi3 (3.8B)** – Fast & lightweight [recommended for 8GB systems]
+* **mistral (7B)** – Balanced reasoning
+* **neural-chat (7B)** – Strong conversational coherence
+
+### 3️⃣ Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4️⃣ Configure Environment
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Generate secure key (or add your own)
+python -c "import secrets; print(secrets.token_hex(32))"
+
+# Add the key to .env file:
+# MEMORY_SECRET_KEY=<generated-key>
+```
+
+### 5️⃣ Run Entelgia
+
+```bash
+# Start Ollama (if not already running)
+ollama serve
+
+# Run the enhanced dialogue demo (10 turns, ~2 minutes)
+python demo_enhanced_dialogue.py
+
+# Or run the full system (30 minutes)
+python Entelgia_production_meta.py
+```
+
+---
+
+## 🚀 Installation from GitHub
+
+For development or integration purposes:
 
 ```bash
 # Install from GitHub (recommended)
 pip install git+https://github.com/sivanhavkin/Entelgia.git
 
-# Or clone and install
+# Or clone and install in editable mode
 git clone https://github.com/sivanhavkin/Entelgia.git
 cd Entelgia
 pip install -e .
 ```
 
-### 📦 Release Information
+### 🔄 Upgrading
+
+```bash
+pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
+```
+
+---
+
+## 📦 Version Information
 
 | Version | Status | Notes |
 |---------|--------|-------|
 | **v2.2.0** | ✅ **Stable** | Enhanced dialogue system |
-| **v2.1.1** |⚠️ Superseded | Use v2.2.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.2.0 instead |
 | v2.1.0 | ⚠️ Superseded | Use v2.1.1 instead |
 | v2.0.01 | ⚠️ Superseded | Use v2.1.1 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
-
-### 🔄 Upgrading
-
-If you're using an older version:
-
-```bash
-# Upgrade to latest
-pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
-```
 
 ---
 
@@ -229,77 +274,6 @@ We follow [Semantic Versioning](https://semver.org/):
 - 🚨 **Hotfixes**: Within 24h for security issues
 
 📖 See [Changelog.md](Changelog.md) for detailed version history.
-
----
-
-## 🔧 Installing Ollama
-
-Entelgia runs entirely on a **local LLM** for privacy, reproducibility, and execution control.
-
-### 1️⃣ Download Ollama
-
-👉 [https://ollama.com](https://ollama.com)
-
-Supported:
-
-* macOS
-* Linux
-* Windows (WSL recommended)
-
----
-
-### 2️⃣ Pull a Model
-
-```bash
-ollama pull phi3
-```
-
-If you encounter `OLLAMA_HTTP_ERROR` or `EOF`, ensure Ollama is running.
-
-Recommended models:
-
-* **phi3 (3.8B)** – Fast & lightweight
-* **mistral (7B)** – Balanced reasoning
-* **neural-chat (7B)** – Strong conversational coherence
-* **openchat (7B)** – Fast dialogue
-
-> On 8GB RAM systems, prefer `phi3`.
-
----
-
-### 3️⃣ Verify Installation
-
-```bash
-ollama run phi3 "hello"
-```
-
-If a response appears, Ollama is operational.
-
----
-
-## 🚀 Quick Start
-
-```bash
-git clone https://github.com/sivanhavkin/Entelgia.git
-cd Entelgia
-
-pip install -r requirements.txt
-ollama pull phi3
-
-# Only if Ollama is not already running:
-# ollama serve
-
-# 🆕 Run enhanced dialogue demo (10 turns, 2 minutes)
-python demo_enhanced_dialogue.py
-
-# Run full system (30 minutes)
-python Entelgia_production_meta.py
-
-# 🆕 Run enhanced dialogue tests
-python test_enhanced_dialogue.py
-```
-
-Upon launch, memory initializes automatically and the agents begin structured dialogue.
 
 ---
 
