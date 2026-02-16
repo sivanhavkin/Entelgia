@@ -26,7 +26,7 @@ Unlike stateless chatbot systems, Entelgia maintains evolving internal state acr
 
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
-> **⚡ Get started in under 2 minutes with our automated installer!**
+> **⚡ Get started with our automated installer!**
 
 The fastest way to install and configure Entelgia:
 
