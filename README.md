@@ -1,5 +1,3 @@
-📖 [See a conscious awareness demo](./DEMO_CONSCIOUS_DIALOGUE.md)
-
 # 🧠 Entelgia
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
@@ -14,6 +12,8 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 ![CI](https://github.com/sivanhavkin/Entelgia/actions/workflows/python-app.yml/badge.svg)
 
+---
+
 ## A Consciousness-Inspired Multi-Agent AI Architecture
 
 **Entelgia** is a multi-agent AI architecture that models persistent identity, internal conflict, and emergent moral regulation through shared long-term memory and structured dialogue.
@@ -22,113 +22,11 @@ Unlike stateless chatbot systems, Entelgia maintains evolving internal state acr
 
 ---
 
-## 📖 Whitepaper
+## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
-For the full architectural and theoretical foundation:
+> **⚡ Get started in under 2 minutes with our automated installer!**
 
-📘 [whitepaper.md](whitepaper.md)
-
----
-
-## 📘 System Specification
-See the full architecture specification here:  
-
-👉 [System Specification (SPEC.md)](./SPEC.md)
-
----
-## ✨ Core Features
-
-* **Multi-agent dialogue system** (Socrates · Athena · Fixy)
-* **Persistent memory**
-  * Short-term memory (JSON)
-  * Long-term memory (SQLite)
-  * 🔐 HMAC-SHA256 cryptographic integrity protection
-* **🆕 Enhanced Dialogue Engine** (v2.2.0+)
-  * **Dynamic speaker selection** - Intelligent turn-taking (no 3+ consecutive turns)
-  * **Varied seed generation** - 6+ strategy types (analogy, disagree, reflect, etc.)
-  * **Rich context enrichment** - Full dialogue history + thoughts + memories
-  * **Smart Fixy interventions** - Need-based (not scheduled) meta-cognitive monitoring
-  * **Enhanced personas** - Deep character traits and speech patterns
-* **Psychological drive modeling**
-  * Id / Ego / Superego dynamics
-* **Emotion tracking & importance scoring**
-* **Dream cycles & memory promotion**
-* **Observer-based meta-cognition**
-* **Memory poisoning protection**
-* **PII redaction & privacy safeguards**
-* **Resilient error handling (exponential backoff)**
-* **Structured logging**
-
----
-
-## ⚡ Performance
-
-* **Up to 50% fewer LLM calls** via LRU caching
-* **Up to 70% lower token usage** through compression
-* **Up to 2–3× faster** response times
-* **🆕 More natural dialogue** - Dynamic speaker selection vs ping-pong
-* **🆕 Full responses** - No truncation; LLM guidance ensures concise ~150-word answers
-
----
-
-## 🏗 Architecture Overview
-
-Entelgia is built as a modular CoreMind system:
-
-* `Conscious` — reflective narrative construction
-* `Memory` — persistent identity continuity
-* `Emotion` — affective weighting & regulation
-* `Language` — dialogue-driven cognition
-* `Behavior` — goal-oriented response shaping
-* `Observer` — meta-level monitoring & correction
-
-### 🆕 Enhanced Dialogue Module (v2.2.0+)
-
-The new `entelgia/` package provides modular components:
-
-```
-entelgia/
-├── __init__.py              # Package exports
-├── dialogue_engine.py       # Dynamic speaker & seed generation
-├── enhanced_personas.py     # Rich character definitions
-├── context_manager.py       # Smart context enrichment
-└── fixy_interactive.py      # Need-based interventions
-```
-
-**Key improvements:**
-- 📊 **6 seed strategies** vs 1 simple template
-- 🎯 **Dynamic speaker selection** vs ping-pong alternation
-- 🧠 **Context-aware** with 8 turns + 6 thoughts + 5 memories
-- 🔍 **Intelligent Fixy** detects circular reasoning, not just scheduled checks
-
-The entire system runs as a unified executable Python file:
-
-```
-Entelgia_production_meta.py
-```
-
----
-
-## 📋 Requirements
-
-For the complete dependency list, see `requirements.txt`.
-
-* Python **3.10+**
-* **Ollama** (local LLM runtime)
-* At least one supported model (`phi3`, `mistral`, etc.)
-* **8GB+ RAM** recommended (16GB+ for larger models)
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## ⚡ Quick Install
-
-The fastest way to get started is using the automated installer:
+The fastest way to install and configure Entelgia:
 
 ```bash
 # Clone the repository
@@ -139,18 +37,39 @@ cd Entelgia
 python install.py
 ```
 
-📄 **See the installer script:** [`install.py`](https://github.com/sivanhavkin/Entelgia/blob/main/install.py)
+📄 **View installer source:** [`install.py`](https://github.com/sivanhavkin/Entelgia/blob/main/install.py)
 
-The installer automates the entire setup process:
-1. ✅ Detects and installs Ollama (macOS via Homebrew; manual instructions for Linux/Windows)
-2. ✅ Pulls the `phi3` model (or lets you skip)
-3. ✅ Creates `.env` configuration from `.env.example`
-4. ✅ Generates secure `MEMORY_SECRET_KEY` (or accepts custom key)
-5. ✅ Installs Python dependencies from `requirements.txt`
+### What the installer does:
 
-After installation completes, follow the on-screen instructions to:
-- Start Ollama: `ollama serve`
-- Run Entelgia: `python demo_enhanced_dialogue.py`
+1. ✅ **Detects and installs Ollama** (macOS via Homebrew; provides instructions for Linux/Windows)
+2. ✅ **Pulls the `phi3` model** automatically (or lets you skip)
+3. ✅ **Creates `.env` configuration** from template
+4. ✅ **Generates secure `MEMORY_SECRET_KEY`** (48-char cryptographic key)
+5. ✅ **Installs Python dependencies** from `requirements.txt`
+
+### After installation:
+
+```bash
+# Start Ollama service
+ollama serve
+
+# Run the demo (10 turns, ~2 minutes)
+python demo_enhanced_dialogue.py
+
+# Or run the full system (30 minutes)
+python Entelgia_production_meta.py
+```
+
+---
+
+## 📋 Requirements
+
+* Python **3.10+**
+* **Ollama** (local LLM runtime)
+* At least one supported model (`phi3`, `mistral`, etc.)
+* **8GB+ RAM** recommended (16GB+ for larger models)
+
+For the complete dependency list, see [`requirements.txt`](requirements.txt).
 
 ---
 
@@ -223,7 +142,7 @@ python Entelgia_production_meta.py
 
 ---
 
-## 🚀 Installation from GitHub
+## 📦 Installation from GitHub
 
 For development or integration purposes:
 
@@ -245,35 +164,38 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
 
 ---
 
-## 📦 Version Information
+## ✨ Core Features
 
-| Version | Status | Notes |
-|---------|--------|-------|
-| **v2.2.0** | ✅ **Stable** | Enhanced dialogue system |
-| **v2.1.1** | ⚠️ Superseded | Use v2.2.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.1.1 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.1.1 instead |
-| v1.5 | 📦 Legacy | Production v2.0+ recommended |
-
-💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
+* **Multi-agent dialogue system** (Socrates · Athena · Fixy)
+* **Persistent memory**
+  * Short-term memory (JSON)
+  * Long-term memory (SQLite)
+  * 🔐 HMAC-SHA256 cryptographic integrity protection
+* **🆕 Enhanced Dialogue Engine** (v2.2.0+)
+  * **Dynamic speaker selection** - Intelligent turn-taking (no 3+ consecutive turns)
+  * **Varied seed generation** - 6+ strategy types (analogy, disagree, reflect, etc.)
+  * **Rich context enrichment** - Full dialogue history + thoughts + memories
+  * **Smart Fixy interventions** - Need-based (not scheduled) meta-cognitive monitoring
+  * **Enhanced personas** - Deep character traits and speech patterns
+* **Psychological drive modeling**
+  * Id / Ego / Superego dynamics
+* **Emotion tracking & importance scoring**
+* **Dream cycles & memory promotion**
+* **Observer-based meta-cognition**
+* **Memory poisoning protection**
+* **PII redaction & privacy safeguards**
+* **Resilient error handling (exponential backoff)**
+* **Structured logging**
 
 ---
 
-## 📋 Release Policy
+## ⚡ Performance
 
-We follow [Semantic Versioning](https://semver.org/):
-
-- **Major** (v3.0.0): Breaking changes
-- **Minor** (v2.2.0): New features, backward compatible  
-- **Patch** (v2.1.2): Bug fixes only
-
-### Release Schedule
-
-- 🗓️ **Minor releases**: Every 2 weeks (feature batches)
-- 🐛 **Patch releases**: As needed for critical bugs
-- 🚨 **Hotfixes**: Within 24h for security issues
-
-📖 See [Changelog.md](Changelog.md) for detailed version history.
+* **Up to 50% fewer LLM calls** via LRU caching
+* **Up to 70% lower token usage** through compression
+* **Up to 2–3× faster** response times
+* **🆕 More natural dialogue** - Dynamic speaker selection vs ping-pong
+* **🆕 Full responses** - No truncation; LLM guidance ensures concise ~150-word answers
 
 ---
 
@@ -325,41 +247,49 @@ For the complete list of configuration options, see the `Config` class definitio
 
 ---
 
-## 🧪 Research Scope
+## 🏗 Architecture Overview
 
-Entelgia is an architectural experiment exploring:
+Entelgia is built as a modular CoreMind system:
 
-* Persistent identity in LLM systems
-* Internal tension as computational driver
-* Memory-based regulation
-* Dialogue-driven ethical modeling
+* `Conscious` — reflective narrative construction
+* `Memory` — persistent identity continuity
+* `Emotion` — affective weighting & regulation
+* `Language` — dialogue-driven cognition
+* `Behavior` — goal-oriented response shaping
+* `Observer` — meta-level monitoring & correction
 
-It does **not** claim biological consciousness or sentience.
+### 🆕 Enhanced Dialogue Module (v2.2.0+)
+
+The new `entelgia/` package provides modular components:
+
+```
+entelgia/
+├── __init__.py              # Package exports
+├── dialogue_engine.py       # Dynamic speaker & seed generation
+├── enhanced_personas.py     # Rich character definitions
+├── context_manager.py       # Smart context enrichment
+└── fixy_interactive.py      # Need-based interventions
+```
+
+**Key improvements:**
+- 📊 **6 seed strategies** vs 1 simple template
+- 🎯 **Dynamic speaker selection** vs ping-pong alternation
+- 🧠 **Context-aware** with 8 turns + 6 thoughts + 5 memories
+- 🔍 **Intelligent Fixy** detects circular reasoning, not just scheduled checks
+
+The entire system runs as a unified executable Python file:
+
+```
+Entelgia_production_meta.py
+```
 
 ---
 
-## 📄 License
+## 📚 Documentation
 
-Entelgia is released under the **MIT License**.
-
-This ensures the project remains open, permissive, and compatible with the broader open‑source ecosystem, encouraging research, experimentation, and collaboration.
-
-For the complete legal terms, see the `LICENSE` file included in this repository.
-
----
-
-### Ethical Position
-
-While the MIT License permits broad use, Entelgia was created as a **research‑oriented, human‑centered system** exploring reflective dialogue, moral self‑regulation, and internal cognitive structure.
-
-The original creator, **Sivan Havkin**, does not endorse and is not responsible for applications that:
-
-* Intentionally cause harm to human beings or other living creatures
-* Enable coercion, manipulation, or exploitation
-* Promote violence, hatred, or dehumanization
-* Contradict the philosophical intent of the project
-
-This statement expresses the ethical stance of the author but does not modify the legal permissions granted by the MIT License.
+* 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
+* 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
+* 📖 **[Conscious Awareness Demo](./DEMO_CONSCIOUS_DIALOGUE.md)** - See the system in action
 
 ---
 
@@ -448,6 +378,59 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 ---
 
+---
+
+## 📦 Version Information
+
+| Version | Status | Notes |
+|---------|--------|-------|
+| **v2.2.0** | ✅ **Stable** | Enhanced dialogue system |
+| **v2.1.1** | ⚠️ Superseded | Use v2.2.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.1.1 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.1.1 instead |
+| v1.5 | 📦 Legacy | Production v2.0+ recommended |
+
+💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
+
+---
+
+---
+
+## 📋 Release Policy
+
+We follow [Semantic Versioning](https://semver.org/):
+
+- **Major** (v3.0.0): Breaking changes
+- **Minor** (v2.2.0): New features, backward compatible  
+- **Patch** (v2.1.2): Bug fixes only
+
+### Release Schedule
+
+- 🗓️ **Minor releases**: Every 2 weeks (feature batches)
+- 🐛 **Patch releases**: As needed for critical bugs
+- 🚨 **Hotfixes**: Within 24h for security issues
+
+📖 See [Changelog.md](Changelog.md) for detailed version history.
+
+---
+
+---
+
+## 🧪 Research Scope
+
+Entelgia is an architectural experiment exploring:
+
+* Persistent identity in LLM systems
+* Internal tension as computational driver
+* Memory-based regulation
+* Dialogue-driven ethical modeling
+
+It does **not** claim biological consciousness or sentience.
+
+---
+
+---
+
 ## 📰 News & Recognition
 
 **January 2026** — Entelgia was featured by **Yutori AI Agents Research & Frameworks Scout** in their article *"New agent SDKs and skills with secure execution"*.
@@ -489,6 +472,33 @@ Together, these projects advance three operational levers:
 
 ---
 
+---
+
+## 📄 License
+
+Entelgia is released under the **MIT License**.
+
+This ensures the project remains open, permissive, and compatible with the broader open‑source ecosystem, encouraging research, experimentation, and collaboration.
+
+For the complete legal terms, see the `LICENSE` file included in this repository.
+
+---
+
+### Ethical Position
+
+While the MIT License permits broad use, Entelgia was created as a **research‑oriented, human‑centered system** exploring reflective dialogue, moral self‑regulation, and internal cognitive structure.
+
+The original creator, **Sivan Havkin**, does not endorse and is not responsible for applications that:
+
+* Intentionally cause harm to human beings or other living creatures
+* Enable coercion, manipulation, or exploitation
+* Promote violence, hatred, or dehumanization
+* Contradict the philosophical intent of the project
+
+This statement expresses the ethical stance of the author but does not modify the legal permissions granted by the MIT License.
+
+---
+
 ## 👤 Author
 
 Conceived and developed by **Sivan Havkin**.
@@ -513,4 +523,3 @@ It sits at the intersection between academic experimentation and real-world appl
 - The project actively solicits both contributors interested in AI/agent research and users who need a dependable foundation for projects that require persistent, moral, and reflective AI agents.
 
 This "hybrid" approach allows Entelgia to bridge the gap between the rapid pace of AI research and the needs of production-grade software.
-  
