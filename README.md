@@ -128,6 +128,51 @@ pip install -r requirements.txt
 
 ---
 
+## ⚡ Quick Install
+
+For a streamlined installation experience, use the automated installer script:
+
+```bash
+# Clone the repository
+git clone https://github.com/sivanhavkin/Entelgia.git
+cd Entelgia
+
+# Run the installer
+python install.py
+```
+
+The installer will:
+1. ✅ Check for Ollama installation (auto-install on macOS via Homebrew)
+2. ✅ Pull the phi3 model (or let you choose to skip)
+3. ✅ Create `.env` configuration from `.env.example`
+4. ✅ **Auto-generate secure `MEMORY_SECRET_KEY`** (or let you enter custom key)
+5. ✅ Install Python dependencies from `requirements.txt`
+
+### 📝 Platform-Specific Notes
+
+**macOS:**
+- The installer can automatically install Ollama via Homebrew
+- If Homebrew is not installed, visit [brew.sh](https://brew.sh) first
+
+**Linux:**
+- Manual Ollama installation required:
+  ```bash
+  curl -fsSL https://ollama.com/install.sh | sh
+  ```
+- Or visit: [ollama.com/download/linux](https://ollama.com/download/linux)
+
+**Windows:**
+- Manual Ollama installation required
+- Download from: [ollama.com/download/windows](https://ollama.com/download/windows)
+- Or use WSL2 with Linux installation method
+
+After running the installer, follow the on-screen instructions to:
+- Start Ollama: `ollama serve`
+- Pull a model (if you skipped it): `ollama pull phi3`
+- Run Entelgia: `python demo_enhanced_dialogue.py`
+
+---
+
 ## 🚀 Installation
 
 ### Recommended Version
