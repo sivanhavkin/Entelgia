@@ -13,7 +13,7 @@
 ![CI](https://github.com/sivanhavkin/Entelgia/actions/workflows/python-app.yml/badge.svg)
 
 [![📖 See a conscious awareness demo](https://img.shields.io/badge/📖%20See%20a%20conscious%20awareness%20demo-blue?style=for-the-badge)](https://github.com/sivanhavkin/Entelgia/blob/main/DEMO_CONSCIOUS_DIALOGUE.md)
-📖 See a conscious awareness demo
+
 ---
 
 ## A Consciousness-Inspired Multi-Agent AI Architecture
