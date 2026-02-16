@@ -375,7 +375,7 @@ def print_next_steps(model_pulled=False):
     print("   ollama serve")
 
     if not model_pulled:
-        print("\n2. Pull a model (e.g., phi3):")
+        print("\n2. Pull a model if not pulled automatically  (e.g., phi3):")
         print("   ollama pull phi3")
         step_verify = "3"
         step_run = "4"
