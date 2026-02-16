@@ -325,36 +325,6 @@ For the complete list of configuration options, see the `Config` class definitio
 
 ---
 
-## 🔐 Memory Security
-
-Entelgia supports cryptographic integrity protection for memory entries.
-
-To enable memory signing:
-
-```bash
-export MEMORY_SECRET_KEY="your-generated-key"
-```
-
-Generate a secure key:
-
-```bash
-python -c "import secrets; print(secrets.token_hex(32))"
-```
-
-Security includes:
-
-* HMAC-SHA256 signatures
-* Tampering detection & rejection
-* Constant-time comparison
-* Environment-based key management
-* Backward compatibility
-
-Full documentation:
-
-`docs/memory_security.md`
-
----
-
 ## 🧪 Research Scope
 
 Entelgia is an architectural experiment exploring:
