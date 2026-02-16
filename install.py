@@ -16,6 +16,8 @@ import sys
 import platform
 import subprocess
 import shutil
+import secrets
+import string
 from pathlib import Path
 
 
@@ -186,7 +188,7 @@ def pull_ollama_model(model_name="phi3"):
 
 def setup_ollama_model():
     """Prompt user to pull an Ollama model."""
-    print_step(1.5, "Setting up Ollama model...")
+    print_step("1.5", "Setting up Ollama model...")
 
     print("\nEntelgia requires an LLM model to run.")
     print("Recommended models:")
@@ -203,7 +205,7 @@ def setup_ollama_model():
     else:
         print_warning("Skipping model download")
         print("You can pull a model later with: ollama pull phi3")
-        return True
+        return False  # Return False since model was not pulled
 
 
 def setup_env_file():
@@ -236,6 +238,14 @@ def setup_env_file():
     return True
 
 
+def generate_secure_key(length=48):
+    """Generate a cryptographically secure random key."""
+    # Use a mix of letters, digits, and some special characters
+    alphabet = string.ascii_letters + string.digits + "-_"
+    key = "".join(secrets.choice(alphabet) for _ in range(length))
+    return key
+
+
 def update_api_key():
     """Prompt for API key and update .env file."""
     print_step(3, "Configuring API key...")
@@ -248,29 +258,35 @@ def update_api_key():
 
     print("\nThe MEMORY_SECRET_KEY is used for cryptographic integrity protection.")
     print("It should be at least 32 characters long.")
-    print(
-        "Current value in .env.example: "
-        "'your-secret-key-here-change-in-production-32-chars-min'"
-    )
 
     response = (
-        input("\nWould you like to set a custom MEMORY_SECRET_KEY? (y/n): ")
+        input("\nWould you like to automatically generate a secure key? (y/n): ")
         .strip()
         .lower()
     )
 
-    if response != "y":
-        print("Keeping existing configuration")
-        return True
+    if response == "y":
+        api_key = generate_secure_key(48)
+        print_success(f"Generated secure key: {api_key[:20]}...{api_key[-8:]}")
+    else:
+        manual_response = (
+            input("Would you like to enter a custom MEMORY_SECRET_KEY? (y/n): ")
+            .strip()
+            .lower()
+        )
 
-    api_key = input("Enter your MEMORY_SECRET_KEY (min 32 characters): ").strip()
-
-    if len(api_key) < 32:
-        print_warning("Warning: Key is shorter than recommended 32 characters")
-        confirm = input("Continue anyway? (y/n): ").strip().lower()
-        if confirm != "y":
-            print("Skipping API key update")
+        if manual_response != "y":
+            print("Keeping existing configuration from .env.example")
             return True
+
+        api_key = input("Enter your MEMORY_SECRET_KEY (min 32 characters): ").strip()
+
+        if len(api_key) < 32:
+            print_warning("Warning: Key is shorter than recommended 32 characters")
+            confirm = input("Continue anyway? (y/n): ").strip().lower()
+            if confirm != "y":
+                print("Keeping existing configuration from .env.example")
+                return True
 
     try:
         # Read the current .env file

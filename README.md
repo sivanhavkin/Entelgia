@@ -145,7 +145,7 @@ The installer will:
 1. ✅ Check for Ollama installation (auto-install on macOS via Homebrew)
 2. ✅ Pull the phi3 model (or let you choose to skip)
 3. ✅ Create `.env` configuration from `.env.example`
-4. ✅ Prompt for `MEMORY_SECRET_KEY` setup
+4. ✅ **Auto-generate secure `MEMORY_SECRET_KEY`** (or let you enter custom key)
 5. ✅ Install Python dependencies from `requirements.txt`
 
 ### 📝 Platform-Specific Notes
