@@ -22,7 +22,7 @@ The Dependabot configuration file (`.github/dependabot.yml`) references labels t
 
 ## Solution
 
-Create the missing labels in the GitHub repository. This can be done in two ways:
+Create the missing labels in the GitHub repository. This can be done in several ways:
 
 ### Option 1: Using GitHub Web UI
 
