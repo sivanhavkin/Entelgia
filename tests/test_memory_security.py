@@ -142,7 +142,7 @@ class TestSecurityProperties:
     def test_unicode_support(self, test_secret_key):
         """Test that unicode messages are handled correctly."""
         messages = [
-            "שלום עולם",  # Hebrew
+            "Hello World",  # English
             "Hello 世界",  # Mixed
             "مرحبا",  # Arabic
             "🎉🎊✨",  # Emojis

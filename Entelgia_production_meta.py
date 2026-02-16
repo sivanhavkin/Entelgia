@@ -62,7 +62,7 @@ Show help:
   python entelgia_production_meta.py help
 """
 
-from __future__ import annotations  # <-- זה חייב להיות ראשון!
+from __future__ import annotations  # Must be first!
 import sys
 import io
 
@@ -2005,8 +2005,8 @@ class MainScript:
     """Main orchestrator for multi-agent dialogue (configurable timeout)."""
 
     def __init__(self, cfg: Config):
-        global CFG  # ← הוסף שורה זו
-        CFG = cfg  # ← הוסף שורה זו
+        global CFG  # Add this line
+        CFG = cfg  # Add this line
         ensure_dirs(cfg)
         colorama_init(autoreset=True)
 

@@ -190,7 +190,7 @@ This version finalises the 2.x production rewrite with additional **memory secur
 - ✅ **Automatic forgetting** of memory entries when signature validation fails, ensuring corrupted or tampered memories are not retained.
 - ✅ **Secret key management** via environment variables, allowing secure configuration of cryptographic keys without hard‑coding secrets.
 - ✅ **Unit tests** to validate signature creation and verification logic.
-- ✅ **Windows Unicode encoding fix** to improve emoji and Hebrew character support.
+- ✅ **Windows Unicode encoding fix** to improve emoji and character support.
 - ✅ **Standard MIT License** replacing the custom Entelgia ethical licence.
 
 ### 🔄 Changed

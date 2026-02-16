@@ -186,8 +186,8 @@ Generate your intervention (2-4 sentences, direct and concrete).
 
         # Simple heuristic: look for disagreement markers
         conflict_markers = [
-            "לא",
-            "אבל",
+            "no",
+            "but",
             "disagree",
             "however",
             "wrong",
@@ -195,8 +195,8 @@ Generate your intervention (2-4 sentences, direct and concrete).
             "actually",
             "contrary",
             "opposite",
-            "טעות",
-            "שגוי",
+            "mistake",
+            "error",
         ]
 
         conflict_count = 0
@@ -230,17 +230,17 @@ Generate your intervention (2-4 sentences, direct and concrete).
         depth_markers = [
             "why",
             "because",
-            "מדוע",
-            "כי",
+            "how",
+            "reason",
             "therefore",
             "implies",
             "consequence",
             "deeper",
             "fundamental",
             "underlying",
-            "עמוק",
-            "יסוד",
-            "השלכה",
+            "depth",
+            "foundation",
+            "implication",
         ]
 
         depth_count = 0
@@ -274,11 +274,11 @@ Generate your intervention (2-4 sentences, direct and concrete).
             "together",
             "both",
             "combine",
-            "מחבר",
-            "משלב",
-            "יחד",
-            "שניהם",
-            "גם",
+            "linking",
+            "merging",
+            "unified",
+            "all",
+            "also",
         ]
 
         has_synthesis = False
