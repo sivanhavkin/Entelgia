@@ -17,7 +17,7 @@ Advanced Multi-Agent Dialogue System with:
 - 10-MINUTE AUTO-TIMEOUT
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 2.2.0.
+Version Note: Latest release: 2.3.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:

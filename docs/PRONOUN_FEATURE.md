@@ -110,7 +110,7 @@ When `show_pronoun=False` (default):
 ## Version Information / מידע גרסה
 
 - **Feature Version:** v2.2.0 
-- **Latest Official Release:** v2.2.0
+- **Latest Official Release:** v2.3.0
 - **Status:**י Stable
 
 ---

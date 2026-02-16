@@ -337,8 +337,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.1.1
-- 🚧 **Next release:** v2.2.0 (Enhanced Dialogue - coming soon)
+- ✅ **Latest stable:** v2.3.0
+- 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
 
@@ -348,8 +348,9 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.2.0** | TBD | Minor | 🚧 **Coming Soon** | Enhanced dialogue system |
-| **v2.1.1** | 2026-02-13 | Patch | ✅ **Current** | Bug fixes + formatting |
+| **v2.3.0** | 2026-02-16 | Minor | ✅ **Current** | Installation improvements |
+| **v2.2.0** | 2026-02-14 | Minor | ⚠️ Superseded | Enhanced dialogue system |
+| **v2.1.1** | 2026-02-13 | Patch | ⚠️ Superseded | Bug fixes + formatting |
 | v2.1.0 | 2026-02-13 | Minor | ⚠️ Superseded | Testing infrastructure |
 | v2.0.01 | 2026-02-13 | Major | ⚠️ Superseded | Production rewrite |
 | v1.5 | 2026-01-31 | Minor | 📦 Legacy | Multi-agent v1.5 |

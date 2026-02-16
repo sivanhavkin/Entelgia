@@ -56,7 +56,7 @@ Test Coverage:
 
 ### Version Information
 - Feature version: v2.2.0 
-- Latest official release: v2.2.0
+- Latest official release: v2.3.0
 - All version markers updated throughout codebase
 
 ---
@@ -117,7 +117,7 @@ PR זה מיישם תמיכה רשמית בכינויי גוף בפרומפטי�
 
 ### מידע גרסה
 - גרסת תכונה: v2.2.0
-- שחרור רשמי אחרון: v2.2.0
+- שחרור רשמי אחרון: v2.3.0
 - כל סימני הגרסה עודכנו בכל הקוד
 
 ---
