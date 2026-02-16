@@ -190,16 +190,6 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
 
 ---
 
-## ⚡ Performance
-
-* **Up to 50% fewer LLM calls** via LRU caching
-* **Up to 70% lower token usage** through compression
-* **Up to 2–3× faster** response times
-* **🆕 More natural dialogue** - Dynamic speaker selection vs ping-pong
-* **🆕 Full responses** - No truncation; LLM guidance ensures concise ~150-word answers
-
----
-
 ## ⚙️ Configuration
 
 Entelgia can be customized through the `Config` class in `Entelgia_production_meta.py`. Key configuration options:
