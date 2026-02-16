@@ -245,7 +245,7 @@ class Config:
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
-    llm_timeout: int = 600  # Reduced from 600 to 60 seconds for faster responses
+    llm_timeout: int = 300  # Reduced from 600 to 300 seconds for faster responses
     max_prompt_tokens: int = 800
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     log_level: int = logging.INFO
