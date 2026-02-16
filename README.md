@@ -143,9 +143,10 @@ python install.py
 
 The installer will:
 1. ✅ Check for Ollama installation (auto-install on macOS via Homebrew)
-2. ✅ Create `.env` configuration from `.env.example`
-3. ✅ Prompt for `MEMORY_SECRET_KEY` setup
-4. ✅ Install Python dependencies from `requirements.txt`
+2. ✅ Pull the phi3 model (or let you choose to skip)
+3. ✅ Create `.env` configuration from `.env.example`
+4. ✅ Prompt for `MEMORY_SECRET_KEY` setup
+5. ✅ Install Python dependencies from `requirements.txt`
 
 ### 📝 Platform-Specific Notes
 
@@ -167,7 +168,7 @@ The installer will:
 
 After running the installer, follow the on-screen instructions to:
 - Start Ollama: `ollama serve`
-- Pull a model: `ollama pull phi3`
+- Pull a model (if you skipped it): `ollama pull phi3`
 - Run Entelgia: `python demo_enhanced_dialogue.py`
 
 ---

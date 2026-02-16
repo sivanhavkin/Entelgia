@@ -149,6 +149,63 @@ def setup_ollama():
         return False
 
 
+def pull_ollama_model(model_name="phi3"):
+    """Pull an Ollama model."""
+    print(f"\nAttempting to pull Ollama model: {model_name}")
+    print("This may take several minutes depending on your internet speed...")
+
+    try:
+        process = subprocess.Popen(
+            ["ollama", "pull", model_name],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+
+        # Stream output to show progress
+        for line in iter(process.stdout.readline, ""):
+            if line:
+                print(line.rstrip())
+
+        process.wait()
+
+        if process.returncode == 0:
+            print_success(f"Model '{model_name}' pulled successfully")
+            return True
+        else:
+            print_error(f"Failed to pull model '{model_name}'")
+            return False
+    except FileNotFoundError:
+        print_error("Ollama command not found")
+        return False
+    except Exception as e:
+        print_error(f"Error pulling model: {e}")
+        return False
+
+
+def setup_ollama_model():
+    """Prompt user to pull an Ollama model."""
+    print_step(1.5, "Setting up Ollama model...")
+
+    print("\nEntelgia requires an LLM model to run.")
+    print("Recommended models:")
+    print("  - phi3 (3.8B) - Fast & lightweight [RECOMMENDED]")
+    print("  - mistral (7B) - Balanced reasoning")
+    print("  - neural-chat (7B) - Strong conversational coherence")
+
+    response = (
+        input("\nWould you like to pull the phi3 model now? (y/n): ").strip().lower()
+    )
+
+    if response == "y":
+        return pull_ollama_model("phi3")
+    else:
+        print_warning("Skipping model download")
+        print("You can pull a model later with: ollama pull phi3")
+        return True
+
+
 def setup_env_file():
     """Copy .env.example to .env if it doesn't exist."""
     print_step(2, "Setting up environment configuration...")
@@ -192,7 +249,8 @@ def update_api_key():
     print("\nThe MEMORY_SECRET_KEY is used for cryptographic integrity protection.")
     print("It should be at least 32 characters long.")
     print(
-        "Current value in .env.example: 'your-secret-key-here-change-in-production-32-chars-min'"
+        "Current value in .env.example: "
+        "'your-secret-key-here-change-in-production-32-chars-min'"
     )
 
     response = (
@@ -282,7 +340,8 @@ def verify_python_version():
     version = sys.version_info
     if version.major < 3 or (version.major == 3 and version.minor < 10):
         print_error(
-            f"Python 3.10+ is required. Current version: {version.major}.{version.minor}"
+            f"Python 3.10+ is required. "
+            f"Current version: {version.major}.{version.minor}"
         )
         return False
     print_success(
@@ -291,7 +350,7 @@ def verify_python_version():
     return True
 
 
-def print_next_steps():
+def print_next_steps(model_pulled=False):
     """Print instructions for next steps after installation."""
     print_header("Installation Complete!")
 
@@ -299,13 +358,19 @@ def print_next_steps():
     print("\n1. Start Ollama (if not already running):")
     print("   ollama serve")
 
-    print("\n2. Pull a model (e.g., phi3):")
-    print("   ollama pull phi3")
+    if not model_pulled:
+        print("\n2. Pull a model (e.g., phi3):")
+        print("   ollama pull phi3")
+        step_verify = "3"
+        step_run = "4"
+    else:
+        step_verify = "2"
+        step_run = "3"
 
-    print("\n3. Verify Ollama is working:")
+    print(f"\n{step_verify}. Verify Ollama is working:")
     print('   ollama run phi3 "hello"')
 
-    print("\n4. Run Entelgia:")
+    print(f"\n{step_run}. Run Entelgia:")
     print("   python demo_enhanced_dialogue.py")
     print("   or")
     print("   python Entelgia_production_meta.py")
@@ -332,6 +397,9 @@ def main():
         print("\nInstallation paused. Please install Ollama and run this script again.")
         sys.exit(1)
 
+    # Step 1.5: Pull Ollama model
+    model_pulled = setup_ollama_model()
+
     # Step 2: Setup .env file
     if not setup_env_file():
         print_error("Failed to setup .env file")
@@ -348,7 +416,7 @@ def main():
         sys.exit(1)
 
     # Print next steps
-    print_next_steps()
+    print_next_steps(model_pulled)
 
 
 if __name__ == "__main__":
