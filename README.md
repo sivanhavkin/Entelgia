@@ -290,6 +290,7 @@ Entelgia_production_meta.py
 * 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
 * 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
 * 📖 **[Conscious Awareness Demo](./DEMO_CONSCIOUS_DIALOGUE.md)** - See the system in action
+* ⭐ **[Awesome Lists Submission Guide](./docs/AWESOME_LISTS_SUBMISSION.md)** - How to add Entelgia to awesome lists
 
 ---
 
