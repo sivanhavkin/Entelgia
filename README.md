@@ -384,10 +384,11 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.2.0** | ✅ **Stable** | Enhanced dialogue system |
-| **v2.1.1** | ⚠️ Superseded | Use v2.2.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.1.1 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.1.1 instead |
+| **v2.3.0** | ✅ **Stable** | Latest release |
+| **v2.2.0** | ⚠️ Superseded | Use v2.3.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.3.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.3.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.3.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -401,7 +402,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 We follow [Semantic Versioning](https://semver.org/):
 
 - **Major** (v3.0.0): Breaking changes
-- **Minor** (v2.2.0): New features, backward compatible  
+- **Minor** (v2.3.0): New features, backward compatible  
 - **Patch** (v2.1.2): Bug fixes only
 
 ### Release Schedule
@@ -508,8 +509,8 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.2.0 
-* **Last Updated:** 14 February 2026
+* **Version:** 2.3.0 
+* **Last Updated:** 16 February 2026
 
 ### What is "Research Hybrid"?
 
