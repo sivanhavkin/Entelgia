@@ -16,7 +16,7 @@
 
 ---
 
-## A Consciousness-Inspired Multi-Agent AI Architecture
+## Entelgia — A Dialogue-Governed Multi-Agent AI Architecture
 
 **Entelgia** is a multi-agent AI architecture that models persistent identity, internal conflict, and emergent moral regulation through shared long-term memory and structured dialogue.
 
