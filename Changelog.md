@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased] 
 
+---
+
+## [2.3.0] - 2026-02-16
+
 ### Installation & Documentation Improvements
 - Added a new `install.py` script for automated setup: installs all Python dependencies, creates the `.env` file, prompts for API key, and checks/installs Ollama (where supported).
 - Refactored README: unified all installation steps into a single "Quick Install" section, including a direct link to `install.py`.
@@ -20,7 +24,7 @@ All notable changes to this project will be documented in this file. The format 
 - UnicodeEncodeError warnings no longer appear when running on Windows terminal.
 
 ---
----
+
 
 ## [2.2.0] - 2026-02-14
 
@@ -365,6 +369,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
