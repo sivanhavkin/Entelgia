@@ -1,6 +1,5 @@
 # PR Summary: Pronoun Support and 150-Word Limit Features
 
-## English Summary
 
 ### Overview
 This PR implements official support for gender pronouns in agent prompts and adds explicit 150-word limit instructions to all LLM prompts, as requested in the original issue.
