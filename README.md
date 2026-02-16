@@ -12,7 +12,7 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 ![CI](https://github.com/sivanhavkin/Entelgia/actions/workflows/python-app.yml/badge.svg)
 
-[![📖 See a conscious awareness demo](https://github.com/sivanhavkin/Entelgia/blob/main/DEMO_CONSCIOUS_DIALOGUE.md)
+[![ See a conscious awareness demo](https://github.com/sivanhavkin/Entelgia/blob/main/DEMO_CONSCIOUS_DIALOGUE.md)
 
 ---
 
