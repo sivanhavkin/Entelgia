@@ -20,7 +20,7 @@
 
 **Entelgia** is a multi-agent AI architecture that models persistent identity, internal conflict, and emergent moral regulation through shared long-term memory and structured dialogue.
 
-Unlike stateless chatbot systems, Entelgia maintains evolving internal state across sessions — enabling identity continuity, emotional persistence, and reflective behavioral coherence.
+Unlike stateless chatbot systems, Entelgia maintains evolving internal state across sessions — enabling identity continuity, persistence, and reflective behavioral coherence.
 
 ---
 
