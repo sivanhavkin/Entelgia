@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased] 
 
- - Removes all Hebrew language content to standardize repository on English only. Standalone Hebrew text was translated; duplicate Hebrew/English sections were deduplicated
+   Removes all Hebrew language content to standardize repository on English only. Standalone Hebrew text was translated; duplicate Hebrew/English sections were deduplicated
+
 ---
 
 ## [2.3.0] - 2026-02-16
@@ -371,6 +372,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
