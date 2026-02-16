@@ -43,7 +43,7 @@ import requests
 response = requests.post(
     "http://localhost:8000/api/v1/chat",
     json={
-        "message": "שלום, מה קורה?",
+        "message": "Hello, what's up?",
         "user_id": "demo_user"
     }
 )
@@ -121,7 +121,7 @@ class EntalgiaClient:
 
 # Usage
 client = EntalgiaClient()
-result = client.chat("מה המשמעות של חיים?", "user_123")
+result = client.chat("What is the meaning of life?", "user_123")
 print(result['data']['reply'])
 ```
 

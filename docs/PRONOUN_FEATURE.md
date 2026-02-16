@@ -1,48 +1,45 @@
 # Pronoun Support Feature
 
-## Overview / סקירה כללית
+## Overview
 
-**English:** The pronoun support feature allows displaying gender pronouns (he/she) after agent names in prompts and dialogue. This feature is disabled by default to maintain gender-neutral output.
-
-**עברית:** תכונת תמיכת הכינויים מאפשרת הצגת כינויי גוף (he/she) אחרי שמות הסוכנים בפרומפטים ובדיאלוג. תכונה זו מושבתת כברירת מחדל כדי לשמור על פלט ניטרלי מגדרית.
+The pronoun support feature allows displaying gender pronouns (he/she) after agent names in prompts and dialogue. This feature is disabled by default to maintain gender-neutral output.
 
 ---
 
-## Configuration / הגדרות
+## Configuration
 
-### Global Control / שליטה גלובלית
+### Global Control
 
 ```python
 from entelgia import is_global_show_pronouns
 # Default: False - pronouns are hidden
-# ברירת מחדל: False - כינויים מוסתרים
 ```
 
-### Config Flag / דגל בהגדרות
+### Config Flag
 
 ```python
 from Entelgia_production_meta import Config
 
 cfg = Config(
-    show_pronoun=True  # Enable pronoun display / הפעל הצגת כינויים
+    show_pronoun=True  # Enable pronoun display
 )
 ```
 
 ---
 
-## Agent Pronouns / כינויי הסוכנים
+## Agent Pronouns
 
-| Agent / סוכן | Pronoun / כינוי | Description / תיאור |
-|--------------|----------------|---------------------|
-| Socrates | he | Philosophical questioner / שואל פילוסופי |
-| Athena | she | Strategic synthesizer / מסכמת אסטרטגית |
-| Fixy | he | Meta-cognitive observer / משקיף מטה-קוגניטיבי |
+| Agent | Pronoun | Description |
+|-------|---------|-------------|
+| Socrates | he | Philosophical questioner |
+| Athena | she | Strategic synthesizer |
+| Fixy | he | Meta-cognitive observer |
 
 ---
 
-## Usage Examples / דוגמאות שימוש
+## Usage Examples
 
-### Example 1: Default (No Pronouns) / דוגמה 1: ברירת מחדל (ללא כינויים)
+### Example 1: Default (No Pronouns)
 
 ```python
 from Entelgia_production_meta import MainScript, Config
@@ -50,10 +47,9 @@ from Entelgia_production_meta import MainScript, Config
 cfg = Config()  # show_pronoun defaults to False
 script = MainScript(cfg)
 # Output: "Socrates: What is knowledge?"
-# פלט: "Socrates: מהי ידיעה?"
 ```
 
-### Example 2: With Pronouns / דוגמה 2: עם כינויים
+### Example 2: With Pronouns
 
 ```python
 from Entelgia_production_meta import MainScript, Config
@@ -61,14 +57,13 @@ from Entelgia_production_meta import MainScript, Config
 cfg = Config(show_pronoun=True)
 script = MainScript(cfg)
 # Output: "Socrates (he): What is knowledge?"
-# פלט: "Socrates (he): מהי ידיעה?"
 ```
 
 ---
 
-## Implementation Details / פרטי יישום
+## Implementation Details
 
-### Persona Data Structure / מבנה נתוני פרסונה
+### Persona Data Structure
 
 Each persona now includes a `pronoun` field:
 
@@ -81,7 +76,7 @@ SOCRATES_PERSONA = {
 }
 ```
 
-### Prompt Formatting / עיצוב פרומפטים
+### Prompt Formatting
 
 When `show_pronoun=True`, prompts are formatted as:
 - `"AgentName (pronoun):"`
@@ -91,33 +86,30 @@ When `show_pronoun=False` (default):
 
 ---
 
-## Benefits / יתרונות
+## Benefits
 
-### Backward Compatibility / תאימות לאחור
-- **English:** Feature is disabled by default, maintaining existing gender-neutral behavior
-- **עברית:** התכונה מושבתת כברירת מחדל, שומרת על ההתנהגות הניטרלית הקיימת
+### Backward Compatibility
+- Feature is disabled by default, maintaining existing gender-neutral behavior
 
-### Flexibility / גמישות
-- **English:** Users can choose to display pronouns when desired for clarity or preference
-- **עברית:** משתמשים יכולים לבחור להציג כינויים כאשר רצוי לבהירות או העדפה
+### Flexibility
+- Users can choose to display pronouns when desired for clarity or preference
 
-### Consistent Control / שליטה עקבית
-- **English:** Single flag controls display across all prompts (user-facing and LLM)
-- **עברית:** דגל אחד שולט בתצוגה בכל הפרומפטים (למשתמש ול-LLM)
+### Consistent Control
+- Single flag controls display across all prompts (user-facing and LLM)
 
 ---
 
-## Version Information / מידע גרסה
+## Version Information
 
 - **Feature Version:** v2.2.0 
 - **Latest Official Release:** v2.3.0
-- **Status:**י Stable
+- **Status:** Stable
 
 ---
 
-## Related Features / תכונות קשורות
+## Related Features
 
-### 150-Word Limit Instruction / הוראת מגבלת 150 מילים
+### 150-Word Limit Instruction
 
 This release also includes explicit 150-word limit instructions in LLM prompts:
 
@@ -127,11 +119,9 @@ IMPORTANT: Keep your response concise (under 150 words).
 
 This works in conjunction with the existing `smart_truncate_response()` fallback mechanism.
 
-**עברית:** מהדורה זו כוללת גם הוראות מפורשות למגבלת 150 מילים בפרומפטי ה-LLM, הפועלות ביחד עם מנגנון הגיבוי smart_truncate_response() הקיים.
-
 ---
 
-## Testing / בדיקות
+## Testing
 
 Run the test suite to verify pronoun functionality:
 
@@ -145,7 +135,7 @@ Expected output includes:
 
 ---
 
-## Technical Notes / הערות טכניות
+## Technical Notes
 
 1. **Pronoun Data:** Stored in persona dictionaries in `entelgia/enhanced_personas.py`
 2. **Control Points:** 
@@ -156,10 +146,9 @@ Expected output includes:
 
 ---
 
-## Future Enhancements / שיפורים עתידיים
+## Future Enhancements
 
 - [ ] Support for additional pronoun options (they/them, etc.)
 - [ ] Per-agent pronoun override
 - [ ] Localized pronoun display based on language
 - [ ] Dynamic pronoun selection in runtime
-

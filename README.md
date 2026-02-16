@@ -355,7 +355,7 @@ Checks that:
 #### Security Properties
 Tests assert that:
 - Signatures are unique across multiple inputs and keys
-- The implementation supports Unicode messages (Hebrew, mixed-language, Arabic, and emojis)
+- The implementation supports Unicode messages (mixed-language, Arabic, and emojis)
 
 > ✅ **All 24 tests currently pass** (5 dialogue + 19 security), providing confidence that both the enhanced dialogue system and cryptographic memory-security mechanisms perform as expected.
 
