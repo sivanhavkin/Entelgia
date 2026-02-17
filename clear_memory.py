@@ -85,12 +85,19 @@ def delete_long_term_memory(data_dir: str) -> bool:
     
     # Check how many entries exist
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM memories")
-        count = cursor.fetchone()[0]
-        conn.close()
-        print(f"\nFound {count} long-term memory entries in the database.")
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            # Check if memories table exists
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='memories'"
+            )
+            if cursor.fetchone() is None:
+                print("Database exists but 'memories' table not found.")
+            else:
+                # Count entries
+                cursor.execute("SELECT COUNT(*) FROM memories")
+                count = cursor.fetchone()[0]
+                print(f"\nFound {count} long-term memory entries in the database.")
     except Exception as e:
         print(f"Could not read database: {e}")
         return False
