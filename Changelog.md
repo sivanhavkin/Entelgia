@@ -6,11 +6,25 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased] 
 
-   -Removes all  foreign language  content to standardize repository to English only.
-  
-   -Added comprehensive troubleshooting documentation.
+### Added
+- **Memory Management Utility** 🗑️
+  - New `clear_memory.py` script for deleting stored memories
+  - Interactive menu with three deletion options:
+    - Delete short-term memory (JSON files)
+    - Delete long-term memory (SQLite database)
+    - Delete all memories (both types)
+  - Safety features:
+    - Confirmation prompt before deletion
+    - Shows count of files/entries before deletion
+    - Cannot be undone warning
+  - Use cases: reset experiments, privacy concerns, testing, storage management
+  - Documentation added to README.md with usage examples
 
-   -Added Q&A - 513-line FAQ covering.
+### Documentation
+- Removes all foreign language content to standardize repository to English only.
+- Added comprehensive troubleshooting documentation.
+- Added Q&A - 513-line FAQ covering.
+- Added Memory Management section to README.md
 
 ---
 
