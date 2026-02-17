@@ -20,6 +20,11 @@ All notable changes to this project will be documented in this file. The format 
   - Use cases: reset experiments, privacy concerns, testing, storage management
   - Documentation added to README.md with usage examples
 
+### Changed
+- Reorganized project structure into modular subdirectories
+- Moved core files from repository root into dedicated folders
+- Improved repository layout for clarity and future scalability
+
 ### Documentation
 - Removed all foreign language content to standardize repository to English only
 - Added comprehensive troubleshooting documentation
@@ -390,6 +395,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
