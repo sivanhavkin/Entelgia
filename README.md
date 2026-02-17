@@ -240,6 +240,51 @@ For the complete list of configuration options, see the `Config` class definitio
 
 ---
 
+## 🗑️ Memory Management
+
+Entelgia provides a utility to clear stored memories when needed. The `clear_memory.py` script allows you to delete:
+
+- **Short-term memory** (JSON files in `entelgia_data/stm_*.json`)
+- **Long-term memory** (SQLite database in `entelgia_data/entelgia_memory.sqlite`)
+- **All memories** (both short-term and long-term)
+
+### Usage
+
+```bash
+python clear_memory.py
+```
+
+The script will prompt you with an interactive menu:
+
+```
+============================================================
+Entelgia Memory Deletion Utility
+============================================================
+
+What would you like to delete?
+
+1. Short-term memory (JSON files)
+2. Long-term memory (SQLite database)
+3. All memories (both short-term and long-term)
+4. Exit
+```
+
+**Safety features:**
+- ⚠️ Confirmation required before deletion
+- 📊 Shows count of files/entries before deletion
+- 🔒 Cannot be undone - use with caution
+
+### When to Use
+
+- **Reset experiments** - Start fresh with new dialogue sessions
+- **Privacy concerns** - Remove stored conversation data
+- **Testing** - Clear state between test runs
+- **Storage management** - Free up disk space
+
+**Note:** Deleting memories will remove all dialogue history and context. The system will start fresh on the next run.
+
+---
+
 ## 🏗 Architecture Overview
 
 Entelgia is built as a modular CoreMind system:
