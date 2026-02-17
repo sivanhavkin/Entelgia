@@ -215,7 +215,7 @@ def setup_env_file():
     # Get the parent directory (repository root)
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent
-    
+
     env_example = repo_root / ".env.example"
     env_file = repo_root / ".env"
 
