@@ -33,7 +33,7 @@ def list_stm_files(data_dir: str) -> List[str]:
     """List all short-term memory JSON files."""
     if not os.path.exists(data_dir):
         return []
-    
+
     files = []
     for file in os.listdir(data_dir):
         if file.startswith("stm_") and file.endswith(".json"):
@@ -44,20 +44,20 @@ def list_stm_files(data_dir: str) -> List[str]:
 def delete_short_term_memory(data_dir: str) -> int:
     """
     Delete all short-term memory files.
-    
+
     Returns:
         Number of files deleted
     """
     stm_files = list_stm_files(data_dir)
-    
+
     if not stm_files:
         print("No short-term memory files found.")
         return 0
-    
+
     print(f"\nFound {len(stm_files)} short-term memory file(s):")
     for file in stm_files:
         print(f"  - {os.path.basename(file)}")
-    
+
     count = 0
     for file in stm_files:
         try:
@@ -66,23 +66,23 @@ def delete_short_term_memory(data_dir: str) -> int:
             print(f"Deleted: {os.path.basename(file)}")
         except Exception as e:
             print(f"Error deleting {os.path.basename(file)}: {e}")
-    
+
     return count
 
 
 def delete_long_term_memory(data_dir: str) -> bool:
     """
     Delete the long-term memory database.
-    
+
     Returns:
         True if successful, False otherwise
     """
     db_path = os.path.join(data_dir, "entelgia_memory.sqlite")
-    
+
     if not os.path.exists(db_path):
         print("No long-term memory database found.")
         return False
-    
+
     # Check how many entries exist
     try:
         # Use context manager for automatic connection cleanup
@@ -103,7 +103,7 @@ def delete_long_term_memory(data_dir: str) -> bool:
     except Exception as e:
         print(f"Could not read database: {e}")
         return False
-    
+
     try:
         os.remove(db_path)
         print(f"Deleted: {os.path.basename(db_path)}")
@@ -116,7 +116,7 @@ def delete_long_term_memory(data_dir: str) -> bool:
 def delete_all_memories(data_dir: str) -> tuple:
     """
     Delete all memories (both short-term and long-term).
-    
+
     Returns:
         Tuple of (stm_count, ltm_deleted)
     """
@@ -128,18 +128,18 @@ def delete_all_memories(data_dir: str) -> tuple:
 def confirm_deletion(memory_type: str) -> bool:
     """
     Ask user to confirm deletion.
-    
+
     Args:
         memory_type: Type of memory to delete ("short-term", "long-term", or "all")
-    
+
     Returns:
         True if user confirms, False otherwise
     """
     print(f"\n⚠️  WARNING: You are about to delete {memory_type} memory!")
     print("This action cannot be undone.")
-    
+
     response = input("\nType 'yes' to confirm deletion: ").strip().lower()
-    return response == 'yes'
+    return response == "yes"
 
 
 def display_menu():
@@ -158,18 +158,18 @@ def display_menu():
 def main():
     """Main function."""
     data_dir = get_data_directory()
-    
+
     # Check if data directory exists
     if not os.path.exists(data_dir):
         print(f"\nData directory '{data_dir}' does not exist.")
         print("No memories to delete.")
         return
-    
+
     while True:
         display_menu()
         choice = input("\nEnter your choice (1-4): ").strip()
-        
-        if choice == '1':
+
+        if choice == "1":
             # Delete short-term memory
             if confirm_deletion("short-term"):
                 print("\nDeleting short-term memory...")
@@ -177,8 +177,8 @@ def main():
                 print(f"\n✓ Deleted {count} short-term memory file(s).")
             else:
                 print("\nDeletion cancelled.")
-        
-        elif choice == '2':
+
+        elif choice == "2":
             # Delete long-term memory
             if confirm_deletion("long-term"):
                 print("\nDeleting long-term memory...")
@@ -189,8 +189,8 @@ def main():
                     print("\n✗ Failed to delete long-term memory.")
             else:
                 print("\nDeletion cancelled.")
-        
-        elif choice == '3':
+
+        elif choice == "3":
             # Delete all memories
             if confirm_deletion("all"):
                 print("\nDeleting all memories...")
@@ -201,18 +201,20 @@ def main():
                 print("\n✓ All memories have been deleted.")
             else:
                 print("\nDeletion cancelled.")
-        
-        elif choice == '4':
+
+        elif choice == "4":
             print("\nExiting...")
             break
-        
+
         else:
             print("\n✗ Invalid choice. Please enter 1, 2, 3, or 4.")
-        
+
         # Ask if user wants to perform another operation
-        if choice in ['1', '2', '3']:
-            continue_response = input("\nPerform another operation? (y/n): ").strip().lower()
-            if continue_response != 'y':
+        if choice in ["1", "2", "3"]:
+            continue_response = (
+                input("\nPerform another operation? (y/n): ").strip().lower()
+            )
+            if continue_response != "y":
                 print("\nExiting...")
                 break
 
