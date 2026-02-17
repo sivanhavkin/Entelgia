@@ -1,4 +1,4 @@
-# ❓ Frequently Asked Questions (Q&A)
+# ❓ Frequently Asked Questions (FAQ)
 
 ## Table of Contents
 
