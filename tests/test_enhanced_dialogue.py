@@ -7,8 +7,10 @@ Tests dynamic speaker selection, seed variety, context enrichment, and Fixy inte
 """
 
 import sys
+import os
 
-sys.path.insert(0, ".")
+# Add parent directory to path so we can import from entelgia package
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from entelgia import (
     DialogueEngine,

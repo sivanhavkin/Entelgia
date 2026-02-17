@@ -12,7 +12,8 @@ import os
 # Suppress warnings for demo
 os.environ["MEMORY_SECRET_KEY"] = "demo-key-not-for-production-use-only"
 
-sys.path.insert(0, ".")
+# Add parent directory to path so we can import Entelgia_production_meta
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from Entelgia_production_meta import MainScript, Config
 from colorama import Fore, Style, init as colorama_init

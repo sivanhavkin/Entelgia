@@ -7,7 +7,7 @@ to ensure memory integrity and tamper detection.
 """
 
 import pytest
-from memory_security import create_signature, validate_signature
+from entelgia.memory_security import create_signature, validate_signature
 
 
 class TestSignatureCreation:
