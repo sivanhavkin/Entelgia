@@ -61,6 +61,8 @@ python demo_enhanced_dialogue.py
 python Entelgia_production_meta.py
 ```
 
+> 💡 **Having issues?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) for common problems and solutions.
+
 ---
 
 ## 📋 Requirements
@@ -281,6 +283,7 @@ Entelgia_production_meta.py
 * 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
 * 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
 * 📖 **[Conscious Awareness Demo](./DEMO_CONSCIOUS_DIALOGUE.md)** - See the system in action
+* 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
 ---
 
