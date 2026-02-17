@@ -64,7 +64,7 @@ The recommended method is using the automated installer:
 ```bash
 git clone https://github.com/sivanhavkin/Entelgia.git
 cd Entelgia
-python install.py
+python scripts/install.py
 ```
 
 The installer will:
@@ -183,7 +183,7 @@ After installation:
 ollama serve
 
 # Run the quick demo (10 turns, ~2 minutes)
-python demo_enhanced_dialogue.py
+python examples/demo_enhanced_dialogue.py
 
 # Or run the full system (30 minutes)
 python Entelgia_production_meta.py
@@ -410,7 +410,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed steps.
 **Solution**:
 ```bash
 # Run enhanced dialogue tests
-python test_enhanced_dialogue.py
+python tests/test_enhanced_dialogue.py
 
 # Run security tests
 pytest tests/test_memory_security.py -v
@@ -449,7 +449,7 @@ Entelgia has comprehensive test coverage:
 
 Run tests:
 ```bash
-python test_enhanced_dialogue.py
+python tests/test_enhanced_dialogue.py
 pytest tests/test_memory_security.py -v
 ```
 

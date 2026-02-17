@@ -52,7 +52,7 @@ Issues = "https://github.com/sivanhavkin/Entelgia/issues"
 entelgia = "Entelgia_production_meta:main"
 
 [tool.setuptools]
-py-modules = ["Entelgia_production_meta", "memory_security"]
+py-modules = ["Entelgia_production_meta"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

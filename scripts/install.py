@@ -9,7 +9,7 @@ This script automates the installation and setup process for Entelgia:
 - Installs Python dependencies
 
 Usage:
-    python install.py
+    python scripts/install.py
 """
 
 import sys
@@ -212,8 +212,12 @@ def setup_env_file():
     """Copy .env.example to .env if it doesn't exist."""
     print_step(2, "Setting up environment configuration...")
 
-    env_example = Path(".env.example")
-    env_file = Path(".env")
+    # Get the parent directory (repository root)
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    
+    env_example = repo_root / ".env.example"
+    env_file = repo_root / ".env"
 
     if not env_example.exists():
         print_error(".env.example file not found in current directory")
@@ -250,7 +254,10 @@ def update_api_key():
     """Prompt for API key and update .env file."""
     print_step(3, "Configuring API key...")
 
-    env_file = Path(".env")
+    # Get the parent directory (repository root)
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    env_file = repo_root / ".env"
 
     if not env_file.exists():
         print_error(".env file does not exist")
@@ -320,7 +327,10 @@ def install_dependencies():
     """Install Python dependencies from requirements.txt."""
     print_step(4, "Installing Python dependencies...")
 
-    requirements = Path("requirements.txt")
+    # Get the parent directory (repository root)
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    requirements = repo_root / "requirements.txt"
 
     if not requirements.exists():
         print_error("requirements.txt not found in current directory")
@@ -330,7 +340,7 @@ def install_dependencies():
     try:
         print("Running: pip install -r requirements.txt")
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+            [sys.executable, "-m", "pip", "install", "-r", str(requirements)],
             capture_output=True,
             text=True,
             timeout=300,
@@ -387,7 +397,7 @@ def print_next_steps(model_pulled=False):
     print('   ollama run phi3 "hello"')
 
     print(f"\n{step_run}. Run Entelgia:")
-    print("   python demo_enhanced_dialogue.py")
+    print("   python examples/demo_enhanced_dialogue.py")
     print("   or")
     print("   python Entelgia_production_meta.py")
 

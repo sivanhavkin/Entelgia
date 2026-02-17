@@ -126,7 +126,7 @@ This works in conjunction with the existing `smart_truncate_response()` fallback
 Run the test suite to verify pronoun functionality:
 
 ```bash
-python test_enhanced_dialogue.py
+python tests/test_enhanced_dialogue.py
 ```
 
 Expected output includes:

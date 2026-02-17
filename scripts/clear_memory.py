@@ -12,7 +12,7 @@ Options:
 - Clear all memories
 
 Usage:
-    python clear_memory.py
+    python scripts/clear_memory.py
 
 The script will prompt you to choose which type of memory to delete.
 """

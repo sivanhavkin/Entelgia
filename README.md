@@ -35,10 +35,10 @@ git clone https://github.com/sivanhavkin/Entelgia.git
 cd Entelgia
 
 # Run the automated installer
-python install.py
+python scripts/install.py
 ```
 
-📄 **View installer source:** [`install.py`](https://github.com/sivanhavkin/Entelgia/blob/main/install.py)
+📄 **View installer source:** [`scripts/install.py`](https://github.com/sivanhavkin/Entelgia/blob/main/scripts/install.py)
 
 ### What the installer does:
 
@@ -55,7 +55,7 @@ python install.py
 ollama serve
 
 # Run the demo (10 turns, ~2 minutes)
-python demo_enhanced_dialogue.py
+python examples/demo_enhanced_dialogue.py
 
 # Or run the full system (30 minutes)
 python Entelgia_production_meta.py
@@ -137,7 +137,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 ollama serve
 
 # Run the enhanced dialogue demo (10 turns, ~2 minutes)
-python demo_enhanced_dialogue.py
+python examples/demo_enhanced_dialogue.py
 
 # Or run the full system (30 minutes)
 python Entelgia_production_meta.py
@@ -251,7 +251,7 @@ Entelgia provides a utility to clear stored memories when needed. The `clear_mem
 ### Usage
 
 ```bash
-python clear_memory.py
+python scripts/clear_memory.py
 ```
 
 The script will prompt you with an interactive menu:
@@ -340,7 +340,7 @@ Entelgia ships with comprehensive test coverage:
 ### 🆕 Enhanced Dialogue Tests (5 tests)
 
 ```bash
-python test_enhanced_dialogue.py
+python tests/test_enhanced_dialogue.py
 ```
 
 Tests verify:
