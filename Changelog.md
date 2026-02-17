@@ -21,9 +21,9 @@ All notable changes to this project will be documented in this file. The format 
   - Documentation added to README.md with usage examples
 
 ### Documentation
-- Removes all foreign language content to standardize repository to English only.
-- Added comprehensive troubleshooting documentation.
-- Added Q&A - 513-line FAQ covering.
+- Removed all foreign language content to standardize repository to English only
+- Added comprehensive troubleshooting documentation
+- Added Q&A - 513-line FAQ covering common questions
 - Added Memory Management section to README.md
 
 ---

@@ -85,6 +85,8 @@ def delete_long_term_memory(data_dir: str) -> bool:
     
     # Check how many entries exist
     try:
+        # Use context manager for automatic connection cleanup
+        # Note: This is read-only, so no explicit commit needed
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             # Check if memories table exists
