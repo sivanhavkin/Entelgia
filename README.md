@@ -12,7 +12,7 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 
 
-[![ See entelgia_demo](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md)
+[![ See Entelgia demo](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md)
 
 ---
 
