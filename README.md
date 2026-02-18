@@ -11,9 +11,6 @@
 [![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/sivanhavkin/Entelgia)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 
-
-[![ See Entelgia demo](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md)
-
 ---
 
 ## Entelgia — A Dialogue-Governed Multi-Agent AI Architecture
