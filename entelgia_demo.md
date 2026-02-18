@@ -1,4 +1,4 @@
-# 🎭 Dialogue Demonstrations-
+# 🎭 Entelgia demo-Dialogue Demonstrations
 
 ## Welcome!
 
