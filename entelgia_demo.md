@@ -276,4 +276,4 @@ Unlike typical chatbots, these agents don't just respond—they **think, reflect
 
 ---
 
-*Thank you for exploring these conscious dialogue demonstrations! We hope they've given you insight into what's possible with reflective, ethically-aware AI agents.* 🌟
+*Thank you for exploring these dialog demonstrations! We hope they've given you insight into what's possible with reflective, ethically-aware AI agents.* 🌟
