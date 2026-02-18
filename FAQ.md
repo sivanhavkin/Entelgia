@@ -26,13 +26,13 @@ Entelgia is derived from philosophical concepts related to entelechy (the realiz
 
 ### Is Entelgia production-ready?
 
-Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.3.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
+Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.3.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring awareness-inspired AI architectures rather than a production service.
 
 ### Who should use Entelgia?
 
 Entelgia is ideal for:
 - AI researchers exploring multi-agent systems
-- Cognitive science enthusiasts interested in consciousness models
+- Cognitive science enthusiasts interested in awareness models
 - Developers studying emergent behavior in AI
 - Anyone curious about persistent AI identity and memory systems
 
@@ -117,7 +117,7 @@ The `MEMORY_SECRET_KEY` is a cryptographic key used to sign and verify long-term
 ### What is the CoreMind system?
 
 The CoreMind is Entelgia's modular architecture consisting of:
-- **Conscious**: Reflective narrative construction
+- **Reflective**: Reflective narrative construction
 - **Memory**: Persistent identity continuity
 - **Emotion**: Affective weighting & regulation
 - **Language**: Dialogue-driven cognition

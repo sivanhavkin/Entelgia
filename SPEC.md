@@ -139,7 +139,7 @@ Fallback when enhanced modules are missing or disabled.
 ### 4.2 Long-Term Memory (LTM)
 
 * persistent store (e.g., SQLite)
-* may contain layers (e.g., `conscious`, `subconscious`) depending on build
+* may contain layers (e.g., `reflective`, `subconscious`) depending on build
 * accessed either “recent” (legacy) or “relevant” (enhanced)
 
 ### 4.3 Drives / Internal Variables
