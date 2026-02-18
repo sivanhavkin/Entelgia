@@ -12,7 +12,7 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 
 
-[![ See an awareness demo](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md)
+[![ See a conscious awareness demo](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md)
 
 ---
 
@@ -30,7 +30,7 @@
 * 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
 * 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
 * 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
-* 📖 **[Awareness Demo](./entelgia_demo.md)** - See the system in action
+* 📖 **[Conscious Awareness Demo](./entelgia_demo.md)** - See the system in action
 * ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
 * 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
@@ -300,7 +300,7 @@ What would you like to delete?
 
 Entelgia is built as a modular CoreMind system:
 
-* `Reflective` — reflective narrative construction
+* `Conscious` — reflective narrative construction
 * `Memory` — persistent identity continuity
 * `Emotion` — affective weighting & regulation
 * `Language` — dialogue-driven cognition
@@ -467,7 +467,7 @@ Entelgia is an architectural experiment exploring:
 * Memory-based regulation
 * Dialogue-driven ethical modeling
 
-It does **not** claim biological awareness or sentience.
+It does **not** claim biological consciousness or sentience.
 
 ---
 

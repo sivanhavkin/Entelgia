@@ -12,7 +12,7 @@
 
 Entelgia is a multi-agent AI architecture designed to explore persistent identity, internal conflict, emotional regulation, and emergent moral reasoning through shared long-term memory and structured dialogue. Unlike stateless large language model (LLM) systems, Entelgia maintains evolving internal state across sessions, enabling continuity of identity and reflective behavioral coherence.
 
-This whitepaper presents the architectural foundations, memory stratification model, internal conflict dynamics, and ethical regulation mechanisms that define Entelgia as a research platform for awareness-inspired AI systems.
+This whitepaper presents the architectural foundations, memory stratification model, internal conflict dynamics, and ethical regulation mechanisms that define Entelgia as a research platform for consciousness-inspired AI systems.
 
 ---
 
@@ -31,7 +31,7 @@ Entelgia explores the hypothesis that:
 
 > Persistent identity, emotional continuity, and internal tension can produce more coherent long-term behavior than purely reactive systems.
 
-The goal is not to replicate biological awareness, but to investigate how structured internal architecture may give rise to emergent regulatory properties.
+The goal is not to replicate biological consciousness, but to investigate how structured internal architecture may give rise to emergent regulatory properties.
 
 ---
 
@@ -279,7 +279,7 @@ import requests
 client = requests.Session()
 response = client.post(
     "http://localhost:8000/api/dialogue/start",
-    json={"topic": "awareness", "user_id": "user123"}
+    json={"topic": "consciousness", "user_id": "user123"}
 )
 data = response.json()
 ```
@@ -391,7 +391,7 @@ Entelgia supports 4 configuration methods (priority order):
 
 Entelgia does not claim:
 
-* Biological awareness
+* Biological consciousness
 * Phenomenological awareness
 * Sentience
 * Autonomous moral agency
@@ -422,7 +422,7 @@ Potential applications include:
 # 15. Limitations
 
 * Dependent on underlying LLM quality
-* No formal proof of emergent awareness
+* No formal proof of emergent consciousness
 * Resource-bound by local model performance
 * Psychological metaphors are structural, not empirical
 * API security requires additional hardening for production
@@ -531,7 +531,7 @@ Entelgia demonstrates that persistent identity and internal regulation can coexi
 
 Entelgia is structured around six interacting cores:
 
-1. Reflective Core
+1. Conscious Core
 2. Memory Core
 3. Emotion Core
 4. Language Core

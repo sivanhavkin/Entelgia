@@ -2,7 +2,7 @@
 
 Thank you for your interest in Entelgia!
 
-Entelgia is a research-oriented, awareness-inspired AI architecture.  
+Entelgia is a research-oriented, consciousness-inspired AI architecture.  
 **Contributions are welcome—especially when aligned with the project’s core principles.**
 
 ---
