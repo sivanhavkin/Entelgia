@@ -1,6 +1,6 @@
 # 🧠 Entelgia Whitepaper
 
-## A Consciousness-Inspired Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation
+## A Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation
 
 **Author:** Sivan Havkin
 **Version:** 2.3.0
