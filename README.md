@@ -30,7 +30,7 @@
 * 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
 * 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
 * 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
-* 📖 **entelgia_demo](./entelgia_demo.md)** - See the system in action
+* 📖 **[![ entelgia_demo](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md)- See the system in action
 * ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
 * 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
