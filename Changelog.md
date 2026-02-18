@@ -10,9 +10,9 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [3.4.0] - 2026-02-18
+## [2.4.0] - 2026-02-18
 
-# Entelgia v3.4.0 Release Notes
+# Entelgia v2.4.0 Release Notes
 
 ## 🚀 Highlights
 
@@ -399,7 +399,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v3.4.0
+- ✅ **Latest stable:** v2.4.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -410,7 +410,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v3.4.0** | 2026-02-18 | Minor | ✅ **Current** | Documentation & structure improvements |
+| **v2.4.0** | 2026-02-18 | Minor | ✅ **Current** | Documentation & structure improvements |
 | **v2.3.0** | 2026-02-16 | Minor | ⚠️ Superseded | Installation improvements |
 | **v2.2.0** | 2026-02-14 | Minor | ⚠️ Superseded | Enhanced dialogue system |
 | **v2.1.1** | 2026-02-13 | Patch | ⚠️ Superseded | Bug fixes + formatting |

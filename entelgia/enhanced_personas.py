@@ -6,7 +6,7 @@ Enhanced Personas for Entelgia Dialogue System
 Rich, distinctive agent personalities with speech patterns, thinking styles, and drive-based modulation.
 
 Version Note: Pronoun support feature added for v2.2.0
-Latest official release: v3.4.0
+Latest official release: v2.4.0
 """
 
 from typing import Dict, List, Any

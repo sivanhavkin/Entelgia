@@ -102,7 +102,7 @@ When `show_pronoun=False` (default):
 ## Version Information
 
 - **Feature Version:** v2.2.0 
-- **Latest Official Release:** v2.3.0
+- **Latest Official Release:** v2.4.0
 - **Status:** Stable
 
 ---

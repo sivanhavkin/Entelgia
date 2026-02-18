@@ -422,12 +422,12 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v3.4.0** | ✅ **Stable** | Latest release |
-| **v2.3.0** | ⚠️ Superseded | Use v3.4.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v3.4.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v3.4.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v3.4.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v3.4.0 instead |
+| **v2.4.0** | ✅ **Stable** | Latest release |
+| **v2.3.0** | ⚠️ Superseded | Use v2.4.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v2.4.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.4.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.4.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.4.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -441,7 +441,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 We follow [Semantic Versioning](https://semver.org/):
 
 - **Major** (v3.0.0): Breaking changes
-- **Minor** (v3.4.0): New features, backward compatible  
+- **Minor** (v2.4.0): New features, backward compatible  
 - **Patch** (v2.1.2): Bug fixes only
 
 ### Release Schedule
@@ -548,7 +548,7 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 3.4.0 
+* **Version:** 2.4.0 
 * **Last Updated:** 18 February 2026
 
 ### What is "Research Hybrid"?
