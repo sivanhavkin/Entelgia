@@ -3,7 +3,7 @@
 ## A Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation
 
 **Author:** Sivan Havkin
-**Version:** 2.3.0
+**Version:** 3.4.0
 **Status:** Research / Production Hybrid
 
 ---
@@ -515,7 +515,7 @@ It is not a chatbot.
 It is not a safety wrapper.
 It is a structured architectural investigation into whether identity continuity and moral reasoning can arise from internal design rather than external constraint.
 
-**Version 2.3.0** represents a mature research-production hybrid with:
+**Version 3.4.0** represents a mature research-production hybrid with:
 * Comprehensive testing infrastructure (24 tests)
 * Production-ready REST API
 * Advanced performance optimizations (LRU caching, metrics tracking)
