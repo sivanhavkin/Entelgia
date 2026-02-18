@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file. The format 
 - Added comprehensive troubleshooting documentation
 - Added FAQ - 513-line FAQ covering common questions
 - Added Memory Management section to README.md
+- Added detailed ARCHITECTURE.md describing Entelgia's system architecture
 
 ---
 
