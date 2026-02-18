@@ -25,6 +25,17 @@
 
 ---
 
+## 📚 Documentation
+
+* 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
+* 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
+* 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
+* 📖 **[Conscious Awareness Demo](./DEMO_CONSCIOUS_DIALOGUE.md)** - See the system in action
+* ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
+* 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
+
+---
+
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
 > **⚡ Get started fast with our automated installer!**
@@ -320,17 +331,6 @@ The entire system runs as a unified executable Python file:
 ```
 Entelgia_production_meta.py
 ```
-
----
-
-## 📚 Documentation
-
-* 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
-* 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
-* 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
-* 📖 **[Conscious Awareness Demo](./DEMO_CONSCIOUS_DIALOGUE.md)** - See the system in action
-* ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
-* 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
 ---
 
