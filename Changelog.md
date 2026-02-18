@@ -6,6 +6,41 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased] 
 
+*No unreleased changes at this time.*
+
+---
+
+## [2.4.0] - 2026-02-18
+
+# Entelgia v2.4.0 Release Notes
+
+## 🚀 Highlights
+
+- Major refactor and documentation improvements
+- Project structure update
+- Memory management tool improvements
+- Expanded FAQ & troubleshooting
+- Updated whitepaper and architecture overview
+- English documentation standard
+
+## 📝 Changes
+
+- clear_memory.py utility
+- modular project reorganization
+- FAQ updates
+- demo and example updates
+- whitepaper, architecture docs enriched
+
+## 🛑 Breaking Changes
+*None* (All changes are backwards compatible)
+
+## 💡 Upgrade Instructions
+- See ARCHITECTURE.md
+- Use updated clear_memory.py
+
+## 📋 Contributors
+- @sivanhavkin
+
 ### Added
 - **Memory Management Utility** 🗑️
   - New `clear_memory.py` script for deleting stored memories
@@ -364,7 +399,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.3.0
+- ✅ **Latest stable:** v2.4.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -375,7 +410,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.3.0** | 2026-02-16 | Minor | ✅ **Current** | Installation improvements |
+| **v2.4.0** | 2026-02-18 | Minor | ✅ **Current** | Documentation & structure improvements |
+| **v2.3.0** | 2026-02-16 | Minor | ⚠️ Superseded | Installation improvements |
 | **v2.2.0** | 2026-02-14 | Minor | ⚠️ Superseded | Enhanced dialogue system |
 | **v2.1.1** | 2026-02-13 | Patch | ⚠️ Superseded | Bug fixes + formatting |
 | v2.1.0 | 2026-02-13 | Minor | ⚠️ Superseded | Testing infrastructure |
