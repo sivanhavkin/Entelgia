@@ -483,7 +483,7 @@ Entelgia/
 
 - **[whitepaper.md](whitepaper.md)**: Complete architectural and theoretical foundation
 - **[SPEC.md](SPEC.md)**: Detailed system specification
-- **[DEMO_CONSCIOUS_DIALOGUE.md](DEMO_CONSCIOUS_DIALOGUE.md)**: See the system in action
+- **[entelgia_demo.md](entelgia_demo.md)**: See the system in action
 
 ### Is Entelgia open source?
 

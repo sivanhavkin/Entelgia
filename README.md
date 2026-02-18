@@ -12,7 +12,7 @@
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 
 
-[![ See a conscious awareness demo](https://github.com/sivanhavkin/Entelgia/blob/main/DEMO_CONSCIOUS_DIALOGUE.md)
+[![ See a conscious awareness demo](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md)
 
 ---
 
@@ -30,7 +30,7 @@
 * 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
 * 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
 * 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
-* 📖 **[Conscious Awareness Demo](./DEMO_CONSCIOUS_DIALOGUE.md)** - See the system in action
+* 📖 **[Conscious Awareness Demo](./entelgia_demo.md)** - See the system in action
 * ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
 * 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 
