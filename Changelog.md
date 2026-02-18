@@ -4,9 +4,12 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [Unreleased] 
+## [Unreleased]
 
-*No unreleased changes at this time.*
+### Added
+- **ROADMAP.md** 🗺️
+  - Added project roadmap document outlining development direction
+  - Added link to ROADMAP.md in README.md Documentation section
 
 ---
 
