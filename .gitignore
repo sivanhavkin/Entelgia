@@ -34,7 +34,6 @@ runs/
 # IDE
 .vscode/
 .idea/
-logos/
 # Testing  
 .pytest_cache/
 htmlcov/
