@@ -31,7 +31,7 @@ All notable changes to this project will be documented in this file. The format 
 - Added FAQ - 513-line FAQ covering common questions
 - Added Memory Management section to README.md
 - Added detailed ARCHITECTURE.md describing Entelgia's system architecture
-
+- whitepaper updated to reflect all recent changes.
 ---
 
 ## [2.3.0] - 2026-02-16
@@ -396,6 +396,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
