@@ -1,0 +1,49 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Option 1: Brain Network - Interconnected neural network with "E" -->
+  <defs>
+    <linearGradient id="brainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="200" cy="200" r="180" fill="#1e1b4b" opacity="0.1"/>
+  
+  <!-- Brain outline shape -->
+  <path d="M 150 100 Q 120 120 130 150 Q 110 180 140 200 Q 120 230 150 250 Q 170 270 200 260 Q 230 270 250 250 Q 280 230 260 200 Q 290 180 270 150 Q 280 120 250 100 Q 220 80 200 90 Q 180 80 150 100 Z" 
+        fill="none" stroke="url(#brainGradient)" stroke-width="4" opacity="0.6"/>
+  
+  <!-- Neural network nodes -->
+  <circle cx="160" cy="140" r="8" fill="#6366f1"/>
+  <circle cx="200" cy="120" r="8" fill="#8b5cf6"/>
+  <circle cx="240" cy="140" r="8" fill="#6366f1"/>
+  <circle cx="170" cy="180" r="8" fill="#a78bfa"/>
+  <circle cx="230" cy="180" r="8" fill="#a78bfa"/>
+  <circle cx="200" cy="200" r="10" fill="#c4b5fd"/>
+  <circle cx="160" cy="220" r="8" fill="#8b5cf6"/>
+  <circle cx="240" cy="220" r="8" fill="#6366f1"/>
+  <circle cx="200" cy="240" r="8" fill="#a78bfa"/>
+  
+  <!-- Neural connections -->
+  <line x1="160" y1="140" x2="200" y2="120" stroke="#6366f1" stroke-width="2" opacity="0.4"/>
+  <line x1="200" y1="120" x2="240" y2="140" stroke="#6366f1" stroke-width="2" opacity="0.4"/>
+  <line x1="160" y1="140" x2="170" y2="180" stroke="#8b5cf6" stroke-width="2" opacity="0.4"/>
+  <line x1="240" y1="140" x2="230" y2="180" stroke="#8b5cf6" stroke-width="2" opacity="0.4"/>
+  <line x1="170" y1="180" x2="200" y2="200" stroke="#a78bfa" stroke-width="2" opacity="0.4"/>
+  <line x1="230" y1="180" x2="200" y2="200" stroke="#a78bfa" stroke-width="2" opacity="0.4"/>
+  <line x1="200" y1="200" x2="160" y2="220" stroke="#8b5cf6" stroke-width="2" opacity="0.4"/>
+  <line x1="200" y1="200" x2="240" y2="220" stroke="#8b5cf6" stroke-width="2" opacity="0.4"/>
+  <line x1="160" y1="220" x2="200" y2="240" stroke="#6366f1" stroke-width="2" opacity="0.4"/>
+  <line x1="240" y1="220" x2="200" y2="240" stroke="#6366f1" stroke-width="2" opacity="0.4"/>
+  
+  <!-- Large stylized "E" in the center -->
+  <text x="200" y="210" font-family="Arial, sans-serif" font-size="120" font-weight="bold" 
+        fill="url(#brainGradient)" text-anchor="middle" opacity="0.3">E</text>
+  
+  <!-- Project name -->
+  <text x="200" y="330" font-family="Arial, sans-serif" font-size="36" font-weight="bold" 
+        fill="#6366f1" text-anchor="middle">Entelgia</text>
+  <text x="200" y="360" font-family="Arial, sans-serif" font-size="14" 
+        fill="#8b5cf6" text-anchor="middle">Multi-Agent AI Architecture</text>
+</svg>

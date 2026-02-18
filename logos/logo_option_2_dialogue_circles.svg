@@ -1,0 +1,43 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Option 2: Dialogue Circles - Three interconnected circles representing multi-agent dialogue -->
+  <defs>
+    <linearGradient id="circleGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="circleGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="circleGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#db2777;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="400" height="400" fill="#fafafa"/>
+  
+  <!-- Three overlapping circles representing agents -->
+  <circle cx="170" cy="160" r="70" fill="url(#circleGradient1)" opacity="0.7"/>
+  <circle cx="230" cy="160" r="70" fill="url(#circleGradient2)" opacity="0.7"/>
+  <circle cx="200" cy="220" r="70" fill="url(#circleGradient3)" opacity="0.7"/>
+  
+  <!-- Center overlap creates a shared space -->
+  <circle cx="200" cy="180" r="25" fill="#6366f1" opacity="0.9"/>
+  
+  <!-- Agent symbols -->
+  <text x="155" y="140" font-family="Arial, sans-serif" font-size="24" fill="white" font-weight="bold">Id</text>
+  <text x="220" y="140" font-family="Arial, sans-serif" font-size="20" fill="white" font-weight="bold">Ego</text>
+  <text x="180" y="245" font-family="Arial, sans-serif" font-size="18" fill="white" font-weight="bold">Super</text>
+  
+  <!-- Connection lines showing dialogue -->
+  <path d="M 190 175 L 210 175 M 195 180 L 205 180 M 192 185 L 208 185" 
+        stroke="white" stroke-width="2" opacity="0.8"/>
+  
+  <!-- Project name -->
+  <text x="200" y="330" font-family="Arial, sans-serif" font-size="40" font-weight="bold" 
+        fill="#6366f1" text-anchor="middle">Entelgia</text>
+  <text x="200" y="360" font-family="Arial, sans-serif" font-size="14" 
+        fill="#8b5cf6" text-anchor="middle" opacity="0.8">Dialogue-Governed AI</text>
+</svg>

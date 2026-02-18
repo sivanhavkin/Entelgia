@@ -1,0 +1,55 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+  <!-- Option 5: Memory Layers - Representing short-term and long-term memory -->
+  <defs>
+    <linearGradient id="layerGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.9" />
+      <stop offset="50%" style="stop-color:#8b5cf6;stop-opacity:0.7" />
+      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:0.5" />
+    </linearGradient>
+    <radialGradient id="glowGradient">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Gradient background -->
+  <rect width="400" height="400" fill="#0a0a0a"/>
+  
+  <!-- Glow effect -->
+  <circle cx="200" cy="180" r="150" fill="url(#glowGradient)"/>
+  
+  <!-- Memory layer arcs - representing STM and LTM -->
+  <path d="M 100 180 Q 100 120 200 120 Q 300 120 300 180" 
+        fill="none" stroke="#06b6d4" stroke-width="3" opacity="0.9"/>
+  <path d="M 90 190 Q 90 110 200 110 Q 310 110 310 190" 
+        fill="none" stroke="#3b82f6" stroke-width="3" opacity="0.7"/>
+  <path d="M 80 200 Q 80 100 200 100 Q 320 100 320 200" 
+        fill="none" stroke="#8b5cf6" stroke-width="3" opacity="0.5"/>
+  <path d="M 70 210 Q 70 90 200 90 Q 330 90 330 210" 
+        fill="none" stroke="#a855f7" stroke-width="3" opacity="0.3"/>
+  
+  <!-- Mirror bottom layers -->
+  <path d="M 100 180 Q 100 240 200 240 Q 300 240 300 180" 
+        fill="none" stroke="#ec4899" stroke-width="3" opacity="0.9"/>
+  <path d="M 90 170 Q 90 250 200 250 Q 310 250 310 170" 
+        fill="none" stroke="#db2777" stroke-width="3" opacity="0.7"/>
+  <path d="M 80 160 Q 80 260 200 260 Q 320 260 320 160" 
+        fill="none" stroke="#be185d" stroke-width="3" opacity="0.5"/>
+  <path d="M 70 150 Q 70 270 200 270 Q 330 270 330 150" 
+        fill="none" stroke="#9f1239" stroke-width="3" opacity="0.3"/>
+  
+  <!-- Central core -->
+  <circle cx="200" cy="180" r="30" fill="#8b5cf6" opacity="0.4"/>
+  <circle cx="200" cy="180" r="20" fill="#a855f7" opacity="0.6"/>
+  <circle cx="200" cy="180" r="10" fill="#c084fc" opacity="0.8"/>
+  
+  <!-- Labels -->
+  <text x="100" y="160" font-family="Arial, sans-serif" font-size="11" fill="#06b6d4">STM</text>
+  <text x="100" y="210" font-family="Arial, sans-serif" font-size="11" fill="#ec4899">LTM</text>
+  
+  <!-- Project name -->
+  <text x="200" y="320" font-family="Arial, sans-serif" font-size="44" font-weight="bold" 
+        fill="url(#layerGradient)" text-anchor="middle">Entelgia</text>
+  <text x="200" y="350" font-family="Arial, sans-serif" font-size="11" 
+        fill="#94a3b8" text-anchor="middle" letter-spacing="2">PERSISTENT MEMORY AI</text>
+</svg>
