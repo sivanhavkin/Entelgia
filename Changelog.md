@@ -26,11 +26,11 @@ All notable changes to this project will be documented in this file. The format 
 - Improved repository layout for clarity and future scalability
 
 ### Documentation
-- Removed all foreign language content to standardize repository to English only
-- Added comprehensive troubleshooting documentation
-- Added FAQ - 513-line FAQ covering common questions
+- Removed all foreign language content to standardize the repository to English only.
+- Added comprehensive troubleshooting documentation.
+- Added FAQ - 513-line FAQ covering common questions.
 - Added Memory Management section to README.md
-- Added detailed ARCHITECTURE.md describing Entelgia's system architecture
+- Added detailed ARCHITECTURE.md describing Entelgia's system architecture.
 - whitepaper updated to reflect all recent changes.
 ---
 
@@ -396,6 +396,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 🔄 Versioning Guidelines
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/):
+
 
 
 
