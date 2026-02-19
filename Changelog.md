@@ -11,6 +11,22 @@ All notable changes to this project will be documented in this file. The format 
 ## [Unreleased]
 
 ### Added
+- **Personal Long-Term Memory System** 🧠
+  - New module `entelgia/long_term_memory.py` with three classes:
+    - **`DefenseMechanism`** — classifies every memory on write into the unconscious layer as *repressed* (high-intensity painful emotion: anger, fear, shame, guilt, anxiety above 0.75 intensity) or *suppressed* (content containing forbidden/secret/dangerous keywords). Flags stored in existing `intrusive`/`suppressed` database columns.
+    - **`FreudianSlip`** — after each non-Fixy agent turn, rolls a probability against the 30 most-recent unconscious memories, weighted by their defense flags. A defended memory fragment surfaces and is simultaneously promoted to the conscious layer with `source="freudian_slip"`. Printed to console as `[SLIP]` in magenta.
+    - **`SelfReplication`** — LLM-free: scans the 50 most-recent unconscious memories for recurring keyword patterns (≥ 4-char Latin words appearing in ≥ 2 entries), then promotes up to 3 pattern-matching high-importance memories to the conscious layer with `source="self_replication"`. Runs every `self_replicate_every_n_turns` turns (default: 10). Printed as `[SELF-REPL]` in cyan.
+  - `entelgia/__init__.py` now exports `DefenseMechanism`, `FreudianSlip`, `SelfReplication`
+  - `Agent.store_turn()` — runs `DefenseMechanism.analyze()` and passes `intrusive`/`suppressed` flags to `ltm_insert()` on every unconscious write
+  - `Agent.apply_freudian_slip(topic)` — called after each non-Fixy turn; returns and logs the leaked fragment if a slip occurs
+  - `Agent.self_replicate(topic)` — returns count of memories promoted to conscious
+  - `MainScript.self_replicate_cycle(agent, topic)` — orchestrates replication per agent
+  - `MainScript.run()` — Freudian slip attempted every turn; self-replication fires every `self_replicate_every_n_turns` turns
+  - `Config.self_replicate_every_n_turns: int = 10` added
+  - No-op fallback stubs added for non-enhanced (no `entelgia` package) mode
+- **Long-Term Memory Tests** 🧪
+  - `tests/test_long_term_memory.py` — 33 new tests covering all three mechanisms (defense classification, slip probability, fragment formatting, pattern detection, promotion selection)
+  - Total test count: **57** (33 long-term memory + 19 security + 5 dialogue)
 - **ROADMAP.md** 🗺️
   - Added project roadmap document outlining development direction
   - Added link to ROADMAP.md in README.md Documentation section

@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-57%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -185,8 +185,12 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
 * **Multi-agent dialogue system** (Socrates · Athena · Fixy)
 * **Persistent memory**
   * Short-term memory (JSON)
-  * Long-term memory (SQLite)
+  * Long-term memory (SQLite) with **unconscious / conscious layers**
   * 🔐 HMAC-SHA256 cryptographic integrity protection
+  * 🆕 **Personal Long-Term Memory** (v2.5.0+)
+    * **Defense mechanisms** — every memory classified as repressed (high-intensity painful emotion) or suppressed (forbidden-topic keywords)
+    * **Freudian slips** — defended memories surface involuntarily during speech and are promoted to the conscious layer
+    * **Self-replication** — recurring keyword patterns in the unconscious are detected and promoted to conscious without LLM inference
 * **🆕 Enhanced Dialogue Engine** (v2.2.0+)
   * **Dynamic speaker selection** - Intelligent turn-taking (no 3+ consecutive turns)
   * **Varied seed generation** - 6+ strategy types (analogy, disagree, reflect, etc.)
@@ -247,6 +251,7 @@ config.max_turns = 200              # Maximum dialogue turns
 config.timeout_minutes = 30         # Session timeout in minutes
 config.fixy_every_n_turns = 3      # Fixy observation frequency (legacy mode)
 config.dream_every_n_turns = 7     # Dream cycle frequency
+config.self_replicate_every_n_turns = 10  # Self-replication cycle frequency
 ```
 
 For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
@@ -319,7 +324,8 @@ entelgia/
 ├── dialogue_engine.py       # Dynamic speaker & seed generation
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
-└── fixy_interactive.py      # Need-based interventions
+├── fixy_interactive.py      # Need-based interventions
+└── long_term_memory.py      # Unconscious/conscious memory layers
 ```
 
 **Key improvements:**
@@ -375,6 +381,37 @@ Tests verify:
 
 ---
 
+### 🧠 Long-Term Memory Tests (33 tests)
+
+```bash
+pytest tests/test_long_term_memory.py -v
+```
+
+Tests cover the three unconscious→conscious promotion mechanisms:
+
+#### Defense Mechanism (`DefenseMechanism`)
+- Repression triggered by high-intensity painful emotions (fear, anger, shame, guilt, anxiety)
+- Suppression triggered by forbidden-topic keywords (secret, hidden, dangerous, forbidden, …)
+- Slip probability increases for repressed and/or suppressed memories
+- Edge cases: empty content, `None` emotion, combined defenses
+
+#### Freudian Slip (`FreudianSlip`)
+- Empty pool returns `None`
+- Repressed memories slip more often than neutral memories across probabilistic trials
+- When multiple memories slip simultaneously, the highest-importance one is selected
+- Fragment formatting: max 80 chars, trims at natural sentence boundary
+
+#### Self-Replication (`SelfReplication`)
+- Recurring keywords (≥ 4 chars, appearing in ≥ 2 memories) detected as patterns
+- Single-occurrence and short words excluded
+- Pattern-matching memories selected for promotion; non-matching memories skipped
+- At most `_PROMOTE_LIMIT` (3) memories promoted per cycle
+- Higher-importance memories preferred
+
+> ✅ **All 57 tests currently pass** (33 long-term memory + 19 security + 5 dialogue), providing confidence that the new personal memory architecture, cryptographic memory-security mechanisms, and enhanced dialogue system all perform as expected.
+
+---
+
 ### 🔐 Memory Security Tests (19 tests)
 
 ```bash
@@ -400,17 +437,13 @@ Tests assert that:
 - Signatures are unique across multiple inputs and keys
 - The implementation supports Unicode messages (mixed-language, Arabic, and emojis)
 
-> ✅ **All 24 tests currently pass** (5 dialogue + 19 security), providing confidence that both the enhanced dialogue system and cryptographic memory-security mechanisms perform as expected.
-
----
-
-### 🔄 CI/CD Pipeline
+> ✅ **All 24 of these tests pass** (5 dialogue + 19 security). See the Long-Term Memory section above for the 33 additional tests.
 
 In addition to the unit tests, the continuous-integration (CI/CD) pipeline automatically runs a suite of quality and security checks:
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 24 total tests (19 security + 5 dialogue) |
+| **Unit Tests** | `pytest` | Runs 57 total tests (33 long-term memory + 19 security + 5 dialogue) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
