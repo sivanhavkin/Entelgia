@@ -30,7 +30,9 @@ class FixyRegulator:
 
     def __init__(self, threshold: float = 35.0):
         self.name = "Fixy"
-        self.safety_threshold = threshold  # Safety threshold, slightly above the default minimum
+        self.safety_threshold = (
+            threshold  # Safety threshold, slightly above the default minimum
+        )
 
     def inspect_agent(self, target_agent: "EntelgiaAgent") -> bool:
         """
@@ -42,16 +44,22 @@ class FixyRegulator:
         Returns:
             True if a dream cycle (recharge) should be triggered, False otherwise.
         """
-        print(f"[{self.name}] Inspecting {target_agent.name}... Current Energy: {target_agent.energy_level:.1f}%")
+        print(
+            f"[{self.name}] Inspecting {target_agent.name}... Current Energy: {target_agent.energy_level:.1f}%"
+        )
 
         # If energy is too low, Fixy forces a "sleep" (dream cycle)
         if target_agent.energy_level <= self.safety_threshold:
-            print(f"[{self.name}] WARNING: {target_agent.name} is unstable due to low energy. FORCING RECHARGE.")
+            print(
+                f"[{self.name}] WARNING: {target_agent.name} is unstable due to low energy. FORCING RECHARGE."
+            )
             return True  # Trigger forced dream cycle
 
         # Consistency check (currently mocked as a random probability)
         if random.random() < 0.1 and target_agent.energy_level < 60:
-            print(f"[{self.name}] Hallucination risk detected. Suspending dialogue for Dream Cycle.")
+            print(
+                f"[{self.name}] Hallucination risk detected. Suspending dialogue for Dream Cycle."
+            )
             return True
 
         return False
