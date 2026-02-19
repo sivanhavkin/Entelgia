@@ -1,4 +1,8 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> 📋 Changelog
+<div style="display: flex; align-items: center; justify-content: space-between;">
+  <img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120" style="margin: 0;"/>
+  <h1 style="flex-grow: 1; text-align: center; font-size: 2.5em; font-weight: bold; margin: 0;">📋 Changelog</h1>
+  <div style="width: 120px;" aria-hidden="true"></div>
+</div>
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
