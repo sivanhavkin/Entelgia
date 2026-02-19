@@ -1,3 +1,5 @@
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # 🎉 Contributors
 
 Thank you to everyone who has contributed to Entelgia!

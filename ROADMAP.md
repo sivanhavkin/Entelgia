@@ -1,3 +1,5 @@
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # Entelgia Roadmap
 
 This roadmap outlines the evolving direction of the Entelgia project.

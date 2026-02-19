@@ -1,3 +1,5 @@
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # 🧠 Entelgia Whitepaper
 
 ## A Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation

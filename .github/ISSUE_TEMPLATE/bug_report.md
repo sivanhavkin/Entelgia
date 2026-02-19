@@ -1,3 +1,5 @@
+<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 ---
 name: Bug Report
 about: Report a bug or issue

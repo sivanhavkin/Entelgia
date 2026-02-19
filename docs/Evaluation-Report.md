@@ -1,3 +1,5 @@
+<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # 📋 Evaluation Report: Entelgia Repository
 
 **Repository:** [sivanhavkin/Entelgia](https://github.com/sivanhavkin/Entelgia)  

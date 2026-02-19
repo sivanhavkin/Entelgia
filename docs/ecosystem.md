@@ -1,3 +1,5 @@
+<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # Ecosystem
 
 This document lists optional external indexes and ecosystem references.

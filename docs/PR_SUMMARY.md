@@ -1,3 +1,5 @@
+<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # PR Summary: Pronoun Support and 150-Word Limit Features
 
 
