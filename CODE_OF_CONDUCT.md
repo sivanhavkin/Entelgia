@@ -1,4 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # Contributor Covenant Code of Conduct
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> Contributor Covenant Code of Conduct
 
 ## Our Pledge
 

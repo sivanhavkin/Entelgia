@@ -1,4 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 🧠 Entelgia
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> 🧠 Entelgia
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)

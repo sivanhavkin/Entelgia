@@ -1,4 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 🔧 Troubleshooting Guide
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> 🔧 Troubleshooting Guide
 
 This guide helps you diagnose and resolve common issues when working with Entelgia.
 

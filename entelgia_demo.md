@@ -1,4 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 🎭 Entelgia Demo-Dialogue Demonstrations
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> 🎭 Entelgia Demo-Dialogue Demonstrations
 
 ## Welcome!
 
