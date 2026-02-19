@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file. The format 
 - **ROADMAP.md** 🗺️
   - Added project roadmap document outlining development direction
   - Added link to ROADMAP.md in README.md Documentation section
-
+- added logo to all markdown files
 ---
 
 ## [2.4.0] - 2026-02-18
