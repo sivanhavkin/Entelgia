@@ -1,4 +1,4 @@
-<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> ## 📝 Description
+<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 📝 Description
 
 Brief description of changes.
 

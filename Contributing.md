@@ -1,4 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 🤝 Contributing to Entelgia
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> 🤝 Contributing to Entelgia
 
 Thank you for your interest in Entelgia!
 

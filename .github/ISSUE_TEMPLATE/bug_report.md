@@ -8,7 +8,7 @@ labels: bug
 assignees: ''
 ---
 
-<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> ## 🐛 Bug Description
+<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 🐛 Bug Description
 
 A clear description of the bug.
 

@@ -1,4 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # Entelgia Architecture Overview
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> Entelgia Architecture Overview
 
 ## Introduction
 

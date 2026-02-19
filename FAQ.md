@@ -1,4 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # ❓ Frequently Asked Questions (FAQ)
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> ❓ Frequently Asked Questions (FAQ)
 
 ## Table of Contents
 
