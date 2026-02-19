@@ -1,6 +1,4 @@
-<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
-# Pronoun Support Feature
+<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # Pronoun Support Feature
 
 ## Overview
 

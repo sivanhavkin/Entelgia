@@ -1,6 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
- **Entelgia** — System Specification (Research Prototype)
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>  **Entelgia** — System Specification (Research Prototype)
 
  **Entelgia is a dialogue-governed cognitive simulation:** behavior emerges from **internal state + meta-observation**, not from prompts alone.
 

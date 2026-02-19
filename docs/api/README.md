@@ -1,6 +1,4 @@
-<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
-# 🌐 Entelgia API Documentation
+<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 🌐 Entelgia API Documentation
 
 ## Overview
 
