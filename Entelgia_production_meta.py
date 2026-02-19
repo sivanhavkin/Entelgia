@@ -108,12 +108,40 @@ try:
         InteractiveFixy,
         format_persona_for_prompt,
         get_persona,
+        DefenseMechanism,
+        FreudianSlip,
+        SelfReplication,
     )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
+    # Fallback stubs so Agent can always instantiate these
+    class DefenseMechanism:  # type: ignore[no-redef]
+        def analyze(self, content, emotion, emotion_intensity, importance):
+            return {"repressed": 0, "suppressed": 0}
+
+        def slip_probability(self, repressed, suppressed):
+            return 0.0
+
+    class FreudianSlip:  # type: ignore[no-redef]
+        def __init__(self, defense):
+            pass
+
+        def attempt(self, memories):
+            return None
+
+        def format_fragment(self, memory):
+            return ""
+
+    class SelfReplication:  # type: ignore[no-redef]
+        def find_patterns(self, memories):
+            return []
+
+        def select_for_promotion(self, memories, patterns):
+            return []
 
 # Optional: FastAPI for REST API
 try:
@@ -234,6 +262,7 @@ class Config:
     stm_trim_batch: int = 500
     fixy_every_n_turns: int = 3
     dream_every_n_turns: int = 7
+    self_replicate_every_n_turns: int = 10
     promote_importance_threshold: float = 0.72
     promote_emotion_threshold: float = 0.65
     enable_auto_patch: bool = False
@@ -1185,9 +1214,15 @@ class Agent:
         if self.use_enhanced:
             self.context_mgr = ContextManager()
             self.memory_integration = EnhancedMemoryIntegration()
+            self._defense = DefenseMechanism()
+            self._freudian_slip = FreudianSlip(self._defense)
+            self._self_replication = SelfReplication()
         else:
             self.context_mgr = None
             self.memory_integration = None
+            self._defense = DefenseMechanism()
+            self._freudian_slip = FreudianSlip(self._defense)
+            self._self_replication = SelfReplication()
 
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
