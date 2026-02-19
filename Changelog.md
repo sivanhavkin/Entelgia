@@ -15,6 +15,19 @@ All notable changes to this project will be documented in this file. The format 
   - Added project roadmap document outlining development direction
   - Added link to ROADMAP.md in README.md Documentation section
 - Added logo to all markdown files
+- **scripts/draft.py** 🤖
+  - **`FixyRegulator`** (Supervisor Agent) - New class: supervisor agent responsible for system stability and triggering dream cycles
+    - `safety_threshold` (default: 35.0) - Minimum energy threshold for safe operation
+    - `inspect_agent` method: checks if an agent is stable enough to continue
+      - Monitors energy level against safety threshold
+      - Forces recharge (sleep) when energy is too low
+      - Detects hallucination risk - random check with 10% probability when energy drops below 60%
+  - **`EntelgiaAgent`** (Entelgia Agent) - New class: agent with energy management and memory mechanisms
+    - Energy system: `energy_level` starts at 100% and decreases with each operation (8–15 units per operation)
+    - Dual memory system: `conscious_memory` (active input) and `subconscious_store` (for future use)
+    - Fixy integration: every agent operates under `FixyRegulator` supervision
+    - `process_step` method: processes text input, reduces energy, calls Fixy for stability check, triggers automatic dream cycle when needed
+    - `dream_cycle` method: internal processing and "forgetting" mechanism; keeps only last 5 memories; serves as reset and recharge mechanism
 ---
 
 ## [2.4.0] - 2026-02-18
