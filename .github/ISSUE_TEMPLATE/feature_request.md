@@ -8,7 +8,7 @@ labels: enhancement
 assignees: ''
 ---
 
-## 💡 Feature Description
+<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> ## 💡 Feature Description
 
 A clear description of the feature you'd like.
 

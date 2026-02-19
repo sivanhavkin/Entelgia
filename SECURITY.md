@@ -1,6 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
-# Security Policy
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # Security Policy
 
 Entelgia is an experimental, research-oriented AI system.
 Security is approached as a design concern, not a claim of complete protection.

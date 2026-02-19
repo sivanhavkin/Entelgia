@@ -1,6 +1,4 @@
-<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
-# Memory Security
+<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # Memory Security
 
 ## Overview
 

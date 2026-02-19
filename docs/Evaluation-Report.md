@@ -1,6 +1,4 @@
-<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
-# 📋 Evaluation Report: Entelgia Repository
+<img src="../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 📋 Evaluation Report: Entelgia Repository
 
 **Repository:** [sivanhavkin/Entelgia](https://github.com/sivanhavkin/Entelgia)  
 **Project:** Unified AI core for persistent agents, internal conflict, and moral self-regulation through dialogue  

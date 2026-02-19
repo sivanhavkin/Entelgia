@@ -1,6 +1,4 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
-# Entelgia Roadmap
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # Entelgia Roadmap
 
 This roadmap outlines the evolving direction of the Entelgia project.
 It represents exploration goals rather than fixed delivery promises.

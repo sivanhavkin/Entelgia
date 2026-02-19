@@ -1,6 +1,4 @@
-<img src="entelgia-logo.png" alt="Entelgia Logo" width="120"/>
-
-# Assets
+<img src="entelgia-logo.png" alt="Entelgia Logo" width="120"/> # Assets
 
 This directory contains project assets such as images, logos, icons, and other media files used in the Entelgia project.
 
