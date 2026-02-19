@@ -1,4 +1,4 @@
-<img src="entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+<img src="entelgia-logo.png" alt="Entelgia Logo" width="120"/>
 
 # Assets
 
