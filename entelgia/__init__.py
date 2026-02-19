@@ -21,6 +21,7 @@ from .enhanced_personas import (
 )
 from .context_manager import ContextManager, EnhancedMemoryIntegration
 from .fixy_interactive import InteractiveFixy
+from .long_term_memory import DefenseMechanism, FreudianSlip, SelfReplication
 
 __all__ = [
     "DialogueEngine",
@@ -35,6 +36,9 @@ __all__ = [
     "EnhancedMemoryIntegration",
     "InteractiveFixy",
     "is_global_show_pronouns",
+    "DefenseMechanism",
+    "FreudianSlip",
+    "SelfReplication",
 ]
 
 __version__ = "2.4.0"  # Latest official: 2.4.0

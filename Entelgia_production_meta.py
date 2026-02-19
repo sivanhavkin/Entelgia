@@ -108,12 +108,40 @@ try:
         InteractiveFixy,
         format_persona_for_prompt,
         get_persona,
+        DefenseMechanism,
+        FreudianSlip,
+        SelfReplication,
     )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
+    # Fallback stubs so Agent can always instantiate these
+    class DefenseMechanism:  # type: ignore[no-redef]
+        def analyze(self, content, emotion, emotion_intensity, importance):
+            return {"repressed": 0, "suppressed": 0}
+
+        def slip_probability(self, repressed, suppressed):
+            return 0.0
+
+    class FreudianSlip:  # type: ignore[no-redef]
+        def __init__(self, defense):
+            pass
+
+        def attempt(self, memories):
+            return None
+
+        def format_fragment(self, memory):
+            return ""
+
+    class SelfReplication:  # type: ignore[no-redef]
+        def find_patterns(self, memories):
+            return []
+
+        def select_for_promotion(self, memories, patterns):
+            return []
 
 # Optional: FastAPI for REST API
 try:
@@ -234,6 +262,7 @@ class Config:
     stm_trim_batch: int = 500
     fixy_every_n_turns: int = 3
     dream_every_n_turns: int = 7
+    self_replicate_every_n_turns: int = 10
     promote_importance_threshold: float = 0.72
     promote_emotion_threshold: float = 0.65
     enable_auto_patch: bool = False
@@ -1185,9 +1214,15 @@ class Agent:
         if self.use_enhanced:
             self.context_mgr = ContextManager()
             self.memory_integration = EnhancedMemoryIntegration()
+            self._defense = DefenseMechanism()
+            self._freudian_slip = FreudianSlip(self._defense)
+            self._self_replication = SelfReplication()
         else:
             self.context_mgr = None
             self.memory_integration = None
+            self._defense = DefenseMechanism()
+            self._freudian_slip = FreudianSlip(self._defense)
+            self._self_replication = SelfReplication()
 
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
@@ -1418,6 +1453,14 @@ class Agent:
         else:
             ltm_content = text if CFG.store_raw_subconscious_ltm else redacted
 
+        # Apply defense mechanisms: classify repressed/suppressed flags
+        defense_flags = self._defense.analyze(
+            content=ltm_content,
+            emotion=emo,
+            emotion_intensity=float(inten),
+            importance=float(imp),
+        )
+
         self.memory.ltm_insert(
             agent=self.name,
             layer="subconscious",
@@ -1428,7 +1471,77 @@ class Agent:
             importance=float(imp),
             source=source,
             promoted_from=None,
+            intrusive=defense_flags["repressed"],
+            suppressed=defense_flags["suppressed"],
         )
+
+    def apply_freudian_slip(self, topic: str) -> Optional[str]:
+        """
+        Attempt a Freudian slip (פליטת פה): surface an unconscious memory fragment.
+
+        If a slip occurs, the memory fragment is promoted to the conscious layer
+        and the fragment text is returned (for logging/display).
+
+        Args:
+            topic: Current dialogue topic
+
+        Returns:
+            The leaked fragment string, or None if no slip occurred
+        """
+        unconscious = self.memory.ltm_recent(self.name, limit=30, layer="subconscious")
+        slipped = self._freudian_slip.attempt(unconscious)
+        if slipped is None:
+            return None
+
+        fragment = self._freudian_slip.format_fragment(slipped)
+        if not fragment:
+            return None
+
+        # Promote the slipped memory to conscious layer
+        self.memory.ltm_insert(
+            agent=self.name,
+            layer="conscious",
+            content=fragment[:300],
+            topic=topic,
+            emotion=slipped.get("emotion"),
+            emotion_intensity=float(slipped.get("emotion_intensity", 0.0)),
+            importance=float(slipped.get("importance", 0.0)),
+            source="freudian_slip",
+            promoted_from="subconscious",
+        )
+        logger.debug(f"Freudian slip [{self.name}]: {fragment[:60]}")
+        return fragment
+
+    def self_replicate(self, topic: str) -> int:
+        """
+        Perform self-replication (רפליקציה עצמית): promote recurring unconscious
+        patterns to the conscious layer via introspection.
+
+        Args:
+            topic: Current dialogue topic
+
+        Returns:
+            Number of memories promoted to conscious
+        """
+        unconscious = self.memory.ltm_recent(self.name, limit=50, layer="subconscious")
+        patterns = self._self_replication.find_patterns(unconscious)
+        to_promote = self._self_replication.select_for_promotion(unconscious, patterns)
+
+        for mem in to_promote:
+            self.memory.ltm_insert(
+                agent=self.name,
+                layer="conscious",
+                content=(mem.get("content") or "")[:300],
+                topic=topic,
+                emotion=mem.get("emotion"),
+                emotion_intensity=float(mem.get("emotion_intensity", 0.0)),
+                importance=float(mem.get("importance", 0.0)),
+                source="self_replication",
+                promoted_from="subconscious",
+            )
+
+        logger.debug(f"Self-replication [{self.name}]: promoted={len(to_promote)}")
+        return len(to_promote)
 
 
 # ============================================
@@ -2178,6 +2291,21 @@ class MainScript:
             + Style.RESET_ALL
         )
 
+    def self_replicate_cycle(self, agent: Agent, topic: str):
+        """Execute self-replication cycle for agent (רפליקציה עצמית).
+
+        Scans the agent's unconscious (subconscious) memories for recurring
+        patterns and promotes them to the conscious layer without LLM inference.
+        """
+        promoted = agent.self_replicate(topic)
+        if promoted > 0:
+            logger.info(f"Self-replication {agent.name}: promoted={promoted}")
+            print(
+                Fore.CYAN
+                + f"[SELF-REPL] {agent.name} promoted={promoted} patterns to conscious"
+                + Style.RESET_ALL
+            )
+
     def fixy_check(self, recent_context: str):
         """Run Fixy observer check."""
         report = self.fixy.review(recent_context)
@@ -2300,6 +2428,17 @@ class MainScript:
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
+            # Freudian slip: unconscious content may surface during speech (פליטת פה)
+            if speaker.name != "Fixy":
+                slip = speaker.apply_freudian_slip(topic_label)
+                if slip:
+                    logger.info(f"[SLIP] {speaker.name}: {slip[:60]}")
+                    print(
+                        Fore.MAGENTA
+                        + f"[SLIP] {speaker.name}: {slip[:60]}"
+                        + Style.RESET_ALL
+                    )
+
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
@@ -2327,6 +2466,10 @@ class MainScript:
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+
+            if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
+                self.self_replicate_cycle(self.socrates, topic_label)
+                self.self_replicate_cycle(self.athena, topic_label)
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
                 logger.info("Stop signal received from agent")
