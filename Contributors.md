@@ -1,4 +1,8 @@
-<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> 🎉 Contributors
+<div style="display: flex; align-items: center; justify-content: space-between;">
+  <img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="120" style="margin: 0;"/>
+  <h1 style="flex-grow: 1; text-align: center; font-size: 2.5em; font-weight: bold; margin: 0;">🎉 Contributors</h1>
+  <div style="width: 120px;"></div>
+</div>
 
 Thank you to everyone who has contributed to Entelgia!
 
