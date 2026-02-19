@@ -1,3 +1,5 @@
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # 🤝 Contributing to Entelgia
 
 Thank you for your interest in Entelgia!

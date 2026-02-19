@@ -1,3 +1,5 @@
+<img src="Assets/entelgia-logo.png" alt="Entelgia Logo" width="200"/>
+
 # Security Policy
 
 Entelgia is an experimental, research-oriented AI system.
