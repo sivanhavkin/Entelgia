@@ -19,7 +19,6 @@ All notable changes to this project will be documented in this file. The format 
       - Dual memory stores: `conscious_memory` (active inputs) and `subconscious_store` (pending integration).
       - Each agent is supervised by its own `FixyRegulator` instance.
       - `process_step(input_text)` — drains energy, appends input to memory, checks stability; returns `"RECHARGED_AND_READY"` after a forced dream cycle.
-      - `dream_cycle(keep_memories=5)` — forgetting phase (keep last 5 conscious memories), integration phase (flush `subconscious_store` → `conscious_memory`), recharge phase (restore energy to 100.0).
   - `entelgia/__init__.py` now exports `FixyRegulator` and `EntelgiaAgent`; version bumped to **2.5.0**
   - `Config` class in `Entelgia_production_meta.py` gains four new fields:
     - `energy_safety_threshold: float = 35.0`
