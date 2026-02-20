@@ -367,6 +367,42 @@ A session is considered working when:
 * `promote_emotion_threshold`
 * `enable_auto_patch`
 * `allow_write_self_file`
+* `energy_safety_threshold`
+* `energy_drain_min` / `energy_drain_max`
+* `dream_keep_memories`
+
+---
+
+## Energy & Dream Cycles
+
+### Overview
+Agents maintain an energy level (0–100%) that depletes with each turn (8–15 units per action).
+When energy drops below the safety threshold, `FixyRegulator` forces a dream cycle, pausing
+dialogue for internal consolidation and recharge.
+
+### Components
+
+#### FixyRegulator
+- **Role:** Meta-cognitive energy supervisor
+- **Threshold:** 35.0 (configurable via `Config.energy_safety_threshold`)
+- **Detects:**
+  - Low energy (≤ 35%) → force dream cycle
+  - Hallucination risk (energy < 60% + stochastic coherence check, p=0.10)
+
+#### EntelgiaAgent Energy System
+- **Initial energy:** 100.0
+- **Drain rate:** 8–15 units per turn (random, configurable)
+- **Memory stores:** `conscious_memory` (active) + `subconscious_store` (pending integration)
+
+#### Dream Cycle Phases
+1. **Forgetting:** Keep last 5 conscious memories, purge the rest
+2. **Integration:** Move insights from `subconscious_store` → `conscious_memory`
+3. **Recharge:** `energy_level` → 100.0
+
+### Future Integration
+- Compose `FixyRegulator` with `InteractiveFixy`
+- Connect `dream_cycle()` to `EnhancedMemoryIntegration`
+- Feed `conscious_memory` into `ContextManager`
 
 ---
 

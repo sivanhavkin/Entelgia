@@ -158,6 +158,46 @@ Observer (Fixy)
 
 ---
 
+## Energy Regulation & Dream Cycles
+
+### FixyRegulator
+Meta-level energy monitor that:
+- Tracks agent energy levels (0–100%)
+- Triggers dream cycles when energy falls below the safety threshold (default: 35%)
+- Detects hallucination risks (low energy + stochastic coherence check)
+- Enforces stability through forced recharge
+
+### Dream Cycle Process
+When triggered:
+1. **Forgetting** — Purges old conscious memories (keeps last 5)
+2. **Integration** — Moves subconscious insights to the conscious layer
+3. **Recharge** — Restores energy to 100%
+
+### Integration Points
+- `FixyRegulator` → extends/composes with `InteractiveFixy`
+- `EntelgiaAgent.dream_cycle()` → integrates with `EnhancedMemoryIntegration`
+- Energy system → governs agent availability and dialogue pacing
+
+### Energy Flow
+```
+Agent processes turn
+   │
+   ▼
+Energy depleted (8–15 per turn)
+   │
+   ▼
+FixyRegulator.inspect_agent()
+   │
+   ├── energy > threshold ──► continue dialogue
+   │
+   └── energy ≤ threshold ──► dream_cycle()
+                                   │
+                                   ▼
+                             Forgetting → Integration → Recharge (100%)
+```
+
+---
+
 ## Summary
 
 Entelgia moves beyond linear chatbot paradigms by employing a collective of agents with persistent state, adaptive dialogue governance, and meta-cognitive monitoring. Its architecture is designed for research into emergent conversational dynamics, self-correction, and long-term coherence.
