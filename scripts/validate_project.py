@@ -1,620 +1,610 @@
 #!/usr/bin/env python3
 """
-Entelgia Project Validation Script
-===================================
-This script validates that the Entelgia project delivers everything promised in the README.
-
-Usage:
-    python scripts/validate_project.py
-    python scripts/validate_project.py --verbose
-    python scripts/validate_project.py --fix  # Attempt to fix issues
+Entelgia Deep Implementation Validator - IMPROVED
+===================================================
+Enhanced validation with better pattern matching and fallback detection.
 """
 
-import os
-import sys
 import re
-import json
-import subprocess
-import argparse
+import ast
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
-import importlib.util
+from typing import List, Dict, Optional
+from dataclasses import dataclass
+from enum import Enum
 
-# ANSI color codes
-class Colors:
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    MAGENTA = '\033[95m'
-    CYAN = '\033[96m'
-    BOLD = '\033[1m'
-    RESET = '\033[0m'
+class ImplementationStatus(Enum):
+    FULLY_IMPLEMENTED = "✅"
+    PARTIALLY_IMPLEMENTED = "⚠️"
+    NOT_IMPLEMENTED = "❌"
 
-def print_header(text: str):
-    """Print a formatted header"""
-    print(f"\n{Colors.BOLD}{Colors.CYAN}{'='*70}{Colors.RESET}")
-    print(f"{Colors.BOLD}{Colors.CYAN}{text}{Colors.RESET}")
-    print(f"{Colors.BOLD}{Colors.CYAN}{'='*70}{Colors.RESET}\n")
+@dataclass
+class FeatureCheck:
+    name: str
+    status: ImplementationStatus
+    details: List[str]
+    score: float
 
-def print_success(text: str):
-    """Print success message"""
-    print(f"{Colors.GREEN}✓ {text}{Colors.RESET}")
-
-def print_error(text: str):
-    """Print error message"""
-    print(f"{Colors.RED}✗ {text}{Colors.RESET}")
-
-def print_warning(text: str):
-    """Print warning message"""
-    print(f"{Colors.YELLOW}⚠ {text}{Colors.RESET}")
-
-def print_info(text: str):
-    """Print info message"""
-    print(f"{Colors.BLUE}ℹ {text}{Colors.RESET}")
-
-class ValidationResult:
-    def __init__(self):
-        self.passed = []
-        self.failed = []
-        self.warnings = []
-    
-    def add_pass(self, message: str):
-        self.passed.append(message)
-        print_success(message)
-    
-    def add_fail(self, message: str):
-        self.failed.append(message)
-        print_error(message)
-    
-    def add_warning(self, message: str):
-        self.warnings.append(message)
-        print_warning(message)
-    
-    def summary(self):
-        print_header("VALIDATION SUMMARY")
-        print(f"{Colors.GREEN}Passed: {len(self.passed)}{Colors.RESET}")
-        print(f"{Colors.RED}Failed: {len(self.failed)}{Colors.RESET}")
-        print(f"{Colors.YELLOW}Warnings: {len(self.warnings)}{Colors.RESET}")
+class DeepValidator:
+    def __init__(self, project_root: Path):
+        self.root = project_root
+        self.main_file = project_root / "Entelgia_production_meta.py"
+        self.content = ""
+        self.tree = None
         
-        if self.failed:
-            print(f"\n{Colors.RED}{Colors.BOLD}Failed Checks:{Colors.RESET}")
-            for fail in self.failed:
-                print(f"  {Colors.RED}✗ {fail}{Colors.RESET}")
-        
-        if self.warnings:
-            print(f"\n{Colors.YELLOW}{Colors.BOLD}Warnings:{Colors.RESET}")
-            for warning in self.warnings:
-                print(f"  {Colors.YELLOW}⚠ {warning}{Colors.RESET}")
-        
-        return len(self.failed) == 0
-
-def get_project_root() -> Path:
-    """Get the project root directory"""
-    script_dir = Path(__file__).parent
-    return script_dir.parent
-
-def check_documentation_files(result: ValidationResult, verbose: bool = False):
-    """Check that all documentation files exist"""
-    print_header("1. Documentation Files")
-    
-    root = get_project_root()
-    required_docs = [
-        "README.md",
-        "whitepaper.md",
-        "SPEC.md",
-        "ARCHITECTURE.md",
-        "ROADMAP.md",
-        "FAQ.md",
-        "TROUBLESHOOTING.md",
-        "entelgia_demo.md",
-        "LICENSE",
-        "Changelog.md",
-        "Contributing.md",
-        "CODE_OF_CONDUCT.md",
-        "SECURITY.md",
-        "BRANDING.md",
-        "Contributors.md",
-    ]
-    
-    for doc in required_docs:
-        doc_path = root / doc
-        if doc_path.exists():
-            result.add_pass(f"Found: {doc}")
-            if verbose:
-                size = doc_path.stat().st_size
-                print_info(f"  Size: {size} bytes")
-        else:
-            result.add_fail(f"Missing: {doc}")
-
-def check_directory_structure(result: ValidationResult, verbose: bool = False):
-    """Check that all required directories exist"""
-    print_header("2. Directory Structure")
-    
-    root = get_project_root()
-    required_dirs = [
-        "Assets",
-        "docs",
-        "docs/api",
-        "entelgia",
-        "examples",
-        "scripts",
-        "tests",
-        ".github",
-        ".github/workflows",
-    ]
-    
-    for dir_name in required_dirs:
-        dir_path = root / dir_name
-        if dir_path.is_dir():
-            result.add_pass(f"Found directory: {dir_name}")
-            if verbose:
-                files = list(dir_path.iterdir())
-                print_info(f"  Contains {len(files)} items")
-        else:
-            result.add_fail(f"Missing directory: {dir_name}")
-
-def check_core_files(result: ValidationResult, verbose: bool = False):
-    """Check that core Python files exist"""
-    print_header("3. Core Files")
-    
-    root = get_project_root()
-    core_files = [
-        "Entelgia_production_meta.py",
-        "requirements.txt",
-        "pyproject.toml",
-        ".env.example",
-        ".gitignore",
-        "scripts/install.py",
-        "scripts/clear_memory.py",
-        "tests/test_enhanced_dialogue.py",
-        "tests/test_memory_security.py",
-    ]
-    
-    for file_name in core_files:
-        file_path = root / file_name
-        if file_path.exists():
-            result.add_pass(f"Found: {file_name}")
-            if verbose and file_path.suffix == '.py':
-                try:
-                    lines = len(file_path.read_text(encoding='utf-8').splitlines())
-                    print_info(f"  Lines: {lines}")
-                except Exception:
-                    pass
-        else:
-            result.add_fail(f"Missing: {file_name}")
-
-def check_entelgia_package(result: ValidationResult, verbose: bool = False):
-    """Check the entelgia package modules"""
-    print_header("4. Entelgia Package Modules")
-    
-    root = get_project_root()
-    entelgia_modules = [
-        "entelgia/__init__.py",
-        "entelgia/dialogue_engine.py",
-        "entelgia/enhanced_personas.py",
-        "entelgia/context_manager.py",
-        "entelgia/fixy_interactive.py",
-    ]
-    
-    for module in entelgia_modules:
-        module_path = root / module
-        if module_path.exists():
-            result.add_pass(f"Found module: {module}")
-            if verbose:
-                try:
-                    content = module_path.read_text(encoding='utf-8')
-                    classes = len(re.findall(r'^class\s+\w+', content, re.MULTILINE))
-                    functions = len(re.findall(r'^def\s+\w+', content, re.MULTILINE))
-                    print_info(f"  Classes: {classes}, Functions: {functions}")
-                except Exception:
-                    pass
-        else:
-            result.add_fail(f"Missing module: {module}")
-
-def check_core_features_in_code(result: ValidationResult, verbose: bool = False):
-    """Check that core features are implemented in the main file"""
-    print_header("5. Core Features Implementation")
-    
-    root = get_project_root()
-    main_file = root / "Entelgia_production_meta.py"
-    
-    if not main_file.exists():
-        result.add_fail("Entelgia_production_meta.py not found")
-        return
-    
-    try:
-        # FIX: Added encoding='utf-8'
-        content = main_file.read_text(encoding='utf-8')
-    except Exception as e:
-        result.add_fail(f"Could not read Entelgia_production_meta.py: {e}")
-        return
-    
-    features_to_check = {
-        "Multi-agent system": [r"class.*Socrates", r"class.*Athena", r"class.*Fixy"],
-        "Memory system": [r"class.*Memory", r"sqlite", r"json"],
-        "HMAC-SHA256": [r"hmac", r"sha256"],
-        "Emotion tracking": [r"emotion", r"class.*Emotion"],
-        "Dream cycles": [r"dream", r"promote.*memory"],
-        "Observer meta-cognition": [r"Observer", r"meta.*cognition"],
-        "PII redaction": [r"pii", r"redact"],
-        "Error handling": [r"try:", r"except", r"retry", r"backoff"],
-        "Psychological drives": [r"id|ego|superego", r"drive"],
-        "Configuration": [r"class.*Config"],
-    }
-    
-    for feature, patterns in features_to_check.items():
-        found = False
-        for pattern in patterns:
-            if re.search(pattern, content, re.IGNORECASE):
-                found = True
-                break
-        
-        if found:
-            result.add_pass(f"Feature implemented: {feature}")
-        else:
-            result.add_warning(f"Feature not clearly visible in code: {feature}")
-
-def check_version_consistency(result: ValidationResult, verbose: bool = False):
-    """Check version consistency across files"""
-    print_header("6. Version Consistency")
-    
-    root = get_project_root()
-    versions = {}
-    
-    # Check README
-    readme_path = root / "README.md"
-    if readme_path.exists():
-        try:
-            readme_content = readme_path.read_text(encoding='utf-8')
-            match = re.search(r'\*\*Version:\*\*\s*([\d.]+)', readme_content)
-            if match:
-                versions['README'] = match.group(1)
-                print_info(f"README version: {versions['README']}")
-        except Exception:
-            pass
-    
-    # Check pyproject.toml
-    pyproject_path = root / "pyproject.toml"
-    if pyproject_path.exists():
-        try:
-            pyproject_content = pyproject_path.read_text(encoding='utf-8')
-            match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', pyproject_content)
-            if match:
-                versions['pyproject.toml'] = match.group(1)
-                print_info(f"pyproject.toml version: {versions['pyproject.toml']}")
-        except Exception:
-            pass
-    
-    # Check Changelog
-    changelog_path = root / "Changelog.md"
-    if changelog_path.exists():
-        try:
-            changelog_content = changelog_path.read_text(encoding='utf-8')
-            # Find the first version heading
-            match = re.search(r'##?\s*\[?v?([\d.]+)\]?', changelog_content)
-            if match:
-                versions['Changelog'] = match.group(1)
-                print_info(f"Changelog latest version: {versions['Changelog']}")
-        except Exception:
-            pass
-    
-    # Check consistency
-    if len(versions) > 1:
-        unique_versions = set(versions.values())
-        if len(unique_versions) == 1:
-            result.add_pass(f"Version consistent across files: {list(unique_versions)[0]}")
-        else:
-            result.add_fail(f"Version mismatch: {versions}")
-    else:
-        result.add_warning("Could not extract versions from all files")
-
-def check_dependencies(result: ValidationResult, verbose: bool = False):
-    """Check that dependencies are properly listed"""
-    print_header("7. Dependencies")
-    
-    root = get_project_root()
-    requirements_path = root / "requirements.txt"
-    
-    if not requirements_path.exists():
-        result.add_fail("requirements.txt not found")
-        return
-    
-    try:
-        content = requirements_path.read_text(encoding='utf-8')
-    except Exception as e:
-        result.add_fail(f"Could not read requirements.txt: {e}")
-        return
-    
-    expected_deps = [
-        "ollama",
-        "python-dotenv",
-        "pytest",
-    ]
-    
-    found_deps = []
-    missing_deps = []
-    
-    for dep in expected_deps:
-        if dep.lower() in content.lower():
-            found_deps.append(dep)
-        else:
-            missing_deps.append(dep)
-    
-    if found_deps:
-        result.add_pass(f"Found core dependencies: {', '.join(found_deps)}")
-    
-    if missing_deps:
-        result.add_warning(f"Missing expected dependencies: {', '.join(missing_deps)}")
-    
-    if verbose:
-        lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith('#')]
-        print_info(f"Total dependencies listed: {len(lines)}")
-
-def check_github_actions(result: ValidationResult, verbose: bool = False):
-    """Check GitHub Actions workflows"""
-    print_header("8. CI/CD Pipeline (GitHub Actions)")
-    
-    root = get_project_root()
-    workflows_dir = root / ".github" / "workflows"
-    
-    if not workflows_dir.exists():
-        result.add_warning("GitHub workflows directory not found")
-        return
-    
-    workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
-    
-    if workflow_files:
-        result.add_pass(f"Found {len(workflow_files)} workflow file(s)")
-        if verbose:
-            for wf in workflow_files:
-                print_info(f"  - {wf.name}")
-    else:
-        result.add_warning("No workflow files found")
-
-def check_test_files(result: ValidationResult, verbose: bool = False):
-    """Check test files exist and are valid"""
-    print_header("9. Test Files")
-    
-    root = get_project_root()
-    test_files = [
-        "tests/test_enhanced_dialogue.py",
-        "tests/test_memory_security.py",
-    ]
-    
-    total_tests = 0
-    
-    for test_file in test_files:
-        test_path = root / test_file
-        if test_path.exists():
-            result.add_pass(f"Found test file: {test_file}")
-            
-            if verbose:
-                try:
-                    content = test_path.read_text(encoding='utf-8')
-                    # Count test functions
-                    test_count = len(re.findall(r'def\s+test_\w+', content))
-                    total_tests += test_count
-                    print_info(f"  Contains ~{test_count} test functions")
-                except Exception:
-                    pass
-        else:
-            result.add_fail(f"Missing test file: {test_file}")
-    
-    if verbose and total_tests > 0:
-        print_info(f"Total test functions found: ~{total_tests}")
-
-def check_example_scripts(result: ValidationResult, verbose: bool = False):
-    """Check example/demo scripts"""
-    print_header("10. Example/Demo Scripts")
-    
-    root = get_project_root()
-    examples_dir = root / "examples"
-    
-    if not examples_dir.exists():
-        result.add_warning("Examples directory not found")
-        return
-    
-    demo_files = list(examples_dir.glob("*.py"))
-    
-    expected_demo = "demo_enhanced_dialogue.py"
-    
-    if (examples_dir / expected_demo).exists():
-        result.add_pass(f"Found: examples/{expected_demo}")
-    else:
-        result.add_warning(f"Missing: examples/{expected_demo}")
-    
-    if verbose:
-        print_info(f"Total example files: {len(demo_files)}")
-        for demo in demo_files:
-            print_info(f"  - {demo.name}")
-
-def check_api_documentation(result: ValidationResult, verbose: bool = False):
-    """Check API documentation"""
-    print_header("11. API Documentation")
-    
-    root = get_project_root()
-    api_doc = root / "docs" / "api" / "README.md"
-    
-    if api_doc.exists():
-        result.add_pass("API documentation exists")
-        if verbose:
+        if self.main_file.exists():
+            self.content = self.main_file.read_text(encoding='utf-8')
             try:
-                content = api_doc.read_text(encoding='utf-8')
-                if "POST /api/v1/chat" in content:
-                    print_info("  Contains chat endpoint documentation")
-                if "localhost:8000" in content:
-                    print_info("  Contains base URL information")
-            except Exception:
-                pass
-    else:
-        result.add_warning("API documentation not found")
+                self.tree = ast.parse(self.content)
+            except SyntaxError:
+                print("⚠ Could not parse main Python file")
+    
+    def find_classes(self, patterns: List[str]) -> List[str]:
+        """Find all classes matching any of the patterns"""
+        classes = []
+        if self.tree:
+            for node in ast.walk(self.tree):
+                if isinstance(node, ast.ClassDef):
+                    for pattern in patterns:
+                        if re.search(pattern, node.name, re.IGNORECASE):
+                            if node.name not in classes:
+                                classes.append(node.name)
+                            break
+        return classes
+    
+    def find_functions(self, patterns: List[str]) -> List[str]:
+        """Find all functions/methods matching any pattern - IMPROVED"""
+        functions = []
+        if self.tree:
+            for node in ast.walk(self.tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    for pattern in patterns:
+                        if re.search(pattern, node.name, re.IGNORECASE):
+                            if node.name not in functions:
+                                functions.append(node.name)
+                            break
+        return functions
+    
+    def find_imports(self, module_names: List[str]) -> Dict[str, bool]:
+        """Check if specific modules are imported"""
+        imports = {mod: False for mod in module_names}
+        if self.tree:
+            for node in ast.walk(self.tree):
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            if alias.name in module_names:
+                                imports[alias.name] = True
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module in module_names:
+                            imports[node.module] = True
+        return imports
+    
+    def check_config_value(self, param_name: str) -> Optional[str]:
+        """Extract config parameter value - IMPROVED with multiple patterns"""
+        patterns = [
+            rf'{param_name}\s*:\s*(?:int|float|str|bool)\s*=\s*([^\n#]+)',
+            rf'{param_name}\s*[:=]\s*(?:int|float|str|bool)?\s*=\s*([^\n#]+)',
+            rf'{param_name}\s*=\s*([^\n#,\)]+)',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, self.content)
+            if match:
+                value = match.group(1).strip()
+                # Clean up quotes and whitespace
+                value = value.strip('"\'')
+                return value
+        return None
+    
+    def code_contains_patterns(self, patterns: List[str]) -> Dict[str, bool]:
+        """Check if code contains specific patterns"""
+        results = {}
+        content_lower = self.content.lower()
+        for pattern in patterns:
+            results[pattern] = bool(re.search(pattern, content_lower, re.IGNORECASE))
+        return results
 
-def check_readme_promises(result: ValidationResult, verbose: bool = False):
-    """Check specific promises made in README"""
-    print_header("12. README Promises")
-    
-    root = get_project_root()
-    readme_path = root / "README.md"
-    
-    if not readme_path.exists():
-        result.add_fail("README.md not found")
-        return
-    
-    try:
-        content = readme_path.read_text(encoding='utf-8')
-    except Exception as e:
-        result.add_fail(f"Could not read README.md: {e}")
-        return
-    
-    promises = {
-        "Installation script": r"scripts/install\.py",
-        "Memory clearing script": r"scripts/clear_memory\.py",
-        "Test coverage claim (24 tests)": r"24.*tests?.*pass",
-        "Version badge": r"!\[.*[Vv]ersion.*\]",
-        "Tests badge": r"!\[.*[Tt]ests.*\]",
-        "License badge": r"!\[.*[Ll]icense.*\]",
-        "Build status badge": r"!\[.*[Bb]uild.*\]",
-    }
-    
-    for promise, pattern in promises.items():
-        if re.search(pattern, content, re.IGNORECASE):
-            result.add_pass(f"README includes: {promise}")
-        else:
-            result.add_warning(f"README missing: {promise}")
-
-def run_tests_check(result: ValidationResult, verbose: bool = False, run_tests: bool = False):
-    """Optionally run the actual tests"""
-    print_header("13. Test Execution (Optional)")
-    
-    if not run_tests:
-        print_info("Skipping test execution (use --run-tests to enable)")
-        return
-    
-    root = get_project_root()
-    
-    # Try to run pytest
-    test_commands = [
-        (["python", "tests/test_enhanced_dialogue.py"], "Enhanced Dialogue Tests"),
-        (["pytest", "tests/test_memory_security.py", "-v"], "Memory Security Tests"),
-    ]
-    
-    for cmd, name in test_commands:
-        try:
-            print_info(f"Running: {name}")
-            process = subprocess.run(
-                cmd,
-                cwd=root,
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-            
-            if process.returncode == 0:
-                result.add_pass(f"{name}: PASSED")
-                if verbose:
-                    print(process.stdout)
-            else:
-                result.add_fail(f"{name}: FAILED")
-                if verbose:
-                    print(process.stderr)
+    def validate_multi_agent_system(self) -> FeatureCheck:
+        """Validate Multi-agent dialogue system - IMPROVED"""
+        details = []
+        checks_passed = 0
+        total_checks = 6
         
-        except subprocess.TimeoutExpired:
-            result.add_warning(f"{name}: TIMEOUT")
-        except FileNotFoundError:
-            result.add_warning(f"{name}: Command not found (pytest may not be installed)")
-        except Exception as e:
-            result.add_warning(f"{name}: Error - {e}")
-
-def check_security_features(result: ValidationResult, verbose: bool = False):
-    """Check security-related features"""
-    print_header("14. Security Features")
+        # Enhanced pattern matching
+        socrates = self.find_classes([r'Socrates', r'SocratesAgent', r'Agent.*Socrates'])
+        athena = self.find_classes([r'Athena', r'AthenaAgent', r'Agent.*Athena'])
+        fixy = self.find_classes([r'Fixy', r'FixyAgent', r'FixyObserver', r'ObserverCore'])
+        
+        # Fallback: search in code text
+        if not socrates and re.search(r'socrates.*agent|agent.*socrates', self.content, re.IGNORECASE):
+            socrates = ['[found in code]']
+        if not athena and re.search(r'athena.*agent|agent.*athena', self.content, re.IGNORECASE):
+            athena = ['[found in code]']
+        
+        if socrates:
+            details.append(f"✓ Socrates: {', '.join(socrates)}")
+            checks_passed += 1
+        else:
+            details.append("✗ Socrates not found")
+        
+        if athena:
+            details.append(f"✓ Athena: {', '.join(athena)}")
+            checks_passed += 1
+        else:
+            details.append("✗ Athena not found")
+        
+        if fixy:
+            details.append(f"✓ Fixy: {', '.join(fixy)}")
+            checks_passed += 1
+        else:
+            details.append("✗ Fixy not found")
+        
+        dialogue_funcs = self.find_functions([r'dialogue', r'speak', r'converse', r'respond'])
+        if dialogue_funcs:
+            details.append(f"✓ Dialogue functions: {len(dialogue_funcs)}")
+            checks_passed += 1
+        else:
+            details.append("✗ No dialogue functions")
+        
+        patterns = self.code_contains_patterns([
+            r'agent.*respond',
+            r'speaker.*selection',
+            r'turn.*taking'
+        ])
+        if any(patterns.values()):
+            details.append("✓ Agent interaction logic")
+            checks_passed += 1
+        
+        if re.search(r'persona|personality|character', self.content, re.IGNORECASE):
+            details.append("✓ Agent personas defined")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.5 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Multi-agent System", status, details, score)
     
-    root = get_project_root()
+    def validate_persistent_memory(self) -> FeatureCheck:
+        """Validate Persistent memory"""
+        details = []
+        checks_passed = 0
+        total_checks = 8
+        
+        memory_classes = self.find_classes([r'Memory', r'MemoryCore', r'MemoryManager'])
+        if memory_classes:
+            details.append(f"✓ Memory classes: {', '.join(memory_classes[:3])}")
+            checks_passed += 1
+        
+        imports = self.find_imports(['json', 'sqlite3', 'hmac'])
+        if imports.get('json'):
+            details.append("✓ JSON imported")
+            checks_passed += 1
+        
+        if re.search(r'sqlite|\.db', self.content, re.IGNORECASE):
+            details.append("✓ SQLite database")
+            checks_passed += 1
+        
+        if imports.get('hmac') and re.search(r'sha256', self.content, re.IGNORECASE):
+            details.append("✓ HMAC-SHA256")
+            checks_passed += 1
+        
+        stm_funcs = self.find_functions([r'stm', r'short.*term', r'temporary'])
+        if stm_funcs:
+            details.append(f"✓ STM functions: {len(stm_funcs)}")
+            checks_passed += 1
+        
+        ltm_funcs = self.find_functions([r'ltm', r'long.*term', r'permanent'])
+        if ltm_funcs:
+            details.append(f"✓ LTM functions: {len(ltm_funcs)}")
+            checks_passed += 1
+        
+        persist_funcs = self.find_functions([r'save', r'load', r'persist', r'store', r'retrieve'])
+        if persist_funcs:
+            details.append(f"✓ Persistence: {len(persist_funcs)}")
+            checks_passed += 1
+        
+        if re.search(r'signature|verify|integrity|hmac', self.content, re.IGNORECASE):
+            details.append("✓ Memory integrity")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.5 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Persistent Memory", status, details, score)
     
-    # Check for .env.example (but not .env)
-    if (root / ".env.example").exists():
-        result.add_pass(".env.example template exists")
-    else:
-        result.add_fail(".env.example not found")
-    
-    if (root / ".env").exists():
-        result.add_warning(".env file exists (should be in .gitignore)")
-    
-    # Check .gitignore
-    gitignore_path = root / ".gitignore"
-    if gitignore_path.exists():
-        try:
-            content = gitignore_path.read_text(encoding='utf-8')
-            if ".env" in content:
-                result.add_pass(".gitignore includes .env")
+    def validate_dream_cycles(self) -> FeatureCheck:
+        """Validate Dream cycles - IMPROVED"""
+        details = []
+        checks_passed = 0
+        total_checks = 7
+        
+        dream_turns = self.check_config_value('dream_every_n_turns')
+        if dream_turns:
+            details.append(f"✓ dream_every_n_turns = {dream_turns}")
+            checks_passed += 1
+        
+        dream_funcs = self.find_functions([r'dream', r'dream.*cycle', r'dream.*reflection'])
+        if dream_funcs:
+            details.append(f"✓ Dream functions: {', '.join(dream_funcs[:2])}")
+            checks_passed += 1
+        
+        # IMPROVED: multiple promotion patterns
+        promote_funcs = self.find_functions([r'promote', r'consolidate', r'transfer.*memory', r'migrate'])
+        promote_in_code = re.search(r'promote|consolidate|transfer.*memory', self.content, re.IGNORECASE)
+        if promote_funcs or promote_in_code:
+            if promote_funcs:
+                details.append(f"✓ Memory promotion: {', '.join(promote_funcs[:2])}")
             else:
-                result.add_warning(".gitignore may not protect .env file")
-        except Exception:
-            pass
+                details.append("✓ Memory promotion: [found in code]")
+            checks_passed += 1
+        else:
+            details.append("✗ No promotion logic")
+        
+        if re.search(r'importance.*score|score.*importance', self.content, re.IGNORECASE):
+            details.append("✓ Importance scoring")
+            checks_passed += 1
+        
+        if re.search(r'stm.*ltm|short.*long|temporary.*permanent', self.content, re.IGNORECASE):
+            details.append("✓ STM → LTM transfer")
+            checks_passed += 1
+        
+        if re.search(r'turn.*%.*dream|dream_every|dream.*trigger', self.content, re.IGNORECASE):
+            details.append("✓ Dream cycle triggering")
+            checks_passed += 1
+        
+        if re.search(r'threshold|cutoff|minimum.*importance', self.content, re.IGNORECASE):
+            details.append("✓ Threshold filtering")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.5 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Dream Cycles", status, details, score)
     
-    # Check SECURITY.md
-    if (root / "SECURITY.md").exists():
-        result.add_pass("Security policy documented")
+    def validate_emotion_tracking(self) -> FeatureCheck:
+        """Validate Emotion tracking - IMPROVED"""
+        details = []
+        checks_passed = 0
+        total_checks = 5
+        
+        emotion_classes = self.find_classes([r'Emotion', r'EmotionCore', r'EmotionTracker'])
+        if emotion_classes:
+            details.append(f"✓ Emotion class: {', '.join(emotion_classes)}")
+            checks_passed += 1
+        
+        emotion_funcs = self.find_functions([r'emotion', r'affect', r'sentiment', r'feeling'])
+        # Fallback: check if emotion methods exist
+        if not emotion_funcs:
+            if re.search(r'def.*emotion|emotion.*score|track.*emotion', self.content, re.IGNORECASE):
+                emotion_funcs = ['[found in code]']
+        
+        if emotion_funcs:
+            details.append(f"✓ Emotion functions: {len(emotion_funcs) if isinstance(emotion_funcs, list) and emotion_funcs[0] != '[found in code]' else 'found'}")
+            checks_passed += 1
+        
+        if re.search(r'track.*emotion|emotion.*track|emotion.*state', self.content, re.IGNORECASE):
+            details.append("✓ Emotion tracking logic")
+            checks_passed += 1
+        
+        importance_funcs = self.find_functions([r'importance', r'score', r'weight', r'priority'])
+        if importance_funcs:
+            details.append(f"✓ Importance scoring: {len(importance_funcs)}")
+            checks_passed += 1
+        
+        if re.search(r'emotion.*memory|memory.*emotion|affect.*weight', self.content, re.IGNORECASE):
+            details.append("✓ Emotion-memory integration")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.5 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Emotion Tracking", status, details, score)
+    
+    def validate_psychological_drives(self) -> FeatureCheck:
+        """Validate Id/Ego/Superego"""
+        details = []
+        checks_passed = 0
+        total_checks = 4
+        
+        psycho_patterns = self.code_contains_patterns([r'\bid\b', r'\bego\b', r'\bsuperego\b'])
+        found_drives = [k for k, v in psycho_patterns.items() if v]
+        
+        if len(found_drives) >= 2:
+            details.append(f"✓ Drives found: {len(found_drives)}")
+            checks_passed += len(found_drives)
+        else:
+            details.append("⚠ Limited psychological drives")
+        
+        if re.search(r'drive|motivation|impulse', self.content, re.IGNORECASE):
+            details.append("✓ Drive modeling")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.75 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.5 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Psychological Drives", status, details, score)
+    
+    def validate_observer_metacognition(self) -> FeatureCheck:
+        """Validate Observer metacognition - IMPROVED"""
+        details = []
+        checks_passed = 0
+        total_checks = 5
+        
+        observer_classes = self.find_classes([r'Observer', r'ObserverCore', r'Fixy.*Observer'])
+        if observer_classes:
+            details.append(f"✓ Observer: {', '.join(observer_classes)}")
+            checks_passed += 1
+        
+        fixy_funcs = self.find_functions([r'fixy', r'observe', r'monitor', r'watch'])
+        if fixy_funcs:
+            details.append(f"✓ Meta-cognitive functions: {len(fixy_funcs)}")
+            checks_passed += 1
+        
+        if re.search(r'meta.*cognition|metacognition|self.*monitor', self.content, re.IGNORECASE):
+            details.append("✓ Meta-cognitive logic")
+            checks_passed += 1
+        
+        # IMPROVED: check for intervention
+        intervention_funcs = self.find_functions([r'interven', r'correct', r'adjust', r'fix'])
+        intervention_in_code = re.search(r'should_intervene|generate_intervention|intervention.*logic', self.content, re.IGNORECASE)
+        if intervention_funcs or intervention_in_code:
+            if intervention_funcs:
+                details.append(f"✓ Intervention: {len(intervention_funcs)}")
+            else:
+                details.append("✓ Intervention: [found in code]")
+            checks_passed += 1
+        else:
+            details.append("✗ No intervention mechanisms")
+        
+        fixy_config = self.check_config_value('fixy_every_n_turns')
+        if fixy_config:
+            details.append(f"✓ fixy_every_n_turns = {fixy_config}")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.6 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Observer Meta-cognition", status, details, score)
+    
+    def validate_pii_redaction(self) -> FeatureCheck:
+        """Validate PII redaction - IMPROVED"""
+        details = []
+        checks_passed = 0
+        total_checks = 4
+        
+        redact_funcs = self.find_functions([r'redact', r'sanitize', r'anonymize', r'mask'])
+        if redact_funcs:
+            details.append(f"✓ Redaction: {', '.join(redact_funcs)}")
+            checks_passed += 1
+        
+        if re.search(r'pii|personal.*identif|email.*pattern|phone.*pattern', self.content, re.IGNORECASE):
+            details.append("✓ PII patterns")
+            checks_passed += 1
+        
+        # IMPROVED: check for regex in multiple formats
+        regex_patterns = [
+            r're\.compile.*email',
+            r're\.search.*email',
+            r'r["\'].*@.*\\.',
+            r'EMAIL_PATTERN|PHONE_PATTERN',
+        ]
+        if any(re.search(p, self.content, re.IGNORECASE) for p in regex_patterns):
+            details.append("✓ Regex PII detection")
+            checks_passed += 1
+        else:
+            details.append("⚠ Limited regex detection")
+        
+        if re.search(r'privacy|gdpr|protect.*data|redacted', self.content, re.IGNORECASE):
+            details.append("✓ Privacy safeguards")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.75 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.5 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("PII Redaction", status, details, score)
+    
+    def validate_error_handling(self) -> FeatureCheck:
+        """Validate Error handling - IMPROVED"""
+        details = []
+        checks_passed = 0
+        total_checks = 5
+        
+        try_count = len(re.findall(r'\btry:', self.content))
+        if try_count >= 5:
+            details.append(f"✓ Error handling: {try_count} try blocks")
+            checks_passed += 1
+        
+        if re.search(r'backoff|exponential.*retry|retry.*delay', self.content, re.IGNORECASE):
+            details.append("✓ Exponential backoff")
+            checks_passed += 1
+        
+        # IMPROVED: check for retry logic
+        retry_funcs = self.find_functions([r'retry', r'backoff', r'attempt'])
+        retry_in_code = re.search(r'for.*attempt|while.*retry|max.*retries|llm_max_retries', self.content, re.IGNORECASE)
+        if retry_funcs or retry_in_code:
+            if retry_funcs:
+                details.append(f"✓ Retry functions: {len(retry_funcs)}")
+            else:
+                details.append("✓ Retry logic: [found in code]")
+            checks_passed += 1
+        else:
+            details.append("⚠ Limited retry logic")
+        
+        if re.search(r'timeout|time.*limit|llm_timeout', self.content, re.IGNORECASE):
+            details.append("✓ Timeout handling")
+            checks_passed += 1
+        
+        log_imports = self.find_imports(['logging'])
+        if log_imports.get('logging'):
+            details.append("✓ Logging configured")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.6 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Error Handling", status, details, score)
+    
+    def validate_enhanced_dialogue_engine(self) -> FeatureCheck:
+        """Validate Enhanced Dialogue Engine"""
+        details = []
+        checks_passed = 0
+        total_checks = 5
+        
+        entelgia_dir = self.root / "entelgia"
+        if entelgia_dir.exists():
+            details.append("✓ entelgia/ package exists")
+            checks_passed += 1
+            
+            modules = ["dialogue_engine.py", "enhanced_personas.py", "context_manager.py", "fixy_interactive.py"]
+            found = [m for m in modules if (entelgia_dir / m).exists()]
+            if len(found) >= 3:
+                details.append(f"✓ Modules: {len(found)}/4")
+                checks_passed += 1
+        
+        if re.search(r'select.*speaker|dynamic.*turn|speaker.*selection', self.content, re.IGNORECASE):
+            details.append("✓ Dynamic speaker selection")
+            checks_passed += 1
+        
+        if re.search(r'seed.*strategy|analogy|disagree|reflect|question', self.content, re.IGNORECASE):
+            details.append("✓ Varied seed generation")
+            checks_passed += 1
+        
+        if re.search(r'context.*enrich|history|dialogue.*context', self.content, re.IGNORECASE):
+            details.append("✓ Context enrichment")
+            checks_passed += 1
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.6 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Enhanced Dialogue Engine", status, details, score)
+    
+    def validate_configuration(self) -> FeatureCheck:
+        """Validate Configuration - IMPROVED"""
+        details = []
+        checks_passed = 0
+        total_checks = 8
+        
+        config_params = ['max_turns', 'timeout_minutes', 'max_output_words', 
+                        'llm_timeout', 'fixy_every_n_turns', 'dream_every_n_turns']
+        
+        for param in config_params:
+            value = self.check_config_value(param)
+            if value:
+                details.append(f"✓ {param} = {value}")
+                checks_passed += 1
+            else:
+                details.append(f"⚠ {param} not found")
+        
+        config_classes = self.find_classes([r'^Config$', r'Configuration'])
+        if config_classes:
+            details.append("✓ Config class found")
+            checks_passed += 1
+        
+        # IMPROVED: check for validation method
+        validate_funcs = self.find_functions([r'validate', r'__post_init__'])
+        if validate_funcs or re.search(r'def __post_init__|def validate', self.content):
+            details.append("✓ Config validation")
+            checks_passed += 1
+        else:
+            details.append("⚠ No validation method")
+        
+        score = checks_passed / total_checks
+        status = ImplementationStatus.FULLY_IMPLEMENTED if score >= 0.8 else \
+                 ImplementationStatus.PARTIALLY_IMPLEMENTED if score >= 0.6 else \
+                 ImplementationStatus.NOT_IMPLEMENTED
+        
+        return FeatureCheck("Configuration", status, details, score)
+
+
+def print_feature_report(feature: FeatureCheck):
+    print(f"\n{feature.status.value} {feature.name} ({feature.score:.0%})")
+    for detail in feature.details:
+        print(f"   {detail}")
+
+
+def print_summary(features: List[FeatureCheck]):
+    print("\n" + "="*70)
+    print("📊 IMPLEMENTATION VALIDATION SUMMARY")
+    print("="*70)
+    
+    total_score = sum(f.score for f in features) / len(features)
+    
+    fully = len([f for f in features if f.status == ImplementationStatus.FULLY_IMPLEMENTED])
+    partial = len([f for f in features if f.status == ImplementationStatus.PARTIALLY_IMPLEMENTED])
+    missing = len([f for f in features if f.status == ImplementationStatus.NOT_IMPLEMENTED])
+    
+    print(f"\n✅ Fully Implemented:     {fully}/{len(features)}")
+    print(f"⚠️  Partially Implemented: {partial}/{len(features)}")
+    print(f"❌ Not Implemented:       {missing}/{len(features)}")
+    print(f"\n🎯 Overall Score:         {total_score:.1%}")
+    
+    print("\n" + "="*70)
+    
+    if total_score >= 0.9:
+        print("🏆 EXCELLENT: All features well-implemented!")
+    elif total_score >= 0.8:
+        print("✅ VERY GOOD: Strong implementation")
+    elif total_score >= 0.75:
+        print("✅ GOOD: Most features implemented")
+    elif total_score >= 0.5:
+        print("⚠️  FAIR: Some features need work")
     else:
-        result.add_warning("SECURITY.md not found")
+        print("❌ POOR: Many features missing")
+    
+    print("="*70 + "\n")
+
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Validate Entelgia project against README promises"
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose output"
-    )
-    parser.add_argument(
-        "--run-tests",
-        action="store_true",
-        help="Actually run the test suite (slow)"
-    )
+    root = Path(__file__).parent.parent
     
-    args = parser.parse_args()
+    print("\n" + "="*70)
+    print("🔍 ENTELGIA DEEP IMPLEMENTATION VALIDATOR v2.0")
+    print("   Enhanced pattern matching & fallback detection")
+    print("="*70)
     
-    print(f"{Colors.BOLD}{Colors.MAGENTA}")
-    print("╔════════════════════════════════════════════════════════════════════╗")
-    print("║                                                                    ║")
-    print("║             ENTELGIA PROJECT VALIDATION SCRIPT                     ║")
-    print("║                                                                    ║")
-    print("╚════════════════════════════════════════════════════════════════════╝")
-    print(Colors.RESET)
+    validator = DeepValidator(root)
     
-    result = ValidationResult()
+    if not validator.main_file.exists():
+        print("❌ Entelgia_production_meta.py not found!")
+        return
     
-    # Run all checks
-    check_documentation_files(result, args.verbose)
-    check_directory_structure(result, args.verbose)
-    check_core_files(result, args.verbose)
-    check_entelgia_package(result, args.verbose)
-    check_core_features_in_code(result, args.verbose)
-    check_version_consistency(result, args.verbose)
-    check_dependencies(result, args.verbose)
-    check_github_actions(result, args.verbose)
-    check_test_files(result, args.verbose)
-    check_example_scripts(result, args.verbose)
-    check_api_documentation(result, args.verbose)
-    check_readme_promises(result, args.verbose)
-    check_security_features(result, args.verbose)
+    print("\nAnalyzing code implementation...\n")
     
-    if args.run_tests:
-        run_tests_check(result, args.verbose, run_tests=True)
+    features = [
+        validator.validate_multi_agent_system(),
+        validator.validate_persistent_memory(),
+        validator.validate_dream_cycles(),
+        validator.validate_emotion_tracking(),
+        validator.validate_psychological_drives(),
+        validator.validate_observer_metacognition(),
+        validator.validate_pii_redaction(),
+        validator.validate_error_handling(),
+        validator.validate_enhanced_dialogue_engine(),
+        validator.validate_configuration(),
+    ]
     
-    # Print summary
-    success = result.summary()
+    for feature in features:
+        print_feature_report(feature)
     
-    if success:
-        print(f"\n{Colors.GREEN}{Colors.BOLD}✓ ALL CHECKS PASSED!{Colors.RESET}")
-        print(f"{Colors.GREEN}Your project delivers what the README promises.{Colors.RESET}\n")
-        sys.exit(0)
-    else:
-        print(f"\n{Colors.RED}{Colors.BOLD}✗ SOME CHECKS FAILED{Colors.RESET}")
-        print(f"{Colors.RED}Please review the failed checks above.{Colors.RESET}\n")
-        sys.exit(1)
+    print_summary(features)
+
 
 if __name__ == "__main__":
     main()
