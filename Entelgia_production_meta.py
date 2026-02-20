@@ -668,6 +668,18 @@ class MemoryCore:
             logger.warning(f"PRAGMA Error: {e}")
         return c
 
+    @staticmethod
+    def _build_ltm_payload(content: str, topic, emotion, ts: str) -> str:
+        """Build the canonical signature payload for an LTM entry.
+
+        None values are normalized to empty string so that the payload is
+        identical regardless of whether the caller passes None or the DB
+        returns a SQL NULL.
+        """
+        topic_str = topic if topic is not None else ""
+        emotion_str = emotion if emotion is not None else ""
+        return f"{content}|{topic_str}|{emotion_str}|{ts}"
+
     def _init_db(self):
         """Initialize database schema with better indexing."""
         try:
@@ -714,10 +726,76 @@ class MemoryCore:
                         self_awareness REAL
                     );
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    );
+                """)
                 conn.commit()
                 logger.info("Database schema initialized with memory security")
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
+        self._migrate_signing_key()
+
+    def _migrate_signing_key(self):
+        """Detect MEMORY_SECRET_KEY rotation and re-sign all memories.
+
+        When the signing key changes between runs (e.g. a new .env file or an
+        updated environment variable) every stored HMAC-SHA256 signature
+        becomes invalid.  This method detects that situation by comparing a
+        fingerprint (SHA-256 hash) of the current key against the fingerprint
+        stored in the ``settings`` table, and re-signs every memory row so
+        that ``ltm_recent`` validation keeps working.
+        """
+        import hashlib as _hashlib
+
+        current_fp = _hashlib.sha256(MEMORY_SECRET_KEY_BYTES).hexdigest()
+        try:
+            with self._conn() as conn:
+                row = conn.execute(
+                    "SELECT value FROM settings WHERE key = 'key_fingerprint'"
+                ).fetchone()
+                if row is None:
+                    # First initialization – persist fingerprint and (re-)sign
+                    # any legacy rows that have no signature yet.
+                    conn.execute(
+                        "INSERT OR REPLACE INTO settings (key, value) VALUES ('key_fingerprint', ?)",
+                        (current_fp,),
+                    )
+                    conn.commit()
+                    logger.info("Memory signing key fingerprint stored")
+                    return
+
+                stored_fp = row[0]
+                if stored_fp == current_fp:
+                    # Key unchanged – nothing to do.
+                    return
+
+                # Key has changed: re-sign every memory row.
+                logger.warning(
+                    "MEMORY_SECRET_KEY changed – re-signing all memories to restore validity"
+                )
+                rows = conn.execute(
+                    "SELECT id, content, topic, emotion, ts FROM memories"
+                ).fetchall()
+                for row_id, content, topic, emotion, ts in rows:
+                    payload = self._build_ltm_payload(content, topic, emotion, ts)
+                    new_sig = create_signature(
+                        payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
+                    )
+                    conn.execute(
+                        "UPDATE memories SET signature_hex = ? WHERE id = ?",
+                        (new_sig.hex(), row_id),
+                    )
+                conn.execute(
+                    "UPDATE settings SET value = ? WHERE key = 'key_fingerprint'",
+                    (current_fp,),
+                )
+                conn.commit()
+                logger.info(f"Re-signed {len(rows)} memories with updated key")
+        except Exception as e:
+            logger.error(f"Key migration error: {e}")
 
     def stm_path(self, agent_name: str) -> str:
         """Get STM file path for agent."""
@@ -769,8 +847,9 @@ class MemoryCore:
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
 
-        # Create payload for signature
-        payload_for_sig = f"{content}|{topic}|{emotion}|{ts}"
+        # Create payload for signature (use canonical builder to keep insertion
+        # and validation payloads identical)
+        payload_for_sig = self._build_ltm_payload(content, topic, emotion, ts)
         sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
 
@@ -828,8 +907,11 @@ class MemoryCore:
                 sig_hex = mem.get("signature_hex")
 
                 if sig_hex:
-                    # Validate signature
-                    payload = f"{mem['content']}|{mem.get('topic', '')}|{mem.get('emotion', '')}|{mem['ts']}"
+                    # Validate signature using the same canonical payload builder
+                    # used during insertion, so the two payloads are always identical.
+                    payload = self._build_ltm_payload(
+                        mem["content"], mem.get("topic"), mem.get("emotion"), mem["ts"]
+                    )
                     try:
                         sig_bytes = bytes.fromhex(sig_hex)
                         if validate_signature(
