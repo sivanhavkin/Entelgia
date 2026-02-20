@@ -27,7 +27,6 @@ All notable changes to this project will be documented in this file. The format 
     - Dual memory system: `conscious_memory` (active input) and `subconscious_store` (for future use)
     - Fixy integration: every agent operates under `FixyRegulator` supervision
     - `process_step` method: processes text input, reduces energy, calls Fixy for stability check, triggers automatic dream cycle when needed
-    - `dream_cycle` method: internal processing and "forgetting" mechanism; keeps only last 5 memories; serves as reset and recharge mechanism
 ---
 
 ## [2.4.0] - 2026-02-18
