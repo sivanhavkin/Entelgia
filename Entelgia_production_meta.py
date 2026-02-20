@@ -65,11 +65,13 @@ Show help:
 from __future__ import annotations  # Must be first!
 import sys
 import io
+import os
 
-# Fix Windows Unicode encoding
+# Fix Windows Unicode encoding - MUST be before other imports
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    os.environ["PYTHONIOENCODING"] = "utf-8"  # Affects subprocesses spawned by this script
 #  LOAD .env FIRST - BEFORE logger setup
 try:
     from dotenv import load_dotenv
@@ -81,7 +83,6 @@ except ImportError as e:
     sys.exit(1)
 
 import json
-import os
 import re
 import time
 import uuid
@@ -191,17 +192,27 @@ def validate_signature(message: bytes, key: bytes, signature: bytes) -> bool:
 
 
 def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
-    """Setup structured logging."""
+    """Setup structured logging with UTF-8 support."""
     logger = logging.getLogger("entelgia")
     logger.setLevel(log_level)
 
-    # Console handler
+    # Console handler with UTF-8 encoding
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
+    # Force UTF-8 encoding for Windows compatibility
+    if hasattr(console_handler.stream, "reconfigure"):
+        try:
+            console_handler.stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass  # Fallback if reconfigure fails
 
-    # File handler
+    # File handler with explicit UTF-8 encoding
     os.makedirs("entelgia_data", exist_ok=True)
-    file_handler = logging.FileHandler("entelgia_data/entelgia.log")
+    file_handler = logging.FileHandler(
+        "entelgia_data/entelgia.log",
+        encoding="utf-8",
+        errors="replace",
+    )
     file_handler.setLevel(log_level)
 
     # Formatter
@@ -871,7 +882,7 @@ class MemoryCore:
                             valid_memories.append(mem)
                         else:
                             logger.warning(
-                                f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                                f"[!] INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
                             )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
