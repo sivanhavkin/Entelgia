@@ -11,23 +11,50 @@ All notable changes to this project will be documented in this file. The format 
 ## [Unreleased]
 
 ### Added
+- **Energy-Based Agent Regulation System** ⚡ (v2.5.0)
+  - New module `entelgia/energy_regulation.py` with two classes:
+    - **`FixyRegulator`** — Meta-level energy supervisor. Monitors `energy_level` against a configurable safety threshold (default: 35.0). Triggers a dream cycle when energy is too low, and performs a stochastic hallucination-risk check (p=0.10) when energy drops below 60%.
+    - **`EntelgiaAgent`** — Agent with energy tracking and dream cycle consolidation.
+      - `energy_level` starts at 100.0 and decreases by 8–15 units per `process_step()` call.
+      - Dual memory stores: `conscious_memory` (active inputs) and `subconscious_store` (pending integration).
+      - Each agent is supervised by its own `FixyRegulator` instance.
+      - `process_step(input_text)` — drains energy, appends input to memory, checks stability; returns `"RECHARGED_AND_READY"` after a forced dream cycle.
+      - `dream_cycle(keep_memories=5)` — forgetting phase (keep last 5 conscious memories), integration phase (flush `subconscious_store` → `conscious_memory`), recharge phase (restore energy to 100.0).
+  - `entelgia/__init__.py` now exports `FixyRegulator` and `EntelgiaAgent`; version bumped to **2.5.0**
+  - `Config` class in `Entelgia_production_meta.py` gains four new fields:
+    - `energy_safety_threshold: float = 35.0`
+    - `energy_drain_min: float = 8.0`
+    - `energy_drain_max: float = 15.0`
+    - `dream_keep_memories: int = 5`
+- **Energy Regulation Tests** 🧪
+  - `tests/test_energy_regulation.py` — 16 new tests covering threshold defaults, custom thresholds, energy drain, memory management, dream cycle phases, and package-level import
+  - Total test count: **80** (16 energy + 33 long-term memory + 19 security + 5 dialogue + 6 enhanced dialogue + 1 conftest)
+- **Energy Regulation Demo** 📖
+  - `examples/demo_energy_regulation.py` — runnable demo showing a Socrates agent depleting energy over 8 turns and recovering through a dream cycle
+- **Documentation updates**
+  - `ARCHITECTURE.md` — new *Energy Regulation & Dream Cycles* section with flow diagram and integration points
+  - `README.md` — new *Energy-Based Regulation* entry in Core Features; `energy_regulation.py` listed in architecture diagram; `EnergyRegulator` bullet added to Architecture Overview
+  - `SPEC.md` — new *Energy & Dream Cycles* specification section with component details, phase descriptions, and future integration notes
+  - `whitepaper.md` — new *Energy-Based Cognitive Regulation* theoretical section
+- **Personal Long-Term Memory System** 🧠
+  - New module `entelgia/long_term_memory.py` with three classes:
+    - **`DefenseMechanism`** — classifies every memory on write into the unconscious layer as *repressed* (high-intensity painful emotion: anger, fear, shame, guilt, anxiety above 0.75 intensity) or *suppressed* (content containing forbidden/secret/dangerous keywords). Flags stored in existing `intrusive`/`suppressed` database columns.
+    - **`FreudianSlip`** — after each non-Fixy agent turn, rolls a probability against the 30 most-recent unconscious memories, weighted by their defense flags. A defended memory fragment surfaces and is simultaneously promoted to the conscious layer with `source="freudian_slip"`. Printed to console as `[SLIP]` in magenta.
+    - **`SelfReplication`** — LLM-free: scans the 50 most-recent unconscious memories for recurring keyword patterns (≥ 4-char Latin words appearing in ≥ 2 entries), then promotes up to 3 pattern-matching high-importance memories to the conscious layer with `source="self_replication"`. Runs every `self_replicate_every_n_turns` turns (default: 10). Printed as `[SELF-REPL]` in cyan.
+  - `entelgia/__init__.py` now exports `DefenseMechanism`, `FreudianSlip`, `SelfReplication`
+  - `Agent.store_turn()` — runs `DefenseMechanism.analyze()` and passes `intrusive`/`suppressed` flags to `ltm_insert()` on every unconscious write
+  - `Agent.apply_freudian_slip(topic)` — called after each non-Fixy turn; returns and logs the leaked fragment if a slip occurs
+  - `Agent.self_replicate(topic)` — returns count of memories promoted to conscious
+  - `MainScript.self_replicate_cycle(agent, topic)` — orchestrates replication per agent
+  - `MainScript.run()` — Freudian slip attempted every turn; self-replication fires every `self_replicate_every_n_turns` turns
+  - `Config.self_replicate_every_n_turns: int = 10` added
+  - No-op fallback stubs added for non-enhanced (no `entelgia` package) mode
+- **Long-Term Memory Tests** 🧪
+  - `tests/test_long_term_memory.py` — 33 new tests covering all three mechanisms (defense classification, slip probability, fragment formatting, pattern detection, promotion selection)
 - **ROADMAP.md** 🗺️
   - Added project roadmap document outlining development direction
   - Added link to ROADMAP.md in README.md Documentation section
 - Added logo to all markdown files
-- **scripts/draft.py** 🤖
-  - **`FixyRegulator`** (Supervisor Agent) - New class: supervisor agent responsible for system stability and triggering dream cycles
-    - `safety_threshold` (default: 35.0) - Minimum energy threshold for safe operation
-    - `inspect_agent` method: checks if an agent is stable enough to continue
-      - Monitors energy level against safety threshold
-      - Forces recharge (sleep) when energy is too low
-      - Detects hallucination risk - random check with 10% probability when energy drops below 60%
-  - **`EntelgiaAgent`** (Entelgia Agent) - New class: agent with energy management and memory mechanisms
-    - Energy system: `energy_level` starts at 100% and decreases with each operation (8–15 units per operation)
-    - Dual memory system: `conscious_memory` (active input) and `subconscious_store` (for future use)
-    - Fixy integration: every agent operates under `FixyRegulator` supervision
-    - `process_step` method: processes text input, reduces energy, calls Fixy for stability check, triggers automatic dream cycle when needed
-    - `dream_cycle` method: internal processing and "forgetting" mechanism; keeps only last 5 memories; serves as reset and recharge mechanism
 ---
 
 ## [2.4.0] - 2026-02-18

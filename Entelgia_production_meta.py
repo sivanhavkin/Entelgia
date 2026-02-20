@@ -65,11 +65,13 @@ Show help:
 from __future__ import annotations  # Must be first!
 import sys
 import io
+import os
 
-# Fix Windows Unicode encoding
+# Fix Windows Unicode encoding - MUST be before other imports
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    os.environ["PYTHONIOENCODING"] = "utf-8"  # Affects subprocesses spawned by this script
 #  LOAD .env FIRST - BEFORE logger setup
 try:
     from dotenv import load_dotenv
@@ -81,7 +83,6 @@ except ImportError as e:
     sys.exit(1)
 
 import json
-import os
 import re
 import time
 import uuid
@@ -108,12 +109,40 @@ try:
         InteractiveFixy,
         format_persona_for_prompt,
         get_persona,
+        DefenseMechanism,
+        FreudianSlip,
+        SelfReplication,
     )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
+    # Fallback stubs so Agent can always instantiate these
+    class DefenseMechanism:  # type: ignore[no-redef]
+        def analyze(self, content, emotion, emotion_intensity, importance):
+            return {"repressed": 0, "suppressed": 0}
+
+        def slip_probability(self, repressed, suppressed):
+            return 0.0
+
+    class FreudianSlip:  # type: ignore[no-redef]
+        def __init__(self, defense):
+            pass
+
+        def attempt(self, memories):
+            return None
+
+        def format_fragment(self, memory):
+            return ""
+
+    class SelfReplication:  # type: ignore[no-redef]
+        def find_patterns(self, memories):
+            return []
+
+        def select_for_promotion(self, memories, patterns):
+            return []
 
 # Optional: FastAPI for REST API
 try:
@@ -163,17 +192,27 @@ def validate_signature(message: bytes, key: bytes, signature: bytes) -> bool:
 
 
 def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
-    """Setup structured logging."""
+    """Setup structured logging with UTF-8 support."""
     logger = logging.getLogger("entelgia")
     logger.setLevel(log_level)
 
-    # Console handler
+    # Console handler with UTF-8 encoding
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
+    # Force UTF-8 encoding for Windows compatibility
+    if hasattr(console_handler.stream, "reconfigure"):
+        try:
+            console_handler.stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass  # Fallback if reconfigure fails
 
-    # File handler
+    # File handler with explicit UTF-8 encoding
     os.makedirs("entelgia_data", exist_ok=True)
-    file_handler = logging.FileHandler("entelgia_data/entelgia.log")
+    file_handler = logging.FileHandler(
+        "entelgia_data/entelgia.log",
+        encoding="utf-8",
+        errors="replace",
+    )
     file_handler.setLevel(log_level)
 
     # Formatter
@@ -234,6 +273,7 @@ class Config:
     stm_trim_batch: int = 500
     fixy_every_n_turns: int = 3
     dream_every_n_turns: int = 7
+    self_replicate_every_n_turns: int = 10
     promote_importance_threshold: float = 0.72
     promote_emotion_threshold: float = 0.65
     enable_auto_patch: bool = False
@@ -250,6 +290,10 @@ class Config:
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     log_level: int = logging.INFO
     timeout_minutes: int = 30
+    energy_safety_threshold: float = 35.0  # Min energy before dream cycle is forced
+    energy_drain_min: float = 8.0  # Min energy drained per agent turn
+    energy_drain_max: float = 15.0  # Max energy drained per agent turn
+    dream_keep_memories: int = 5  # Conscious memories retained after dream cycle
 
     def __post_init__(self):
         """Validate configuration."""
@@ -920,7 +964,7 @@ class MemoryCore:
                             valid_memories.append(mem)
                         else:
                             logger.warning(
-                                f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                                f"[!] INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
                             )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
@@ -1271,6 +1315,10 @@ class Agent:
             self.context_mgr = None
             self.memory_integration = None
 
+        self._defense = DefenseMechanism()
+        self._freudian_slip = FreudianSlip(self._defense)
+        self._self_replication = SelfReplication()
+
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
@@ -1500,6 +1548,14 @@ class Agent:
         else:
             ltm_content = text if CFG.store_raw_subconscious_ltm else redacted
 
+        # Apply defense mechanisms: classify repressed/suppressed flags
+        defense_flags = self._defense.analyze(
+            content=ltm_content,
+            emotion=emo,
+            emotion_intensity=float(inten),
+            importance=float(imp),
+        )
+
         self.memory.ltm_insert(
             agent=self.name,
             layer="subconscious",
@@ -1510,7 +1566,77 @@ class Agent:
             importance=float(imp),
             source=source,
             promoted_from=None,
+            intrusive=defense_flags["repressed"],
+            suppressed=defense_flags["suppressed"],
         )
+
+    def apply_freudian_slip(self, topic: str) -> Optional[str]:
+        """
+        Attempt a Freudian slip: surface an unconscious memory fragment.
+
+        If a slip occurs, the memory fragment is promoted to the conscious layer
+        and the fragment text is returned (for logging/display).
+
+        Args:
+            topic: Current dialogue topic
+
+        Returns:
+            The leaked fragment string, or None if no slip occurred
+        """
+        unconscious = self.memory.ltm_recent(self.name, limit=30, layer="subconscious")
+        slipped = self._freudian_slip.attempt(unconscious)
+        if slipped is None:
+            return None
+
+        fragment = self._freudian_slip.format_fragment(slipped)
+        if not fragment:
+            return None
+
+        # Promote the slipped memory to conscious layer
+        self.memory.ltm_insert(
+            agent=self.name,
+            layer="conscious",
+            content=fragment[:300],
+            topic=topic,
+            emotion=slipped.get("emotion"),
+            emotion_intensity=float(slipped.get("emotion_intensity", 0.0)),
+            importance=float(slipped.get("importance", 0.0)),
+            source="freudian_slip",
+            promoted_from="subconscious",
+        )
+        logger.debug(f"Freudian slip [{self.name}]: {fragment[:60]}")
+        return fragment
+
+    def self_replicate(self, topic: str) -> int:
+        """
+        Perform self-replication: promote recurring unconscious patterns to the
+        conscious layer via introspection.
+
+        Args:
+            topic: Current dialogue topic
+
+        Returns:
+            Number of memories promoted to conscious
+        """
+        unconscious = self.memory.ltm_recent(self.name, limit=50, layer="subconscious")
+        patterns = self._self_replication.find_patterns(unconscious)
+        to_promote = self._self_replication.select_for_promotion(unconscious, patterns)
+
+        for mem in to_promote:
+            self.memory.ltm_insert(
+                agent=self.name,
+                layer="conscious",
+                content=(mem.get("content") or "")[:300],
+                topic=topic,
+                emotion=mem.get("emotion"),
+                emotion_intensity=float(mem.get("emotion_intensity", 0.0)),
+                importance=float(mem.get("importance", 0.0)),
+                source="self_replication",
+                promoted_from="subconscious",
+            )
+
+        logger.debug(f"Self-replication [{self.name}]: promoted={len(to_promote)}")
+        return len(to_promote)
 
 
 # ============================================
@@ -2185,7 +2311,11 @@ class MainScript:
         self.metrics.record_turn()
 
     def dream_cycle(self, agent: Agent, topic: str):
-        """Execute dream cycle for agent."""
+        """Execute dream cycle for agent.
+
+        Forgetting mechanism: short-term memory synchronization that retains only
+        entries important to the agent and omits details below relevance thresholds.
+        """
         stm = self.memory.stm_load(agent.name)
         if not stm:
             return
@@ -2243,6 +2373,16 @@ class MainScript:
                 )
                 promoted += 1
 
+        # Short-term memory synchronization: retain only entries that are relevant
+        # to the agent and omit details below importance/emotion thresholds.
+        synced_stm = [
+            e for e in stm
+            if (float(e.get("importance", 0.0)) >= self.cfg.promote_importance_threshold)
+            or (float(e.get("emotion_intensity", 0.0)) >= self.cfg.promote_emotion_threshold)
+        ]
+        self.memory.stm_save(agent.name, synced_stm)
+        forgotten = len(stm) - len(synced_stm)
+
         try:
             nodes = [("Socrates", "Socrates"), ("Athena", "Athena")]
             edges = []
@@ -2253,12 +2393,27 @@ class MainScript:
         except Exception:
             pass
 
-        logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
+        logger.info(f"Dream cycle {agent.name}: promoted={promoted}, forgotten={forgotten}")
         print(
             Fore.YELLOW
-            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
+            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}, forgotten={forgotten}"
             + Style.RESET_ALL
         )
+
+    def self_replicate_cycle(self, agent: Agent, topic: str):
+        """Execute self-replication cycle for agent.
+
+        Scans the agent's unconscious (subconscious) memories for recurring
+        patterns and promotes them to the conscious layer without LLM inference.
+        """
+        promoted = agent.self_replicate(topic)
+        if promoted > 0:
+            logger.info(f"Self-replication {agent.name}: promoted={promoted}")
+            print(
+                Fore.CYAN
+                + f"[SELF-REPL] {agent.name} promoted={promoted} patterns to conscious"
+                + Style.RESET_ALL
+            )
 
     def fixy_check(self, recent_context: str):
         """Run Fixy observer check."""
@@ -2382,6 +2537,17 @@ class MainScript:
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
+            # Freudian slip: unconscious content may surface during speech
+            if speaker.name != "Fixy":
+                slip = speaker.apply_freudian_slip(topic_label)
+                if slip:
+                    logger.info(f"[SLIP] {speaker.name}: {slip[:60]}")
+                    print(
+                        Fore.MAGENTA
+                        + f"[SLIP] {speaker.name}: {slip[:60]}"
+                        + Style.RESET_ALL
+                    )
+
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
@@ -2409,6 +2575,10 @@ class MainScript:
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+
+            if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
+                self.self_replicate_cycle(self.socrates, topic_label)
+                self.self_replicate_cycle(self.athena, topic_label)
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
                 logger.info("Stop signal received from agent")

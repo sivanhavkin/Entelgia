@@ -84,6 +84,7 @@ class EntelgiaAgent:
         self.energy_level: float = 100.0
         self.conscious_memory: List[str] = []
         self.subconscious_store: List[str] = []
+        self.forgotten_memories: List[str] = []  # De-prioritised but never deleted
         self.regulator = FixyRegulator()  # Each agent is supervised by a FixyRegulator
 
     def process_step(self, input_text: str) -> str:
@@ -111,22 +112,46 @@ class EntelgiaAgent:
 
     def dream_cycle(self):
         """
-        Internal consolidation process: forgetting and memory integration.
+        Internal consolidation process: memory synchronisation without deletion.
 
-        Clears old conscious memories (keeping the last 5 entries), moves insights
-        from the subconscious store to the conscious layer, and restores full energy.
+        Synchronises STM (conscious_memory) and LTM (subconscious_store):
+        - Emotionally relevant STM entries are collected and promoted to LTM.
+        - Unimportant entries are de-prioritised (marked as forgotten) but never deleted.
+        - All memories of every type are preserved intact; no entry is removed.
+        - Energy is fully restored.
 
         Future: Integrate with EnhancedMemoryIntegration for meaningful LTM transfer.
         """
         print(f"\n--- STARTING DREAM CYCLE: {self.name} ---")
 
-        # Forgetting phase: clear old context, keep last 5 entries
-        old_memories = len(self.conscious_memory)
-        self.conscious_memory = self.conscious_memory[-5:]
-        print(f"-> [Forgetting] Purged {old_memories - 5} irrelevant thoughts.")
+        # Emotional keywords used to assess relevance of each STM entry
+        emotional_keywords = {
+            "fear", "joy", "anger", "love", "sad", "happy", "afraid", "anxious",
+            "excited", "curious", "worried", "trust", "disgust", "surprise",
+            "ethics", "meaningful", "important", "significant",
+        }
 
-        # Integration phase: move insights from subconscious to conscious layer (mocked)
-        print(f"-> [Integration] Moving deep insights to Conscious Layer.")
+        # --- Sync phase: collect emotionally relevant STM entries into LTM ---
+        promoted = 0
+        deprioritised = 0
+        for entry in self.conscious_memory:
+            lower = entry.lower()
+            is_relevant = any(kw in lower for kw in emotional_keywords)
+            if is_relevant:
+                # Promote to LTM (subconscious_store) if not already present
+                if entry not in self.subconscious_store:
+                    self.subconscious_store.append(entry)
+                    promoted += 1
+            else:
+                # De-prioritise: record in forgotten_memories but do NOT delete
+                if entry not in self.forgotten_memories:
+                    self.forgotten_memories.append(entry)
+                    deprioritised += 1
+
+        print(
+            f"-> [Sync] {promoted} emotionally relevant STM entries promoted to LTM; "
+            f"{deprioritised} entries de-prioritised (all memories preserved)."
+        )
 
         # Full energy restore
         self.energy_level = 100.0
