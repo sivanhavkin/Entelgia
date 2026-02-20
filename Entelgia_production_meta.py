@@ -2231,7 +2231,11 @@ class MainScript:
         self.metrics.record_turn()
 
     def dream_cycle(self, agent: Agent, topic: str):
-        """Execute dream cycle for agent."""
+        """Execute dream cycle for agent.
+
+        Forgetting mechanism: short-term memory synchronization that retains only
+        entries important to the agent and omits details below relevance thresholds.
+        """
         stm = self.memory.stm_load(agent.name)
         if not stm:
             return
@@ -2289,6 +2293,16 @@ class MainScript:
                 )
                 promoted += 1
 
+        # Short-term memory synchronization: retain only entries that are relevant
+        # to the agent and omit details below importance/emotion thresholds.
+        synced_stm = [
+            e for e in stm
+            if (float(e.get("importance", 0.0)) >= self.cfg.promote_importance_threshold)
+            or (float(e.get("emotion_intensity", 0.0)) >= self.cfg.promote_emotion_threshold)
+        ]
+        self.memory.stm_save(agent.name, synced_stm)
+        forgotten = len(stm) - len(synced_stm)
+
         try:
             nodes = [("Socrates", "Socrates"), ("Athena", "Athena")]
             edges = []
@@ -2299,10 +2313,10 @@ class MainScript:
         except Exception:
             pass
 
-        logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
+        logger.info(f"Dream cycle {agent.name}: promoted={promoted}, forgotten={forgotten}")
         print(
             Fore.YELLOW
-            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
+            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}, forgotten={forgotten}"
             + Style.RESET_ALL
         )
 
