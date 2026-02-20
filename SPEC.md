@@ -395,8 +395,8 @@ dialogue for internal consolidation and recharge.
 - **Memory stores:** `conscious_memory` (active) + `subconscious_store` (pending integration)
 
 #### Dream Cycle Phases
-1. **Forgetting:** Keep last 5 conscious memories, purge the rest
-2. **Integration:** Move insights from `subconscious_store` → `conscious_memory`
+1. **Forgetting:** Delete old conscious LTM rows from SQLite (keep last `dream_keep_memories`, default 5); also sync STM by dropping low-importance entries
+2. **Integration:** Move insights from `subconscious_store` → `conscious_memory` / conscious LTM layer
 3. **Recharge:** `energy_level` → 100.0
 
 ### Future Integration

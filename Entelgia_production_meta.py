@@ -977,6 +977,49 @@ class MemoryCore:
             logger.error(f"DB Query Error: {e}")
             return []
 
+    def ltm_trim_conscious(self, agent: str, keep: int = 5) -> int:
+        """Delete old conscious-layer memories for *agent*, keeping only the most
+        recent *keep* entries.
+
+        This implements the "forgetting phase" of the dream cycle for the SQLite
+        LTM: after consolidation, only the last *keep* conscious memories are
+        retained and all older rows are deleted.
+
+        Args:
+            agent: Agent name whose conscious memories will be trimmed.
+            keep:  Number of most-recent conscious memories to retain.
+
+        Returns:
+            Number of rows deleted (0 if nothing to trim).
+        """
+        try:
+            with self._conn() as conn:
+                # Identify the IDs of the entries to KEEP (most recent N)
+                keep_rows = conn.execute(
+                    "SELECT id FROM memories WHERE agent = ? AND layer = 'conscious' "
+                    "ORDER BY ts DESC LIMIT ?",
+                    (agent, keep),
+                ).fetchall()
+                if not keep_rows:
+                    return 0
+                keep_ids = [r[0] for r in keep_rows]
+                placeholders = ",".join("?" * len(keep_ids))
+                result = conn.execute(
+                    f"DELETE FROM memories WHERE agent = ? AND layer = 'conscious' "
+                    f"AND id NOT IN ({placeholders})",
+                    [agent] + keep_ids,
+                )
+                conn.commit()
+                deleted = result.rowcount
+                if deleted > 0:
+                    logger.debug(
+                        f"LTM conscious trim [{agent}]: deleted={deleted}, kept={keep}"
+                    )
+                return deleted
+        except Exception as e:
+            logger.error(f"LTM conscious trim error: {e}")
+            return 0
+
     def get_agent_state(self, agent: str) -> Dict[str, float]:
         """Get agent's internal drives/state."""
         try:
@@ -2381,7 +2424,15 @@ class MainScript:
             or (float(e.get("emotion_intensity", 0.0)) >= self.cfg.promote_emotion_threshold)
         ]
         self.memory.stm_save(agent.name, synced_stm)
-        forgotten = len(stm) - len(synced_stm)
+        forgotten_stm = len(stm) - len(synced_stm)
+
+        # Forgetting phase: trim conscious LTM to the most recent N entries so
+        # the dream cycle actually enforces the "keeps last dream_keep_memories"
+        # contract described in the documentation.
+        forgotten_ltm = self.memory.ltm_trim_conscious(
+            agent.name, keep=self.cfg.dream_keep_memories
+        )
+        forgotten = forgotten_stm + forgotten_ltm
 
         try:
             nodes = [("Socrates", "Socrates"), ("Athena", "Athena")]

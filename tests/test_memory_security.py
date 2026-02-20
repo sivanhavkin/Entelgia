@@ -306,3 +306,100 @@ class TestLtmPayloadConsistency:
         mems_phase3 = mc2.ltm_recent("Socrates")
         assert len(mems_phase3) == 3, "New memory must also validate with key-B"
         sys.modules.pop(mod_name2, None)
+
+
+class TestLtmTrimConscious:
+    """Tests for MemoryCore.ltm_trim_conscious() — the dream-cycle forgetting phase."""
+
+    @pytest.fixture
+    def memory_core(self, tmp_path):
+        """Provide a MemoryCore backed by a temp SQLite database."""
+        import sys
+        import importlib.util
+
+        original_key = os.environ.get("MEMORY_SECRET_KEY")
+        os.environ["MEMORY_SECRET_KEY"] = "test-key-trim-conscious-1234567890"
+        data_dir = str(tmp_path)
+        os.environ["ENTELGIA_DATA_DIR"] = data_dir
+
+        spec = importlib.util.spec_from_file_location(
+            "Entelgia_production_meta_trim",
+            os.path.join(os.path.dirname(__file__), "..", "Entelgia_production_meta.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["Entelgia_production_meta_trim"] = mod
+        spec.loader.exec_module(mod)
+
+        db_path = os.path.join(data_dir, "test_trim.db")
+        mc = mod.MemoryCore(db_path)
+
+        yield mc, mod
+
+        sys.modules.pop("Entelgia_production_meta_trim", None)
+        if original_key is None:
+            os.environ.pop("MEMORY_SECRET_KEY", None)
+        else:
+            os.environ["MEMORY_SECRET_KEY"] = original_key
+
+    def _insert_conscious(self, mc, agent: str, count: int):
+        """Insert *count* conscious memories for *agent* with distinct timestamps."""
+        for i in range(count):
+            ts = f"2026-01-01T00:{i // 60:02d}:{i % 60:02d}Z"
+            mc.ltm_insert(agent, "conscious", f"Conscious memory {i}",
+                          topic="test", emotion="neutral", ts=ts)
+
+    def test_trim_removes_old_entries(self, memory_core):
+        """ltm_trim_conscious keeps only the N most recent conscious entries."""
+        mc, _ = memory_core
+        self._insert_conscious(mc, "Socrates", 10)
+        assert len(mc.ltm_recent("Socrates", limit=50, layer="conscious")) == 10
+
+        deleted = mc.ltm_trim_conscious("Socrates", keep=5)
+        assert deleted == 5
+        remaining = mc.ltm_recent("Socrates", limit=50, layer="conscious")
+        assert len(remaining) == 5
+
+    def test_trim_keeps_most_recent(self, memory_core):
+        """ltm_trim_conscious retains the most recent entries."""
+        mc, _ = memory_core
+        self._insert_conscious(mc, "Athena", 6)
+        mc.ltm_trim_conscious("Athena", keep=3)
+        remaining = mc.ltm_recent("Athena", limit=50, layer="conscious")
+        # The remaining 3 should be the most recent (highest-numbered content)
+        contents = {m["content"] for m in remaining}
+        assert "Conscious memory 5" in contents
+        assert "Conscious memory 4" in contents
+        assert "Conscious memory 3" in contents
+
+    def test_trim_does_not_touch_subconscious(self, memory_core):
+        """ltm_trim_conscious must not delete subconscious entries."""
+        mc, _ = memory_core
+        for i in range(8):
+            mc.ltm_insert("Socrates", "subconscious", f"Subconscious {i}")
+        self._insert_conscious(mc, "Socrates", 8)
+
+        mc.ltm_trim_conscious("Socrates", keep=2)
+
+        subconscious = mc.ltm_recent("Socrates", limit=50, layer="subconscious")
+        assert len(subconscious) == 8  # Subconscious untouched
+
+    def test_trim_keep_more_than_existing_no_deletion(self, memory_core):
+        """When keep >= existing entries, nothing should be deleted."""
+        mc, _ = memory_core
+        self._insert_conscious(mc, "Socrates", 3)
+        deleted = mc.ltm_trim_conscious("Socrates", keep=10)
+        assert deleted == 0
+        remaining = mc.ltm_recent("Socrates", limit=50, layer="conscious")
+        assert len(remaining) == 3
+
+    def test_trim_empty_conscious_layer(self, memory_core):
+        """trim on an agent with no conscious memories returns 0."""
+        mc, _ = memory_core
+        deleted = mc.ltm_trim_conscious("NonExistentAgent", keep=5)
+        assert deleted == 0
+
+    def test_dream_cycle_config_default(self, memory_core):
+        """dream_keep_memories default is 5 in Config."""
+        _, mod = memory_core
+        cfg = mod.Config()
+        assert cfg.dream_keep_memories == 5

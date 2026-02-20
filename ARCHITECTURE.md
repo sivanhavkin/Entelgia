@@ -169,7 +169,7 @@ Meta-level energy monitor that:
 
 ### Dream Cycle Process
 When triggered:
-1. **Forgetting** — Purges old conscious memories (keeps last 5)
+1. **Forgetting** — Deletes old conscious LTM entries from SQLite (keeps last `dream_keep_memories`, default 5); also trims low-importance STM entries
 2. **Integration** — Moves subconscious insights to the conscious layer
 3. **Recharge** — Restores energy to 100%
 
