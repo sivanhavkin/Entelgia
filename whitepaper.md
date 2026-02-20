@@ -531,6 +531,24 @@ Entelgia demonstrates that persistent identity and internal regulation can coexi
 
 ---
 
+### Energy-Based Cognitive Regulation
+
+Traditional dialogue systems run indefinitely without degradation signals.
+Entelgia introduces **energy as a computational constraint**:
+
+- **Cognitive load modeling:** Every action depletes energy (8–15 units per turn)
+- **Safety threshold:** Prevents unstable outputs when energy falls below 35%
+- **Dream consolidation:** Forced rest cycles integrate experiences and clear cognitive noise
+- **Hallucination prevention:** Suspends processing when coherence risk is detected
+
+This creates a more human-like cognitive rhythm: active dialogue → fatigue → rest → renewal.
+The `FixyRegulator` acts as a meta-cognitive watchdog, enforcing rest cycles before instability
+can propagate into the conversation. The `EntelgiaAgent.dream_cycle()` performs three phases:
+forgetting (pruning old context), integration (promoting subconscious insights), and recharge
+(restoring full energy). This mirrors consolidation processes observed in biological cognition.
+
+---
+
 # Appendix: CoreMind Model
 
 Entelgia is structured around six interacting cores:

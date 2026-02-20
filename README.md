@@ -197,6 +197,14 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **Rich context enrichment** - Full dialogue history + thoughts + memories
   * **Smart Fixy interventions** - Need-based (not scheduled) meta-cognitive monitoring
   * **Enhanced personas** - Deep character traits and speech patterns
+* **🆕 Energy-Based Regulation** (v2.5.0+)
+  * **Energy tracking** — Each agent has an energy level (0–100%)
+  * **FixyRegulator** — Meta-level supervisor monitoring energy & stability
+  * **Dream cycles** — Automatic consolidation when energy falls below 35%
+    * Forgetting phase: clears old conscious memories (keeps last 5)
+    * Integration phase: promotes subconscious insights to conscious layer
+    * Recharge phase: restores full energy (100%)
+  * **Hallucination prevention** — Suspends dialogue when coherence risk detected
 * **Psychological drive modeling**
   * Id / Ego / Superego dynamics
 * **Emotion tracking & importance scoring**
@@ -325,7 +333,8 @@ entelgia/
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
 ├── fixy_interactive.py      # Need-based interventions
-└── long_term_memory.py      # Unconscious/conscious memory layers
+├── long_term_memory.py      # Unconscious/conscious memory layers
+└── energy_regulation.py     # Energy-based stability & dream cycles
 ```
 
 **Key improvements:**
@@ -333,6 +342,7 @@ entelgia/
 - 🎯 **Dynamic speaker selection** vs ping-pong alternation
 - 🧠 **Context-aware** with 8 turns + 6 thoughts + 5 memories
 - 🔍 **Intelligent Fixy** detects circular reasoning, not just scheduled checks
+- ⚡ **EnergyRegulator** — energy-based agent stability & recharge cycles
 
 The entire system runs as a unified executable Python file:
 

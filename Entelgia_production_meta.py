@@ -279,6 +279,10 @@ class Config:
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     log_level: int = logging.INFO
     timeout_minutes: int = 30
+    energy_safety_threshold: float = 35.0  # Min energy before dream cycle is forced
+    energy_drain_min: float = 8.0  # Min energy drained per agent turn
+    energy_drain_max: float = 15.0  # Max energy drained per agent turn
+    dream_keep_memories: int = 5  # Conscious memories retained after dream cycle
 
     def __post_init__(self):
         """Validate configuration."""

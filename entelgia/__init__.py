@@ -22,6 +22,7 @@ from .enhanced_personas import (
 from .context_manager import ContextManager, EnhancedMemoryIntegration
 from .fixy_interactive import InteractiveFixy
 from .long_term_memory import DefenseMechanism, FreudianSlip, SelfReplication
+from .energy_regulation import FixyRegulator, EntelgiaAgent
 
 __all__ = [
     "DialogueEngine",
@@ -39,6 +40,8 @@ __all__ = [
     "DefenseMechanism",
     "FreudianSlip",
     "SelfReplication",
+    "FixyRegulator",
+    "EntelgiaAgent",
 ]
 
-__version__ = "2.4.0"  # Latest official: 2.4.0
+__version__ = "2.5.0"  # Latest official: 2.5.0 — Energy-Based Regulation
