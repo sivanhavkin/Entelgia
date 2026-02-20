@@ -65,11 +65,13 @@ Show help:
 from __future__ import annotations  # Must be first!
 import sys
 import io
+import os
 
-# Fix Windows Unicode encoding
+# Fix Windows Unicode encoding - MUST be before other imports
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    os.environ["PYTHONIOENCODING"] = "utf-8"  # Affects subprocesses spawned by this script
 #  LOAD .env FIRST - BEFORE logger setup
 try:
     from dotenv import load_dotenv
@@ -81,7 +83,6 @@ except ImportError as e:
     sys.exit(1)
 
 import json
-import os
 import re
 import time
 import uuid
@@ -108,12 +109,40 @@ try:
         InteractiveFixy,
         format_persona_for_prompt,
         get_persona,
+        DefenseMechanism,
+        FreudianSlip,
+        SelfReplication,
     )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
+    # Fallback stubs so Agent can always instantiate these
+    class DefenseMechanism:  # type: ignore[no-redef]
+        def analyze(self, content, emotion, emotion_intensity, importance):
+            return {"repressed": 0, "suppressed": 0}
+
+        def slip_probability(self, repressed, suppressed):
+            return 0.0
+
+    class FreudianSlip:  # type: ignore[no-redef]
+        def __init__(self, defense):
+            pass
+
+        def attempt(self, memories):
+            return None
+
+        def format_fragment(self, memory):
+            return ""
+
+    class SelfReplication:  # type: ignore[no-redef]
+        def find_patterns(self, memories):
+            return []
+
+        def select_for_promotion(self, memories, patterns):
+            return []
 
 # Optional: FastAPI for REST API
 try:
@@ -163,17 +192,27 @@ def validate_signature(message: bytes, key: bytes, signature: bytes) -> bool:
 
 
 def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
-    """Setup structured logging."""
+    """Setup structured logging with UTF-8 support."""
     logger = logging.getLogger("entelgia")
     logger.setLevel(log_level)
 
-    # Console handler
+    # Console handler with UTF-8 encoding
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
+    # Force UTF-8 encoding for Windows compatibility
+    if hasattr(console_handler.stream, "reconfigure"):
+        try:
+            console_handler.stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass  # Fallback if reconfigure fails
 
-    # File handler
+    # File handler with explicit UTF-8 encoding
     os.makedirs("entelgia_data", exist_ok=True)
-    file_handler = logging.FileHandler("entelgia_data/entelgia.log")
+    file_handler = logging.FileHandler(
+        "entelgia_data/entelgia.log",
+        encoding="utf-8",
+        errors="replace",
+    )
     file_handler.setLevel(log_level)
 
     # Formatter
@@ -234,6 +273,7 @@ class Config:
     stm_trim_batch: int = 500
     fixy_every_n_turns: int = 3
     dream_every_n_turns: int = 7
+    self_replicate_every_n_turns: int = 10
     promote_importance_threshold: float = 0.72
     promote_emotion_threshold: float = 0.65
     enable_auto_patch: bool = False
@@ -250,6 +290,10 @@ class Config:
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     log_level: int = logging.INFO
     timeout_minutes: int = 30
+    energy_safety_threshold: float = 35.0  # Min energy before dream cycle is forced
+    energy_drain_min: float = 8.0  # Min energy drained per agent turn
+    energy_drain_max: float = 15.0  # Max energy drained per agent turn
+    dream_keep_memories: int = 5  # Conscious memories retained after dream cycle
 
     def __post_init__(self):
         """Validate configuration."""
@@ -668,6 +712,18 @@ class MemoryCore:
             logger.warning(f"PRAGMA Error: {e}")
         return c
 
+    @staticmethod
+    def _build_ltm_payload(content: str, topic, emotion, ts: str) -> str:
+        """Build the canonical signature payload for an LTM entry.
+
+        None values are normalised to empty string so that the payload is
+        identical regardless of whether the caller passes None or the DB
+        returns a SQL NULL.
+        """
+        topic_str = topic if topic is not None else ""
+        emotion_str = emotion if emotion is not None else ""
+        return f"{content}|{topic_str}|{emotion_str}|{ts}"
+
     def _init_db(self):
         """Initialize database schema with better indexing."""
         try:
@@ -714,10 +770,76 @@ class MemoryCore:
                         self_awareness REAL
                     );
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL
+                    );
+                """)
                 conn.commit()
                 logger.info("Database schema initialized with memory security")
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
+        self._migrate_signing_key()
+
+    def _migrate_signing_key(self):
+        """Detect MEMORY_SECRET_KEY rotation and re-sign all memories.
+
+        When the signing key changes between runs (e.g. a new .env file or an
+        updated environment variable) every stored HMAC-SHA256 signature
+        becomes invalid.  This method detects that situation by comparing a
+        fingerprint (SHA-256 hash) of the current key against the fingerprint
+        stored in the ``settings`` table, and re-signs every memory row so
+        that ``ltm_recent`` validation keeps working.
+        """
+        import hashlib as _hashlib
+
+        current_fp = _hashlib.sha256(MEMORY_SECRET_KEY_BYTES).hexdigest()
+        try:
+            with self._conn() as conn:
+                row = conn.execute(
+                    "SELECT value FROM settings WHERE key = 'key_fingerprint'"
+                ).fetchone()
+                if row is None:
+                    # First initialization – persist fingerprint and (re-)sign
+                    # any legacy rows that have no signature yet.
+                    conn.execute(
+                        "INSERT OR REPLACE INTO settings (key, value) VALUES ('key_fingerprint', ?)",
+                        (current_fp,),
+                    )
+                    conn.commit()
+                    logger.info("Memory signing key fingerprint stored")
+                    return
+
+                stored_fp = row[0]
+                if stored_fp == current_fp:
+                    # Key unchanged – nothing to do.
+                    return
+
+                # Key has changed: re-sign every memory row.
+                logger.warning(
+                    "MEMORY_SECRET_KEY changed – re-signing all memories to restore validity"
+                )
+                rows = conn.execute(
+                    "SELECT id, content, topic, emotion, ts FROM memories"
+                ).fetchall()
+                for row_id, content, topic, emotion, ts in rows:
+                    payload = self._build_ltm_payload(content, topic, emotion, ts)
+                    new_sig = create_signature(
+                        payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
+                    )
+                    conn.execute(
+                        "UPDATE memories SET signature_hex = ? WHERE id = ?",
+                        (new_sig.hex(), row_id),
+                    )
+                conn.execute(
+                    "UPDATE settings SET value = ? WHERE key = 'key_fingerprint'",
+                    (current_fp,),
+                )
+                conn.commit()
+                logger.info(f"Re-signed {len(rows)} memories with updated key")
+        except Exception as e:
+            logger.error(f"Key migration error: {e}")
 
     def stm_path(self, agent_name: str) -> str:
         """Get STM file path for agent."""
@@ -769,8 +891,9 @@ class MemoryCore:
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
 
-        # Create payload for signature
-        payload_for_sig = f"{content}|{topic}|{emotion}|{ts}"
+        # Create payload for signature (use canonical builder to keep insertion
+        # and validation payloads identical)
+        payload_for_sig = self._build_ltm_payload(content, topic, emotion, ts)
         sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
 
@@ -828,8 +951,11 @@ class MemoryCore:
                 sig_hex = mem.get("signature_hex")
 
                 if sig_hex:
-                    # Validate signature
-                    payload = f"{mem['content']}|{mem.get('topic', '')}|{mem.get('emotion', '')}|{mem['ts']}"
+                    # Validate signature using the same canonical payload builder
+                    # used during insertion, so the two payloads are always identical.
+                    payload = self._build_ltm_payload(
+                        mem["content"], mem.get("topic"), mem.get("emotion"), mem["ts"]
+                    )
                     try:
                         sig_bytes = bytes.fromhex(sig_hex)
                         if validate_signature(
@@ -838,7 +964,7 @@ class MemoryCore:
                             valid_memories.append(mem)
                         else:
                             logger.warning(
-                                f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                                f"[!] INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
                             )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
@@ -1185,9 +1311,15 @@ class Agent:
         if self.use_enhanced:
             self.context_mgr = ContextManager()
             self.memory_integration = EnhancedMemoryIntegration()
+            self._defense = DefenseMechanism()
+            self._freudian_slip = FreudianSlip(self._defense)
+            self._self_replication = SelfReplication()
         else:
             self.context_mgr = None
             self.memory_integration = None
+            self._defense = DefenseMechanism()
+            self._freudian_slip = FreudianSlip(self._defense)
+            self._self_replication = SelfReplication()
 
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
@@ -1418,6 +1550,14 @@ class Agent:
         else:
             ltm_content = text if CFG.store_raw_subconscious_ltm else redacted
 
+        # Apply defense mechanisms: classify repressed/suppressed flags
+        defense_flags = self._defense.analyze(
+            content=ltm_content,
+            emotion=emo,
+            emotion_intensity=float(inten),
+            importance=float(imp),
+        )
+
         self.memory.ltm_insert(
             agent=self.name,
             layer="subconscious",
@@ -1428,7 +1568,77 @@ class Agent:
             importance=float(imp),
             source=source,
             promoted_from=None,
+            intrusive=defense_flags["repressed"],
+            suppressed=defense_flags["suppressed"],
         )
+
+    def apply_freudian_slip(self, topic: str) -> Optional[str]:
+        """
+        Attempt a Freudian slip: surface an unconscious memory fragment.
+
+        If a slip occurs, the memory fragment is promoted to the conscious layer
+        and the fragment text is returned (for logging/display).
+
+        Args:
+            topic: Current dialogue topic
+
+        Returns:
+            The leaked fragment string, or None if no slip occurred
+        """
+        unconscious = self.memory.ltm_recent(self.name, limit=30, layer="subconscious")
+        slipped = self._freudian_slip.attempt(unconscious)
+        if slipped is None:
+            return None
+
+        fragment = self._freudian_slip.format_fragment(slipped)
+        if not fragment:
+            return None
+
+        # Promote the slipped memory to conscious layer
+        self.memory.ltm_insert(
+            agent=self.name,
+            layer="conscious",
+            content=fragment[:300],
+            topic=topic,
+            emotion=slipped.get("emotion"),
+            emotion_intensity=float(slipped.get("emotion_intensity", 0.0)),
+            importance=float(slipped.get("importance", 0.0)),
+            source="freudian_slip",
+            promoted_from="subconscious",
+        )
+        logger.debug(f"Freudian slip [{self.name}]: {fragment[:60]}")
+        return fragment
+
+    def self_replicate(self, topic: str) -> int:
+        """
+        Perform self-replication: promote recurring unconscious patterns to the
+        conscious layer via introspection.
+
+        Args:
+            topic: Current dialogue topic
+
+        Returns:
+            Number of memories promoted to conscious
+        """
+        unconscious = self.memory.ltm_recent(self.name, limit=50, layer="subconscious")
+        patterns = self._self_replication.find_patterns(unconscious)
+        to_promote = self._self_replication.select_for_promotion(unconscious, patterns)
+
+        for mem in to_promote:
+            self.memory.ltm_insert(
+                agent=self.name,
+                layer="conscious",
+                content=(mem.get("content") or "")[:300],
+                topic=topic,
+                emotion=mem.get("emotion"),
+                emotion_intensity=float(mem.get("emotion_intensity", 0.0)),
+                importance=float(mem.get("importance", 0.0)),
+                source="self_replication",
+                promoted_from="subconscious",
+            )
+
+        logger.debug(f"Self-replication [{self.name}]: promoted={len(to_promote)}")
+        return len(to_promote)
 
 
 # ============================================
@@ -2103,7 +2313,11 @@ class MainScript:
         self.metrics.record_turn()
 
     def dream_cycle(self, agent: Agent, topic: str):
-        """Execute dream cycle for agent."""
+        """Execute dream cycle for agent.
+
+        Forgetting mechanism: short-term memory synchronization that retains only
+        entries important to the agent and omits details below relevance thresholds.
+        """
         stm = self.memory.stm_load(agent.name)
         if not stm:
             return
@@ -2161,6 +2375,16 @@ class MainScript:
                 )
                 promoted += 1
 
+        # Short-term memory synchronization: retain only entries that are relevant
+        # to the agent and omit details below importance/emotion thresholds.
+        synced_stm = [
+            e for e in stm
+            if (float(e.get("importance", 0.0)) >= self.cfg.promote_importance_threshold)
+            or (float(e.get("emotion_intensity", 0.0)) >= self.cfg.promote_emotion_threshold)
+        ]
+        self.memory.stm_save(agent.name, synced_stm)
+        forgotten = len(stm) - len(synced_stm)
+
         try:
             nodes = [("Socrates", "Socrates"), ("Athena", "Athena")]
             edges = []
@@ -2171,12 +2395,27 @@ class MainScript:
         except Exception:
             pass
 
-        logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
+        logger.info(f"Dream cycle {agent.name}: promoted={promoted}, forgotten={forgotten}")
         print(
             Fore.YELLOW
-            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
+            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}, forgotten={forgotten}"
             + Style.RESET_ALL
         )
+
+    def self_replicate_cycle(self, agent: Agent, topic: str):
+        """Execute self-replication cycle for agent.
+
+        Scans the agent's unconscious (subconscious) memories for recurring
+        patterns and promotes them to the conscious layer without LLM inference.
+        """
+        promoted = agent.self_replicate(topic)
+        if promoted > 0:
+            logger.info(f"Self-replication {agent.name}: promoted={promoted}")
+            print(
+                Fore.CYAN
+                + f"[SELF-REPL] {agent.name} promoted={promoted} patterns to conscious"
+                + Style.RESET_ALL
+            )
 
     def fixy_check(self, recent_context: str):
         """Run Fixy observer check."""
@@ -2300,6 +2539,17 @@ class MainScript:
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
+            # Freudian slip: unconscious content may surface during speech
+            if speaker.name != "Fixy":
+                slip = speaker.apply_freudian_slip(topic_label)
+                if slip:
+                    logger.info(f"[SLIP] {speaker.name}: {slip[:60]}")
+                    print(
+                        Fore.MAGENTA
+                        + f"[SLIP] {speaker.name}: {slip[:60]}"
+                        + Style.RESET_ALL
+                    )
+
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
@@ -2327,6 +2577,10 @@ class MainScript:
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+
+            if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
+                self.self_replicate_cycle(self.socrates, topic_label)
+                self.self_replicate_cycle(self.athena, topic_label)
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
                 logger.info("Stop signal received from agent")
