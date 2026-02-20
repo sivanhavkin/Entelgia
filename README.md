@@ -201,9 +201,9 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **Energy tracking** — Each agent has an energy level (0–100%)
   * **FixyRegulator** — Meta-level supervisor monitoring energy & stability
   * **Dream cycles** — Automatic consolidation when energy falls below 35%
-    * Consolidation phase: promotes subconscious insights to conscious layer; low-importance STM entries are trimmed
+    * Forgetting phase: keeps only the last `dream_keep_memories` (default 5) conscious entries in SQLite — older entries are deleted
+    * Integration phase: promotes subconscious insights to the conscious layer
     * Recharge phase: restores full energy (100%)
-    * Conscious LTM memories are **never deleted** — all are preserved across dream cycles
   * **Hallucination prevention** — Suspends dialogue when coherence risk detected
 * **Psychological drive modeling**
   * Id / Ego / Superego dynamics
