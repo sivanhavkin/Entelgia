@@ -801,14 +801,32 @@ class MemoryCore:
                     "SELECT value FROM settings WHERE key = 'key_fingerprint'"
                 ).fetchone()
                 if row is None:
-                    # First initialization – persist fingerprint and (re-)sign
-                    # any legacy rows that have no signature yet.
+                    # First initialization after the canonical payload format was
+                    # introduced.  Re-sign every existing row so that memories
+                    # previously signed with the old format (where Python None
+                    # fields became the literal string "None") are normalised to
+                    # the new format (None → "") before the fingerprint is stored.
+                    existing = conn.execute(
+                        "SELECT id, content, topic, emotion, ts FROM memories"
+                    ).fetchall()
+                    for row_id, content, topic, emotion, ts_val in existing:
+                        payload = self._build_ltm_payload(content, topic, emotion, ts_val)
+                        new_sig = create_signature(
+                            payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
+                        )
+                        conn.execute(
+                            "UPDATE memories SET signature_hex = ? WHERE id = ?",
+                            (new_sig.hex(), row_id),
+                        )
                     conn.execute(
                         "INSERT OR REPLACE INTO settings (key, value) VALUES ('key_fingerprint', ?)",
                         (current_fp,),
                     )
                     conn.commit()
-                    logger.info("Memory signing key fingerprint stored")
+                    logger.info(
+                        f"Memory signing key fingerprint stored; "
+                        f"re-signed {len(existing)} existing memories with canonical format"
+                    )
                     return
 
                 stored_fp = row[0]
@@ -963,9 +981,41 @@ class MemoryCore:
                         ):
                             valid_memories.append(mem)
                         else:
-                            logger.warning(
-                                f"[!] INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                            # Fallback: try the legacy payload format where Python
+                            # None fields were rendered as the string "None" by
+                            # f-string interpolation.  Memories stored before the
+                            # canonical builder was introduced will match here.
+                            legacy_payload = (
+                                f"{mem['content']}|{mem.get('topic')}|"
+                                f"{mem.get('emotion')}|{mem['ts']}"
                             )
+                            if validate_signature(
+                                legacy_payload.encode("utf-8"),
+                                MEMORY_SECRET_KEY_BYTES,
+                                sig_bytes,
+                            ):
+                                # Auto-heal: re-sign with the canonical format so
+                                # this fallback is only needed once per memory.
+                                new_sig = create_signature(
+                                    payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
+                                )
+                                try:
+                                    with self._conn() as heal_conn:
+                                        heal_conn.execute(
+                                            "UPDATE memories SET signature_hex = ? WHERE id = ?",
+                                            (new_sig.hex(), mem["id"]),
+                                        )
+                                        heal_conn.commit()
+                                except Exception:
+                                    pass
+                                logger.info(
+                                    f"Auto-healed legacy signature for memory {mem['id'][:8]}..."
+                                )
+                                valid_memories.append(mem)
+                            else:
+                                logger.warning(
+                                    f"[!] INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                                )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
                 else:

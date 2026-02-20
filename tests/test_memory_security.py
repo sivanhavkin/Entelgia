@@ -306,3 +306,129 @@ class TestLtmPayloadConsistency:
         mems_phase3 = mc2.ltm_recent("Socrates")
         assert len(mems_phase3) == 3, "New memory must also validate with key-B"
         sys.modules.pop(mod_name2, None)
+
+    def test_first_init_re_signs_legacy_format_memories(self, tmp_path):
+        """Memories signed with the old None→'None' format must be re-signed on
+        first init so they pass validation without any key change."""
+        import sys
+        import importlib.util
+        import sqlite3 as _sqlite3
+        import hashlib as _hashlib
+        import hmac as _hmac
+
+        db_path = os.path.join(str(tmp_path), "legacy_format.db")
+        key = "test-key-legacy-format-abc123"
+        key_bytes = key.encode("utf-8")
+
+        # Manually create a DB with a memory signed in the OLD format
+        # (None topic/emotion rendered as the string "None").
+        with _sqlite3.connect(db_path) as conn:
+            conn.execute("""
+                CREATE TABLE memories (
+                    id TEXT PRIMARY KEY, agent TEXT, ts TEXT, layer TEXT,
+                    content TEXT, topic TEXT, emotion TEXT,
+                    emotion_intensity REAL, importance REAL, source TEXT,
+                    promoted_from TEXT, intrusive INTEGER DEFAULT 0,
+                    suppressed INTEGER DEFAULT 0,
+                    retrain_status INTEGER DEFAULT 0,
+                    signature_hex TEXT DEFAULT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
+            """)
+            # Old payload: Python f-string renders None as "None"
+            old_payload = "Hello world|None|None|2026-01-01T00:00:00Z"
+            old_sig = _hmac.new(key_bytes, old_payload.encode("utf-8"), _hashlib.sha256).digest()
+            conn.execute(
+                "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ("mem-001", "Socrates", "2026-01-01T00:00:00Z", "subconscious",
+                 "Hello world", None, None, 0.5, 0.5, "test", None, 0, 0, 0,
+                 old_sig.hex()),
+            )
+            conn.commit()
+
+        # Load MemoryCore with the same key — first init should re-sign
+        os.environ["MEMORY_SECRET_KEY"] = key
+        os.environ["ENTELGIA_DATA_DIR"] = str(tmp_path)
+        spec = importlib.util.spec_from_file_location(
+            "Entelgia_production_meta_legacy",
+            os.path.join(os.path.dirname(__file__), "..", "Entelgia_production_meta.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["Entelgia_production_meta_legacy"] = mod
+        spec.loader.exec_module(mod)
+        mc = mod.MemoryCore(db_path)
+
+        mems = mc.ltm_recent("Socrates")
+        assert len(mems) == 1, (
+            "Legacy-format memory must be retrievable after first-init re-sign"
+        )
+        assert mems[0]["content"] == "Hello world"
+        sys.modules.pop("Entelgia_production_meta_legacy", None)
+
+    def test_ltm_recent_auto_heals_legacy_signature(self, tmp_path):
+        """ltm_recent must auto-heal a legacy 'None'-format signature even when
+        the key_fingerprint already exists (i.e. first-init already ran)."""
+        import sys
+        import importlib.util
+        import sqlite3 as _sqlite3
+        import hashlib as _hashlib
+        import hmac as _hmac
+
+        db_path = os.path.join(str(tmp_path), "autoheal.db")
+        key = "test-key-autoheal-xyz789"
+        key_bytes = key.encode("utf-8")
+
+        # Pre-populate DB: settings has key_fingerprint (first-init already ran),
+        # but one memory still has the old-format signature.
+        fp = _hashlib.sha256(key_bytes).hexdigest()
+        with _sqlite3.connect(db_path) as conn:
+            conn.execute("""
+                CREATE TABLE memories (
+                    id TEXT PRIMARY KEY, agent TEXT, ts TEXT, layer TEXT,
+                    content TEXT, topic TEXT, emotion TEXT,
+                    emotion_intensity REAL, importance REAL, source TEXT,
+                    promoted_from TEXT, intrusive INTEGER DEFAULT 0,
+                    suppressed INTEGER DEFAULT 0,
+                    retrain_status INTEGER DEFAULT 0,
+                    signature_hex TEXT DEFAULT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
+            """)
+            conn.execute(
+                "INSERT INTO settings VALUES ('key_fingerprint', ?)", (fp,)
+            )
+            # Old payload: topic is None → f-string renders as "None"
+            old_payload = "Ancient wisdom|None|curious|2026-01-02T00:00:00Z"
+            old_sig = _hmac.new(key_bytes, old_payload.encode("utf-8"), _hashlib.sha256).digest()
+            conn.execute(
+                "INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ("mem-002", "Athena", "2026-01-02T00:00:00Z", "conscious",
+                 "Ancient wisdom", None, "curious", 0.7, 0.8, "test", None, 0, 0, 0,
+                 old_sig.hex()),
+            )
+            conn.commit()
+
+        os.environ["MEMORY_SECRET_KEY"] = key
+        os.environ["ENTELGIA_DATA_DIR"] = str(tmp_path)
+        spec = importlib.util.spec_from_file_location(
+            "Entelgia_production_meta_heal",
+            os.path.join(os.path.dirname(__file__), "..", "Entelgia_production_meta.py"),
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["Entelgia_production_meta_heal"] = mod
+        spec.loader.exec_module(mod)
+        mc = mod.MemoryCore(db_path)
+
+        # First retrieval: auto-heal should fire and include the memory
+        mems = mc.ltm_recent("Athena")
+        assert len(mems) == 1, "Auto-heal must rescue the legacy-format memory"
+        assert mems[0]["content"] == "Ancient wisdom"
+
+        # Second retrieval: memory was re-signed, so plain validation must pass now
+        mems2 = mc.ltm_recent("Athena")
+        assert len(mems2) == 1, "Re-signed memory must validate on subsequent reads"
+        sys.modules.pop("Entelgia_production_meta_heal", None)
