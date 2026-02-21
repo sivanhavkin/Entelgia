@@ -27,7 +27,7 @@ Advanced Multi-Agent Dialogue System with:
 - Energy-based dream cycles (automatic recovery when energy ≤ energy_safety_threshold)
 - Meta-cognitive state display per turn (drives, energy, emotion, tone)
 - Coherent Freudian drive correlations (conflict → ego erosion, temperature spike, energy drain)
-- Super ego persona fix: dialogue displays agent's original voice; rewrite used for internal state only
+- Superego persona fix: agent identity anchored in persona prompt via "Current mode (as {name})"; drive label uses s_ego= to avoid LLM persona confusion; Superego: prefix stripped from LLM output as safety net
 - Output quality rules: forbidden meta-commentary phrases removed, hard word truncation removed
 
 Version Note: Latest release: 2.5.0.
