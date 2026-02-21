@@ -13,16 +13,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Minimal stub that replicates only the methods under test
 # ---------------------------------------------------------------------------
+
 
 class _StubAgent:
     """Minimal Agent stub exposing conflict_index, debate_profile, and
     _behavioral_rule_instruction without requiring real LLM / memory deps."""
 
-    def __init__(self, name: str, id_strength: float, ego_strength: float, superego_strength: float):
+    def __init__(
+        self,
+        name: str,
+        id_strength: float,
+        ego_strength: float,
+        superego_strength: float,
+    ):
         self.name = name
         self.drives = {
             "id_strength": id_strength,
@@ -54,7 +60,7 @@ class _StubAgent:
             )
         if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
             return (
-                'BEHAVIORAL RULE: Your response MUST include at least one sentence that '
+                "BEHAVIORAL RULE: Your response MUST include at least one sentence that "
                 'begins with "However," or "Yet," or "This assumes…"'
             )
         return ""
@@ -64,6 +70,7 @@ class _StubAgent:
 # Helper to build a stub with a known conflict_index value
 # ---------------------------------------------------------------------------
 
+
 def _socrates_with_conflict(conflict: float) -> _StubAgent:
     """Return a Socrates stub whose conflict_index() equals *conflict*.
     conflict_index = |id - ego| + |superego - ego|
@@ -72,7 +79,12 @@ def _socrates_with_conflict(conflict: float) -> _StubAgent:
     """
     ego = 5.0
     half = conflict / 2.0
-    return _StubAgent("Socrates", id_strength=ego + half, ego_strength=ego, superego_strength=ego + half)
+    return _StubAgent(
+        "Socrates",
+        id_strength=ego + half,
+        ego_strength=ego,
+        superego_strength=ego + half,
+    )
 
 
 def _athena_with_dissent(dissent: float) -> _StubAgent:
@@ -88,6 +100,7 @@ def _athena_with_dissent(dissent: float) -> _StubAgent:
 # ---------------------------------------------------------------------------
 # Rule A: Socrates + Conflict
 # ---------------------------------------------------------------------------
+
 
 class TestRuleASocrates:
     """Rule A: Socrates emits binary-choice question when Conflict >= 5.0."""
@@ -121,7 +134,9 @@ class TestRuleASocrates:
 
     def test_non_socrates_not_triggered_even_with_high_conflict(self):
         """Rule A must not fire for agents other than Socrates."""
-        agent = _StubAgent("Fixy", id_strength=10.0, ego_strength=5.0, superego_strength=10.0)
+        agent = _StubAgent(
+            "Fixy", id_strength=10.0, ego_strength=5.0, superego_strength=10.0
+        )
         assert agent.conflict_index() >= 5.0
         rule = agent._behavioral_rule_instruction()
         assert rule == ""
@@ -130,6 +145,7 @@ class TestRuleASocrates:
 # ---------------------------------------------------------------------------
 # Rule B: Athena + Dissent
 # ---------------------------------------------------------------------------
+
 
 class TestRuleBAnthena:
     """Rule B: Athena emits dissent-marker instruction when Dissent >= 3.0."""
@@ -168,7 +184,9 @@ class TestRuleBAnthena:
 
     def test_non_athena_not_triggered_even_with_high_dissent(self):
         """Rule B must not fire for agents other than Athena."""
-        agent = _StubAgent("Fixy", id_strength=8.0, ego_strength=5.0, superego_strength=8.0)
+        agent = _StubAgent(
+            "Fixy", id_strength=8.0, ego_strength=5.0, superego_strength=8.0
+        )
         assert agent.debate_profile()["dissent_level"] >= 3.0
         rule = agent._behavioral_rule_instruction()
         assert rule == ""
@@ -178,15 +196,14 @@ class TestRuleBAnthena:
 # Prompt injection: ensure rule is embedded before "Respond now:"
 # ---------------------------------------------------------------------------
 
+
 class TestPromptInjection:
     """Verify that the rule string is correctly injected before 'Respond now:'."""
 
     def _simulate_inject(self, prompt: str, rule: str) -> str:
         """Replicate the injection logic from Agent.speak()."""
         if rule:
-            prompt = prompt.replace(
-                "\nRespond now:\n", f"\n{rule}\nRespond now:\n"
-            )
+            prompt = prompt.replace("\nRespond now:\n", f"\n{rule}\nRespond now:\n")
         return prompt
 
     def test_rule_a_injected_before_respond_now(self):
@@ -202,7 +219,7 @@ class TestPromptInjection:
     def test_rule_b_injected_before_respond_now(self):
         dummy_prompt = "PERSONA: ...\nSEED: ...\n\nRespond now:\n"
         rule = (
-            'BEHAVIORAL RULE: Your response MUST include at least one sentence that '
+            "BEHAVIORAL RULE: Your response MUST include at least one sentence that "
             'begins with "However," or "Yet," or "This assumes…"'
         )
         result = self._simulate_inject(dummy_prompt, rule)
