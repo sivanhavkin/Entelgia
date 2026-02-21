@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file. The format 
 - **Energy-Based Agent Regulation System** — cognitive energy as a first-class resource
 - **Personal Long-Term Memory System** — psychoanalytically-inspired memory regulation
 - **Drive-aware cognition** — dynamic LLM temperature, ego-driven memory depth, superego second-pass critique
+- **Coherent Freudian drive correlations** — high conflict now directly erodes ego, raises temperature, and amplifies energy drain (PR #92)
 - **`entelgia_production_long.py`** — guaranteed 200-turn dialogue without time-based stopping
 - **Dialogue bug fixes** — third body calling to first body, double turn (agent answering twice in one turn), and pronoun issue all resolved
 - New module exports, comprehensive tests, and a working demo
@@ -93,6 +94,12 @@ All notable changes to this project will be documented in this file. The format 
 - **ROADMAP.md** 🗺️ — project roadmap added to repository
 - Project logo added to all markdown files
 
+- **`tests/test_drive_correlations.py`** 🧪 — 18 unit tests across 4 classes (PR #92)
+  - `TestConflictIndex` — boundary value tests for `conflict_index()`
+  - `TestEgoErosion` — magnitude and monotonicity of ego erosion under conflict
+  - `TestTemperatureConflictCorrelation` — temperature rises with conflict index
+  - `TestEnergyDrainScaling` — conflict-scaled drain and cap behavior
+
 ## 🔄 Changed
 
 - **`Entelgia_production_meta.py`** — Drive-aware cognition (PR #75)
@@ -115,6 +122,22 @@ All notable changes to this project will be documented in this file. The format 
     - Removes gender script tags: `(he):`, `(she)`, `(they)`
     - Removes stray scoring markers: `(5)`, `(4.5)`, etc.
     - Truncates to `MAX_RESPONSE_WORDS = 150`
+
+- **`Entelgia_production_meta.py`** — Coherent Freudian drive correlations (PR #92)
+  - **Conflict → Ego erosion** (`update_drives_after_turn`): captures `pre_conflict = |ide - ego| + |sup - ego|` before updating drives; when it exceeds 4.0, Ego is eroded proportionally:
+    ```python
+    if pre_conflict > 4.0:
+        ego = max(0.0, ego - 0.03 * (pre_conflict - 4.0))
+    ```
+  - **Conflict → Temperature/Tone** (`speak`): adds a conflict component to the LLM temperature formula so high drive imbalance produces a more volatile, impulsive tone:
+    ```python
+    temperature = 0.60 + 0.03*(ide-ego) - 0.02*(sup-ego) + 0.015*self.conflict_index()
+    ```
+  - **Conflict → Energy drain** (`update_drives_after_turn`): replaces flat random drain with conflict-scaled drain, capped at `2 × energy_drain_max`:
+    ```python
+    drain = random.uniform(CFG.energy_drain_min, CFG.energy_drain_max) + 0.4 * pre_conflict
+    drain = min(drain, CFG.energy_drain_max * 2.0)
+    ```
 
 - Package `__version__` bumped to **2.5.0**
 - `pyproject.toml` version bumped to **2.5.0**
@@ -570,7 +593,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.5.0** | 2026-02-21 | Minor | ✅ **Current** | Energy regulation & long-term memory modules |
+| **v2.5.0** | 2026-02-21 | Minor | ✅ **Current** | Energy regulation, long-term memory & coherent drive correlations |
 | **v2.4.0** | 2026-02-18 | Minor | ⚠️ Superseded | Documentation & structure improvements |
 | **v2.3.0** | 2026-02-16 | Minor | ⚠️ Superseded | Installation improvements |
 | **v2.2.0** | 2026-02-14 | Minor | ⚠️ Superseded | Enhanced dialogue system |

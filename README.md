@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-81%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-99%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -213,6 +213,7 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **Superego second-pass critique** — response is rewritten by a principled internal governor when `superego_strength ≥ 7.5`
   * **Ego-driven memory depth** — long-term and short-term retrieval limits scale with ego/self-awareness
   * **Output artifact cleanup** — strips echoed name/pronoun headers, gender tags, scoring markers
+  * **Coherent drive correlations** (PR #92) — conflict now directly erodes ego capacity, raises LLM temperature, and scales energy drain
 * **Psychological drive modeling**
   * Id / Ego / Superego dynamics
 * **Emotion tracking & importance scoring**
@@ -451,7 +452,23 @@ Tests assert that:
 - Signatures are unique across multiple inputs and keys
 - The implementation supports Unicode messages (mixed-language, Arabic, and emojis)
 
-> ✅ **All 81 tests currently pass** (6 dialogue + 23 energy regulation + 33 long-term memory + 19 security), providing confidence that all subsystems perform as expected.
+---
+
+### 🔗 Drive Correlation Tests (18 tests)
+
+```bash
+pytest tests/test_drive_correlations.py -v
+```
+
+Tests verify the coherent Freudian drive correlations added in PR #92:
+- ✅ **conflict_index boundaries** — zero conflict at balance, maximum at extremes
+- ✅ **Ego erosion magnitude** — proportional reduction above the 4.0 threshold
+- ✅ **Ego erosion monotonicity** — higher conflict → greater erosion
+- ✅ **Temperature–conflict correlation** — temperature rises with conflict index
+- ✅ **Energy drain scaling** — conflict adds to base drain
+- ✅ **Energy drain cap** — drain never exceeds `2 × energy_drain_max`
+
+> ✅ **All 99 tests currently pass** (6 dialogue + 23 energy regulation + 33 long-term memory + 19 security + 18 drive correlations), providing confidence that all subsystems perform as expected.
 
 ---
 
@@ -461,7 +478,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 81 total tests (19 security + 6 dialogue + 23 energy + 33 LTM) |
+| **Unit Tests** | `pytest` | Runs 99 total tests (19 security + 6 dialogue + 23 energy + 33 LTM + 18 drive correlations) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
