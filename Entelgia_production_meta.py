@@ -1347,6 +1347,8 @@ class Agent:
         self._last_emotion: str = "neutral"
         self._last_emotion_intensity: float = 0.0
         self._last_response_kind: str = "reflective"
+        self._last_temperature: float = 0.6
+        self._last_superego_rewrite: bool = False
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -1544,6 +1546,7 @@ class Agent:
         temperature = max(
             0.25, min(0.95, 0.60 + 0.03 * (ide - ego) - 0.02 * (sup - ego))
         )
+        self._last_temperature = temperature
 
         raw_response = (
             self.llm.generate(
@@ -1556,7 +1559,8 @@ class Agent:
         out = validate_output(raw_response)
 
         # Superego → second-pass critique (internal governor)
-        if sup >= 7.5:
+        self._last_superego_rewrite = sup >= 7.5
+        if self._last_superego_rewrite:
             critique_prompt = (
                 "You are the agent's Superego. Rewrite the response to be: "
                 "more principled, less impulsive, remove contradictions, keep the core idea.\n\n"
@@ -2378,6 +2382,24 @@ class MainScript:
         sa = float(agent.drives.get("self_awareness", 0.55))
         conflict = agent.conflict_index()
         profile = agent.debate_profile()
+
+        # Tone label derived from LLM temperature (itself driven by Id/Ego/SuperEgo)
+        temp = agent._last_temperature
+        if temp >= 0.80:
+            tone_label = "impulsive / uninhibited (Id-driven)"
+        elif temp >= 0.70:
+            tone_label = "expressive / spontaneous"
+        elif temp >= 0.55:
+            tone_label = "balanced / exploratory"
+        elif temp >= 0.40:
+            tone_label = "reflective / measured"
+        else:
+            tone_label = "restrained / controlled (SuperEgo-driven)"
+
+        # Dominant drive
+        dominant_drive = max(("Id", ide), ("Ego", ego), ("SuperEgo", sup), key=lambda x: x[1])
+        dominant_label = f"{dominant_drive[0]} ({dominant_drive[1]:.1f})"
+
         bar = "─" * 54
         dim = Fore.WHITE + Style.DIM
         reset = Style.RESET_ALL
@@ -2402,6 +2424,13 @@ class MainScript:
         print(
             dim
             + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
+            + reset
+        )
+        rewrite_tag = "  [SuperEgo rewrite applied]" if agent._last_superego_rewrite else ""
+        print(
+            dim
+            + f"  Tone: temp={temp:.2f} → {tone_label}"
+            + f"  Dominant: {dominant_label}{rewrite_tag}"
             + reset
         )
         if actions:
@@ -2757,7 +2786,7 @@ class MainScript:
 def run_cli():
     """Run command line interface - configurable timeout dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=30)
+    CFG = Config(max_turns=200, timeout_minutes=30, show_meta=True)
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(
