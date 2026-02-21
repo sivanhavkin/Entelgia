@@ -20,12 +20,24 @@ All notable changes to this project will be documented in this file. The format 
 
 - **Energy-Based Agent Regulation System** — cognitive energy as a first-class resource
 - **Personal Long-Term Memory System** — psychoanalytically-inspired memory regulation
+- **Drive-aware cognition** — dynamic LLM temperature, ego-driven memory depth, superego second-pass critique
+- **`entelgia_production_long.py`** — guaranteed 200-turn dialogue without time-based stopping
+- **Dialogue bug fixes** — duplicate Fixy output, broken speaker alternation, pronoun leakage all resolved
 - New module exports, comprehensive tests, and a working demo
 - Version bump from 2.4.0 → 2.5.0 across all documents and code
 
 ## 📝 Changes
 
 ### Added
+
+- **`entelgia_production_long.py`** 🔁 — 200-turn companion script
+  - `MainScriptLong(MainScript)` — subclass that overrides only `run()`, replacing the
+    time-based `while time < timeout` condition with a turn-count gate `while turn_index < max_turns`
+  - `_NO_TIMEOUT_MINUTES = 9999` sentinel disables time-based stopping entirely
+  - `run_cli_long()` entry point: `Config(max_turns=200, timeout_minutes=9999)`
+  - All other behaviour (memory, emotions, Fixy interventions, dream cycles, session
+    persistence) inherited from `MainScript` unchanged
+  - Run via: `python entelgia_production_long.py`
 
 - **`entelgia/energy_regulation.py`** ⚡ — Energy-Based Agent Regulation System
   - **`FixyRegulator`** — Meta-level energy supervisor
@@ -86,11 +98,48 @@ All notable changes to this project will be documented in this file. The format 
 
 ## 🔄 Changed
 
+- **`Entelgia_production_meta.py`** — Drive-aware cognition (PR #75)
+  - **Dynamic LLM temperature** derived from Freudian drive values:
+    ```
+    temperature = max(0.25, min(0.95, 0.60 + 0.03 * (id - ego) - 0.02 * (superego - ego)))
+    ```
+    Higher `id_strength` → more creative/exploratory; higher `superego_strength` → more constrained.
+  - **Superego second-pass critique**: when `superego_strength ≥ 7.5`, the initial response is
+    fed back to the LLM at `temperature=0.25` with a principled rewrite prompt acting as an
+    internal governor.
+  - **Ego-driven memory retrieval depth** replaces fixed `limit=4` / `[-6:]`:
+    ```
+    ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))   # long-term
+    stm_tail  = max(3, min(12, int(3 + ego / 2)))             # short-term
+    ```
+    Agents with stronger ego / self-awareness pull more context and stabilise faster after reset.
+  - **Output artifact cleanup + word limit enforcement** after all validate/critique passes:
+    - Strips agent name/pronoun prefix echoed by LLM (e.g. `"Socrates (he): "`)
+    - Removes gender script tags: `(he):`, `(she)`, `(they)`
+    - Removes stray scoring markers: `(5)`, `(4.5)`, etc.
+    - Truncates to `MAX_RESPONSE_WORDS = 150`
+
 - Package `__version__` bumped to **2.5.0**
 - `pyproject.toml` version bumped to **2.5.0**
 - All documentation version references updated to **v2.5.0**
 - `entelgia/energy_regulation.py` and `entelgia/long_term_memory.py` added as
   first-class modules in the `entelgia` package
+- Applied **Black** code formatting across the entire Python codebase (PR #69)
+
+## 🐛 Fixed
+
+- **`Entelgia_production_meta.py`** — Dialogue engine bug fixes (PR #74)
+  - **Duplicate Fixy output**: legacy scheduled `fixy_check` (every N turns) no longer fires
+    when `InteractiveFixy` is active — guard: `elif not self.interactive_fixy and …`
+  - **Broken speaker alternation after Fixy intervention**: `last_speaker` is now determined
+    by scanning `dialog` backwards for the last non-Fixy turn, preventing Socrates from
+    speaking twice in a row after a Fixy intervention.
+  - **Pronoun leakage from LLM response**: `speak()` strips the agent header prefix
+    (`"Socrates (he): …"`) that the LLM echoes from its own prompt, so pronouns never
+    appear in output when `show_pronoun=False`.
+  - **Smart text truncation** in `_format_prompt`: dialog turns capped at 200 chars,
+    thoughts at 150 chars, memories at 200 chars — all cut at the last word boundary
+    (no mid-word splits).
 
 ## 🛑 Breaking Changes
 *None* — all changes are backward compatible
