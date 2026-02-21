@@ -9,6 +9,26 @@ Extended dialogue session: runs for exactly 200 turns without any time-based
 stopping.  Based on Entelgia_production_meta.py but uses a turn-count loop so
 the dialogue always completes all 200 turns regardless of how long it takes.
 
+Advanced Multi-Agent Dialogue System with:
+- Full unit tests with pytest
+- Async/concurrent agent processing
+- Proper logging with levels
+- Config validation
+- Session persistence
+- REST API (FastAPI)
+- Better monitoring
+- NO TIME-BASED TIMEOUT – runs exactly max_turns turns
+- MEMORY SECURITY with HMAC-SHA256 signatures
+- Freudian slip memory surfacing
+- Self-replication memory promotion
+- Agent stop-signal detection
+
+Version Note: Latest release: 2.5.0.
+
+Requirements:
+- Python 3.10+
+- Ollama running locally (http://localhost:11434)
+
 Run:
   python entelgia_production_long.py
 """
@@ -16,6 +36,7 @@ Run:
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from dataclasses import asdict
@@ -55,14 +76,17 @@ class MainScriptLong(MainScript):
 
             # Dynamic speaker selection (if enhanced mode available)
             if self.dialogue_engine:
+                # Check if Fixy should be allowed to speak
                 allow_fixy, fixy_prob = self.dialogue_engine.should_allow_fixy(
                     self.dialog, self.turn_index
                 )
 
+                # Select next speaker dynamically
                 if self.turn_index == 1:
-                    speaker = self.socrates
+                    speaker = self.socrates  # Start with Socrates
                 else:
-                    last_speaker = self.athena
+                    # Find last non-Fixy speaker so Fixy interventions don't break alternation
+                    last_speaker = self.athena  # default
                     for turn in reversed(self.dialog):
                         role = turn.get("role", "")
                         if role == "Socrates":
@@ -97,6 +121,7 @@ class MainScriptLong(MainScript):
                     turn_count=self.turn_index,
                 )
             else:
+                # Legacy or Fixy seed
                 seed = (
                     f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
                 )
@@ -108,6 +133,10 @@ class MainScriptLong(MainScript):
             speaker.store_turn(out, topic_label, source="stm")
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
+
+            # Freudian slip attempt after each non-Fixy turn
+            if speaker.name != "Fixy":
+                speaker.apply_freudian_slip(topic_label)
 
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
@@ -131,6 +160,7 @@ class MainScriptLong(MainScript):
                 not self.interactive_fixy
                 and self.turn_index % self.cfg.fixy_every_n_turns == 0
             ):
+                # Legacy scheduled Fixy (only when interactive_fixy is unavailable)
                 tail = self.dialog[-10:]
                 ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
                 self.fixy_check(ctx)
@@ -138,6 +168,16 @@ class MainScriptLong(MainScript):
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+
+            # Self-replication cycle
+            if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
+                self.self_replicate_cycle(self.socrates, topic_label)
+                self.self_replicate_cycle(self.athena, topic_label)
+
+            if re.search(r"\b(stop|quit|bye)\b", out.lower()):
+                logger.info("Stop signal received from agent")
+                print(Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL)
+                break
 
             if self.turn_index % 2 == 0:
                 topicman.advance_round()
