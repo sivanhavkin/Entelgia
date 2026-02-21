@@ -539,6 +539,12 @@ def validate_output(text: str) -> str:
     return text.strip()
 
 
+def _first_sentence(text: str) -> str:
+    """Extract the first sentence from text (up to the first .!? or first newline)."""
+    m = re.match(r"([^.!?\n]+[.!?])", text.strip())
+    return m.group(1).strip() if m else text.strip().split("\n")[0].strip()
+
+
 # ============================================
 # PRIVACY / REDACTION
 # ============================================
@@ -1520,6 +1526,22 @@ class Agent:
                 "\nRespond now:\n", f"\n{behavioral_rule}\nRespond now:\n"
             )
 
+        # Prevent opening with a sentence this agent has already used in this dialog
+        own_texts = [
+            t.get("text", "")
+            for t in dialog_tail
+            if t.get("role") == self.name and t.get("text", "").strip()
+        ]
+        if own_texts:
+            last_opener = _first_sentence(own_texts[-1])
+            if last_opener:
+                opener_rule = (
+                    f'FORBIDDEN OPENER: Do not begin your response with: "{last_opener}"'
+                )
+                prompt = prompt.replace(
+                    "\nRespond now:\n", f"\n{opener_rule}\nRespond now:\n"
+                )
+
         # Drives → temperature (cognition control); conflict raises volatility
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
@@ -1602,6 +1624,22 @@ class Agent:
 
         # Remove stray scoring markers like "(5)" or "(4.5)"
         out = re.sub(r"\(\d+(\.\d+)?\)", "", out).strip()
+
+        # Safety net: strip a repeated first sentence if the LLM still produced one
+        own_openings = {
+            " ".join(_first_sentence(t.get("text", "")).split()).lower()
+            for t in dialog_tail
+            if t.get("role") == self.name and t.get("text", "").strip()
+        }
+        out_first = _first_sentence(out)
+        if (
+            out_first
+            and " ".join(out_first.split()).lower() in own_openings
+            and out.lower().startswith(out_first.lower())
+        ):
+            remainder = out[len(out_first):].strip()
+            if remainder:
+                out = remainder
 
         return out
 
