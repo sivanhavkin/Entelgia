@@ -68,8 +68,8 @@ import io
 
 # Fix Windows Unicode encoding
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 #  LOAD .env FIRST - BEFORE logger setup
 try:
     from dotenv import load_dotenv
@@ -189,8 +189,20 @@ def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger("entelgia")
     logger.setLevel(log_level)
 
-    # Console handler
-    console_handler = logging.StreamHandler()
+    # Console handler – use a UTF-8 stream so emoji/non-ASCII chars never
+    # raise UnicodeEncodeError on Windows consoles with narrow code pages
+    # (e.g. cp1255).  errors="replace" silently substitutes any character
+    # that the underlying codec cannot encode.
+    try:
+        if sys.platform == "win32" and hasattr(sys.stderr, "buffer"):
+            _console_stream = io.TextIOWrapper(
+                sys.stderr.buffer, encoding="utf-8", errors="replace"
+            )
+        else:
+            _console_stream = sys.stderr
+    except Exception:
+        _console_stream = sys.stderr
+    console_handler = logging.StreamHandler(_console_stream)
     console_handler.setLevel(log_level)
 
     # File handler
@@ -678,6 +690,16 @@ class TopicManager:
 class MemoryCore:
     """Unified memory system: JSON STM + SQLite LTM with cryptographic signatures."""
 
+    @staticmethod
+    def _build_ltm_payload(content: str, topic, emotion, ts: str) -> str:
+        """Build canonical payload string for LTM HMAC-SHA256 signature.
+
+        ``None`` values are normalised to empty string so that the
+        signed payload is stable regardless of whether the caller
+        passes ``None`` or ``""`` for optional fields.
+        """
+        return f"{content}|{topic or ''}|{emotion or ''}|{ts}"
+
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._init_db()
@@ -798,7 +820,7 @@ class MemoryCore:
         ts = ts or now_iso()
 
         # Create payload for signature
-        payload_for_sig = f"{content}|{topic}|{emotion}|{ts}"
+        payload_for_sig = MemoryCore._build_ltm_payload(content, topic, emotion, ts)
         sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
 
@@ -856,8 +878,13 @@ class MemoryCore:
                 sig_hex = mem.get("signature_hex")
 
                 if sig_hex:
-                    # Validate signature
-                    payload = f"{mem['content']}|{mem.get('topic', '')}|{mem.get('emotion', '')}|{mem['ts']}"
+                    # Validate signature using canonical payload (None → "")
+                    payload = MemoryCore._build_ltm_payload(
+                        mem["content"],
+                        mem.get("topic"),
+                        mem.get("emotion"),
+                        mem["ts"],
+                    )
                     try:
                         sig_bytes = bytes.fromhex(sig_hex)
                         if validate_signature(
@@ -865,9 +892,40 @@ class MemoryCore:
                         ):
                             valid_memories.append(mem)
                         else:
-                            logger.warning(
-                                f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                            # Fallback: try legacy format where None was rendered
+                            # as the string "None" (used before _build_ltm_payload
+                            # was introduced).  If it validates, auto-heal the row
+                            # by re-signing with the canonical format.
+                            legacy_payload = (
+                                f"{mem['content']}"
+                                f"|{mem.get('topic')}"
+                                f"|{mem.get('emotion')}"
+                                f"|{mem['ts']}"
                             )
+                            if validate_signature(
+                                legacy_payload.encode("utf-8"),
+                                MEMORY_SECRET_KEY_BYTES,
+                                sig_bytes,
+                            ):
+                                # Re-sign with canonical format so future
+                                # lookups use the correct payload.
+                                new_sig = create_signature(
+                                    payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
+                                )
+                                try:
+                                    with self._conn() as _conn:
+                                        _conn.execute(
+                                            "UPDATE memories SET signature_hex=? WHERE id=?",
+                                            (new_sig.hex(), mem["id"]),
+                                        )
+                                        _conn.commit()
+                                except Exception:
+                                    pass
+                                valid_memories.append(mem)
+                            else:
+                                logger.warning(
+                                    f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                                )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
                 else:
