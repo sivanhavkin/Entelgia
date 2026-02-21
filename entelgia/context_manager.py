@@ -183,9 +183,7 @@ class ContextManager:
         id_str = drives.get("id_strength", 5.0)
         ego_str = drives.get("ego_strength", 5.0)
         sup_str = drives.get("superego_strength", 5.0)
-        prompt += (
-            f"[Drives: id={id_str:.1f} ego={ego_str:.1f} s_ego={sup_str:.1f}]\n"
-        )
+        prompt += f"[Drives: id={id_str:.1f} ego={ego_str:.1f} s_ego={sup_str:.1f}]\n"
 
         # Add debate style
         style = debate_profile.get("style", "integrative")

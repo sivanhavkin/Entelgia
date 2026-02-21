@@ -1384,7 +1384,10 @@ class Agent:
         }
         self.memory.save_agent_state(self.name, self.drives)
         # Energy drain scales with conflict: high drive imbalance costs more energy
-        drain = random.uniform(CFG.energy_drain_min, CFG.energy_drain_max) + 0.4 * pre_conflict
+        drain = (
+            random.uniform(CFG.energy_drain_min, CFG.energy_drain_max)
+            + 0.4 * pre_conflict
+        )
         drain = min(drain, CFG.energy_drain_max * 2.0)
         self.energy_level = max(0.0, self.energy_level - drain)
 

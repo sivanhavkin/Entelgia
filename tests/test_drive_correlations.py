@@ -159,7 +159,12 @@ class TestConflictIndex:
     @pytest.mark.parametrize(
         "ide, ego, sup, expected",
         [
-            (2.9, 8.8, 8.7, pytest.approx(6.0, abs=0.1)),  # example from problem statement
+            (
+                2.9,
+                8.8,
+                8.7,
+                pytest.approx(6.0, abs=0.1),
+            ),  # example from problem statement
             (5.0, 5.0, 5.0, pytest.approx(0.0)),
             (10.0, 5.0, 0.0, pytest.approx(10.0)),
         ],
@@ -187,9 +192,9 @@ class TestEgoErosionUnderConflict:
         # "reflective" kind normally raises ego (+0.05 + 0.06), but conflict erosion
         # should bring it below the no-conflict baseline
         no_conflict_ego = ego_before + 0.05 + 0.06  # maximum reflective gain
-        assert ego_after < no_conflict_ego, (
-            f"Ego should be eroded by conflict; got {ego_after:.3f} vs baseline {no_conflict_ego:.3f}"
-        )
+        assert (
+            ego_after < no_conflict_ego
+        ), f"Ego should be eroded by conflict; got {ego_after:.3f} vs baseline {no_conflict_ego:.3f}"
 
     def test_low_conflict_does_not_erode_ego(self):
         """With pre_conflict <= 4.0, no erosion step is applied."""
@@ -214,9 +219,9 @@ class TestEgoErosionUnderConflict:
         high.update_drives_after_turn("reflective", "neutral", 0.5)
         ego_high_conflict = float(high.drives["ego_strength"])
 
-        assert ego_high_conflict < ego_low_conflict, (
-            "Higher conflict must result in lower Ego after the turn"
-        )
+        assert (
+            ego_high_conflict < ego_low_conflict
+        ), "Higher conflict must result in lower Ego after the turn"
 
     def test_ego_never_negative(self):
         """Ego must never drop below 0.0, even with extreme conflict."""
@@ -260,18 +265,18 @@ class TestTemperatureConflictCorrelation:
     @pytest.mark.parametrize(
         "ide, ego, sup",
         [
-            (0.0, 10.0, 0.0),   # extreme low Id, high Ego, low SuperEgo
+            (0.0, 10.0, 0.0),  # extreme low Id, high Ego, low SuperEgo
             (10.0, 0.0, 10.0),  # maximum conflict
-            (5.0, 5.0, 5.0),    # balanced
+            (5.0, 5.0, 5.0),  # balanced
         ],
     )
     def test_temperature_stays_within_bounds(self, ide, ego, sup):
         """Temperature must always remain in [0.25, 0.95]."""
         agent = _DriveStub(id_strength=ide, ego_strength=ego, superego_strength=sup)
         temp = agent.compute_temperature()
-        assert 0.25 <= temp <= 0.95, (
-            f"Temperature {temp} out of bounds for drives ({ide},{ego},{sup})"
-        )
+        assert (
+            0.25 <= temp <= 0.95
+        ), f"Temperature {temp} out of bounds for drives ({ide},{ego},{sup})"
 
     def test_conflict_component_is_positive(self):
         """The conflict addend (0.015 * conflict_index) must be non-negative."""
@@ -300,9 +305,9 @@ class TestEnergyDrainConflictCorrelation:
         high.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
         drain_high = 100.0 - high.energy_level
 
-        assert drain_high > drain_low, (
-            f"High-conflict drain ({drain_high:.2f}) must exceed low-conflict drain ({drain_low:.2f})"
-        )
+        assert (
+            drain_high > drain_low
+        ), f"High-conflict drain ({drain_high:.2f}) must exceed low-conflict drain ({drain_low:.2f})"
 
     def test_energy_never_negative(self):
         """Energy must never go below 0.0."""
@@ -317,10 +322,11 @@ class TestEnergyDrainConflictCorrelation:
         # 0.4 * 20 = 8, base max = 15, cap = 30 = 2 × 15
         agent = _DriveStub(id_strength=10.0, ego_strength=0.0, superego_strength=10.0)
         for seed in range(50):
-            agent.energy_level = 100.0  # reset energy; drives don't affect the cap check
+            agent.energy_level = (
+                100.0  # reset energy; drives don't affect the cap check
+            )
             agent.update_drives_after_turn("aggressive", "anger", 1.0, rng_seed=seed)
             drain = 100.0 - agent.energy_level
-            assert drain <= ENERGY_DRAIN_MAX * 2.0 + 1e-9, (
-                f"Drain {drain:.2f} exceeded cap of {ENERGY_DRAIN_MAX * 2.0}"
-            )
-
+            assert (
+                drain <= ENERGY_DRAIN_MAX * 2.0 + 1e-9
+            ), f"Drain {drain:.2f} exceeded cap of {ENERGY_DRAIN_MAX * 2.0}"
