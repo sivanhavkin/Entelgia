@@ -1324,6 +1324,9 @@ class Agent:
         sup = float(self.drives.get("superego_strength", 5.0))
         sa = float(self.drives.get("self_awareness", 0.55))
 
+        # Capture pre-update conflict (Id-Ego and SuperEgo-Ego tension)
+        pre_conflict = abs(ide - ego) + abs(sup - ego)
+
         ego = min(10.0, ego + 0.05)
         sa = min(1.0, sa + 0.01)
 
@@ -1346,6 +1349,10 @@ class Agent:
         if emo in ("fear", "anxiety"):
             sup = min(10.0, sup + 0.08)
 
+        # High conflict erodes Ego's mediating capacity (manifests as low Ego)
+        if pre_conflict > 4.0:
+            ego = max(0.0, ego - 0.03 * (pre_conflict - 4.0))
+
         self.drives = {
             "id_strength": ide,
             "ego_strength": ego,
@@ -1353,7 +1360,9 @@ class Agent:
             "self_awareness": sa,
         }
         self.memory.save_agent_state(self.name, self.drives)
-        drain = random.uniform(CFG.energy_drain_min, CFG.energy_drain_max)
+        # Energy drain scales with conflict: high drive imbalance costs more energy
+        drain = random.uniform(CFG.energy_drain_min, CFG.energy_drain_max) + 0.4 * pre_conflict
+        drain = min(drain, CFG.energy_drain_max * 2.0)
         self.energy_level = max(0.0, self.energy_level - drain)
 
     def _build_compact_prompt(
@@ -1482,12 +1491,19 @@ class Agent:
                 "\nRespond now:\n", f"\n{behavioral_rule}\nRespond now:\n"
             )
 
-        # Drives → temperature (cognition control)
+        # Drives → temperature (cognition control); conflict raises volatility
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
         sup = float(self.drives.get("superego_strength", 5.0))
         temperature = max(
-            0.25, min(0.95, 0.60 + 0.03 * (ide - ego) - 0.02 * (sup - ego))
+            0.25,
+            min(
+                0.95,
+                0.60
+                + 0.03 * (ide - ego)
+                - 0.02 * (sup - ego)
+                + 0.015 * self.conflict_index(),
+            ),
         )
         self._last_temperature = temperature
 
