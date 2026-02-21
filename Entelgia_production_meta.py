@@ -249,6 +249,9 @@ logger.info(
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 MAX_RESPONSE_WORDS = 150
 
+# LLM First-Person Instruction - agents must speak as themselves using "I"
+LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
+
 
 @dataclass
 class Config:
@@ -1395,8 +1398,9 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
-        # Add 150-word limit instruction for LLM
-        prompt += f"\n{LLM_RESPONSE_LIMIT}\n"
+        # Add first-person and 150-word limit instructions for LLM
+        prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
+        prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -2232,7 +2236,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="Socratic, curious, probing. Seeks clarity and truth.",
+            persona="I am Socratic, curious, and probing. I seek clarity and truth.",
         )
         self.athena = Agent(
             name="Athena",
@@ -2244,7 +2248,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="Strategic, integrative, creative. Builds frameworks and synthesis.",
+            persona="I am strategic, integrative, and creative. I build frameworks and synthesis.",
         )
 
         # Language tracking removed for gender-neutral output
@@ -2265,7 +2269,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="Observer/fixer. Brief, concrete, points out contradictions.",
+            persona="I am an observer and fixer. I am brief, concrete, and point out contradictions.",
         )
 
         # Initialize enhanced dialogue components if available
