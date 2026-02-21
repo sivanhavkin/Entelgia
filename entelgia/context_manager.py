@@ -15,6 +15,9 @@ from typing import Dict, List, Any, Optional
 # LLM Response Length Instruction
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 
+# LLM First-Person Instruction - agents must speak as themselves using "I"
+LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
+
 
 class ContextManager:
     """Manages intelligent context windowing and summarization."""
@@ -209,8 +212,9 @@ class ContextManager:
                 marker = "⭐ " if float(importance) > 0.7 else ""
                 prompt += f"{marker}- {content}\n"
 
-        # Add 150-word limit instruction for LLM
-        prompt += f"\n{LLM_RESPONSE_LIMIT}\n"
+        # Add first-person and 150-word limit instructions for LLM
+        prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
+        prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += "\nRespond now:\n"
 
         return prompt
