@@ -196,6 +196,10 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **Rich context enrichment** - Full dialogue history + thoughts + memories
   * **Smart Fixy interventions** - Need-based (not scheduled) meta-cognitive monitoring
   * **Enhanced personas** - Deep character traits and speech patterns
+  * **🐛 Dialogue bug fixes** (v2.5.0):
+    * **Third body calling to first body** — after Fixy (3rd agent) intervened, the turn was incorrectly assigned back to Socrates (1st agent); fixed by tracking the last non-Fixy speaker
+    * **Double turn** (agent answering twice in one turn) — duplicate Fixy response per turn caused by legacy scheduled check firing alongside `InteractiveFixy`; resolved with an active-mode guard
+    * **Pronoun issue** — LLM echoed its own prompt header (e.g. `"Socrates (he):"`) into the response; now stripped automatically when `show_pronoun=False`
 * **⚡ Energy-Based Regulation** (v2.5.0)
   * **FixyRegulator** — Meta-level energy supervisor with configurable safety threshold
   * **Dream cycle consolidation** — automatic recharge when energy falls below threshold; critical STM entries are promoted to long-term memory
