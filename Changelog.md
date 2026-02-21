@@ -41,7 +41,7 @@ All notable changes to this project will be documented in this file. The format 
 - **Personal Long-Term Memory System** — psychoanalytically-inspired memory regulation
 - **Drive-aware cognition** — dynamic LLM temperature, ego-driven memory depth, superego second-pass critique
 - **`entelgia_production_long.py`** — guaranteed 200-turn dialogue without time-based stopping
-- **Dialogue bug fixes** — duplicate Fixy output, broken speaker alternation, pronoun leakage all resolved
+- **Dialogue bug fixes** — third body calling to first body, double turn (agent answering twice in one turn), and pronoun issue all resolved
 - New module exports, comprehensive tests, and a working demo
 - Version bump from 2.4.0 → 2.5.0 across all documents and code
 
@@ -148,14 +148,17 @@ All notable changes to this project will be documented in this file. The format 
 ## 🐛 Fixed
 
 - **`Entelgia_production_meta.py`** — Dialogue engine bug fixes (PR #74)
-  - **Duplicate Fixy output**: legacy scheduled `fixy_check` (every N turns) no longer fires
-    when `InteractiveFixy` is active — guard: `elif not self.interactive_fixy and …`
-  - **Broken speaker alternation after Fixy intervention**: `last_speaker` is now determined
-    by scanning `dialog` backwards for the last non-Fixy turn, preventing Socrates from
-    speaking twice in a row after a Fixy intervention.
-  - **Pronoun leakage from LLM response**: `speak()` strips the agent header prefix
-    (`"Socrates (he): …"`) that the LLM echoes from its own prompt, so pronouns never
-    appear in output when `show_pronoun=False`.
+  - **Third body calling to first body** (broken speaker alternation after Fixy intervention):
+    after Fixy (the third agent) intervened, `last_speaker` was mistakenly resolved as the
+    first body (Socrates), causing Socrates to speak twice in a row. Fixed by scanning
+    `dialog` backwards for the last *non-Fixy* turn when determining the next speaker.
+  - **Double turn — agent answering 2 times in 1 turn** (duplicate Fixy output): the legacy
+    scheduled `fixy_check` (every N turns) fired *in addition to* the `InteractiveFixy`
+    handler, producing two Fixy responses in a single turn. Fixed by guarding the legacy path:
+    `elif not self.interactive_fixy and …`
+  - **Pronoun issue** (pronoun leakage from LLM response): `speak()` now strips the agent
+    header prefix that the LLM echoes from its own prompt (e.g. `"Socrates (he): …"`), so
+    pronouns never appear in output when `show_pronoun=False`.
   - **Smart text truncation** in `_format_prompt`: dialog turns capped at 200 chars,
     thoughts at 150 chars, memories at 200 chars — all cut at the last word boundary
     (no mid-word splits).
