@@ -35,17 +35,17 @@ def print_step(step_num, message):
 
 def print_success(message):
     """Print a success message."""
-    print(f"✓ {message}")
+    print(f"{message}")
 
 
 def print_warning(message):
     """Print a warning message."""
-    print(f"⚠ {message}")
+    print(f"{message}")
 
 
 def print_error(message):
     """Print an error message."""
-    print(f"✗ {message}")
+    print(f"{message}")
 
 
 def get_platform():

@@ -135,7 +135,7 @@ def confirm_deletion(memory_type: str) -> bool:
     Returns:
         True if user confirms, False otherwise
     """
-    print(f"\n⚠️  WARNING: You are about to delete {memory_type} memory!")
+    print(f"\n WARNING: You are about to delete {memory_type} memory!")
     print("This action cannot be undone.")
 
     response = input("\nType 'yes' to confirm deletion: ").strip().lower()
@@ -174,7 +174,7 @@ def main():
             if confirm_deletion("short-term"):
                 print("\nDeleting short-term memory...")
                 count = delete_short_term_memory(data_dir)
-                print(f"\n✓ Deleted {count} short-term memory file(s).")
+                print(f"\nDeleted {count} short-term memory file(s).")
             else:
                 print("\nDeletion cancelled.")
 
@@ -184,9 +184,9 @@ def main():
                 print("\nDeleting long-term memory...")
                 success = delete_long_term_memory(data_dir)
                 if success:
-                    print("\n✓ Long-term memory deleted successfully.")
+                    print("\nLong-term memory deleted successfully.")
                 else:
-                    print("\n✗ Failed to delete long-term memory.")
+                    print("\nFailed to delete long-term memory.")
             else:
                 print("\nDeletion cancelled.")
 
@@ -195,10 +195,10 @@ def main():
             if confirm_deletion("all"):
                 print("\nDeleting all memories...")
                 stm_count, ltm_deleted = delete_all_memories(data_dir)
-                print(f"\n✓ Deleted {stm_count} short-term memory file(s).")
+                print(f"\nDeleted {stm_count} short-term memory file(s).")
                 if ltm_deleted:
-                    print("✓ Long-term memory deleted successfully.")
-                print("\n✓ All memories have been deleted.")
+                    print("Long-term memory deleted successfully.")
+                print("\nAll memories have been deleted.")
             else:
                 print("\nDeletion cancelled.")
 
@@ -207,7 +207,7 @@ def main():
             break
 
         else:
-            print("\n✗ Invalid choice. Please enter 1, 2, 3, or 4.")
+            print("\nInvalid choice. Please enter 1, 2, 3, or 4.")
 
         # Ask if user wants to perform another operation
         if choice in ["1", "2", "3"]:
@@ -226,5 +226,5 @@ if __name__ == "__main__":
         print("\n\nOperation cancelled by user.")
         sys.exit(0)
     except Exception as e:
-        print(f"\n✗ An error occurred: {e}")
+        print(f"\nAn error occurred: {e}")
         sys.exit(1)

@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 from entelgia.long_term_memory import DefenseMechanism, FreudianSlip, SelfReplication
 
-
 # ============================================================================
 # DefenseMechanism tests
 # ============================================================================
@@ -32,25 +31,33 @@ class TestDefenseMechanismRepression:
     def test_repression_fear_above_threshold(self):
         """Fear above 0.75 should set intrusive=1."""
         dm = DefenseMechanism()
-        intrusive, _ = dm.analyze("I was terrified", emotion="fear", emotion_intensity=0.9)
+        intrusive, _ = dm.analyze(
+            "I was terrified", emotion="fear", emotion_intensity=0.9
+        )
         assert intrusive == 1
 
     def test_repression_shame_above_threshold(self):
         """Shame above 0.75 should set intrusive=1."""
         dm = DefenseMechanism()
-        intrusive, _ = dm.analyze("I felt ashamed", emotion="shame", emotion_intensity=0.76)
+        intrusive, _ = dm.analyze(
+            "I felt ashamed", emotion="shame", emotion_intensity=0.76
+        )
         assert intrusive == 1
 
     def test_repression_guilt_above_threshold(self):
         """Guilt above 0.75 should set intrusive=1."""
         dm = DefenseMechanism()
-        intrusive, _ = dm.analyze("I feel guilty", emotion="guilt", emotion_intensity=0.80)
+        intrusive, _ = dm.analyze(
+            "I feel guilty", emotion="guilt", emotion_intensity=0.80
+        )
         assert intrusive == 1
 
     def test_repression_anxiety_above_threshold(self):
         """Anxiety above 0.75 should set intrusive=1."""
         dm = DefenseMechanism()
-        intrusive, _ = dm.analyze("constant worry", emotion="anxiety", emotion_intensity=0.85)
+        intrusive, _ = dm.analyze(
+            "constant worry", emotion="anxiety", emotion_intensity=0.85
+        )
         assert intrusive == 1
 
     def test_no_repression_below_threshold(self):
@@ -62,13 +69,17 @@ class TestDefenseMechanismRepression:
     def test_no_repression_neutral_emotion(self):
         """Neutral emotion should not trigger intrusive flag."""
         dm = DefenseMechanism()
-        intrusive, _ = dm.analyze("I was calm", emotion="neutral", emotion_intensity=0.9)
+        intrusive, _ = dm.analyze(
+            "I was calm", emotion="neutral", emotion_intensity=0.9
+        )
         assert intrusive == 0
 
     def test_no_repression_without_emotion(self):
         """Missing emotion should not trigger intrusive flag."""
         dm = DefenseMechanism()
-        intrusive, _ = dm.analyze("no emotion given", emotion=None, emotion_intensity=0.9)
+        intrusive, _ = dm.analyze(
+            "no emotion given", emotion=None, emotion_intensity=0.9
+        )
         assert intrusive == 0
 
 
@@ -118,6 +129,7 @@ class TestDefenseMechanismSuppression:
 # ============================================================================
 # FreudianSlip tests
 # ============================================================================
+
 
 def _make_memory(content="test", intrusive=0, suppressed=0, importance=0.5):
     """Helper to create a memory dict for tests."""
@@ -304,14 +316,17 @@ class TestLongTermMemoryPackageImports:
     def test_import_defense_mechanism(self):
         """DefenseMechanism should be importable from entelgia package."""
         from entelgia import DefenseMechanism as DM
+
         assert DM is DefenseMechanism
 
     def test_import_freudian_slip(self):
         """FreudianSlip should be importable from entelgia package."""
         from entelgia import FreudianSlip as FS
+
         assert FS is FreudianSlip
 
     def test_import_self_replication(self):
         """SelfReplication should be importable from entelgia package."""
         from entelgia import SelfReplication as SR
+
         assert SR is SelfReplication

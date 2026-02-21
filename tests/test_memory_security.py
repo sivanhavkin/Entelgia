@@ -145,7 +145,7 @@ class TestSecurityProperties:
             "Hello World",  # English
             "Hello 世界",  # Mixed
             "مرحبا",  # Arabic
-            "🎉🎊✨",  # Emojis
+            "αβγδ",  # Greek letters
         ]
 
         for msg in messages:

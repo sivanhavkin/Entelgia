@@ -127,7 +127,10 @@ class MainScriptLong(MainScript):
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
                     logger.info(f"Fixy intervention: {reason}")
-            elif not self.interactive_fixy and self.turn_index % self.cfg.fixy_every_n_turns == 0:
+            elif (
+                not self.interactive_fixy
+                and self.turn_index % self.cfg.fixy_every_n_turns == 0
+            ):
                 tail = self.dialog[-10:]
                 ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
                 self.fixy_check(ctx)
@@ -186,7 +189,7 @@ def run_cli_long():
     try:
         app_script = MainScriptLong(cfg)
         app_script.run()
-        print(Fore.GREEN + "\n✓ Long session completed successfully!" + Style.RESET_ALL)
+        print(Fore.GREEN + "\nLong session completed successfully!" + Style.RESET_ALL)
     except KeyboardInterrupt:
         print(
             Fore.YELLOW + "\n[INTERRUPTED] Session cancelled by user" + Style.RESET_ALL
