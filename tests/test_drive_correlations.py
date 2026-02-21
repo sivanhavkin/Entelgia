@@ -105,6 +105,15 @@ class _DriveStub:
         if pre_conflict > 4.0:
             ego = max(0.0, ego - 0.03 * (pre_conflict - 4.0))
 
+        # Fluidity: each turn, id and superego are pulled back toward neutral (5.0)
+        # proportionally to how far they've drifted, plus a random oscillation so they
+        # can move in either direction.  This prevents either drive from stagnating at
+        # an extreme level and ensures changes ripple into the ego balance every turn.
+        ide += 0.04 * (5.0 - ide) + random.uniform(-0.15, 0.15)
+        sup += 0.04 * (5.0 - sup) + random.uniform(-0.15, 0.15)
+        ide = max(0.0, min(10.0, ide))
+        sup = max(0.0, min(10.0, sup))
+
         self.drives = {
             "id_strength": ide,
             "ego_strength": ego,
