@@ -707,6 +707,7 @@ class MemoryCore:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._init_db()
+        self._migrate_signing_key()
         logger.info(f"MemoryCore initialized: {db_path}")
 
     def _conn(self) -> sqlite3.Connection:
@@ -768,10 +769,66 @@ class MemoryCore:
                         self_awareness REAL
                     );
                 """)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT
+                    );
+                """)
                 conn.commit()
                 logger.info("Database schema initialized with memory security")
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
+
+    def _migrate_signing_key(self):
+        """Re-sign all LTM rows when the HMAC key or payload format has changed.
+
+        On first initialisation (no ``key_fingerprint`` row in ``settings``),
+        every existing row is re-signed with the current key so that legacy
+        rows – created before this migration mechanism existed, or signed with
+        a different key – validate correctly going forward.
+
+        When the stored fingerprint differs from the current key fingerprint,
+        all rows are re-signed with the new key using the canonical
+        ``_build_ltm_payload`` format.
+        """
+        current_fingerprint = hashlib.sha256(MEMORY_SECRET_KEY_BYTES).hexdigest()
+        try:
+            with self._conn() as conn:
+                row = conn.execute(
+                    "SELECT value FROM settings WHERE key='key_fingerprint'"
+                ).fetchone()
+                stored_fingerprint = row["value"] if row else None
+
+                if stored_fingerprint == current_fingerprint:
+                    return  # Key hasn't changed; nothing to do.
+
+                # Key changed or first init — re-sign every row with the current
+                # canonical payload format so future validation always succeeds.
+                rows = conn.execute(
+                    "SELECT id, content, topic, emotion, ts FROM memories"
+                ).fetchall()
+
+                for r in rows:
+                    payload = MemoryCore._build_ltm_payload(
+                        r["content"], r["topic"], r["emotion"], r["ts"]
+                    )
+                    new_sig = create_signature(
+                        payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
+                    )
+                    conn.execute(
+                        "UPDATE memories SET signature_hex=? WHERE id=?",
+                        (new_sig.hex(), r["id"]),
+                    )
+
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('key_fingerprint', ?)",
+                    (current_fingerprint,),
+                )
+                conn.commit()
+                logger.info(f"Memory signing key migrated; re-signed {len(rows)} rows.")
+        except Exception as e:
+            logger.error(f"Key migration error: {e}")
 
     def stm_path(self, agent_name: str) -> str:
         """Get STM file path for agent."""
