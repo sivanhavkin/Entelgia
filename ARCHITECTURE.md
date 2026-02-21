@@ -212,6 +212,7 @@ process_step(input)
 
 ### Integration Points
 
+- `Config.energy_safety_threshold` (default `35.0`) — when an agent's energy drops to or below this value, Fixy forces a dream cycle (sleep/recharge).
 - `Config.energy_drain_min` / `energy_drain_max` (default `8.0` / `15.0`) — per-step drain range.
 - `entelgia/energy_regulation.py` — standalone module; importable without a live LLM.
 

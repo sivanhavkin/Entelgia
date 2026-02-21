@@ -367,6 +367,7 @@ A session is considered working when:
 * `promote_emotion_threshold`
 * `enable_auto_patch`
 * `allow_write_self_file`
+* `energy_safety_threshold` (v2.5.0)
 * `energy_drain_min` / `energy_drain_max` (v2.5.0)
 * `self_replicate_every_n_turns` (v2.5.0)
 

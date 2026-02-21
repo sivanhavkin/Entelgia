@@ -292,6 +292,7 @@ class Config:
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     show_meta: bool = False  # Show agent meta-cognitive state (drives, energy, emotion) after each turn
     timeout_minutes: int = 30
+    energy_safety_threshold: float = 35.0
     energy_drain_min: float = 8.0
     energy_drain_max: float = 15.0
     self_replicate_every_n_turns: int = 10
@@ -2716,6 +2717,19 @@ class MainScript:
                         + Style.RESET_ALL
                         + "\n"
                     )
+
+            # Energy-based dream cycle: Fixy forces agents to sleep when energy is critically low
+            for _agent in (self.socrates, self.athena):
+                if _agent.energy_level <= self.cfg.energy_safety_threshold:
+                    self.dream_cycle(_agent, topic_label)
+                    if self.cfg.show_meta:
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[META-ACTION] {_agent.name} energy critical ({_agent.energy_level:.1f}); dream cycle forced"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
 
             # Self-replication cycle
             if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
