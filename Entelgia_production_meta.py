@@ -309,6 +309,8 @@ class Config:
     energy_safety_threshold: float = 35.0
     energy_drain_min: float = 8.0
     energy_drain_max: float = 15.0
+    drive_mean_reversion_rate: float = 0.04   # pulls id/superego back toward 5.0 each turn
+    drive_oscillation_range: float = 0.15     # max random nudge applied to id/superego each turn
     self_replicate_every_n_turns: int = 10
 
     def __post_init__(self):
@@ -1381,6 +1383,16 @@ class Agent:
         # High conflict erodes Ego's mediating capacity (manifests as low Ego)
         if pre_conflict > 4.0:
             ego = max(0.0, ego - 0.03 * (pre_conflict - 4.0))
+
+        # Fluidity: each turn, id and superego are pulled back toward neutral (5.0)
+        # proportionally to how far they've drifted, plus a random oscillation so they
+        # can move in either direction.  This prevents either drive from stagnating at
+        # an extreme level and ensures changes ripple into the ego balance every turn.
+        _osc = CFG.drive_oscillation_range
+        ide += CFG.drive_mean_reversion_rate * (5.0 - ide) + random.uniform(-_osc, _osc)
+        sup += CFG.drive_mean_reversion_rate * (5.0 - sup) + random.uniform(-_osc, _osc)
+        ide = max(0.0, min(10.0, ide))
+        sup = max(0.0, min(10.0, sup))
 
         self.drives = {
             "id_strength": ide,
