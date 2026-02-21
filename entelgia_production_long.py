@@ -134,11 +134,19 @@ class MainScriptLong(MainScript):
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
+            # Collect meta-actions performed this turn
+            _meta_actions: List[str] = []
+
             # Freudian slip attempt after each non-Fixy turn
             if speaker.name != "Fixy":
-                speaker.apply_freudian_slip(topic_label)
+                slip = speaker.apply_freudian_slip(topic_label)
+                if slip is not None:
+                    _meta_actions.append("freudian_slip")
 
-            # Interactive Fixy (need-based)
+            # Display meta-cognitive state for this speaker
+            self.print_meta_state(speaker, _meta_actions)
+
+            # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
                     self.dialog, self.turn_index
@@ -156,15 +164,52 @@ class MainScriptLong(MainScript):
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
                     logger.info(f"Fixy intervention: {reason}")
+                    if self.cfg.show_meta:
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[META-ACTION] Fixy intervened: {reason}"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
 
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+                if self.cfg.show_meta:
+                    print(
+                        Fore.WHITE
+                        + Style.DIM
+                        + "[META-ACTION] Dream cycle completed; energy restored to 100"
+                        + Style.RESET_ALL
+                        + "\n"
+                    )
+
+            # Energy-based dream cycle: Fixy forces agents to sleep when energy is critically low
+            for _agent in (self.socrates, self.athena):
+                if _agent.energy_level <= self.cfg.energy_safety_threshold:
+                    self.dream_cycle(_agent, topic_label)
+                    if self.cfg.show_meta:
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[META-ACTION] {_agent.name} energy critical ({_agent.energy_level:.1f}); dream cycle forced"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
 
             # Self-replication cycle
             if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
-                self.self_replicate_cycle(self.socrates, topic_label)
-                self.self_replicate_cycle(self.athena, topic_label)
+                count_s = self.self_replicate_cycle(self.socrates, topic_label)
+                count_a = self.self_replicate_cycle(self.athena, topic_label)
+                if self.cfg.show_meta and (count_s + count_a) > 0:
+                    print(
+                        Fore.WHITE
+                        + Style.DIM
+                        + f"[META-ACTION] Self-replication: Socrates promoted={count_s}, Athena promoted={count_a}"
+                        + Style.RESET_ALL
+                        + "\n"
+                    )
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
                 logger.info("Stop signal received from agent")
@@ -202,7 +247,7 @@ _NO_TIMEOUT_MINUTES = 9999  # Effectively disables time-based stopping
 
 def run_cli_long():
     """Run 200-turn long dialogue without time-based stopping."""
-    cfg = Config(max_turns=200, timeout_minutes=_NO_TIMEOUT_MINUTES)
+    cfg = Config(max_turns=200, timeout_minutes=_NO_TIMEOUT_MINUTES, show_meta=True)
     _meta.CFG = cfg
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
