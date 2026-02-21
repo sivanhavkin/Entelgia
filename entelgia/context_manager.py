@@ -18,6 +18,12 @@ LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 # LLM First-Person Instruction - agents must speak as themselves using "I"
 LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
 
+# LLM instruction to avoid forbidden meta-commentary phrases
+LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
+    "FORBIDDEN PHRASES: Never use 'In our dialogue', 'We learn', "
+    "or 'Our conversations reveal'."
+)
+
 
 class ContextManager:
     """Manages intelligent context windowing and summarization."""
@@ -214,9 +220,10 @@ class ContextManager:
                 marker = "* " if float(importance) > 0.7 else ""
                 prompt += f"{marker}- {content}\n"
 
-        # Add first-person and 150-word limit instructions for LLM
+        # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
+        prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
         prompt += "\nRespond now:\n"
 
         return prompt

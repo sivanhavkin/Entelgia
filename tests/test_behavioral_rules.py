@@ -60,7 +60,7 @@ class _StubAgent:
             )
         if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
             return (
-                "BEHAVIORAL RULE: Your response MUST include at least one sentence that "
+                "BEHAVIORAL RULE: Your response MUST include exactly one sentence that "
                 'begins with "However," or "Yet," or "This assumes…"'
             )
         return ""
