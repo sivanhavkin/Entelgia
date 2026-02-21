@@ -265,7 +265,6 @@ This approach ensures:
 ```python
 config.max_turns = 200              # Maximum dialogue turns
 config.timeout_minutes = 30         # Session timeout in minutes (set to 9999 to disable)
-config.fixy_every_n_turns = 3      # Fixy observation frequency (legacy mode)
 config.dream_every_n_turns = 7     # Dream cycle frequency
 ```
 

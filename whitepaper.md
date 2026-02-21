@@ -369,7 +369,6 @@ Entelgia supports 4 configuration methods (priority order):
 * `data_dir: "entelgia_data"` - Data storage directory
 
 ### Agent Behavior
-* `fixy_every_n_turns: 3` - Legacy scheduling (unused in enhanced mode)
 * `dream_every_n_turns: 7` - Memory consolidation frequency
 * `promote_importance_threshold: 0.72` - LTM promotion criteria
 * `promote_emotion_threshold: 0.65` - Emotional weighting

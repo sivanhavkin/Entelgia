@@ -361,7 +361,6 @@ A session is considered working when:
 
 ## Appendix: Config Expectations (Example)
 
-* `fixy_every_n_turns`
 * `dream_every_n_turns`
 * `promote_importance_threshold`
 * `promote_emotion_threshold`
@@ -369,7 +368,6 @@ A session is considered working when:
 * `allow_write_self_file`
 * `energy_safety_threshold` (v2.5.0)
 * `energy_drain_min` / `energy_drain_max` (v2.5.0)
-* `dream_keep_memories` (v2.5.0)
 * `self_replicate_every_n_turns` (v2.5.0)
 
 ---
