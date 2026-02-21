@@ -132,14 +132,38 @@ All notable changes to this project will be documented in this file. The format 
     `dialog` backwards for the last *non-Fixy* turn when determining the next speaker.
   - **Double turn — agent answering 2 times in 1 turn** (duplicate Fixy output): the legacy
     scheduled `fixy_check` (every N turns) fired *in addition to* the `InteractiveFixy`
-    handler, producing two Fixy responses in a single turn. Fixed by guarding the legacy path:
-    `elif not self.interactive_fixy and …`
+    handler, producing two Fixy responses in a single turn. The legacy scheduled path has since
+    been fully removed (PR #87); Fixy now intervenes exclusively via `InteractiveFixy`.
   - **Pronoun issue** (pronoun leakage from LLM response): `speak()` now strips the agent
     header prefix that the LLM echoes from its own prompt (e.g. `"Socrates (he): …"`), so
     pronouns never appear in output when `show_pronoun=False`.
   - **Smart text truncation** in `_format_prompt`: dialog turns capped at 200 chars,
     thoughts at 150 chars, memories at 200 chars — all cut at the last word boundary
     (no mid-word splits).
+
+## 🧹 Clean Config & Need-Based Fixy (PR #87)
+
+### Removed
+- **Dead `Config` fields** — `fixy_every_n_turns`, `max_prompt_tokens`, `log_level`, and
+  `dream_keep_memories` were defined but never read anywhere in the codebase; all removed.
+- **`ObserverCore` / `FixyReport`** — legacy observer classes and the `fixy_check()` method
+  are removed; Fixy now intervenes exclusively via `InteractiveFixy.should_intervene()`.
+- **Legacy scheduled Fixy path** — the `elif not self.interactive_fixy and turn % fixy_every_n_turns == 0`
+  block has been deleted from both `Entelgia_production_meta.py` and `entelgia_production_long.py`.
+
+### Changed
+- **`Config.energy_safety_threshold`** — was defined but silently ignored; now actively
+  forces a dream cycle for each agent whose `energy_level` drops to or below the threshold
+  on every turn.
+- **`ARCHITECTURE.md`** — `energy_safety_threshold` description updated to reflect the
+  direct dream-cycle trigger instead of the old "passed to `FixyRegulator`" wording.
+- **`TROUBLESHOOTING.md`** — circular-reasoning section rewritten: removed the
+  `fixy_every_n_turns` tuning step; Fixy is now described as need-based.
+- **`SPEC.md` appendix** — removed `fixy_every_n_turns` and `dream_keep_memories` entries.
+- **`whitepaper.md`** — removed `fixy_every_n_turns` entry from Agent Behavior config table.
+- **`README.md`** — removed `fixy_every_n_turns` example from the configuration snippet.
+- **`scripts/validate_project.py`** — updated class-name patterns from `ObserverCore` to
+  `InteractiveFixy`; removed `fixy_every_n_turns` config check; reduced `total_checks` from 5 to 4.
 
 ## 🛑 Breaking Changes
 *None* — all changes are backward compatible
