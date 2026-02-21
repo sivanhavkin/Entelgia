@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-24%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-81%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -70,8 +70,11 @@ ollama serve
 # Run the demo (10 turns, ~2 minutes)
 python examples/demo_enhanced_dialogue.py
 
-# Or run the full system (30 minutes)
+# Or run the full system (30 minutes, stops when time limit is reached)
 python Entelgia_production_meta.py
+
+# Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
+python entelgia_production_long.py
 ```
 
 > 💡 **Having issues?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) for common problems and solutions.
@@ -201,6 +204,11 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **DefenseMechanism** — classifies memories as repressed or suppressed on write
   * **FreudianSlip** — probabilistically surfaces defended memory fragments
   * **SelfReplication** — promotes recurring-pattern memories to consciousness
+* **🎛️ Drive-Aware Cognition** (v2.5.0)
+  * **Dynamic LLM temperature** — derived from id/ego/superego drive balance
+  * **Superego second-pass critique** — response is rewritten by a principled internal governor when `superego_strength ≥ 7.5`
+  * **Ego-driven memory depth** — long-term and short-term retrieval limits scale with ego/self-awareness
+  * **Output artifact cleanup** — strips echoed name/pronoun headers, gender tags, scoring markers
 * **Psychological drive modeling**
   * Id / Ego / Superego dynamics
 * **Emotion tracking & importance scoring**
@@ -252,9 +260,24 @@ This approach ensures:
 
 ```python
 config.max_turns = 200              # Maximum dialogue turns
-config.timeout_minutes = 30         # Session timeout in minutes
+config.timeout_minutes = 30         # Session timeout in minutes (set to 9999 to disable)
 config.fixy_every_n_turns = 3      # Fixy observation frequency (legacy mode)
 config.dream_every_n_turns = 7     # Dream cycle frequency
+```
+
+### Drive-Aware Cognition Settings (v2.5.0)
+
+These `Config` fields control how Freudian drives influence LLM behaviour at runtime:
+
+```python
+# LLM temperature is computed automatically from drive values:
+# temperature = max(0.25, min(0.95, 0.60 + 0.03*(id - ego) - 0.02*(superego - ego)))
+# No separate config — driven by id_strength / ego_strength / superego_strength in agent state.
+
+# Superego critique (second-pass rewrite) fires when superego_strength >= 7.5
+# Memory depth scales automatically:
+#   ltm_limit = max(2, min(10, int(2 + ego/2 + self_awareness*4)))
+#   stm_tail  = max(3, min(12, int(3 + ego/2)))
 ```
 
 For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
@@ -341,19 +364,20 @@ entelgia/
 - ⚡ **Energy regulation** with dream-cycle recovery and hallucination-risk detection
 - 🧠 **Defense mechanisms** classifying memories as repressed or suppressed on every write
 
-The entire system runs as a unified executable Python file:
+The system runs via two executable entry points:
 
 ```
-Entelgia_production_meta.py
+Entelgia_production_meta.py   # Standard 30-minute session (time-bounded)
+entelgia_production_long.py   # 200-turn session, no time-based stopping
 ```
 
 ---
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage:
+Entelgia ships with comprehensive test coverage across **81 tests** in four suites:
 
-### 🆕 Enhanced Dialogue Tests (5 tests)
+### Enhanced Dialogue Tests (6 tests)
 
 ```bash
 python tests/test_enhanced_dialogue.py
@@ -366,25 +390,36 @@ Tests verify:
 - ✅ **Fixy interventions** - Need-based (circular reasoning, repetition)
 - ✅ **Persona formatting** - Rich traits and speech patterns
 
-**Sample output:**
+---
+
+### ⚡ Energy Regulation Tests (23 tests)
+
+```bash
+pytest tests/test_energy_regulation.py -v
 ```
-=== Test 1: Dynamic Speaker Selection ===
-✓ PASS: No speaker spoke 3+ times consecutively
 
-=== Test 2: Seed Variety ===
-✓ PASS: Found 6 different seed strategies
+Tests verify:
+- ✅ **FixyRegulator defaults** — threshold and constant values
+- ✅ **Dream trigger** — fires when energy ≤ safety threshold
+- ✅ **Energy recharge** — restored to 100.0 after dream cycle
+- ✅ **Hallucination-risk probe** — stochastic detection below 60 %
+- ✅ **EntelgiaAgent init** — initial state, regulator propagation
+- ✅ **process_step** — energy drain, memory append, return values
+- ✅ **Dream cycle** — subconscious consolidation and memory pruning
 
-=== Test 3: Context Enrichment ===
-✓ PASS: All context enrichment checks passed
+---
 
-=== Test 4: Fixy Interventions ===
-✓ PASS: Fixy intervention logic works correctly
+### 🧠 Long-Term Memory Tests (33 tests)
 
-=== Test 5: Persona Formatting ===
-✓ PASS: Personas are rich and well-formatted
-
-✅ ALL TESTS PASSED!
+```bash
+pytest tests/test_long_term_memory.py -v
 ```
+
+Tests verify `DefenseMechanism`, `FreudianSlip`, and `SelfReplication` classes:
+- ✅ **Repression classification** — painful emotions above threshold
+- ✅ **Suppression classification** — mildly negative content
+- ✅ **Freudian slip surfacing** — probabilistic recall of defended memories
+- ✅ **Self-replication promotion** — recurring keyword detection
 
 ---
 
@@ -413,7 +448,7 @@ Tests assert that:
 - Signatures are unique across multiple inputs and keys
 - The implementation supports Unicode messages (mixed-language, Arabic, and emojis)
 
-> ✅ **All 24 tests currently pass** (5 dialogue + 19 security), providing confidence that both the enhanced dialogue system and cryptographic memory-security mechanisms perform as expected.
+> ✅ **All 81 tests currently pass** (6 dialogue + 23 energy regulation + 33 long-term memory + 19 security), providing confidence that all subsystems perform as expected.
 
 ---
 
@@ -423,7 +458,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 24 total tests (19 security + 5 dialogue) |
+| **Unit Tests** | `pytest` | Runs 81 total tests (19 security + 6 dialogue + 23 energy + 33 LTM) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |

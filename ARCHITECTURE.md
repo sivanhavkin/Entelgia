@@ -216,3 +216,55 @@ process_step(input)
 - `Config.energy_drain_min` / `energy_drain_max` (default `8.0` / `15.0`) — per-step drain range.
 - `Config.dream_keep_memories` (default `5`) — number of memories retained after dream cycle.
 - `entelgia/energy_regulation.py` — standalone module; importable without a live LLM.
+
+---
+
+## Drive-Aware Cognition
+
+### Dynamic Temperature
+
+Each `CoreMind` agent computes its LLM temperature from its current Freudian drive values on every turn:
+
+```
+temperature = max(0.25, min(0.95, 0.60 + 0.03*(id − ego) − 0.02*(superego − ego)))
+```
+
+Higher `id_strength` → more creative; higher `superego_strength` → more constrained.
+
+### Superego Second-Pass Critique
+
+When `superego_strength ≥ 7.5`, the initial response is rewritten by the LLM at `temperature=0.25` with a principled internal-governor prompt. This models the ego-superego tension: id produces a raw response; superego revises it.
+
+### Ego-Driven Memory Retrieval Depth
+
+| Limit | Formula | Range |
+|---|---|---|
+| `ltm_limit` | `int(2 + ego/2 + self_awareness×4)` | 2 – 10 |
+| `stm_tail` | `int(3 + ego/2)` | 3 – 12 |
+
+Agents with stronger ego / higher self-awareness pull deeper context and stabilise faster after reset.
+
+### Output Artifact Cleanup
+
+`speak()` performs a final cleanup pass after all validate/critique steps:
+1. Strips the LLM-echoed agent name/pronoun prefix (e.g. `"Socrates (he): "`)
+2. Removes gender script tags: `(he):`, `(she)`, `(they)`
+3. Removes stray scoring markers: `(5)`, `(4.5)`
+4. Truncates to `MAX_RESPONSE_WORDS = 150` at a word boundary
+
+---
+
+## Long-Duration Dialogue
+
+`entelgia_production_long.py` provides a turn-count-gated variant of the main runner:
+
+```python
+class MainScriptLong(MainScript):
+    def run(self):
+        while self.turn_index < self.cfg.max_turns:
+            ...  # no timeout check
+```
+
+- Uses `Config(max_turns=200, timeout_minutes=9999)` to disable time-based stopping.
+- All other behaviour (memory, emotions, Fixy, dream cycles, logging) is inherited unchanged.
+- Run via: `python entelgia_production_long.py`
