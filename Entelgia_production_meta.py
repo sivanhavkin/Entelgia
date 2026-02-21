@@ -289,7 +289,9 @@ class Config:
     llm_max_retries: int = 3
     llm_timeout: int = 300  # Reduced from 600 to 300 seconds for faster responses
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
-    show_meta: bool = False  # Show agent meta-cognitive state (drives, energy, emotion) after each turn
+    show_meta: bool = (
+        False  # Show agent meta-cognitive state (drives, energy, emotion) after each turn
+    )
     timeout_minutes: int = 30
     energy_safety_threshold: float = 35.0
     energy_drain_min: float = 8.0
@@ -1310,7 +1312,7 @@ class Agent:
             )
         if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
             return (
-                'BEHAVIORAL RULE: Your response MUST include at least one sentence that '
+                "BEHAVIORAL RULE: Your response MUST include at least one sentence that "
                 'begins with "However," or "Yet," or "This assumes…"'
             )
         return ""
@@ -2321,7 +2323,9 @@ class MainScript:
             tone_label = "restrained / controlled (SuperEgo-driven)"
 
         # Dominant drive
-        dominant_drive = max(("Id", ide), ("Ego", ego), ("SuperEgo", sup), key=lambda x: x[1])
+        dominant_drive = max(
+            ("Id", ide), ("Ego", ego), ("SuperEgo", sup), key=lambda x: x[1]
+        )
         dominant_label = f"{dominant_drive[0]} ({dominant_drive[1]:.1f})"
 
         bar = "─" * 54
@@ -2350,7 +2354,9 @@ class MainScript:
             + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
             + reset
         )
-        rewrite_tag = "  [SuperEgo rewrite applied]" if agent._last_superego_rewrite else ""
+        rewrite_tag = (
+            "  [SuperEgo rewrite applied]" if agent._last_superego_rewrite else ""
+        )
         print(
             dim
             + f"  Tone: temp={temp:.2f} → {tone_label}"

@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [Unreleased] - [2.5.0] 
+## [2.5.0] - 2026-02-21
 
 ## 🚀 Highlights
 

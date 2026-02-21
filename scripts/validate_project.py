@@ -117,9 +117,7 @@ class DeepValidator:
             [r"Socrates", r"SocratesAgent", r"Agent.*Socrates"]
         )
         athena = self.find_classes([r"Athena", r"AthenaAgent", r"Agent.*Athena"])
-        fixy = self.find_classes(
-            [r"Fixy", r"FixyAgent", r"InteractiveFixy"]
-        )
+        fixy = self.find_classes([r"Fixy", r"FixyAgent", r"InteractiveFixy"])
 
         # Fallback: search in code text
         if not socrates and re.search(
