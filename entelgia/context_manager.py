@@ -184,7 +184,7 @@ class ContextManager:
         ego_str = drives.get("ego_strength", 5.0)
         sup_str = drives.get("superego_strength", 5.0)
         prompt += (
-            f"[Drives: id={id_str:.1f} ego={ego_str:.1f} superego={sup_str:.1f}]\n"
+            f"[Drives: id={id_str:.1f} ego={ego_str:.1f} s_ego={sup_str:.1f}]\n"
         )
 
         # Add debate style

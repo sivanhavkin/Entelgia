@@ -155,7 +155,7 @@ def format_persona_for_prompt(
     # Build persona prompt
     prompt = f"{description}\n"
     prompt += f"Thinking style: {thinking_style}\n"
-    prompt += f"Current mode: {drive_modifier}"
+    prompt += f"Current mode (as {name}): {drive_modifier}"
 
     return prompt
 

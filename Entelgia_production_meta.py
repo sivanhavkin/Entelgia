@@ -1586,6 +1586,11 @@ class Agent:
             count=1,
         ).strip()
 
+        # Strip "Superego:" / "Super-ego:" / "Super ego:" prefix if LLM mistakenly
+        # echoed the superego drive label instead of speaking as the agent.
+        # The optional space/hyphen covers all common LLM formatting variants.
+        out = re.sub(r"^[Ss]uper[\s\-]?[Ee]go\s*:\s*", "", out).strip()
+
         # Remove gender/script artifacts like "(he): " or bare "(she)"
         out = re.sub(r"\(\s*(he|she|they)\s*\)\s*:\s*", ": ", out, flags=re.IGNORECASE)
         out = re.sub(r"\(\s*(he|she|they)\s*\)", "", out, flags=re.IGNORECASE).strip()
