@@ -479,8 +479,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.5.0** | ✅ **Stable** | Latest release |
-| **v2.4.0** | ⚠️ Superseded | Use v2.5.0 instead |
+| **v2.4.0** | ✅ **Stable** |latest|
 | **v2.3.0** | ⚠️ Superseded | Use v2.5.0 instead |
 | **v2.2.0** | ⚠️ Superseded | Use v2.5.0 instead |
 | **v2.1.1** | ⚠️ Superseded | Use v2.5.0 instead |
