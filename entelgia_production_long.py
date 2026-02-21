@@ -22,6 +22,11 @@ Advanced Multi-Agent Dialogue System with:
 - Freudian slip memory surfacing
 - Self-replication memory promotion
 - Agent stop-signal detection
+- Drive-aware cognition (dynamic LLM temperature from Freudian drives)
+- Drive-triggered behavioral rules (Socrates conflict → binary choice; Athena dissent → dissent markers)
+- Energy-based dream cycles (automatic recovery when energy ≤ energy_safety_threshold)
+- Meta-cognitive state display per turn (drives, energy, emotion, tone)
+- Coherent Freudian drive correlations (conflict → ego erosion, temperature spike, energy drain)
 
 Version Note: Latest release: 2.5.0.
 
