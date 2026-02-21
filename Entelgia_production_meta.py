@@ -82,6 +82,7 @@ except ImportError as e:
 
 import json
 import os
+import random
 import re
 import time
 import uuid
@@ -253,6 +254,9 @@ MAX_RESPONSE_WORDS = 150
 # LLM First-Person Instruction - agents must speak as themselves using "I"
 LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
 
+# Initial energy for all agents (restored after each dream cycle)
+AGENT_INITIAL_ENERGY: float = 100.0
+
 
 @dataclass
 class Config:
@@ -287,6 +291,7 @@ class Config:
     llm_timeout: int = 300  # Reduced from 600 to 300 seconds for faster responses
     max_prompt_tokens: int = 800
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
+    show_meta: bool = False  # Show agent meta-cognitive state (drives, energy, emotion) after each turn
     log_level: int = logging.INFO
     timeout_minutes: int = 30
     energy_safety_threshold: float = 35.0
@@ -1338,6 +1343,12 @@ class Agent:
 
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
+        self.energy_level: float = AGENT_INITIAL_ENERGY
+        self._last_emotion: str = "neutral"
+        self._last_emotion_intensity: float = 0.0
+        self._last_response_kind: str = "reflective"
+        self._last_temperature: float = 0.6
+        self._last_superego_rewrite: bool = False
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -1406,6 +1417,8 @@ class Agent:
             "self_awareness": sa,
         }
         self.memory.save_agent_state(self.name, self.drives)
+        drain = random.uniform(CFG.energy_drain_min, CFG.energy_drain_max)
+        self.energy_level = max(0.0, self.energy_level - drain)
 
     def _build_compact_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
@@ -1533,6 +1546,7 @@ class Agent:
         temperature = max(
             0.25, min(0.95, 0.60 + 0.03 * (ide - ego) - 0.02 * (sup - ego))
         )
+        self._last_temperature = temperature
 
         raw_response = (
             self.llm.generate(
@@ -1545,7 +1559,8 @@ class Agent:
         out = validate_output(raw_response)
 
         # Superego → second-pass critique (internal governor)
-        if sup >= 7.5:
+        self._last_superego_rewrite = sup >= 7.5
+        if self._last_superego_rewrite:
             critique_prompt = (
                 "You are the agent's Superego. Rewrite the response to be: "
                 "more principled, less impulsive, remove contradictions, keep the core idea.\n\n"
@@ -1564,6 +1579,9 @@ class Agent:
             kind = "aggressive"
         elif emo in ("fear", "anxiety"):
             kind = "guilt"
+        self._last_emotion = emo
+        self._last_emotion_intensity = float(inten)
+        self._last_response_kind = kind
         self.update_drives_after_turn(kind, emo, float(inten))
 
         m = re.search(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]", out)
@@ -2354,6 +2372,72 @@ class MainScript:
         """Print agent message with color."""
         print(agent.color + f"{agent.name}: " + Style.RESET_ALL + text + "\n")
 
+    def print_meta_state(self, agent: Agent, actions: List[str]) -> None:
+        """Print agent meta-cognitive state when show_meta is enabled."""
+        if not self.cfg.show_meta:
+            return
+        ide = float(agent.drives.get("id_strength", 5.0))
+        ego = float(agent.drives.get("ego_strength", 5.0))
+        sup = float(agent.drives.get("superego_strength", 5.0))
+        sa = float(agent.drives.get("self_awareness", 0.55))
+        conflict = agent.conflict_index()
+        profile = agent.debate_profile()
+
+        # Tone label derived from LLM temperature (itself driven by Id/Ego/SuperEgo)
+        temp = agent._last_temperature
+        if temp >= 0.80:
+            tone_label = "impulsive / uninhibited (Id-driven)"
+        elif temp >= 0.70:
+            tone_label = "expressive / spontaneous"
+        elif temp >= 0.55:
+            tone_label = "balanced / exploratory"
+        elif temp >= 0.40:
+            tone_label = "reflective / measured"
+        else:
+            tone_label = "restrained / controlled (SuperEgo-driven)"
+
+        # Dominant drive
+        dominant_drive = max(("Id", ide), ("Ego", ego), ("SuperEgo", sup), key=lambda x: x[1])
+        dominant_label = f"{dominant_drive[0]} ({dominant_drive[1]:.1f})"
+
+        bar = "─" * 54
+        dim = Fore.WHITE + Style.DIM
+        reset = Style.RESET_ALL
+        print(dim + bar + reset)
+        print(dim + f"[META: {agent.name}]" + reset)
+        print(
+            dim
+            + f"  Id: {ide:.1f}  Ego: {ego:.1f}  SuperEgo: {sup:.1f}  SA: {sa:.2f}"
+            + reset
+        )
+        print(
+            dim
+            + f"  Energy: {agent.energy_level:.1f}  Conflict: {conflict:.2f}"
+            + reset
+        )
+        print(
+            dim
+            + f"  Emotion: {agent._last_emotion} ({agent._last_emotion_intensity:.2f})"
+            + f"  Kind: {agent._last_response_kind}"
+            + reset
+        )
+        print(
+            dim
+            + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
+            + reset
+        )
+        rewrite_tag = "  [SuperEgo rewrite applied]" if agent._last_superego_rewrite else ""
+        print(
+            dim
+            + f"  Tone: temp={temp:.2f} → {tone_label}"
+            + f"  Dominant: {dominant_label}{rewrite_tag}"
+            + reset
+        )
+        if actions:
+            print(dim + f"  Actions: {', '.join(actions)}" + reset)
+        print(dim + bar + reset)
+        print()
+
     def log_turn(self, agent_name: str, text: str, topic: str):
         """Log dialogue turn to CSV."""
         row = {
@@ -2437,6 +2521,7 @@ class MainScript:
             pass
 
         logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
+        agent.energy_level = AGENT_INITIAL_ENERGY
         print(
             Fore.YELLOW
             + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
@@ -2577,9 +2662,17 @@ class MainScript:
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
+            # Collect meta-actions performed this turn
+            _meta_actions: List[str] = []
+
             # Freudian slip attempt after each non-Fixy turn
             if speaker.name != "Fixy":
-                speaker.apply_freudian_slip(topic_label)
+                slip = speaker.apply_freudian_slip(topic_label)
+                if slip is not None:
+                    _meta_actions.append("freudian_slip")
+
+            # Display meta-cognitive state for this speaker
+            self.print_meta_state(speaker, _meta_actions)
 
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
@@ -2599,6 +2692,14 @@ class MainScript:
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
                     logger.info(f"Fixy intervention: {reason}")
+                    if self.cfg.show_meta:
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[META-ACTION] Fixy intervened: {reason}"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
             elif (
                 not self.interactive_fixy
                 and self.turn_index % self.cfg.fixy_every_n_turns == 0
@@ -2611,11 +2712,27 @@ class MainScript:
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+                if self.cfg.show_meta:
+                    print(
+                        Fore.WHITE
+                        + Style.DIM
+                        + "[META-ACTION] Dream cycle completed; energy restored to 100"
+                        + Style.RESET_ALL
+                        + "\n"
+                    )
 
             # Self-replication cycle
             if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
-                self.self_replicate_cycle(self.socrates, topic_label)
-                self.self_replicate_cycle(self.athena, topic_label)
+                count_s = self.self_replicate_cycle(self.socrates, topic_label)
+                count_a = self.self_replicate_cycle(self.athena, topic_label)
+                if self.cfg.show_meta and (count_s + count_a) > 0:
+                    print(
+                        Fore.WHITE
+                        + Style.DIM
+                        + f"[META-ACTION] Self-replication: Socrates promoted={count_s}, Athena promoted={count_a}"
+                        + Style.RESET_ALL
+                        + "\n"
+                    )
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
                 logger.info("Stop signal received from agent")
@@ -2669,7 +2786,7 @@ class MainScript:
 def run_cli():
     """Run command line interface - configurable timeout dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=30)
+    CFG = Config(max_turns=200, timeout_minutes=30, show_meta=True)
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(
