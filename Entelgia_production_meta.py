@@ -927,7 +927,7 @@ class MemoryCore:
                                 valid_memories.append(mem)
                             else:
                                 logger.warning(
-                                    f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
+                                    f" INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
                                 )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
