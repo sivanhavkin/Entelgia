@@ -289,15 +289,11 @@ class Config:
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
     llm_timeout: int = 300  # Reduced from 600 to 300 seconds for faster responses
-    max_prompt_tokens: int = 800
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     show_meta: bool = False  # Show agent meta-cognitive state (drives, energy, emotion) after each turn
-    log_level: int = logging.INFO
     timeout_minutes: int = 30
-    energy_safety_threshold: float = 35.0
     energy_drain_min: float = 8.0
     energy_drain_max: float = 15.0
-    dream_keep_memories: int = 5
     self_replicate_every_n_turns: int = 10
 
     def __post_init__(self):
