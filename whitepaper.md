@@ -547,8 +547,8 @@ The `FixyRegulator` acts as a homeostatic supervisor. When an agent's `energy_le
 
 The dream cycle mirrors memory consolidation research in cognitive neuroscience:
 
-1. **Subconscious integration** — pending memories from `subconscious_store` are merged into `conscious_memory`.
-2. **Selective retention** — only the most recent `dream_keep_memories` entries (default: 5) are preserved, reflecting memory decay and selective consolidation.
+1. **Subconscious integration** — pending memories from `subconscious_store` are merged into `conscious_memory`; no long-term memories are hard-deleted.
+2. **Relevance filtering** — short-term memory entries that are not emotionally or operationally relevant to the agent are forgotten, reflecting natural memory decay without destroying accumulated knowledge.
 3. **Energy restoration** — `energy_level` returns to 100.0, allowing normal processing to resume.
 
 ### 20.4 Personal Long-Term Memory

@@ -403,8 +403,8 @@ Monitors `energy_level` against `safety_threshold`.
 
 ### Dream Cycle Phases
 
-1. **Consolidation** — `subconscious_store` entries appended to `conscious_memory`.
-2. **Pruning** — `conscious_memory` trimmed to `dream_keep_memories` most recent entries.
+1. **Integration** — `subconscious_store` entries appended to `conscious_memory`; no long-term memories are deleted.
+2. **Relevance filtering** — STM entries that are not emotionally or operationally relevant (empty/whitespace) are forgotten.
 3. **Recharge** — `energy_level` reset to 100.0.
 
 ### Future Integration Notes

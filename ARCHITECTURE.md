@@ -206,15 +206,14 @@ process_step(input)
 
 ### Dream Cycle Phases
 
-1. **Consolidation** — subconscious memories are merged into conscious memory.
-2. **Pruning** — conscious memory is trimmed to the `dream_keep_memories` most recent entries (default: 5).
+1. **Integration** — subconscious memories are merged into conscious memory; nothing is hard-deleted from long-term memory.
+2. **Relevance filtering** — short-term memory entries that are not emotionally or operationally relevant (empty / whitespace-only) are forgotten.
 3. **Recharge** — `energy_level` is restored to 100.0.
 
 ### Integration Points
 
 - `Config.energy_safety_threshold` (default `35.0`) — passed to `FixyRegulator`.
 - `Config.energy_drain_min` / `energy_drain_max` (default `8.0` / `15.0`) — per-step drain range.
-- `Config.dream_keep_memories` (default `5`) — number of memories retained after dream cycle.
 - `entelgia/energy_regulation.py` — standalone module; importable without a live LLM.
 
 ---

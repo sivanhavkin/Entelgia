@@ -89,13 +89,31 @@ class EntelgiaAgent:
         self.energy_level = max(0.0, self.energy_level - drain)
         return drain
 
+    def _is_relevant(self, memory: Optional[str]) -> bool:
+        """Return True if *memory* is emotionally or operationally relevant.
+
+        Override in subclasses for richer relevance scoring.
+        Entries that are empty or contain only whitespace are considered
+        irrelevant and will be forgotten during dream integration.
+        """
+        return bool(memory and memory.strip())
+
     def _run_dream_cycle(self) -> None:
-        """Consolidate subconscious memories into conscious memory and recharge."""
-        # Move pending memories to conscious layer
+        """Integrate subconscious memories into conscious memory and recharge.
+
+        During the dream cycle memories undergo integration:
+
+        - Subconscious memories are transferred to conscious memory.
+        - Short-term memory entries that are not emotionally or operationally
+          relevant are forgotten; no long-term memories are hard-deleted.
+        - Energy is restored to full.
+        """
+        # Integrate subconscious into conscious layer
         self.conscious_memory.extend(self.subconscious_store)
-        # Keep only the most recent entries to avoid unbounded growth
-        keep = getattr(self.regulator, "dream_keep_memories", 5)
-        self.conscious_memory = self.conscious_memory[-keep:]
+        # Forget STM entries that are not emotionally or operationally relevant
+        self.conscious_memory = [
+            m for m in self.conscious_memory if self._is_relevant(m)
+        ]
         self.subconscious_store = []
         # Restore energy to full
         self.energy_level = self.INITIAL_ENERGY
