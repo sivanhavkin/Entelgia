@@ -10,24 +10,147 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+---
+
+## [2.5.0] - 2026-02-21
+
+# Entelgia v2.5.0 Release Notes
+
+## 🚀 Highlights
+
+- **Energy-Based Agent Regulation System** — cognitive energy as a first-class resource
+- **Personal Long-Term Memory System** — psychoanalytically-inspired memory regulation
+- **Drive-aware cognition** — dynamic LLM temperature, ego-driven memory depth, superego second-pass critique
+- **`entelgia_production_long.py`** — guaranteed 200-turn dialogue without time-based stopping
+- **Dialogue bug fixes** — duplicate Fixy output, broken speaker alternation, pronoun leakage all resolved
+- New module exports, comprehensive tests, and a working demo
+- Version bump from 2.4.0 → 2.5.0 across all documents and code
+
+## 📝 Changes
+
 ### Added
-- **ROADMAP.md** 🗺️
-  - Added project roadmap document outlining development direction
-  - Added link to ROADMAP.md in README.md Documentation section
-- Added logo to all markdown files
-- **scripts/draft.py** 🤖
-  - **`FixyRegulator`** (Supervisor Agent) - New class: supervisor agent responsible for system stability and triggering dream cycles
-    - `safety_threshold` (default: 35.0) - Minimum energy threshold for safe operation
-    - `inspect_agent` method: checks if an agent is stable enough to continue
-      - Monitors energy level against safety threshold
-      - Forces recharge (sleep) when energy is too low
-      - Detects hallucination risk - random check with 10% probability when energy drops below 60%
-  - **`EntelgiaAgent`** (Entelgia Agent) - New class: agent with energy management and memory mechanisms
-    - Energy system: `energy_level` starts at 100% and decreases with each operation (8–15 units per operation)
-    - Dual memory system: `conscious_memory` (active input) and `subconscious_store` (for future use)
-    - Fixy integration: every agent operates under `FixyRegulator` supervision
-    - `process_step` method: processes text input, reduces energy, calls Fixy for stability check, triggers automatic dream cycle when needed
-    - `dream_cycle` method: internal processing and "forgetting" mechanism; keeps only last 5 memories; serves as reset and recharge mechanism
+
+- **`entelgia_production_long.py`** 🔁 — 200-turn companion script
+  - `MainScriptLong(MainScript)` — subclass that overrides only `run()`, replacing the
+    time-based `while time < timeout` condition with a turn-count gate `while turn_index < max_turns`
+  - `_NO_TIMEOUT_MINUTES = 9999` sentinel disables time-based stopping entirely
+  - `run_cli_long()` entry point: `Config(max_turns=200, timeout_minutes=9999)`
+  - All other behaviour (memory, emotions, Fixy interventions, dream cycles, session
+    persistence) inherited from `MainScript` unchanged
+  - Run via: `python entelgia_production_long.py`
+
+- **`entelgia/energy_regulation.py`** ⚡ — Energy-Based Agent Regulation System
+  - **`FixyRegulator`** — Meta-level energy supervisor
+    - `safety_threshold` (default: 35.0) — minimum energy threshold for safe operation
+    - `check_stability(agent)` method: evaluates agent energy and applies regulation
+      - Triggers a dream cycle (`DREAM_TRIGGERED`) when energy ≤ safety threshold
+      - Stochastic hallucination-risk check (p=0.10) when energy drops below 60 %
+        returns `HALLUCINATION_RISK_DETECTED`
+      - Returns `None` when the agent is healthy
+    - Class constants: `DEFAULT_SAFETY_THRESHOLD = 35.0`,
+      `HALLUCINATION_RISK_PROBABILITY = 0.10`,
+      `HALLUCINATION_RISK_ENERGY_CUTOFF = 60.0`
+  - **`EntelgiaAgent`** — Agent with energy tracking and dream-cycle consolidation
+    - `energy_level` starts at 100.0 and decreases 8–15 units per `process_step` call
+    - `conscious_memory` (active inputs) and `subconscious_store` (pending consolidation)
+    - Every agent is supervised by an embedded `FixyRegulator`
+    - `process_step(text)` — appends input to memory, drains energy, triggers dream cycle
+      when needed; returns `"RECHARGED_AND_READY"` or `"OK"`
+    - `_run_dream_cycle()` — consolidates `subconscious_store` into `conscious_memory`,
+      keeps only the last 5 entries, and restores `energy_level` to 100.0
+
+- **`entelgia/long_term_memory.py`** 🧠 — Personal Long-Term Memory System
+  - **`DefenseMechanism`** — classifies every memory write as repressed or suppressed
+    - Repression: painful emotion (anger, fear, shame, guilt, anxiety) above 0.75 intensity
+      or forbidden-keyword match → sets `intrusive = 1`
+    - Suppression: mildly negative or low-intensity content → sets `suppressed = 1`
+  - **`FreudianSlip`** — surfaces defended memories probabilistically
+    - Samples up to 30 candidate memories; returns one at random (p per-call)
+    - Skips memories that are not intrusive or suppressed
+  - **`SelfReplication`** — promotes recurring-pattern memories to consciousness
+    - Detects keywords (≥ 4 chars) appearing ≥ 2 times across candidate pool
+    - Promotes up to 3 matching memories per call
+
+- **`entelgia/__init__.py`** package exports updated
+  - `FixyRegulator`, `EntelgiaAgent` exported from `energy_regulation`
+  - `DefenseMechanism`, `FreudianSlip`, `SelfReplication` exported from `long_term_memory`
+
+- **`tests/test_energy_regulation.py`** 🧪 — 18 unit tests
+  - `TestFixyRegulatorDefaults` — threshold and constant validation
+  - `TestFixyRegulatorCheckStability` — dream trigger, recharge, hallucination risk
+  - `TestEntelgiaAgentInit` — initial state, regulator propagation
+  - `TestEntelgiaAgentProcessStep` — energy drain, memory append, return values
+  - `TestEntelgiaAgentDreamCycle` — consolidation and subconscious clearing
+  - `TestPackageImports` — package-level import checks
+
+- **`tests/test_long_term_memory.py`** 🧪 — comprehensive tests for all three classes
+  - `TestDefenseMechanismRepression` / `TestDefenseMechanismSuppression`
+  - `TestFreudianSlip` — slip surface and empty-pool edge cases
+  - `TestSelfReplication` — keyword promotion and threshold logic
+  - `TestPackageImports` — package-level import checks
+
+- **`examples/demo_energy_regulation.py`** 📖 — 8-turn Socrates demo
+  - Shows energy depletion and automatic dream-cycle recovery
+  - Prints turn-by-turn energy level and status
+
+- **ROADMAP.md** 🗺️ — project roadmap added to repository
+- Project logo added to all markdown files
+
+## 🔄 Changed
+
+- **`Entelgia_production_meta.py`** — Drive-aware cognition (PR #75)
+  - **Dynamic LLM temperature** derived from Freudian drive values:
+    ```
+    temperature = max(0.25, min(0.95, 0.60 + 0.03 * (id - ego) - 0.02 * (superego - ego)))
+    ```
+    Higher `id_strength` → more creative/exploratory; higher `superego_strength` → more constrained.
+  - **Superego second-pass critique**: when `superego_strength ≥ 7.5`, the initial response is
+    fed back to the LLM at `temperature=0.25` with a principled rewrite prompt acting as an
+    internal governor.
+  - **Ego-driven memory retrieval depth** replaces fixed `limit=4` / `[-6:]`:
+    ```
+    ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))   # long-term
+    stm_tail  = max(3, min(12, int(3 + ego / 2)))             # short-term
+    ```
+    Agents with stronger ego / self-awareness pull more context and stabilise faster after reset.
+  - **Output artifact cleanup + word limit enforcement** after all validate/critique passes:
+    - Strips agent name/pronoun prefix echoed by LLM (e.g. `"Socrates (he): "`)
+    - Removes gender script tags: `(he):`, `(she)`, `(they)`
+    - Removes stray scoring markers: `(5)`, `(4.5)`, etc.
+    - Truncates to `MAX_RESPONSE_WORDS = 150`
+
+- Package `__version__` bumped to **2.5.0**
+- `pyproject.toml` version bumped to **2.5.0**
+- All documentation version references updated to **v2.5.0**
+- `entelgia/energy_regulation.py` and `entelgia/long_term_memory.py` added as
+  first-class modules in the `entelgia` package
+- Applied **Black** code formatting across the entire Python codebase (PR #69)
+
+## 🐛 Fixed
+
+- **`Entelgia_production_meta.py`** — Dialogue engine bug fixes (PR #74)
+  - **Duplicate Fixy output**: legacy scheduled `fixy_check` (every N turns) no longer fires
+    when `InteractiveFixy` is active — guard: `elif not self.interactive_fixy and …`
+  - **Broken speaker alternation after Fixy intervention**: `last_speaker` is now determined
+    by scanning `dialog` backwards for the last non-Fixy turn, preventing Socrates from
+    speaking twice in a row after a Fixy intervention.
+  - **Pronoun leakage from LLM response**: `speak()` strips the agent header prefix
+    (`"Socrates (he): …"`) that the LLM echoes from its own prompt, so pronouns never
+    appear in output when `show_pronoun=False`.
+  - **Smart text truncation** in `_format_prompt`: dialog turns capped at 200 chars,
+    thoughts at 150 chars, memories at 200 chars — all cut at the last word boundary
+    (no mid-word splits).
+
+## 🛑 Breaking Changes
+*None* — all changes are backward compatible
+
+## 💡 Upgrade Instructions
+- `pip install --upgrade entelgia`
+- New imports available: `from entelgia import FixyRegulator, EntelgiaAgent, DefenseMechanism, FreudianSlip, SelfReplication`
+
+## 📋 Contributors
+- @sivanhavkin
+
 ---
 
 ## [2.4.0] - 2026-02-18
@@ -419,7 +542,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.4.0
+- ✅ **Latest stable:** v2.5.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -430,7 +553,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.4.0** | 2026-02-18 | Minor | ✅ **Current** | Documentation & structure improvements |
+| **v2.5.0** | 2026-02-21 | Minor | ✅ **Current** | Energy regulation & long-term memory modules |
+| **v2.4.0** | 2026-02-18 | Minor | ⚠️ Superseded | Documentation & structure improvements |
 | **v2.3.0** | 2026-02-16 | Minor | ⚠️ Superseded | Installation improvements |
 | **v2.2.0** | 2026-02-14 | Minor | ⚠️ Superseded | Enhanced dialogue system |
 | **v2.1.1** | 2026-02-13 | Patch | ⚠️ Superseded | Bug fixes + formatting |

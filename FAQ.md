@@ -30,7 +30,7 @@ Entelgia is derived from philosophical concepts related to entelechy (the realiz
 
 ### Is Entelgia production-ready?
 
-Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.4.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
+Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.5.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
 
 ### Who should use Entelgia?
 
@@ -189,8 +189,11 @@ ollama serve
 # Run the quick demo (10 turns, ~2 minutes)
 python examples/demo_enhanced_dialogue.py
 
-# Or run the full system (30 minutes)
+# Or run the full system (30 minutes, stops when time limit is reached)
 python Entelgia_production_meta.py
+
+# Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
+python entelgia_production_long.py
 ```
 
 ### What happens during a typical session?
@@ -200,16 +203,18 @@ python Entelgia_production_meta.py
 3. Selected agent generates a response based on:
    - Current dialogue context
    - Relevant memories (STM + LTM)
-   - Internal drives and persona
-4. Response is logged and memory is updated
-5. Fixy may intervene if needed
-6. Dream/reflection cycles occur periodically
-7. Process continues for configured number of turns
+   - Internal drives and persona (temperature computed from id/ego/superego balance)
+4. Response is optionally rewritten by superego critique if `superego_strength ≥ 7.5`
+5. Response is logged and memory is updated
+6. Fixy may intervene if needed
+7. Dream/reflection cycles occur periodically
+8. Process continues for configured number of turns
 
 ### How long does a session take?
 
 - **Demo mode** (`demo_enhanced_dialogue.py`): ~2 minutes (10 turns)
-- **Full session** (`Entelgia_production_meta.py`): ~30 minutes (default 200 turns)
+- **Full session** (`Entelgia_production_meta.py`): ~30 minutes (default 200 turns, time-bounded)
+- **Long session** (`entelgia_production_long.py`): turn-count-bounded (200 turns, no time limit)
 - Duration depends on:
   - Number of turns configured
   - LLM response time
@@ -497,7 +502,7 @@ Yes! Entelgia is released under the MIT License. See [LICENSE](LICENSE) for deta
 
 - Watch the GitHub repository for updates
 - Check [Changelog.md](Changelog.md) for version history
-- Follow semantic versioning: Major.Minor.Patch (e.g., v2.4.0)
+- Follow semantic versioning: Major.Minor.Patch (e.g., v2.5.0)
 
 ---
 
@@ -514,4 +519,4 @@ Yes! Entelgia is released under the MIT License. See [LICENSE](LICENSE) for deta
 
 ---
 
-**Last Updated**: Version 2.4.0
+**Last Updated**: Version 2.5.0

@@ -7,7 +7,7 @@
 ## A Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation
 
 **Author:** Sivan Havkin
-**Version:** 2.4.0
+**Version:** 2.5.0
 **Status:** Research / Production Hybrid
 
 ---
@@ -319,7 +319,7 @@ The `scripts/clear_memory.py` tool offers:
 
 Comprehensive automated testing with 6 tools:
 
-* **pytest** - Unit testing (24 tests, 100% pass rate)
+* **pytest** - Unit testing (81 tests, 100% pass rate)
 * **black** - Code formatting (88-char line length)
 * **flake8** - Linting and style enforcement
 * **mypy** - Static type checking
@@ -438,7 +438,7 @@ Potential applications include:
 
 ## 16.1 Test Coverage
 
-* **24 total tests** with 100% pass rate
+* **81 total tests** with 100% pass rate
 * **5 Enhanced Dialogue tests** covering:
   - Dynamic speaker selection
   - Seed variety and rotation
@@ -519,13 +519,15 @@ It is not a chatbot.
 It is not a safety wrapper.
 It is a structured architectural investigation into whether identity continuity and moral reasoning can arise from internal design rather than external constraint.
 
-**Version 2.4.0** represents a mature research-production hybrid with:
-* Comprehensive testing infrastructure (24 tests)
+**Version 2.5.0** represents a mature research-production hybrid with:
+* Comprehensive testing infrastructure (81 tests)
 * Production-ready REST API
 * Advanced performance optimizations (LRU caching, metrics tracking)
 * Enhanced dialogue dynamics (7 seed strategies)
 * Robust security features (HMAC-SHA256, PII redaction)
 * Developer-friendly tooling (automated installation, memory management)
+* Drive-aware cognition (dynamic temperature, superego critique, ego-driven memory depth)
+* Long-duration 200-turn dialogue mode (`entelgia_production_long.py`)
 
 Entelgia demonstrates that persistent identity and internal regulation can coexist with production-grade reliability.
 
@@ -567,6 +569,69 @@ Energy-bounded cognition enables:
 - **Realistic agent fatigue modeling** in multi-turn dialogue simulations.
 - **Adversarial testing** of hallucination mitigations by observing behavior under low-energy conditions.
 - **Memory consolidation research** by inspecting what persists after dream cycles.
+
+---
+
+## 21. Drive-Aware Cognition (v2.5.0)
+
+### 21.1 Dynamic LLM Temperature
+
+Rather than using a fixed `temperature` parameter, each `CoreMind` agent computes its LLM sampling temperature on every turn from its current Freudian drive values:
+
+```
+temperature = max(0.25, min(0.95, 0.60 + 0.03 × (id − ego) − 0.02 × (superego − ego)))
+```
+
+- Higher **`id_strength`** shifts the agent toward more exploratory, creative outputs.
+- Higher **`superego_strength`** constrains the agent toward more principled, conservative responses.
+- The range [0.25, 0.95] prevents degenerate extremes (near-deterministic or fully random).
+
+### 21.2 Superego Second-Pass Critique
+
+When an agent's `superego_strength` reaches or exceeds **7.5** (on a 0–10 scale), the initial response is passed back through the LLM at `temperature=0.25` with the following prompt acting as an internal governor:
+
+> *"You are the agent's Superego. Rewrite the response to be: more principled, less impulsive, remove contradictions, keep the core idea."*
+
+This two-pass approach models the Freudian ego-superego tension: the id produces a raw response; the superego governs and revises it.
+
+### 21.3 Ego-Driven Memory Retrieval Depth
+
+Fixed memory retrieval limits have been replaced by ego- and self-awareness-scaled bounds:
+
+| Parameter | Formula | Min | Max |
+|---|---|---|---|
+| `ltm_limit` | `int(2 + ego/2 + self_awareness×4)` | 2 | 10 |
+| `stm_tail` | `int(3 + ego/2)` | 3 | 12 |
+
+Agents with a stronger ego and higher self-awareness retrieve deeper context, allowing them to stabilise faster after a dream-cycle reset and maintain conversational coherence over longer sessions.
+
+### 21.4 Output Artifact Cleanup
+
+After all validate/critique passes, `speak()` performs a final cleanup sweep:
+
+1. **Name/pronoun prefix strip** — removes echoed agent headers (e.g. `"Socrates (he): "`) that the LLM copies from its own prompt.
+2. **Gender script tag removal** — strips residual `(he): `, `(she)`, `(they)` markers.
+3. **Scoring marker removal** — removes stray numeric markers like `(5)` or `(4.5)`.
+4. **150-word cap** — truncates to `MAX_RESPONSE_WORDS = 150`, preserving word boundaries.
+
+---
+
+## 22. Long-Duration Dialogue (`entelgia_production_long.py`)
+
+The standard `Entelgia_production_meta.py` runner enforces a 30-minute session timeout, which can terminate a session before all configured turns complete. `entelgia_production_long.py` addresses this with a minimal subclass:
+
+```python
+class MainScriptLong(MainScript):
+    def run(self):
+        while self.turn_index < self.cfg.max_turns:
+            ...  # no timeout check
+```
+
+Key characteristics:
+- **Turn-count gate only** — `while turn_index < max_turns` replaces `while time < timeout`.
+- **`_NO_TIMEOUT_MINUTES = 9999`** sentinel passed to `Config.timeout_minutes`.
+- **Full inheritance** — memory, emotions, Fixy interventions, dream cycles, session persistence, and logging are all inherited unchanged from `MainScript`.
+- **Run via**: `python entelgia_production_long.py`
 
 ---
 
