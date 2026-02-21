@@ -1443,6 +1443,8 @@ class Agent:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
+        # Identity lock: drives are internal psychology metrics, not persona labels.
+        prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
@@ -1589,10 +1591,10 @@ class Agent:
             count=1,
         ).strip()
 
-        # Strip "Superego:" / "Super-ego:" / "Super ego:" prefix if LLM mistakenly
-        # echoed the superego drive label instead of speaking as the agent.
+        # Strip "Superego:" / "Super-ego:" / "Super ego:" / "s_ego:" prefix if LLM
+        # mistakenly echoed the superego drive label instead of speaking as the agent.
         # The optional space/hyphen covers all common LLM formatting variants.
-        out = re.sub(r"^[Ss]uper[\s\-]?[Ee]go\s*:\s*", "", out).strip()
+        out = re.sub(r"^([Ss]uper[\s\-]?[Ee]go|s_ego)\s*:\s*", "", out).strip()
 
         # Remove gender/script artifacts like "(he): " or bare "(she)"
         out = re.sub(r"\(\s*(he|she|they)\s*\)\s*:\s*", ": ", out, flags=re.IGNORECASE)
