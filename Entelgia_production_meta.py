@@ -1297,6 +1297,24 @@ class Agent:
             "opening_rule": opening,
         }
 
+    def _behavioral_rule_instruction(self) -> str:
+        """Return a behavioral rule instruction to inject into the prompt, if applicable.
+
+        Rule A (Socrates): If Conflict >= 5.0, end response with a sharp binary-choice question (A or B).
+        Rule B (Athena): If Dissent >= 3.0, include a sentence starting with 'However,' / 'Yet,' / 'This assumes…'
+        """
+        if self.name == "Socrates" and self.conflict_index() >= 5.0:
+            return (
+                "BEHAVIORAL RULE: You MUST end your response with one sharp question "
+                "that forces Athena to choose between exactly 2 options (A or B)."
+            )
+        if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
+            return (
+                'BEHAVIORAL RULE: Your response MUST include at least one sentence that '
+                'begins with "However," or "Yet," or "This assumes…"'
+            )
+        return ""
+
     def update_drives_after_turn(self, response_kind: str, emo: str, inten: float):
         """Update internal drives after response."""
         ide = float(self.drives.get("id_strength", 5.0))
@@ -1454,6 +1472,13 @@ class Agent:
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
         """Generate dialogue response."""
         prompt = self._build_compact_prompt(seed, dialog_tail)
+
+        # Inject behavioral rule into prompt if applicable
+        behavioral_rule = self._behavioral_rule_instruction()
+        if behavioral_rule:
+            prompt = prompt.replace(
+                "\nRespond now:\n", f"\n{behavioral_rule}\nRespond now:\n"
+            )
 
         # Drives → temperature (cognition control)
         ide = float(self.drives.get("id_strength", 5.0))
