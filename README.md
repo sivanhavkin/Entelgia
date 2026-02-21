@@ -210,10 +210,14 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **SelfReplication** — promotes recurring-pattern memories to consciousness
 * **🎛️ Drive-Aware Cognition** (v2.5.0)
   * **Dynamic LLM temperature** — derived from id/ego/superego drive balance
-  * **Superego second-pass critique** — response is rewritten by a principled internal governor when `superego_strength ≥ 7.5`
+  * **Superego second-pass critique** — response is internally rewritten by a principled governor when `superego_strength ≥ 7.5`; the rewrite is used only for emotion/drive state updates — the **agent's original voice is always displayed in dialogue** (PR #95)
   * **Ego-driven memory depth** — long-term and short-term retrieval limits scale with ego/self-awareness
   * **Output artifact cleanup** — strips echoed name/pronoun headers, gender tags, scoring markers
   * **Coherent drive correlations** (PR #92) — conflict now directly erodes ego capacity, raises LLM temperature, and scales energy drain
+* **🗣️ Output Quality Rules** (v2.5.0, PR #96)
+  * **Forbidden meta-commentary phrases** — `validate_output()` removes any sentence containing `"In our dialogue"`, `"We learn"`, or `"Our conversations reveal"`; the same instruction is injected into LLM prompts to prevent generation up-front
+  * **Dissent marker capped to exactly one sentence** — Athena's behavioral rule now requires *exactly* one dissent opener (e.g. `"However,"`, `"Yet,"`) rather than *at least* one
+  * **Hard word truncation removed** — the post-processing 150-word cut is removed; response length is governed solely by the LLM prompt instruction, preventing mid-sentence clips
 * **Psychological drive modeling**
   * Id / Ego / Superego dynamics
 * **Emotion tracking & importance scoring**

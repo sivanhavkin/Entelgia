@@ -23,10 +23,12 @@ Advanced Multi-Agent Dialogue System with:
 - Self-replication memory promotion
 - Agent stop-signal detection
 - Drive-aware cognition (dynamic LLM temperature from Freudian drives)
-- Drive-triggered behavioral rules (Socrates conflict → binary choice; Athena dissent → dissent markers)
+- Drive-triggered behavioral rules (Socrates conflict → binary choice; Athena dissent → exactly one dissent sentence)
 - Energy-based dream cycles (automatic recovery when energy ≤ energy_safety_threshold)
 - Meta-cognitive state display per turn (drives, energy, emotion, tone)
 - Coherent Freudian drive correlations (conflict → ego erosion, temperature spike, energy drain)
+- Super ego persona fix: dialogue displays agent's original voice; rewrite used for internal state only
+- Output quality rules: forbidden meta-commentary phrases removed, hard word truncation removed
 
 Version Note: Latest release: 2.5.0.
 

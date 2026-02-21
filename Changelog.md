@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file. The format 
 - **Coherent Freudian drive correlations** — high conflict now directly erodes ego, raises temperature, and amplifies energy drain (PR #92)
 - **`entelgia_production_long.py`** — guaranteed 200-turn dialogue without time-based stopping
 - **Dialogue bug fixes** — third body calling to first body, double turn (agent answering twice in one turn), and pronoun issue all resolved
+- **Super ego persona fix** — dialogue now displays the agent's original authentic voice; the superego rewrite is applied only for internal state updates (PR #95)
+- **Output quality rules** — forbidden meta-commentary phrases removed at sentence level, dissent marker capped to exactly one sentence, hard word truncation removed (PR #96)
 - New module exports, comprehensive tests, and a working demo
 - Version bump from 2.4.0 → 2.5.0 across all documents and code
 
@@ -139,6 +141,13 @@ All notable changes to this project will be documented in this file. The format 
     drain = min(drain, CFG.energy_drain_max * 2.0)
     ```
 
+- **`Entelgia_production_meta.py` / `entelgia/context_manager.py`** — Output quality rules (PR #96)
+  - **Dissent marker capped to exactly one sentence** — `_behavioral_rule_instruction` (Athena, `dissent_level ≥ 3.0`) changed from `"at least one sentence"` to `"exactly one sentence"`.
+  - **Forbidden meta-commentary phrases** — Added `FORBIDDEN_PHRASES` (`"In our dialogue"`, `"We learn"`, `"Our conversations reveal"`) and `LLM_FORBIDDEN_PHRASES_INSTRUCTION` to both `Entelgia_production_meta.py` and `entelgia/context_manager.py`.
+    - `validate_output()` now performs sentence-level removal of any sentence containing a forbidden phrase (regex split on `.!?`).
+    - `LLM_FORBIDDEN_PHRASES_INSTRUCTION` is injected into both prompt-building paths (`_build_compact_prompt` / `_format_prompt`) to prevent generation up-front.
+  - **Hard word truncation removed from `speak()`** — the post-processing `# Enforce 150-word limit` block (word-split + `…` append) is removed; response length is already governed by `LLM_RESPONSE_LIMIT` in the prompt.
+
 - Package `__version__` bumped to **2.5.0**
 - `pyproject.toml` version bumped to **2.5.0**
 - All documentation version references updated to **v2.5.0**
@@ -147,6 +156,11 @@ All notable changes to this project will be documented in this file. The format 
 - Applied **Black** code formatting across the entire Python codebase (PR #69)
 
 ## 🐛 Fixed
+
+- **`Entelgia_production_meta.py`** — Super ego character role fix (PR #95)
+  - **Super ego persona removed from critique prompt** — `"You are the agent's Superego."` was inadvertently assigning a dialogue character role to the rewrite call, causing agents with high `superego_strength` to speak as the super ego character instead of themselves. Replaced with a plain rewrite instruction: `"Rewrite the following response to be more principled…"`.
+  - **Original agent response preserved in dialogue** — `speak()` now saves `original_out` before the superego critique pass. The rewrite is still executed and used for internal state updates (emotion inference + drive recalibration), but `out` is restored to `original_out` before returning, so the dialogue always displays what the agent originally said.
+  - **Meta display tag updated** — `[SuperEgo rewrite applied]` → `[SuperEgo critique applied; original shown in dialogue]` to reflect the actual behaviour.
 
 - **`Entelgia_production_meta.py`** — Dialogue engine bug fixes (PR #74)
   - **Third body calling to first body** (broken speaker alternation after Fixy intervention):
