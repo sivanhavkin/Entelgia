@@ -1390,6 +1390,14 @@ class Agent:
             self.language.set(self.name, m.group(1))
             out = re.sub(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]\s*", "", out).strip()
 
+        # Strip agent name/pronoun prefix if LLM echoed the header (e.g. "Socrates (he): ...")
+        out = re.sub(
+            rf"^{re.escape(self.name)}\s*(\([^)]*\))?\s*:\s*",
+            "",
+            out,
+            count=1,
+        ).strip()
+
         return out
 
     def store_turn(self, text: str, topic: str, source: str = "stm"):
@@ -2256,11 +2264,16 @@ class MainScript:
                 if self.turn_index == 1:
                     speaker = self.socrates  # Start with Socrates
                 else:
-                    last_speaker = (
-                        self.socrates
-                        if self.dialog[-1].get("role") == "Socrates"
-                        else self.athena
-                    )
+                    # Find last non-Fixy speaker so Fixy interventions don't break alternation
+                    last_speaker = self.athena  # default
+                    for turn in reversed(self.dialog):
+                        role = turn.get("role", "")
+                        if role == "Socrates":
+                            last_speaker = self.socrates
+                            break
+                        elif role == "Athena":
+                            last_speaker = self.athena
+                            break
                     agents = [self.socrates, self.athena]
                     if allow_fixy:
                         agents.append(self.fixy_agent)
@@ -2318,8 +2331,8 @@ class MainScript:
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
                     logger.info(f"Fixy intervention: {reason}")
-            elif self.turn_index % self.cfg.fixy_every_n_turns == 0:
-                # Legacy scheduled Fixy
+            elif not self.interactive_fixy and self.turn_index % self.cfg.fixy_every_n_turns == 0:
+                # Legacy scheduled Fixy (only when interactive_fixy is unavailable)
                 tail = self.dialog[-10:]
                 ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
                 self.fixy_check(ctx)
