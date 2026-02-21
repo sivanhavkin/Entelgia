@@ -539,6 +539,12 @@ def validate_output(text: str) -> str:
     return text.strip()
 
 
+def _first_sentence(text: str) -> str:
+    """Extract the first sentence from text (up to the first .!? or first newline)."""
+    m = re.match(r"([^.!?\n]+[.!?])", text.strip())
+    return m.group(1).strip() if m else text.strip().split("\n")[0].strip()
+
+
 # ============================================
 # PRIVACY / REDACTION
 # ============================================
@@ -1443,6 +1449,8 @@ class Agent:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
+        # Identity lock: drives are internal psychology metrics, not persona labels.
+        prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
@@ -1518,6 +1526,22 @@ class Agent:
                 "\nRespond now:\n", f"\n{behavioral_rule}\nRespond now:\n"
             )
 
+        # Prevent opening with a sentence this agent has already used in this dialog
+        own_texts = [
+            t.get("text", "")
+            for t in dialog_tail
+            if t.get("role") == self.name and t.get("text", "").strip()
+        ]
+        if own_texts:
+            last_opener = _first_sentence(own_texts[-1])
+            if last_opener:
+                opener_rule = (
+                    f'FORBIDDEN OPENER: Do not begin your response with: "{last_opener}"'
+                )
+                prompt = prompt.replace(
+                    "\nRespond now:\n", f"\n{opener_rule}\nRespond now:\n"
+                )
+
         # Drives → temperature (cognition control); conflict raises volatility
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
@@ -1589,10 +1613,10 @@ class Agent:
             count=1,
         ).strip()
 
-        # Strip "Superego:" / "Super-ego:" / "Super ego:" prefix if LLM mistakenly
-        # echoed the superego drive label instead of speaking as the agent.
+        # Strip "Superego:" / "Super-ego:" / "Super ego:" / "s_ego:" prefix if LLM
+        # mistakenly echoed the superego drive label instead of speaking as the agent.
         # The optional space/hyphen covers all common LLM formatting variants.
-        out = re.sub(r"^[Ss]uper[\s\-]?[Ee]go\s*:\s*", "", out).strip()
+        out = re.sub(r"^([Ss]uper[\s\-]?[Ee]go|s_ego)\s*:\s*", "", out).strip()
 
         # Remove gender/script artifacts like "(he): " or bare "(she)"
         out = re.sub(r"\(\s*(he|she|they)\s*\)\s*:\s*", ": ", out, flags=re.IGNORECASE)
@@ -1600,6 +1624,22 @@ class Agent:
 
         # Remove stray scoring markers like "(5)" or "(4.5)"
         out = re.sub(r"\(\d+(\.\d+)?\)", "", out).strip()
+
+        # Safety net: strip a repeated first sentence if the LLM still produced one
+        own_openings = {
+            " ".join(_first_sentence(t.get("text", "")).split()).lower()
+            for t in dialog_tail
+            if t.get("role") == self.name and t.get("text", "").strip()
+        }
+        out_first = _first_sentence(out)
+        if (
+            out_first
+            and " ".join(out_first.split()).lower() in own_openings
+            and out.lower().startswith(out_first.lower())
+        ):
+            remainder = out[len(out_first):].strip()
+            if remainder:
+                out = remainder
 
         return out
 

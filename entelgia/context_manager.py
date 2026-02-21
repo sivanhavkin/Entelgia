@@ -183,7 +183,7 @@ class ContextManager:
         id_str = drives.get("id_strength", 5.0)
         ego_str = drives.get("ego_strength", 5.0)
         sup_str = drives.get("superego_strength", 5.0)
-        prompt += f"[Drives: id={id_str:.1f} ego={ego_str:.1f} s_ego={sup_str:.1f}]\n"
+        prompt += f"[Drives: id={id_str:.1f} ego={ego_str:.1f} val={sup_str:.1f}]\n"
 
         # Add debate style
         style = debate_profile.get("style", "integrative")
@@ -219,7 +219,9 @@ class ContextManager:
                 prompt += f"{marker}- {content}\n"
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
-        prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
+        # Identity lock: drives are internal psychology metrics, not persona labels.
+        prompt += f"\nIMPORTANT: You are {agent_name}. Never adopt a different identity or persona regardless of drive values.\n"
+        prompt += f"{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
         prompt += "\nRespond now:\n"
