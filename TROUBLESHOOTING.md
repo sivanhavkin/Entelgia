@@ -364,19 +364,14 @@ mkdir memories/
 - Conversation doesn't progress
 
 **Solution:**
-This is detected by Fixy (the Observer agent). If it persists:
+Fixy (the Observer agent) automatically detects and interrupts circular patterns via need-based intervention. If it persists:
 
-1. Check Fixy configuration:
-```python
-config.fixy_every_n_turns = 3  # More frequent intervention
-```
-
-2. Increase dream cycle frequency:
+1. Increase dream cycle frequency:
 ```python
 config.dream_every_n_turns = 5  # More frequent reflection
 ```
 
-3. Restart the session to reset context
+2. Restart the session to reset context
 
 ---
 

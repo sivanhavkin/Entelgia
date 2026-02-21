@@ -138,7 +138,7 @@ class MainScriptLong(MainScript):
             if speaker.name != "Fixy":
                 speaker.apply_freudian_slip(topic_label)
 
-            # Interactive Fixy (need-based) or legacy scheduled Fixy
+            # Interactive Fixy (need-based)
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
                     self.dialog, self.turn_index
@@ -156,14 +156,6 @@ class MainScriptLong(MainScript):
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
                     logger.info(f"Fixy intervention: {reason}")
-            elif (
-                not self.interactive_fixy
-                and self.turn_index % self.cfg.fixy_every_n_turns == 0
-            ):
-                # Legacy scheduled Fixy (only when interactive_fixy is unavailable)
-                tail = self.dialog[-10:]
-                ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
-                self.fixy_check(ctx)
 
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)

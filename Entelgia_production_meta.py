@@ -275,7 +275,6 @@ class Config:
     sessions_dir: str = "entelgia_data/sessions"
     stm_max_entries: int = 10000
     stm_trim_batch: int = 500
-    fixy_every_n_turns: int = 3
     dream_every_n_turns: int = 7
     promote_importance_threshold: float = 0.72
     promote_emotion_threshold: float = 0.65
@@ -2697,14 +2696,6 @@ class MainScript:
                             + Style.RESET_ALL
                             + "\n"
                         )
-            elif (
-                not self.interactive_fixy
-                and self.turn_index % self.cfg.fixy_every_n_turns == 0
-            ):
-                # Legacy scheduled Fixy (only when interactive_fixy is unavailable)
-                tail = self.dialog[-10:]
-                ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
-                self.fixy_check(ctx)
 
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)

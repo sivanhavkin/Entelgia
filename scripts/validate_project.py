@@ -414,7 +414,7 @@ class DeepValidator:
         """Validate Observer metacognition - IMPROVED"""
         details = []
         checks_passed = 0
-        total_checks = 5
+        total_checks = 4
 
         observer_classes = self.find_classes(
             [r"Observer", r"ObserverCore", r"Fixy.*Observer"]
@@ -451,11 +451,6 @@ class DeepValidator:
             checks_passed += 1
         else:
             details.append("No intervention mechanisms")
-
-        fixy_config = self.check_config_value("fixy_every_n_turns")
-        if fixy_config:
-            details.append(f"fixy_every_n_turns = {fixy_config}")
-            checks_passed += 1
 
         score = checks_passed / total_checks
         status = (
@@ -646,7 +641,6 @@ class DeepValidator:
             "timeout_minutes",
             "max_output_words",
             "llm_timeout",
-            "fixy_every_n_turns",
             "dream_every_n_turns",
         ]
 
