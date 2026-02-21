@@ -1150,86 +1150,6 @@ class ConsciousCore:
 
 
 # ============================================
-# OBSERVER / FIXY CORE
-# ============================================
-
-
-@dataclass
-class FixyReport:
-    """Report from Fixy observer."""
-
-    detected_issue: bool
-    issue_summary: str
-    proposed_patch: str
-    severity: str
-    rationale: str
-
-
-class ObserverCore:
-    """Meta-cognitive observer (Fixy)."""
-
-    def __init__(self, llm: LLM, model: str):
-        self.llm = llm
-        self.model = model
-        self.mistake_memory: List[Dict[str, Any]] = []
-        logger.info("ObserverCore (Fixy) initialized")
-
-    def review(self, context: str) -> FixyReport:
-        """Review recent context for issues."""
-        prompt = (
-            "Review for bugs/contradictions.\n"
-            'Return JSON: {"detected_issue": bool, "issue_summary": string, '
-            '"proposed_patch": string, "severity": string, "rationale": string}\n'
-            f"CONTEXT:\n{context[:300]}\n"
-        )
-        raw = self.llm.generate(self.model, prompt, temperature=0.2, use_cache=False)
-        m = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not m:
-            return FixyReport(
-                False, "No structured output.", "", "low", "Parser fallback."
-            )
-        try:
-            obj = json.loads(m.group(0))
-            return FixyReport(
-                bool(obj.get("detected_issue", False)),
-                str(obj.get("issue_summary", "")).strip()[:100],
-                str(obj.get("proposed_patch", "")).strip(),
-                str(obj.get("severity", "low")).strip().lower(),
-                str(obj.get("rationale", "")).strip()[:100],
-            )
-        except Exception as e:
-            logger.warning(f"Fixy parse error: {e}")
-            return FixyReport(False, "Parse error.", "", "low", "Could not parse JSON.")
-
-    def commentary(self, context: str, report: FixyReport) -> str:
-        """Generate intervention message."""
-        prompt = (
-            "Generate brief intervention (2-5 sentences).\n"
-            "If issue: state it and give ONE correction.\n"
-            "If no issue: suggest ONE way to increase depth.\n"
-            f"ISSUE: {report.detected_issue}\n"
-            f"CONTEXT:\n{context[:250]}\n"
-            f"{LLM_RESPONSE_LIMIT}\n"
-        )
-        msg = self.llm.generate(self.model, prompt, temperature=0.3, use_cache=False)
-        return validate_output(msg)
-
-    def remember(self, report: FixyReport):
-        """Store observation in memory."""
-        if report.detected_issue:
-            self.mistake_memory.append(
-                {
-                    "ts": now_iso(),
-                    "issue": report.issue_summary,
-                    "severity": report.severity,
-                    "rationale": report.rationale,
-                }
-            )
-            if len(self.mistake_memory) > 5000:
-                self.mistake_memory = self.mistake_memory[-4000:]
-
-
-# ============================================
 # BEHAVIOR CORE (HEURISTIC-BASED)
 # ============================================
 
@@ -2152,22 +2072,6 @@ def test_language_core():
     logger.info("Language core tests passed")
 
 
-def test_fixy_report():
-    """Test Fixy report dataclass."""
-    report = FixyReport(
-        detected_issue=True,
-        issue_summary="Contradiction detected",
-        proposed_patch="FIX: ...",
-        severity="high",
-        rationale="Logic error",
-    )
-
-    assert report.detected_issue is True
-    assert report.severity == "high"
-
-    logger.info("Fixy report tests passed")
-
-
 def test_memory_signatures():
     """Test memory signature creation and validation."""
     test_msg = b"test message"
@@ -2298,7 +2202,6 @@ class MainScript:
         self.language = LanguageCore()
         self.conscious = ConsciousCore()
         self.behavior = BehaviorCore(self.llm)
-        self.fixy = ObserverCore(self.llm, cfg.model_fixy)
         self.vtrack = VersionTracker(cfg.version_dir)
         self.session_mgr = SessionManager(cfg.sessions_dir)
         self.async_proc = AsyncProcessor()
@@ -2523,53 +2426,6 @@ class MainScript:
             + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
             + Style.RESET_ALL
         )
-
-    def fixy_check(self, recent_context: str):
-        """Run Fixy observer check."""
-        report = self.fixy.review(recent_context)
-        self.fixy.remember(report)
-
-        msg = self.fixy.commentary(recent_context, report)
-
-        if report.detected_issue:
-            logger.warning(f"Fixy detected issue: {report.issue_summary}")
-            print(
-                Fore.YELLOW
-                + "Fixy detected issue: "
-                + Style.RESET_ALL
-                + report.issue_summary
-            )
-            if report.proposed_patch:
-                print(Fore.YELLOW + "Proposed patch:" + Style.RESET_ALL)
-                print(report.proposed_patch[:100] + "\n")
-
-        if msg:
-            self.dialog.append({"role": "Fixy", "text": msg})
-            self.fixy_agent.store_turn(msg, topic="observer", source="reflection")
-            self.log_turn("Fixy", msg, topic="observer")
-            print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + msg + "\n")
-
-        if (
-            report.detected_issue
-            and report.proposed_patch
-            and self.cfg.enable_auto_patch
-            and self.cfg.allow_write_self_file
-        ):
-            try:
-                this_file = os.path.abspath(__file__)
-                with open(this_file, "r", encoding="utf-8") as f:
-                    original = f.read()
-                ok, updated = safe_apply_patch(original, report.proposed_patch)
-                if ok and updated != original:
-                    self.vtrack.snapshot_text("before_patch", original)
-                    with open(this_file, "w", encoding="utf-8") as f:
-                        f.write(updated)
-                    self.vtrack.snapshot_text("after_patch", updated)
-                    logger.info("Auto-patch applied successfully")
-                    print(Fore.GREEN + "[AUTO-PATCH] Applied patch." + Style.RESET_ALL)
-            except Exception as ex:
-                logger.error(f"Auto-patch failed: {ex}")
-                print(Fore.RED + f"[AUTO-PATCH] Failed: {ex}" + Style.RESET_ALL)
 
     def self_replicate_cycle(self, agent: "Agent", topic: str) -> int:
         """Orchestrate self-replication for *agent* and return promotion count."""
@@ -2832,7 +2688,6 @@ def run_tests():
         test_topic_manager()
         test_behavior_core()
         test_language_core()
-        test_fixy_report()
         test_memory_signatures()
         test_session_manager()
 

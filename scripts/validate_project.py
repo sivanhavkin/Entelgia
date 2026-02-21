@@ -118,7 +118,7 @@ class DeepValidator:
         )
         athena = self.find_classes([r"Athena", r"AthenaAgent", r"Agent.*Athena"])
         fixy = self.find_classes(
-            [r"Fixy", r"FixyAgent", r"FixyObserver", r"ObserverCore"]
+            [r"Fixy", r"FixyAgent", r"InteractiveFixy"]
         )
 
         # Fallback: search in code text
@@ -417,7 +417,7 @@ class DeepValidator:
         total_checks = 4
 
         observer_classes = self.find_classes(
-            [r"Observer", r"ObserverCore", r"Fixy.*Observer"]
+            [r"Observer", r"InteractiveFixy", r"Fixy.*Observer"]
         )
         if observer_classes:
             details.append(f"Observer: {', '.join(observer_classes)}")
