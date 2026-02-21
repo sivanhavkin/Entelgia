@@ -53,6 +53,7 @@ entelgia = "Entelgia_production_meta:main"
 
 [tool.setuptools]
 py-modules = ["Entelgia_production_meta"]
+packages = ["entelgia"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
