@@ -1516,13 +1516,14 @@ class Agent:
 
         # Validate output (sanitization only, no truncation)
         out = validate_output(raw_response)
+        original_out = out  # preserve the agent's original response before any rewrite
 
         # Superego → second-pass critique (internal governor)
         self._last_superego_rewrite = sup >= 7.5
         if self._last_superego_rewrite:
             critique_prompt = (
-                "You are the agent's Superego. Rewrite the response to be: "
-                "more principled, less impulsive, remove contradictions, keep the core idea.\n\n"
+                "Rewrite the following response to be more principled, "
+                "less impulsive, remove contradictions, keep the core idea.\n\n"
                 f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
             )
             out = validate_output(
@@ -1542,6 +1543,11 @@ class Agent:
         self._last_emotion_intensity = float(inten)
         self._last_response_kind = kind
         self.update_drives_after_turn(kind, emo, float(inten))
+
+        # Restore original response for display; superego rewrite is used only
+        # for internal state (emotion/drive analysis), not shown in dialogue
+        if self._last_superego_rewrite:
+            out = original_out
 
         m = re.search(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]", out)
         if m:
@@ -2371,7 +2377,9 @@ class MainScript:
             + reset
         )
         rewrite_tag = (
-            "  [SuperEgo rewrite applied]" if agent._last_superego_rewrite else ""
+            "  [SuperEgo critique applied; original shown in dialogue]"
+            if agent._last_superego_rewrite
+            else ""
         )
         print(
             dim
