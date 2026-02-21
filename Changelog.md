@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [Unreleased]
+## [Unreleased] - [2.5.0] 
 
 ## 🚀 Highlights
 
@@ -143,13 +143,6 @@ All notable changes to this project will be documented in this file. The format 
 
 ## 🛑 Breaking Changes
 *None* — all changes are backward compatible
-
-## 💡 Upgrade Instructions
-- `pip install --upgrade entelgia`
-- New imports available: `from entelgia import FixyRegulator, EntelgiaAgent, DefenseMechanism, FreudianSlip, SelfReplication`
-
-## 📋 Contributors
-- @sivanhavkin
 
 ---
 
