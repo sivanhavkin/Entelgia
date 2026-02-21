@@ -26,7 +26,6 @@ from Entelgia_production_meta import (  # noqa: E402
     create_signature,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -142,7 +141,9 @@ class TestMigrateSigningKey:
         MemoryCore(temp_db_path)  # schema + sets fingerprint
 
         ts = datetime.datetime.utcnow().isoformat()
-        _insert_legacy_row(temp_db_path, "Socrates", "Memory about truth", None, None, ts)
+        _insert_legacy_row(
+            temp_db_path, "Socrates", "Memory about truth", None, None, ts
+        )
 
         # Corrupt the fingerprint so migration runs on next init
         _corrupt_fingerprint(temp_db_path)

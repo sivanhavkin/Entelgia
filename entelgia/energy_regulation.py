@@ -57,6 +57,8 @@ class EntelgiaAgent:
         energy_level      — Current energy (starts at 100.0).
         conscious_memory  — Active inputs accumulated during processing.
         subconscious_store — Pending memories awaiting integration.
+        long_term_memory  — Persistent store for critical memories promoted
+                            from short-term memory during dream cycles.
         regulator         — Associated :class:`FixyRegulator` instance.
     """
 
@@ -77,6 +79,7 @@ class EntelgiaAgent:
         self.energy_level: float = self.INITIAL_ENERGY
         self.conscious_memory: List[str] = []
         self.subconscious_store: List[str] = []
+        self.long_term_memory: List[str] = []
         self.regulator = FixyRegulator(safety_threshold=safety_threshold)
 
     # ------------------------------------------------------------------
@@ -89,13 +92,49 @@ class EntelgiaAgent:
         self.energy_level = max(0.0, self.energy_level - drain)
         return drain
 
+    def _is_relevant(self, memory: Optional[str]) -> bool:
+        """Return True if *memory* is emotionally or operationally relevant.
+
+        Override in subclasses for richer relevance scoring.
+        Entries that are empty or contain only whitespace are considered
+        irrelevant and will be forgotten during dream integration.
+        """
+        return bool(memory and memory.strip())
+
+    def _is_critical(self, memory: Optional[str]) -> bool:
+        """Return True if *memory* is critical enough to be promoted to LTM.
+
+        A memory is considered critical when it is relevant (non-empty) and
+        contains at least one word of four or more characters, indicating
+        substantive, non-trivial content.  Override in subclasses to apply
+        richer emotional- or importance-based scoring.
+        """
+        if not self._is_relevant(memory):
+            return False
+        assert memory is not None
+        return any(len(word) >= 4 for word in memory.split())
+
     def _run_dream_cycle(self) -> None:
-        """Consolidate subconscious memories into conscious memory and recharge."""
-        # Move pending memories to conscious layer
+        """Integrate subconscious memories into conscious memory and recharge.
+
+        During the dream cycle memories undergo integration:
+
+        - Subconscious memories are transferred to conscious memory.
+        - Critical and relevant STM entries are promoted to long-term memory.
+        - Short-term memory entries that are not emotionally or operationally
+          relevant are forgotten; no long-term memories are hard-deleted.
+        - Energy is restored to full.
+        """
+        # Integrate subconscious into conscious layer
         self.conscious_memory.extend(self.subconscious_store)
-        # Keep only the most recent entries to avoid unbounded growth
-        keep = getattr(self.regulator, "dream_keep_memories", 5)
-        self.conscious_memory = self.conscious_memory[-keep:]
+        # Promote critical entries from STM to long-term memory
+        for entry in self.conscious_memory:
+            if self._is_critical(entry) and entry not in self.long_term_memory:
+                self.long_term_memory.append(entry)
+        # Forget STM entries that are not emotionally or operationally relevant
+        self.conscious_memory = [
+            m for m in self.conscious_memory if self._is_relevant(m)
+        ]
         self.subconscious_store = []
         # Restore energy to full
         self.energy_level = self.INITIAL_ENERGY

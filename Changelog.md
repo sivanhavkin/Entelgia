@@ -10,6 +10,25 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
+
+- **`EntelgiaAgent.long_term_memory`** — persistent list that accumulates critical memories
+  promoted from short-term memory during every dream cycle.
+- **`EntelgiaAgent._is_critical(memory)`** — relevance gate that determines whether a STM
+  entry is substantive enough (contains at least one word ≥ 4 characters) to be
+  promoted to long-term memory; designed to be overridden in subclasses for richer
+  emotional / importance-based scoring.
+- **Dream cycle STM → LTM promotion** — `_run_dream_cycle()` now iterates conscious memory
+  and copies every critical, relevant entry to `long_term_memory` (no duplicates).
+  Existing integration and relevance-filtering behavior is unchanged.
+- Eight new unit tests in `tests/test_energy_regulation.py` (`TestEntelgiaAgentLTMPromotion`)
+  covering: initial LTM state, critical-entry promotion, trivial-entry exclusion,
+  duplicate prevention, `_is_critical` edge cases, and subconscious-path promotion.
+
+### Changed
+
+- Applied **Black** code formatting across the entire Python codebase.
+
 ---
 
 ## [2.5.0] - 2026-02-21

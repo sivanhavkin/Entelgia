@@ -198,7 +198,7 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **Enhanced personas** - Deep character traits and speech patterns
 * **⚡ Energy-Based Regulation** (v2.5.0)
   * **FixyRegulator** — Meta-level energy supervisor with configurable safety threshold
-  * **Dream cycle consolidation** — automatic recharge when energy falls below threshold
+  * **Dream cycle consolidation** — automatic recharge when energy falls below threshold; critical STM entries are promoted to long-term memory
   * **Hallucination-risk detection** — stochastic check when energy is below 60 %
 * **🧠 Personal Long-Term Memory System** (v2.5.0)
   * **DefenseMechanism** — classifies memories as repressed or suppressed on write

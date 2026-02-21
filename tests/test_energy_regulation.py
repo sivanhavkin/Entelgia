@@ -187,6 +187,94 @@ class TestEntelgiaAgentDreamCycle:
         assert "memory A" in agent.conscious_memory
         assert "memory B" in agent.conscious_memory
 
+    def test_dream_does_not_truncate_long_term_memories(self):
+        """Dream cycle must not delete long-term memories (no hard truncation)."""
+        agent = EntelgiaAgent("Socrates")
+        memories = [f"memory {i}" for i in range(20)]
+        agent.conscious_memory.extend(memories)
+        agent._run_dream_cycle()
+        for m in memories:
+            assert m in agent.conscious_memory
+
+    def test_dream_forgets_irrelevant_stm_entries(self):
+        """Dream cycle should forget empty/whitespace-only STM entries."""
+        agent = EntelgiaAgent("Socrates")
+        agent.conscious_memory.extend(["important thought", "", "   ", "useful data"])
+        agent._run_dream_cycle()
+        assert "important thought" in agent.conscious_memory
+        assert "useful data" in agent.conscious_memory
+        assert "" not in agent.conscious_memory
+        assert "   " not in agent.conscious_memory
+
+    def test_is_relevant_returns_true_for_non_empty(self):
+        """_is_relevant should return True for non-empty strings."""
+        agent = EntelgiaAgent("Socrates")
+        assert agent._is_relevant("hello") is True
+        assert agent._is_relevant("  text  ") is True
+
+    def test_is_relevant_returns_false_for_empty(self):
+        """_is_relevant should return False for empty or whitespace-only strings."""
+        agent = EntelgiaAgent("Socrates")
+        assert agent._is_relevant("") is False
+        assert agent._is_relevant("   ") is False
+        assert agent._is_relevant(None) is False
+
+
+class TestEntelgiaAgentLTMPromotion:
+    """Tests for dream-cycle STM → LTM promotion."""
+
+    def test_long_term_memory_starts_empty(self):
+        """long_term_memory should be empty on initialisation."""
+        agent = EntelgiaAgent("Socrates")
+        assert agent.long_term_memory == []
+
+    def test_critical_entry_promoted_to_ltm(self):
+        """Critical STM entries should be copied to long_term_memory during dream."""
+        agent = EntelgiaAgent("Socrates")
+        agent.conscious_memory.append("important reflection")
+        agent._run_dream_cycle()
+        assert "important reflection" in agent.long_term_memory
+
+    def test_non_critical_entry_not_promoted(self):
+        """Short, trivial entries should not be promoted to long_term_memory."""
+        agent = EntelgiaAgent("Socrates")
+        agent.conscious_memory.extend(["ok", "hi"])
+        agent._run_dream_cycle()
+        assert "ok" not in agent.long_term_memory
+        assert "hi" not in agent.long_term_memory
+
+    def test_ltm_no_duplicates(self):
+        """The same entry should not be added to long_term_memory twice."""
+        agent = EntelgiaAgent("Socrates")
+        agent.long_term_memory.append("already stored thought")
+        agent.conscious_memory.append("already stored thought")
+        agent._run_dream_cycle()
+        assert agent.long_term_memory.count("already stored thought") == 1
+
+    def test_is_critical_returns_true_for_substantive(self):
+        """_is_critical should return True for entries with long words."""
+        agent = EntelgiaAgent("Socrates")
+        assert agent._is_critical("important thought") is True
+
+    def test_is_critical_returns_false_for_trivial(self):
+        """_is_critical should return False for very short words."""
+        agent = EntelgiaAgent("Socrates")
+        assert agent._is_critical("ok") is False
+        assert agent._is_critical("hi") is False
+
+    def test_is_critical_returns_false_for_empty(self):
+        """_is_critical should return False for empty or None input."""
+        agent = EntelgiaAgent("Socrates")
+        assert agent._is_critical("") is False
+        assert agent._is_critical(None) is False
+
+    def test_subconscious_critical_entry_promoted_to_ltm(self):
+        """Critical entries arriving via subconscious_store are also promoted."""
+        agent = EntelgiaAgent("Socrates")
+        agent.subconscious_store.append("deep subconscious insight")
+        agent._run_dream_cycle()
+        assert "deep subconscious insight" in agent.long_term_memory
+
 
 # ============================================================================
 # Package-level import test
