@@ -254,6 +254,19 @@ MAX_RESPONSE_WORDS = 150
 # LLM First-Person Instruction - agents must speak as themselves using "I"
 LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
 
+# Phrases that agents must never produce (meta-commentary about the conversation)
+FORBIDDEN_PHRASES = [
+    "In our dialogue",
+    "We learn",
+    "Our conversations reveal",
+]
+
+# LLM instruction to avoid forbidden meta-commentary phrases
+LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
+    "FORBIDDEN PHRASES: Never use 'In our dialogue', 'We learn', "
+    "or 'Our conversations reveal'."
+)
+
 # Initial energy for all agents (restored after each dream cycle)
 AGENT_INITIAL_ENERGY: float = 100.0
 
@@ -502,6 +515,7 @@ def validate_output(text: str) -> str:
     Performs sanitization only (no truncation):
     - Removes control characters
     - Normalizes excessive newlines
+    - Removes sentences containing forbidden meta-commentary phrases
 
     Note: Response length is controlled by LLM prompt instructions, not by this function.
     """
@@ -512,6 +526,15 @@ def validate_output(text: str) -> str:
     text = re.sub(r"[\x00-\x08\x0b-\x0c\x0e-\x1f]", "", text)
     # Normalize excessive newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # Remove sentences containing forbidden meta-commentary phrases
+    sentences = re.split(r"(?<=[.!?])(?:\s+|$)", text)
+    sentences = [
+        s
+        for s in sentences
+        if s and not any(fp.lower() in s.lower() for fp in FORBIDDEN_PHRASES)
+    ]
+    text = " ".join(sentences)
 
     return text.strip()
 
@@ -1312,7 +1335,7 @@ class Agent:
             )
         if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
             return (
-                "BEHAVIORAL RULE: Your response MUST include at least one sentence that "
+                "BEHAVIORAL RULE: Your response MUST include exactly one sentence that "
                 'begins with "However," or "Yet," or "This assumes…"'
             )
         return ""
@@ -1416,9 +1439,10 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
-        # Add first-person and 150-word limit instructions for LLM
+        # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
+        prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -1568,11 +1592,6 @@ class Agent:
 
         # Remove stray scoring markers like "(5)" or "(4.5)"
         out = re.sub(r"\(\d+(\.\d+)?\)", "", out).strip()
-
-        # Enforce 150-word limit
-        words = out.split()
-        if len(words) > MAX_RESPONSE_WORDS:
-            out = " ".join(words[:MAX_RESPONSE_WORDS]).rstrip() + "…"
 
         return out
 
