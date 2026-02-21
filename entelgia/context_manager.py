@@ -58,11 +58,12 @@ class ContextManager:
         # Take last 8 turns (up from 5)
         recent_dialog = dialog_tail[-8:] if len(dialog_tail) >= 8 else dialog_tail
 
-        # Smart display for dialogue - show full content
+        # Smart display for dialogue - truncate long content at word boundary with "..."
+        max_dialog_text = 200
         dialog_lines = []
         for turn in recent_dialog:
             role = turn.get("role", "")  # Full name, not abbreviated
-            text = turn.get("text", "")
+            text = self._truncate_text(turn.get("text", ""), max_dialog_text)
             dialog_lines.append(f"{role}: {text}")
 
         # Take last 6 STM entries (up from 3)
@@ -109,6 +110,25 @@ class ContextManager:
         )
 
         return sorted_ltm[:limit]
+
+    def _truncate_text(self, text: str, max_length: int) -> str:
+        """
+        Truncate text to max_length characters at a word boundary.
+
+        Args:
+            text: Text to truncate
+            max_length: Maximum character length before truncation
+
+        Returns:
+            Text truncated at the last word boundary before max_length, with "..." appended
+        """
+        if len(text) <= max_length:
+            return text
+        # Find the last space at or before max_length to avoid cutting mid-word
+        cut = text.rfind(" ", 0, max_length)
+        if cut <= 0:
+            cut = max_length  # No space found; fall back to hard cut
+        return text[:cut] + "..."
 
     def _format_prompt(
         self,
@@ -169,18 +189,20 @@ class ContextManager:
         for line in dialog_lines:
             prompt += f"{line}\n"
 
-        # Add recent thoughts if available - display in full
+        # Add recent thoughts if available - truncate long entries at word boundary with "..."
+        max_thought_text = 150
         if recent_thoughts:
             prompt += "\nRecent thoughts:\n"
             for thought in recent_thoughts:
-                text = thought.get("text", "")
+                text = self._truncate_text(thought.get("text", ""), max_thought_text)
                 prompt += f"- {text}\n"
 
-        # Add important memories if available - display in full
+        # Add important memories if available - truncate long entries at word boundary with "..."
+        max_memory_text = 200
         if important_memories:
             prompt += "\nKey memories:\n"
             for memory in important_memories:
-                content = memory.get("content", "")
+                content = self._truncate_text(memory.get("content", ""), max_memory_text)
                 importance = memory.get("importance", 0.0)
 
                 # Add star marker for very important memories
