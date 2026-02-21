@@ -531,6 +531,45 @@ Entelgia demonstrates that persistent identity and internal regulation can coexi
 
 ---
 
+## 20. Energy-Based Cognitive Regulation (v2.5.0)
+
+### 20.1 Theoretical Basis
+
+Human cognition is not infinitely available. Sleep, rest, and consolidation cycles are necessary for sustained function. Entelgia v2.5.0 models this through a *cognitive energy* resource that governs when an agent must enter a recovery state.
+
+### 20.2 FixyRegulator
+
+The `FixyRegulator` acts as a homeostatic supervisor. When an agent's `energy_level` drops to or below the configurable `safety_threshold` (default 35.0 out of 100.0), the regulator triggers a *dream cycle*. Additionally, when energy drops below 60 % of capacity, there is a 10 % probability per turn of a `HALLUCINATION_RISK_DETECTED` warning — reflecting the empirical link between cognitive depletion and confabulatory outputs in LLMs.
+
+### 20.3 Dream Cycle Consolidation
+
+The dream cycle mirrors memory consolidation research in cognitive neuroscience:
+
+1. **Subconscious integration** — pending memories from `subconscious_store` are merged into `conscious_memory`.
+2. **Selective retention** — only the most recent `dream_keep_memories` entries (default: 5) are preserved, reflecting memory decay and selective consolidation.
+3. **Energy restoration** — `energy_level` returns to 100.0, allowing normal processing to resume.
+
+### 20.4 Personal Long-Term Memory
+
+Three psychoanalytically-inspired mechanisms operate continuously on the LTM layer:
+
+| Mechanism | Theoretical Basis |
+|---|---|
+| **DefenseMechanism** | Freudian repression / suppression of threatening content |
+| **FreudianSlip** | Parapraxis — defended material breaches conscious attention probabilistically |
+| **SelfReplication** | Mnemonic consolidation — recurring themes self-promote through associative strength |
+
+These mechanisms produce measurable effects on the `intrusive` and `suppressed` columns in the `memories` table, and result in autonomous `conscious` layer promotions with traceable `source` fields (`freudian_slip`, `self_replication`).
+
+### 20.5 Research Implications
+
+Energy-bounded cognition enables:
+- **Realistic agent fatigue modeling** in multi-turn dialogue simulations.
+- **Adversarial testing** of hallucination mitigations by observing behavior under low-energy conditions.
+- **Memory consolidation research** by inspecting what persists after dream cycles.
+
+---
+
 # Appendix: CoreMind Model
 
 Entelgia is structured around six interacting cores:

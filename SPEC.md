@@ -367,6 +367,78 @@ A session is considered working when:
 * `promote_emotion_threshold`
 * `enable_auto_patch`
 * `allow_write_self_file`
+* `energy_safety_threshold` (v2.5.0)
+* `energy_drain_min` / `energy_drain_max` (v2.5.0)
+* `dream_keep_memories` (v2.5.0)
+* `self_replicate_every_n_turns` (v2.5.0)
+
+---
+
+## 13) Energy & Dream Cycles (v2.5.0)
+
+### Overview
+
+Cognitive energy is a first-class agent resource. Every `process_step()` call drains 8–15 energy units. When energy falls to or below the safety threshold (default 35.0), a *dream cycle* fires automatically.
+
+### Components
+
+#### FixyRegulator
+
+Monitors `energy_level` against `safety_threshold`.
+
+| Condition | Action |
+|---|---|
+| `energy_level <= safety_threshold` | Trigger dream cycle; return `DREAM_TRIGGERED` |
+| `energy_level < 60.0` | Roll p=0.10; may return `HALLUCINATION_RISK_DETECTED` |
+| Otherwise | Return `None` |
+
+#### EntelgiaAgent
+
+| Attribute | Description |
+|---|---|
+| `energy_level` | Starts at 100.0; decreases per step |
+| `conscious_memory` | Active inputs accumulated during processing |
+| `subconscious_store` | Pending memories awaiting dream integration |
+| `regulator` | Attached `FixyRegulator` instance |
+
+### Dream Cycle Phases
+
+1. **Consolidation** — `subconscious_store` entries appended to `conscious_memory`.
+2. **Pruning** — `conscious_memory` trimmed to `dream_keep_memories` most recent entries.
+3. **Recharge** — `energy_level` reset to 100.0.
+
+### Future Integration Notes
+
+- Energy drain rates will be tied to dialogue complexity in v3.x.
+- Cross-agent energy sharing is a planned research feature.
+
+---
+
+## 14) Personal Long-Term Memory System (v2.5.0)
+
+### DefenseMechanism
+
+Classifies every subconscious write into two binary flags stored in the `memories` table:
+
+| Flag | Condition |
+|---|---|
+| `intrusive=1` | Painful emotion (`anger`, `fear`, `shame`, `guilt`, `anxiety`) with intensity > 0.75 |
+| `suppressed=1` | Content contains `forbidden`, `secret`, or `dangerous` |
+
+### FreudianSlip
+
+After each non-Fixy agent turn, rolls `slip_probability` (default 0.15) against the 30 most-recent unconscious memories that carry at least one defense flag. A selected fragment is simultaneously:
+- Printed to console as `[SLIP] <content>` (magenta).
+- Promoted to the `conscious` LTM layer with `source="freudian_slip"`.
+
+### SelfReplication
+
+Every `self_replicate_every_n_turns` turns (default 10), scans the 50 most-recent unconscious memories for recurring keywords (≥ 4 Latin chars, appearing in ≥ 2 entries). Up to 3 highest-importance matching memories are promoted to `conscious` with `source="self_replication"` and printed as `[SELF-REPL] <content>` (cyan).
+
+### Future Integration Notes
+
+- Defense flags will influence retrieval priority in future releases.
+- Freudian slip probability will be modulated by agent stress level.
 
 ---
 

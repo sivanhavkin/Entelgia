@@ -193,6 +193,14 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **Rich context enrichment** - Full dialogue history + thoughts + memories
   * **Smart Fixy interventions** - Need-based (not scheduled) meta-cognitive monitoring
   * **Enhanced personas** - Deep character traits and speech patterns
+* **⚡ Energy-Based Regulation** (v2.5.0)
+  * **FixyRegulator** — Meta-level energy supervisor with configurable safety threshold
+  * **Dream cycle consolidation** — automatic recharge when energy falls below threshold
+  * **Hallucination-risk detection** — stochastic check when energy is below 60 %
+* **🧠 Personal Long-Term Memory System** (v2.5.0)
+  * **DefenseMechanism** — classifies memories as repressed or suppressed on write
+  * **FreudianSlip** — probabilistically surfaces defended memory fragments
+  * **SelfReplication** — promotes recurring-pattern memories to consciousness
 * **Psychological drive modeling**
   * Id / Ego / Superego dynamics
 * **Emotion tracking & importance scoring**
@@ -308,6 +316,7 @@ Entelgia is built as a modular CoreMind system:
 * `Language` — dialogue-driven cognition
 * `Behavior` — goal-oriented response shaping
 * `Observer` — meta-level monitoring & correction
+* `EnergyRegulator` — cognitive energy supervision & dream cycles (v2.5.0)
 
 ### 🆕 Enhanced Dialogue Module (v2.2.0+)
 
@@ -315,11 +324,13 @@ The new `entelgia/` package provides modular components:
 
 ```
 entelgia/
-├── __init__.py              # Package exports
+├── __init__.py              # Package exports (v2.5.0)
 ├── dialogue_engine.py       # Dynamic speaker & seed generation
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
-└── fixy_interactive.py      # Need-based interventions
+├── fixy_interactive.py      # Need-based interventions
+├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
+└── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
 ```
 
 **Key improvements:**
@@ -327,6 +338,8 @@ entelgia/
 - 🎯 **Dynamic speaker selection** vs ping-pong alternation
 - 🧠 **Context-aware** with 8 turns + 6 thoughts + 5 memories
 - 🔍 **Intelligent Fixy** detects circular reasoning, not just scheduled checks
+- ⚡ **Energy regulation** with dream-cycle recovery and hallucination-risk detection
+- 🧠 **Defense mechanisms** classifying memories as repressed or suppressed on every write
 
 The entire system runs as a unified executable Python file:
 

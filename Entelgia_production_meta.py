@@ -17,7 +17,7 @@ Advanced Multi-Agent Dialogue System with:
 - 10-MINUTE AUTO-TIMEOUT
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 2.4.0.
+Version Note: Latest release: 2.5.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -108,12 +108,34 @@ try:
         InteractiveFixy,
         format_persona_for_prompt,
         get_persona,
+        DefenseMechanism,
+        FreudianSlip,
+        SelfReplication,
     )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
+    # No-op stubs for non-enhanced mode
+    class DefenseMechanism:  # type: ignore[no-redef]
+        def analyze(self, content, emotion=None, emotion_intensity=0.0):
+            return (0, 0)
+
+    class FreudianSlip:  # type: ignore[no-redef]
+        def attempt_slip(self, recent_memories):
+            return None
+
+        def format_slip(self, memory):
+            return ""
+
+    class SelfReplication:  # type: ignore[no-redef]
+        def replicate(self, recent_memories):
+            return []
+
+        def format_replication(self, memory):
+            return ""
 
 # Optional: FastAPI for REST API
 try:
@@ -251,6 +273,11 @@ class Config:
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
     log_level: int = logging.INFO
     timeout_minutes: int = 30
+    energy_safety_threshold: float = 35.0
+    energy_drain_min: float = 8.0
+    energy_drain_max: float = 15.0
+    dream_keep_memories: int = 5
+    self_replicate_every_n_turns: int = 10
 
     def __post_init__(self):
         """Validate configuration."""
@@ -1463,6 +1490,12 @@ class Agent:
         else:
             ltm_content = text if CFG.store_raw_subconscious_ltm else redacted
 
+        # Classify memory with defense mechanism
+        defense = DefenseMechanism()
+        intrusive, suppressed = defense.analyze(
+            ltm_content, emotion=emo, emotion_intensity=float(inten)
+        )
+
         self.memory.ltm_insert(
             agent=self.name,
             layer="subconscious",
@@ -1473,7 +1506,65 @@ class Agent:
             importance=float(imp),
             source=source,
             promoted_from=None,
+            intrusive=intrusive,
+            suppressed=suppressed,
         )
+
+    def apply_freudian_slip(self, topic: str) -> Optional[str]:
+        """Attempt a Freudian slip after a non-Fixy turn.
+
+        Returns the leaked fragment text if a slip occurs, otherwise None.
+        """
+        recent = self.memory.ltm_recent(self.name, limit=30, layer="subconscious")
+        slip_engine = FreudianSlip()
+        slipped = slip_engine.attempt_slip(recent)
+        if slipped is None:
+            return None
+
+        fragment = str(slipped.get("content", "")).strip()
+        msg = slip_engine.format_slip(slipped)
+        print(Fore.MAGENTA + msg + Style.RESET_ALL)
+
+        # Promote to conscious layer
+        self.memory.ltm_insert(
+            agent=self.name,
+            layer="conscious",
+            content=fragment[:500],
+            topic=topic,
+            emotion=slipped.get("emotion"),
+            emotion_intensity=float(slipped.get("emotion_intensity") or 0.0),
+            importance=float(slipped.get("importance") or 0.0),
+            source="freudian_slip",
+            promoted_from="subconscious",
+        )
+        return fragment
+
+    def self_replicate(self, topic: str) -> int:
+        """Promote recurring-pattern memories to the conscious layer.
+
+        Returns the count of memories promoted.
+        """
+        recent = self.memory.ltm_recent(self.name, limit=50, layer="subconscious")
+        replicator = SelfReplication()
+        promoted_list = replicator.replicate(recent)
+
+        for mem in promoted_list:
+            content = str(mem.get("content", "")).strip()
+            msg = replicator.format_replication(mem)
+            print(Fore.CYAN + msg + Style.RESET_ALL)
+            self.memory.ltm_insert(
+                agent=self.name,
+                layer="conscious",
+                content=content[:500],
+                topic=topic,
+                emotion=mem.get("emotion"),
+                emotion_intensity=float(mem.get("emotion_intensity") or 0.0),
+                importance=float(mem.get("importance") or 0.0),
+                source="self_replication",
+                promoted_from="subconscious",
+            )
+
+        return len(promoted_list)
 
 
 # ============================================
@@ -2270,6 +2361,13 @@ class MainScript:
                 logger.error(f"Auto-patch failed: {ex}")
                 print(Fore.RED + f"[AUTO-PATCH] Failed: {ex}" + Style.RESET_ALL)
 
+    def self_replicate_cycle(self, agent: "Agent", topic: str) -> int:
+        """Orchestrate self-replication for *agent* and return promotion count."""
+        count = agent.self_replicate(topic)
+        if count > 0:
+            logger.info(f"Self-replication {agent.name}: promoted={count}")
+        return count
+
     def run(self):
         """Main execution loop (timeout configurable in minutes)."""
         topicman = TopicManager(TOPIC_CYCLE, rotate_every_rounds=1, shuffle=False)
@@ -2350,6 +2448,10 @@ class MainScript:
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
+            # Freudian slip attempt after each non-Fixy turn
+            if speaker.name != "Fixy":
+                speaker.apply_freudian_slip(topic_label)
+
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
@@ -2377,6 +2479,11 @@ class MainScript:
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+
+            # Self-replication cycle
+            if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
+                self.self_replicate_cycle(self.socrates, topic_label)
+                self.self_replicate_cycle(self.athena, topic_label)
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
                 logger.info("Stop signal received from agent")

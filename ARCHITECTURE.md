@@ -150,6 +150,14 @@ ContextManager
    |
    v
 Agent ↔ Memory (STM/LTM)
+   |        |
+   |        └─ DefenseMechanism → intrusive/suppressed flags
+   |        └─ FreudianSlip     → surface defended memories
+   |        └─ SelfReplication  → promote recurring patterns
+   |
+   v
+FixyRegulator (energy supervision)
+   └─ dream cycle ──────────────┘
    |
    v
 Observer (Fixy)
@@ -161,3 +169,50 @@ Observer (Fixy)
 ## Summary
 
 Entelgia moves beyond linear chatbot paradigms by employing a collective of agents with persistent state, adaptive dialogue governance, and meta-cognitive monitoring. Its architecture is designed for research into emergent conversational dynamics, self-correction, and long-term coherence.
+
+---
+
+## Energy Regulation & Dream Cycles
+
+### Overview
+
+The Energy-Based Regulation System (v2.5.0) introduces cognitive energy as a first-class resource. Each agent carries an `energy_level` that depletes with every processing step and is restored only through a *dream cycle* — a consolidation pass that integrates pending memories.
+
+### Components
+
+| Component | Role |
+|---|---|
+| `FixyRegulator` | Meta-level supervisor; monitors energy against a safety threshold |
+| `EntelgiaAgent` | Agent wrapper with dual memory stores and dream-cycle consolidation |
+
+### Flow
+
+```
+process_step(input)
+      |
+      v
+  _drain_energy()       ← 8–15 units per step
+      |
+      v
+  append to conscious_memory
+      |
+      v
+  FixyRegulator.check_stability()
+      |
+      ├─ energy <= threshold (35.0) → _run_dream_cycle() → RECHARGED_AND_READY
+      ├─ energy < 60 %  → p=0.10 → HALLUCINATION_RISK_DETECTED
+      └─ otherwise      → None (OK)
+```
+
+### Dream Cycle Phases
+
+1. **Consolidation** — subconscious memories are merged into conscious memory.
+2. **Pruning** — conscious memory is trimmed to the `dream_keep_memories` most recent entries (default: 5).
+3. **Recharge** — `energy_level` is restored to 100.0.
+
+### Integration Points
+
+- `Config.energy_safety_threshold` (default `35.0`) — passed to `FixyRegulator`.
+- `Config.energy_drain_min` / `energy_drain_max` (default `8.0` / `15.0`) — per-step drain range.
+- `Config.dream_keep_memories` (default `5`) — number of memories retained after dream cycle.
+- `entelgia/energy_regulation.py` — standalone module; importable without a live LLM.
