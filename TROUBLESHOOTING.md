@@ -567,4 +567,4 @@ These patterns help ensure Entelgia works reliably:
 ---
 
 **Last Updated:** 17 February 2026  
-**Version:** 2.4.0
+**Version:** 2.5.0

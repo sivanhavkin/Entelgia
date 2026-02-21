@@ -30,7 +30,7 @@ Entelgia is derived from philosophical concepts related to entelechy (the realiz
 
 ### Is Entelgia production-ready?
 
-Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.4.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
+Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.5.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
 
 ### Who should use Entelgia?
 
@@ -497,7 +497,7 @@ Yes! Entelgia is released under the MIT License. See [LICENSE](LICENSE) for deta
 
 - Watch the GitHub repository for updates
 - Check [Changelog.md](Changelog.md) for version history
-- Follow semantic versioning: Major.Minor.Patch (e.g., v2.4.0)
+- Follow semantic versioning: Major.Minor.Patch (e.g., v2.5.0)
 
 ---
 
@@ -514,4 +514,4 @@ Yes! Entelgia is released under the MIT License. See [LICENSE](LICENSE) for deta
 
 ---
 
-**Last Updated**: Version 2.4.0
+**Last Updated**: Version 2.5.0

@@ -6,7 +6,7 @@ Entelgia Enhanced Dialogue Package
 Provides improved dialogue quality through dynamic speaker selection, rich personas, and intelligent context management.
 
 Version Note: Pronoun support feature added for v2.2.0
-Latest official release: v2.4.0
+Latest official release: v2.5.0
 """
 
 from .dialogue_engine import DialogueEngine, SeedGenerator
