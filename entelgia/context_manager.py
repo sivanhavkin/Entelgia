@@ -205,11 +205,13 @@ class ContextManager:
         if important_memories:
             prompt += "\nKey memories:\n"
             for memory in important_memories:
-                content = self._truncate_text(memory.get("content", ""), max_memory_text)
+                content = self._truncate_text(
+                    memory.get("content", ""), max_memory_text
+                )
                 importance = memory.get("importance", 0.0)
 
                 # Add star marker for very important memories
-                marker = "⭐ " if float(importance) > 0.7 else ""
+                marker = "* " if float(importance) > 0.7 else ""
                 prompt += f"{marker}- {content}\n"
 
         # Add first-person and 150-word limit instructions for LLM

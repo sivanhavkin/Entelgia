@@ -137,6 +137,7 @@ except ImportError:
         def format_replication(self, memory):
             return ""
 
+
 # Optional: FastAPI for REST API
 try:
     from fastapi import FastAPI, HTTPException
@@ -1360,11 +1361,13 @@ class Agent:
         # Legacy prompt building
         # Drives → memory retrieval depth (what enters cognition)
         ego = float(self.drives.get("ego_strength", 5.0))
-        sa  = float(self.drives.get("self_awareness", 0.55))
+        sa = float(self.drives.get("self_awareness", 0.55))
         ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))
-        stm_tail  = max(3, min(12, int(3 + ego / 2)))
+        stm_tail = max(3, min(12, int(3 + ego / 2)))
 
-        recent_ltm = self.memory.ltm_recent(self.name, limit=ltm_limit, layer="conscious")
+        recent_ltm = self.memory.ltm_recent(
+            self.name, limit=ltm_limit, layer="conscious"
+        )
         stm = self.memory.stm_load(self.name)[-stm_tail:]
 
         # Format agent name with optional pronoun
@@ -1470,10 +1473,14 @@ class Agent:
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
         sup = float(self.drives.get("superego_strength", 5.0))
-        temperature = max(0.25, min(0.95, 0.60 + 0.03 * (ide - ego) - 0.02 * (sup - ego)))
+        temperature = max(
+            0.25, min(0.95, 0.60 + 0.03 * (ide - ego) - 0.02 * (sup - ego))
+        )
 
         raw_response = (
-            self.llm.generate(self.model, prompt, temperature=temperature, use_cache=False)
+            self.llm.generate(
+                self.model, prompt, temperature=temperature, use_cache=False
+            )
             or "[No response]"
         )
 
@@ -1488,7 +1495,10 @@ class Agent:
                 f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
             )
             out = validate_output(
-                self.llm.generate(self.model, critique_prompt, temperature=0.25, use_cache=False) or out
+                self.llm.generate(
+                    self.model, critique_prompt, temperature=0.25, use_cache=False
+                )
+                or out
             )
 
         emo, inten = self.emotion.infer(self.model, out)
@@ -2532,7 +2542,10 @@ class MainScript:
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
                     logger.info(f"Fixy intervention: {reason}")
-            elif not self.interactive_fixy and self.turn_index % self.cfg.fixy_every_n_turns == 0:
+            elif (
+                not self.interactive_fixy
+                and self.turn_index % self.cfg.fixy_every_n_turns == 0
+            ):
                 # Legacy scheduled Fixy (only when interactive_fixy is unavailable)
                 tail = self.dialog[-10:]
                 ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
@@ -2617,7 +2630,7 @@ def run_cli():
     try:
         app_script = MainScript(CFG)
         app_script.run()
-        print(Fore.GREEN + "\n✓ Session completed successfully!" + Style.RESET_ALL)
+        print(Fore.GREEN + "\nSession completed successfully!" + Style.RESET_ALL)
     except KeyboardInterrupt:
         print(
             Fore.YELLOW + "\n[INTERRUPTED] Session cancelled by user" + Style.RESET_ALL
@@ -2650,14 +2663,14 @@ def run_tests():
 
         print()
         print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
-        print(Fore.GREEN + "✓ All tests passed!" + Style.RESET_ALL)
+        print(Fore.GREEN + "All tests passed!" + Style.RESET_ALL)
         print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     except AssertionError as e:
-        print(Fore.RED + f"✗ Test failed: {e}" + Style.RESET_ALL)
+        print(Fore.RED + f"Test failed: {e}" + Style.RESET_ALL)
         logger.error(f"Test failed: {e}")
         sys.exit(1)
     except Exception as e:
-        print(Fore.RED + f"✗ Test error: {e}" + Style.RESET_ALL)
+        print(Fore.RED + f"Test error: {e}" + Style.RESET_ALL)
         logger.error(f"Test error: {e}", exc_info=True)
         sys.exit(1)
 
@@ -2676,9 +2689,9 @@ def run_api():
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(Fore.GREEN + "Entelgia REST API Server" + Style.RESET_ALL)
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
-    print(f"\n🚀 Starting API server on http://0.0.0.0:8000")
-    print(f"📚 API Docs: http://localhost:8000/docs")
-    print(f"🔄 API Spec: http://localhost:8000/redoc")
+    print(f"\nStarting API server on http://0.0.0.0:8000")
+    print(f"API Docs: http://localhost:8000/docs")
+    print(f"API Spec: http://localhost:8000/redoc")
     print()
 
     try:
@@ -2743,7 +2756,7 @@ def main():
             print("  • Session persistence & metrics tracking")
             print("  • REST API interface (FastAPI)")
             print("  • Unit tests (pytest)")
-            print("  • 🔐 MEMORY SECURITY with HMAC-SHA256 signatures")
+            print("  • MEMORY SECURITY with HMAC-SHA256 signatures")
             print("     - Cryptographic signatures on all memories")
             print("     - Automatic forgetting of tampered memories")
             print("     - Constant-time comparison to prevent timing attacks")

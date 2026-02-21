@@ -73,10 +73,10 @@ def test_dynamic_speaker_selection():
     print(f"Max consecutive turns: {max_consecutive}")
 
     if max_consecutive >= 3:
-        print("✗ FAIL: Same speaker spoke 3+ times in a row")
+        print("FAIL: Same speaker spoke 3+ times in a row")
         return False
     else:
-        print("✓ PASS: No speaker spoke 3+ times consecutively")
+        print("PASS: No speaker spoke 3+ times consecutively")
         return True
 
 
@@ -131,10 +131,10 @@ def test_seed_variety():
     print(f"Number of unique strategies: {len(strategies_found)}")
 
     if len(strategies_found) >= 4:
-        print(f"✓ PASS: Found {len(strategies_found)} different seed strategies")
+        print(f"PASS: Found {len(strategies_found)} different seed strategies")
         return True
     else:
-        print(f"✗ FAIL: Only {len(strategies_found)} strategies found (expected 4+)")
+        print(f"FAIL: Only {len(strategies_found)} strategies found (expected 4+)")
         return False
 
 
@@ -211,14 +211,14 @@ def test_context_enrichment():
 
     print("Context checks:")
     for check, passed in checks.items():
-        status = "✓" if passed else "✗"
+        status = "PASS" if passed else "FAIL"
         print(f"  {status} {check}")
 
     all_passed = all(checks.values())
     if all_passed:
-        print("✓ PASS: All context enrichment checks passed")
+        print("PASS: All context enrichment checks passed")
     else:
-        print("✗ FAIL: Some context enrichment checks failed")
+        print("FAIL: Some context enrichment checks failed")
 
     return all_passed
 
@@ -239,10 +239,10 @@ def test_fixy_interventions():
 
     print(f"Early turns (turn 2): should_intervene={should}")
     if not should:
-        print("  ✓ Correctly does not intervene early")
+        print("  Correctly does not intervene early")
         early_pass = True
     else:
-        print("  ✗ Incorrectly wants to intervene early")
+        print("  Incorrectly wants to intervene early")
         early_pass = False
 
     # Test 2: Repetitive dialogue - should intervene
@@ -257,11 +257,11 @@ def test_fixy_interventions():
 
     print(f"Repetitive dialogue (turn 5): should_intervene={should}, reason={reason}")
     if should and reason == "circular_reasoning":
-        print("  ✓ Correctly detects circular reasoning")
+        print("  Correctly detects circular reasoning")
         repetitive_pass = True
     else:
         print(
-            f"  ✗ Failed to detect circular reasoning (should={should}, reason={reason})"
+            f"  Failed to detect circular reasoning (should={should}, reason={reason})"
         )
         repetitive_pass = False
 
@@ -276,17 +276,17 @@ def test_fixy_interventions():
 
     print(f"Normal dialogue (turn 4): should_intervene={should}")
     if not should:
-        print("  ✓ Correctly does not intervene in normal dialogue")
+        print("  Correctly does not intervene in normal dialogue")
         normal_pass = True
     else:
-        print(f"  ✗ Incorrectly wants to intervene (reason={reason})")
+        print(f"  Incorrectly wants to intervene (reason={reason})")
         normal_pass = False
 
     all_passed = early_pass and repetitive_pass and normal_pass
     if all_passed:
-        print("✓ PASS: Fixy intervention logic works correctly")
+        print("PASS: Fixy intervention logic works correctly")
     else:
-        print("✗ FAIL: Some Fixy intervention checks failed")
+        print("FAIL: Some Fixy intervention checks failed")
 
     return all_passed
 
@@ -312,7 +312,7 @@ def test_persona_formatting():
 
     print("Persona checks:")
     for check, passed in checks.items():
-        status = "✓" if passed else "✗"
+        status = "PASS" if passed else "FAIL"
         print(f"  {status} {check}")
 
     # Test formatting with drives
@@ -323,9 +323,9 @@ def test_persona_formatting():
 
     all_passed = all(checks.values()) and len(formatted) > 100
     if all_passed:
-        print("\n✓ PASS: Personas are rich and well-formatted")
+        print("\nPASS: Personas are rich and well-formatted")
     else:
-        print("\n✗ FAIL: Some persona checks failed")
+        print("\nFAIL: Some persona checks failed")
 
     return all_passed
 
@@ -344,14 +344,14 @@ def test_persona_pronouns():
 
     print("Pronoun checks:")
     for check, passed in checks.items():
-        status = "✓" if passed else "✗"
+        status = "PASS" if passed else "FAIL"
         print(f"  {status} {check}")
 
     all_passed = all(checks.values())
     if all_passed:
-        print("✓ PASS: All pronoun checks passed")
+        print("PASS: All pronoun checks passed")
     else:
-        print("✗ FAIL: Some pronoun checks failed")
+        print("FAIL: Some pronoun checks failed")
 
     return all_passed
 
@@ -377,7 +377,7 @@ def main():
             result = test()
             results.append(result)
         except Exception as e:
-            print(f"\n✗ TEST FAILED WITH EXCEPTION: {e}")
+            print(f"\nTEST FAILED WITH EXCEPTION: {e}")
             import traceback
 
             traceback.print_exc()
@@ -391,10 +391,10 @@ def main():
     print(f"Tests passed: {passed}/{total}")
 
     if all(results):
-        print("\n✓ ALL TESTS PASSED!")
+        print("\nALL TESTS PASSED!")
         return 0
     else:
-        print("\n✗ SOME TESTS FAILED")
+        print("\nSOME TESTS FAILED")
         return 1
 
 

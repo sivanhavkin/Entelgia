@@ -81,7 +81,7 @@ def demo_enhanced_dialogue():
         # Check for Fixy interventions
         fixy_turns = speaker_counts.get("Fixy", 0)
         if fixy_turns > 0:
-            print(f"\n  ✓ Fixy intervened {fixy_turns} time(s) (need-based)")
+            print(f"\n  Fixy intervened {fixy_turns} time(s) (need-based)")
         else:
             print(f"\n  ℹ Fixy did not need to intervene")
 

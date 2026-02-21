@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Energy-Based Agent Regulation System ⚡ (v2.5.0)
+Energy-Based Agent Regulation System (v2.5.0)
 
 Provides energy tracking, safety supervision, and dream-cycle consolidation
 for Entelgia agents.

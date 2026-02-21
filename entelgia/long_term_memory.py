@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Personal Long-Term Memory System 🧠 (v2.5.0)
+Personal Long-Term Memory System (v2.5.0)
 
 Provides psychoanalytically-inspired memory regulation mechanisms:
   - DefenseMechanism  — classifies memories as repressed or suppressed
@@ -19,19 +19,14 @@ import random
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-_PAINFUL_EMOTIONS: frozenset = frozenset(
-    {"anger", "fear", "shame", "guilt", "anxiety"}
-)
+_PAINFUL_EMOTIONS: frozenset = frozenset({"anger", "fear", "shame", "guilt", "anxiety"})
 _REPRESSION_INTENSITY_THRESHOLD: float = 0.75
 
-_FORBIDDEN_KEYWORDS: frozenset = frozenset(
-    {"forbidden", "secret", "dangerous"}
-)
+_FORBIDDEN_KEYWORDS: frozenset = frozenset({"forbidden", "secret", "dangerous"})
 
 _SLIP_CANDIDATE_LIMIT: int = 30
 _REPLICATION_CANDIDATE_LIMIT: int = 50
@@ -127,7 +122,7 @@ class FreudianSlip:
         """
         candidates = [
             m
-            for m in recent_memories[: _SLIP_CANDIDATE_LIMIT]
+            for m in recent_memories[:_SLIP_CANDIDATE_LIMIT]
             if m.get("intrusive", 0) or m.get("suppressed", 0)
         ]
         if not candidates:
@@ -135,8 +130,7 @@ class FreudianSlip:
 
         # Weight by defense flags
         weights = [
-            int(m.get("intrusive", 0)) + int(m.get("suppressed", 0))
-            for m in candidates
+            int(m.get("intrusive", 0)) + int(m.get("suppressed", 0)) for m in candidates
         ]
         total = sum(weights)
         if total == 0:
@@ -188,9 +182,7 @@ class SelfReplication:
             for w in re.findall(rf"[A-Za-z]{{{_REPLICATION_MIN_KEYWORD_LEN},}}", text)
         ]
 
-    def _find_recurring_keywords(
-        self, memories: List[Dict[str, Any]]
-    ) -> List[str]:
+    def _find_recurring_keywords(self, memories: List[Dict[str, Any]]) -> List[str]:
         """Find keywords that appear in at least ``_REPLICATION_MIN_OCCURRENCES`` entries."""
         keyword_counts: Dict[str, int] = {}
         for mem in memories:
@@ -208,9 +200,7 @@ class SelfReplication:
     # Public API
     # ------------------------------------------------------------------
 
-    def replicate(
-        self, recent_memories: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def replicate(self, recent_memories: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Return up to ``_REPLICATION_MAX_PROMOTED`` memories to promote.
 
         Parameters

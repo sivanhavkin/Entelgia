@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 from entelgia.energy_regulation import FixyRegulator, EntelgiaAgent
 
-
 # ============================================================================
 # FixyRegulator tests
 # ============================================================================
@@ -200,9 +199,11 @@ class TestPackageImports:
     def test_import_fixy_regulator(self):
         """FixyRegulator should be importable from entelgia package."""
         from entelgia import FixyRegulator as FR
+
         assert FR is FixyRegulator
 
     def test_import_entelgia_agent(self):
         """EntelgiaAgent should be importable from entelgia package."""
         from entelgia import EntelgiaAgent as EA
+
         assert EA is EntelgiaAgent
