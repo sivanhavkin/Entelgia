@@ -16,6 +16,7 @@ Run:
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from dataclasses import asdict
@@ -109,6 +110,10 @@ class MainScriptLong(MainScript):
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
+            # Freudian slip attempt after each non-Fixy turn
+            if speaker.name != "Fixy":
+                speaker.apply_freudian_slip(topic_label)
+
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
@@ -138,6 +143,16 @@ class MainScriptLong(MainScript):
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+
+            # Self-replication cycle
+            if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
+                self.self_replicate_cycle(self.socrates, topic_label)
+                self.self_replicate_cycle(self.athena, topic_label)
+
+            if re.search(r"\b(stop|quit|bye)\b", out.lower()):
+                logger.info("Stop signal received from agent")
+                print(Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL)
+                break
 
             if self.turn_index % 2 == 0:
                 topicman.advance_round()
