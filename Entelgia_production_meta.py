@@ -213,6 +213,7 @@ logger.info(
 
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+MAX_RESPONSE_WORDS = 150
 
 
 @dataclass
@@ -1269,8 +1270,14 @@ class Agent:
             return self._build_enhanced_prompt(user_seed, dialog_tail)
 
         # Legacy prompt building
-        recent_ltm = self.memory.ltm_recent(self.name, limit=4, layer="conscious")
-        stm = self.memory.stm_load(self.name)[-6:]
+        # Drives → memory retrieval depth (what enters cognition)
+        ego = float(self.drives.get("ego_strength", 5.0))
+        sa  = float(self.drives.get("self_awareness", 0.55))
+        ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))
+        stm_tail  = max(3, min(12, int(3 + ego / 2)))
+
+        recent_ltm = self.memory.ltm_recent(self.name, limit=ltm_limit, layer="conscious")
+        stm = self.memory.stm_load(self.name)[-stm_tail:]
 
         # Format agent name with optional pronoun
         if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
@@ -1369,13 +1376,31 @@ class Agent:
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
         """Generate dialogue response."""
         prompt = self._build_compact_prompt(seed, dialog_tail)
+
+        # Drives → temperature (cognition control)
+        ide = float(self.drives.get("id_strength", 5.0))
+        ego = float(self.drives.get("ego_strength", 5.0))
+        sup = float(self.drives.get("superego_strength", 5.0))
+        temperature = max(0.25, min(0.95, 0.60 + 0.03 * (ide - ego) - 0.02 * (sup - ego)))
+
         raw_response = (
-            self.llm.generate(self.model, prompt, temperature=0.75, use_cache=False)
+            self.llm.generate(self.model, prompt, temperature=temperature, use_cache=False)
             or "[No response]"
         )
 
         # Validate output (sanitization only, no truncation)
         out = validate_output(raw_response)
+
+        # Superego → second-pass critique (internal governor)
+        if sup >= 7.5:
+            critique_prompt = (
+                "You are the agent's Superego. Rewrite the response to be: "
+                "more principled, less impulsive, remove contradictions, keep the core idea.\n\n"
+                f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
+            )
+            out = validate_output(
+                self.llm.generate(self.model, critique_prompt, temperature=0.25, use_cache=False) or out
+            )
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
@@ -1397,6 +1422,18 @@ class Agent:
             out,
             count=1,
         ).strip()
+
+        # Remove gender/script artifacts like "(he): " or bare "(she)"
+        out = re.sub(r"\(\s*(he|she|they)\s*\)\s*:\s*", ": ", out, flags=re.IGNORECASE)
+        out = re.sub(r"\(\s*(he|she|they)\s*\)", "", out, flags=re.IGNORECASE).strip()
+
+        # Remove stray scoring markers like "(5)" or "(4.5)"
+        out = re.sub(r"\(\d+(\.\d+)?\)", "", out).strip()
+
+        # Enforce 150-word limit
+        words = out.split()
+        if len(words) > MAX_RESPONSE_WORDS:
+            out = " ".join(words[:MAX_RESPONSE_WORDS]).rstrip() + "…"
 
         return out
 
