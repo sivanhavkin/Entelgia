@@ -185,7 +185,7 @@ class SelfReplication:
         """Return lowercase Latin words of length >= 4."""
         return [
             w.lower()
-            for w in re.findall(r"[A-Za-z]{%d,}" % _REPLICATION_MIN_KEYWORD_LEN, text)
+            for w in re.findall(rf"[A-Za-z]{{{_REPLICATION_MIN_KEYWORD_LEN},}}", text)
         ]
 
     def _find_recurring_keywords(
