@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-99%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-209%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -433,7 +433,9 @@ entelgia/
 ├── fixy_interactive.py      # Need-based interventions
 ├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
 ├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
-└── memory_security.py       # HMAC-SHA256 signature helpers
+├── memory_security.py       # HMAC-SHA256 signature helpers
+├── dialogue_metrics.py      # Circularity, progress & intervention-utility metrics (PR #111)
+└── ablation_study.py        # 4-condition reproducible ablation study (PR #111)
 ```
 
 **Key improvements:**
@@ -455,7 +457,7 @@ entelgia_production_long.py   # 200-turn session, no time-based stopping
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **81 tests** in four suites:
+Entelgia ships with comprehensive test coverage across **209 tests** in 9 suites:
 
 ### Enhanced Dialogue Tests (6 tests)
 
@@ -472,7 +474,7 @@ Tests verify:
 
 ---
 
-### ⚡ Energy Regulation Tests (23 tests)
+### ⚡ Energy Regulation Tests (35 tests)
 
 ```bash
 pytest tests/test_energy_regulation.py -v
@@ -486,6 +488,7 @@ Tests verify:
 - ✅ **EntelgiaAgent init** — initial state, regulator propagation
 - ✅ **process_step** — energy drain, memory append, return values
 - ✅ **Dream cycle** — subconscious consolidation and memory pruning
+- ✅ **LTM promotion** — critical STM entries promoted to long-term memory during dream cycle
 
 ---
 
@@ -530,7 +533,7 @@ Tests assert that:
 
 ---
 
-### 🔗 Drive Correlation Tests (18 tests)
+### 🔗 Drive Correlation Tests (17 tests)
 
 ```bash
 pytest tests/test_drive_correlations.py -v
@@ -544,7 +547,105 @@ Tests verify the coherent Freudian drive correlations added in PR #92:
 - ✅ **Energy drain scaling** — conflict adds to base drain
 - ✅ **Energy drain cap** — drain never exceeds `2 × energy_drain_max`
 
-> ✅ **All 99 tests currently pass** (6 dialogue + 23 energy regulation + 33 long-term memory + 19 security + 18 drive correlations), providing confidence that all subsystems perform as expected.
+---
+
+### 🔥 Drive Pressure Tests (23 tests)
+
+```bash
+pytest tests/test_drive_pressure.py -v
+```
+
+Tests verify the DrivePressure urgency/tension system:
+- ✅ **Pressure clamped to 0–10 range** — output always within bounds
+- ✅ **High conflict raises pressure** — proportional increase
+- ✅ **Stagnation raises pressure** — same topic ≥ 4 turns
+- ✅ **Natural decay** — pressure decreases after progress/resolution
+- ✅ **Forced brevity thresholds** — output trimmed at pressure ≥ 6.5 and ≥ 8.0
+- ✅ **Unresolved question tracking** — count increments and decrements correctly
+
+---
+
+### 🛡️ Behavioral Rules Tests (16 tests)
+
+```bash
+pytest tests/test_behavioral_rules.py -v
+```
+
+Tests verify drive-triggered behavioral rules for Socrates and Athena:
+- ✅ **Socrates conflict rule** — fires at and above conflict threshold 5.0
+- ✅ **Athena dissent rule** — fires at and above dissent threshold 3.0
+- ✅ **Rule content** — correct keywords injected (`binary choice`, `However`, `Yet`)
+- ✅ **Prompt injection** — rule text inserted before "Respond now" in agent prompt
+
+---
+
+### 📊 Dialogue Metrics Tests (45 tests)
+
+```bash
+pytest tests/test_dialogue_metrics.py -v
+```
+
+Tests verify the three dialogue-quality metrics and the ablation study (PR #111):
+- ✅ **circularity_rate** — Jaccard-based looping fraction
+- ✅ **progress_rate** — forward topic shifts and synthesis markers
+- ✅ **intervention_utility** — Fixy-window circularity reduction
+- ✅ **circularity_per_turn** — rolling time-series correctness
+- ✅ **AblationCondition enum** — all four conditions defined
+- ✅ **run_ablation reproducibility** — same seed → identical results
+- ✅ **Inter-condition ordering** — BASELINE circularity > DIALOGUE_ENGINE
+- ✅ **print_results_table** — formatted output without crash
+- ✅ **plot_circularity ASCII fallback** — works without matplotlib
+
+---
+
+### 🔏 Memory Signing Migration Tests (5 tests)
+
+```bash
+pytest tests/test_memory_signing_migration.py -v
+```
+
+Tests verify the key-rotation and legacy-format migration logic in `MemoryCore`:
+- ✅ **Fingerprint stored on first init** — `settings` table populated
+- ✅ **No re-sign when fingerprint matches** — existing rows untouched
+- ✅ **Re-sign on fingerprint mismatch** — all rows updated on key rotation
+- ✅ **Legacy format recovery** — `None`→`"None"` format auto-healed after migration
+- ✅ **Settings table existence** — created during `_init_db`
+
+---
+
+### 📋 Latest Test Run Results
+
+```
+================================================= test session info ==================================================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0
+rootdir: /home/runner/work/Entelgia/Entelgia
+plugins: cov-7.0.0
+
+collected 209 items
+
+tests/test_behavioral_rules.py     ........ ........             [ 16 tests PASSED ]
+tests/test_dialogue_metrics.py     ........ ........ ........ ........ ........ .....  [ 45 tests PASSED ]
+tests/test_drive_correlations.py   ........ .........            [ 17 tests PASSED ]
+tests/test_drive_pressure.py       ........ ........ .......     [ 23 tests PASSED ]
+tests/test_energy_regulation.py    ........ ........ ........ ........ ...           [ 35 tests PASSED ]
+tests/test_enhanced_dialogue.py    ......                        [  6 tests PASSED ]
+tests/test_long_term_memory.py     ........ ........ ........ ........ .            [ 33 tests PASSED ]
+tests/test_memory_security.py      ........ ...........          [ 19 tests PASSED ]
+tests/test_memory_signing_migration.py .....                     [  5 tests PASSED ]
+
+============================== coverage summary ================================
+entelgia/__init__.py              100%
+entelgia/energy_regulation.py     100%
+entelgia/long_term_memory.py       99%
+entelgia/dialogue_metrics.py       80%
+entelgia/ablation_study.py         84%
+entelgia/memory_security.py        88%
+Entelgia_production_meta.py        22%
+TOTAL                              57%
+================================================ 209 passed in 5.19s ================================================
+```
+
+> ✅ **All 209 tests currently pass** (6 dialogue + 35 energy regulation + 33 long-term memory + 19 security + 17 drive correlations + 23 drive pressure + 16 behavioral rules + 45 dialogue metrics + 5 signing migration), providing confidence that all subsystems perform as expected.
 
 ---
 
@@ -554,7 +655,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 99 total tests (19 security + 6 dialogue + 23 energy + 33 LTM + 18 drive correlations) |
+| **Unit Tests** | `pytest` | Runs 209 total tests (6 dialogue + 35 energy + 33 LTM + 19 security + 17 drive correlations + 23 drive pressure + 16 behavioral rules + 45 dialogue metrics + 5 signing migration) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
