@@ -340,3 +340,66 @@ class EnhancedMemoryIntegration:
         union = len(words1 | words2)
 
         return intersection / union if union > 0 else 0.0
+
+
+# ---------------------------------------------------------------------------
+# Entry point — allows running directly: python entelgia/context_manager.py
+# ---------------------------------------------------------------------------
+
+
+if __name__ == "__main__":
+    cm = ContextManager()
+
+    sample_drives = {"id_strength": 6.2, "ego_strength": 7.5, "superego_strength": 8.0}
+    sample_stm = [
+        {"text": "Consciousness may arise from self-referential information loops."},
+        {"text": "The hard problem resists purely functional explanations."},
+        {"text": "Embodiment plays a crucial role in shaping cognition."},
+    ]
+    sample_ltm = [
+        {"content": "Socrates argued that the unexamined life is not worth living.", "importance": 0.9},
+        {"content": "Athena synthesized Platonic idealism with empirical observation.", "importance": 0.75},
+        {"content": "Earlier dialogue resolved the free-will tension via compatibilism.", "importance": 0.6},
+    ]
+    sample_dialog = [
+        {"role": "Socrates", "text": "What is the nature of consciousness?"},
+        {"role": "Athena",   "text": "It emerges from complex information processing."},
+        {"role": "Socrates", "text": "But does that account for subjective experience?"},
+    ]
+    sample_debate_profile = {"style": "integrative"}
+
+    print("=" * 60)
+    print("Context Manager Demo")
+    print("=" * 60)
+
+    prompt = cm.build_enriched_context(
+        agent_name="Socrates",
+        agent_lang="en",
+        persona="Ancient Greek philosopher; pursues truth through dialectic questioning.",
+        drives=sample_drives,
+        user_seed="Explore the relationship between consciousness and identity.",
+        dialog_tail=sample_dialog,
+        stm=sample_stm,
+        ltm=sample_ltm,
+        debate_profile=sample_debate_profile,
+        show_pronoun=True,
+        agent_pronoun="he",
+    )
+
+    print(prompt)
+    print("=" * 60)
+
+    emi = EnhancedMemoryIntegration()
+    relevant = emi.retrieve_relevant_memories(
+        agent_name="Socrates",
+        current_topic="consciousness",
+        recent_dialog=sample_dialog,
+        ltm_entries=sample_ltm,
+        limit=3,
+    )
+
+    print("\nRelevant memories retrieved:")
+    for mem in relevant:
+        print(f"  [{mem.get('importance', 0.0):.2f}] {mem.get('content', '')}")
+
+    print("\nDone.")
