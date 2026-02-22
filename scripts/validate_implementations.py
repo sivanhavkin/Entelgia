@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -37,11 +36,11 @@ PY_PACKAGE_DIR = "entelgia"
 
 # Classes that are intentionally internal and do not require documentation
 INTERNAL_CLASSES: Set[str] = {
-    "Agent",           # generic stub / base inside dialogue_engine.py
-    "LRUCache",        # caching implementation detail
+    "Agent",  # generic stub / base inside dialogue_engine.py
+    "LRUCache",  # caching implementation detail
     "MetricsTracker",  # internal metrics collector
-    "LLM",             # thin HTTP wrapper
-    "TopicManager",    # internal topic rotation helper
+    "LLM",  # thin HTTP wrapper
+    "TopicManager",  # internal topic rotation helper
     "VersionTracker",  # internal version snapshot helper
     "DefenseMechanism",
     "FreudianSlip",
@@ -113,9 +112,11 @@ INTERNAL_FUNCTIONS: Set[str] = {
 # Data classes
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ComparisonResult:
     """Holds the outcome of a single comparison category."""
+
     category: str
     in_code_not_docs: List[str] = field(default_factory=list)
     in_docs_not_code: List[str] = field(default_factory=list)
@@ -129,11 +130,14 @@ class ComparisonResult:
 # Markdown extractor
 # ---------------------------------------------------------------------------
 
+
 class MarkdownExtractor:
     """Extracts documented identifiers from a set of markdown files."""
 
     # Matches backtick-quoted identifiers: `IdentifierName`
-    _BACKTICK_RE = re.compile(r"`([A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*)`")
+    _BACKTICK_RE = re.compile(
+        r"`([A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*)`"
+    )
     # Matches bare .py filenames (not inside URLs)
     _PY_FILE_RE = re.compile(r"(?<![/\w])([a-z_][a-z_0-9]*\.py)\b")
 
@@ -184,6 +188,7 @@ class MarkdownExtractor:
 # ---------------------------------------------------------------------------
 # Python source inspector
 # ---------------------------------------------------------------------------
+
 
 class CodeInspector:
     """Extracts public symbols from Python source files."""
@@ -249,11 +254,7 @@ class CodeInspector:
         pkg = self.root / PY_PACKAGE_DIR
         if not pkg.exists():
             return set()
-        return {
-            p.name
-            for p in pkg.glob("*.py")
-            if p.name != "__init__.py"
-        }
+        return {p.name for p in pkg.glob("*.py") if p.name != "__init__.py"}
 
     def all_project_py_filenames(self) -> Set[str]:
         """Return all *.py filenames anywhere in the project (for doc cross-check)."""
@@ -273,6 +274,7 @@ class CodeInspector:
 # ---------------------------------------------------------------------------
 # Comparator
 # ---------------------------------------------------------------------------
+
 
 class ImplementationComparator:
     """Cross-compares code symbols with markdown documentation."""
@@ -299,9 +301,20 @@ class ImplementationComparator:
         code_all = self.inspector.class_names()
         # Exclude known Python builtins and common non-class tokens
         builtin_names: Set[str] = {
-            "True", "False", "None", "ValueError", "TypeError", "KeyError",
-            "IndexError", "AttributeError", "RuntimeError", "Exception",
-            "NotImplementedError", "StopIteration", "OSError", "IOError",
+            "True",
+            "False",
+            "None",
+            "ValueError",
+            "TypeError",
+            "KeyError",
+            "IndexError",
+            "AttributeError",
+            "RuntimeError",
+            "Exception",
+            "NotImplementedError",
+            "StopIteration",
+            "OSError",
+            "IOError",
             "LICENSE",  # file name, not a class
         }
         for token in sorted(doc_ids):
@@ -312,10 +325,7 @@ class ImplementationComparator:
                 continue
             # Accept if exact name exists, or if any code class starts with the token
             # (e.g., "Memory" matches "MemoryCore", "Emotion" matches "EmotionCore")
-            if not any(
-                cls == token or cls.startswith(token)
-                for cls in code_all
-            ):
+            if not any(cls == token or cls.startswith(token) for cls in code_all):
                 result.in_docs_not_code.append(f"class {token}")
 
         return result
@@ -379,6 +389,7 @@ class ImplementationComparator:
 # Reporter
 # ---------------------------------------------------------------------------
 
+
 def _print_result(result: ComparisonResult) -> None:
     status = "✅" if result.ok else "⚠️ "
     print(f"\n{status} {result.category}")
@@ -417,13 +428,16 @@ def _print_summary(results: List[ComparisonResult], md_files: List[str]) -> int:
         return 0
     else:
         suffix = "y" if total_issues == 1 else "ies"
-        print(f"\n⚠️   ISSUES FOUND — {total_issues} discrepanc{suffix} between code and docs.\n")
+        print(
+            f"\n⚠️   ISSUES FOUND — {total_issues} discrepanc{suffix} between code and docs.\n"
+        )
         return 1
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     root = Path(__file__).parent.parent
