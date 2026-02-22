@@ -617,75 +617,6 @@ Tests verify the key-rotation and legacy-format migration logic in `MemoryCore`:
 
 ```
 $ python -m pytest tests/test_dialogue_metrics.py -v
-================================================= test session starts ==================================================
-platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
-rootdir: /home/runner/work/Entelgia/Entelgia
-configfile: pyproject.toml
-plugins: cov-7.0.0
-collecting ... collected 51 items
-
-tests/test_dialogue_metrics.py::TestKeywords::test_only_long_words PASSED                                        [  1%]
-tests/test_dialogue_metrics.py::TestKeywords::test_lowercases PASSED                                             [  3%]
-tests/test_dialogue_metrics.py::TestJaccard::test_identical_sets PASSED                                          [  5%]
-tests/test_dialogue_metrics.py::TestJaccard::test_disjoint_sets PASSED                                           [  7%]
-tests/test_dialogue_metrics.py::TestJaccard::test_partial_overlap PASSED                                         [  9%]
-tests/test_dialogue_metrics.py::TestJaccard::test_empty_sets PASSED                                              [ 11%]
-tests/test_dialogue_metrics.py::TestCircularityRate::test_empty_dialog PASSED                                    [ 13%]
-tests/test_dialogue_metrics.py::TestCircularityRate::test_single_turn PASSED                                     [ 15%]
-tests/test_dialogue_metrics.py::TestCircularityRate::test_identical_turns_high_circularity PASSED                [ 17%]
-tests/test_dialogue_metrics.py::TestCircularityRate::test_completely_distinct_turns_low_circularity PASSED       [ 19%]
-tests/test_dialogue_metrics.py::TestCircularityRate::test_custom_threshold PASSED                                [ 21%]
-tests/test_dialogue_metrics.py::TestCircularityRate::test_result_in_range PASSED                                 [ 23%]
-tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_series_length_equals_dialog_length PASSED           [ 25%]
-tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_empty_dialog PASSED                                 [ 27%]
-tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_first_turn_is_zero PASSED                           [ 29%]
-tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_values_in_range PASSED                              [ 31%]
-tests/test_dialogue_metrics.py::TestProgressRate::test_empty_or_single_turn PASSED                               [ 33%]
-tests/test_dialogue_metrics.py::TestProgressRate::test_synthesis_marker_increases_progress PASSED                [ 35%]
-tests/test_dialogue_metrics.py::TestProgressRate::test_topic_shift_counts_as_progress PASSED                     [ 37%]
-tests/test_dialogue_metrics.py::TestProgressRate::test_question_resolution PASSED                                [ 39%]
-tests/test_dialogue_metrics.py::TestProgressRate::test_repetitive_dialog_low_progress PASSED                     [ 41%]
-tests/test_dialogue_metrics.py::TestProgressRate::test_result_in_range PASSED                                    [ 43%]
-tests/test_dialogue_metrics.py::TestInterventionUtility::test_no_fixy_turns PASSED                               [ 45%]
-tests/test_dialogue_metrics.py::TestInterventionUtility::test_fixy_reduces_circularity PASSED                    [ 47%]
-tests/test_dialogue_metrics.py::TestInterventionUtility::test_multiple_fixy_turns PASSED                         [ 49%]
-tests/test_dialogue_metrics.py::TestInterventionUtility::test_result_is_float PASSED                             [ 50%]
-tests/test_dialogue_metrics.py::TestComputeAllMetrics::test_keys_present PASSED                                  [ 52%]
-tests/test_dialogue_metrics.py::TestComputeAllMetrics::test_values_are_floats_in_range PASSED                    [ 54%]
-tests/test_dialogue_metrics.py::TestAblationCondition::test_all_four_conditions_defined PASSED                   [ 56%]
-tests/test_dialogue_metrics.py::TestAblationCondition::test_enum_has_four_members PASSED                         [ 58%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.BASELINE] PASSED [ 60%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DIALOGUE_ENGINE] PASSED [ 62%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.FIXY] PASSED [ 64%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DREAM] PASSED [ 66%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.BASELINE] PASSED [ 68%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DIALOGUE_ENGINE] PASSED [ 70%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.FIXY] PASSED   [ 72%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DREAM] PASSED  [ 74%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_reproducible_with_same_seed PASSED                        [ 76%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_different_seeds_differ PASSED                             [ 78%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_fixy_condition_contains_fixy_role PASSED                  [ 80%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_baseline_no_fixy_role PASSED                              [ 82%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_returns_all_four_conditions PASSED                         [ 84%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_each_condition_has_metrics_and_series PASSED               [ 86%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_circularity_series_length PASSED                           [ 88%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_reproducible PASSED                                        [ 90%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_baseline_higher_circularity_than_dialogue_engine PASSED    [ 92%]
-tests/test_dialogue_metrics.py::TestPrintResultsTable::test_smoke_no_crash PASSED                                [ 94%]
-tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_output PASSED                      [ 96%]
-tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED                            [ 98%]
-tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [100%]
-
-==================================================== tests coverage ====================================================
-Name                                     Stmts   Miss  Cover
-------------------------------------------------------------
-entelgia/__init__.py                        10      0   100%
-entelgia/ablation_study.py                 151     24    84%
-entelgia/dialogue_metrics.py                86     17    80%
-entelgia/energy_regulation.py               56      1    98%
-tests/test_dialogue_metrics.py             251      1    99%
-------------------------------------------------------------
-TOTAL                                     3752   3151    16%
 ================================================== 51 passed in 1.20s ==================================================
 ```
 
@@ -697,47 +628,6 @@ TOTAL                                     3752   3151    16%
 
 ```
 $ python -m pytest tests/test_dialogue_metrics.py -v -k "ablation or Ablation or RunCondition or RunAblation or PrintResults or PlotCircularity"
-================================================= test session starts ==================================================
-platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
-rootdir: /home/runner/work/Entelgia/Entelgia
-configfile: pyproject.toml
-plugins: cov-7.0.0
-collecting ... collected 51 items / 28 deselected / 23 selected
-
-tests/test_dialogue_metrics.py::TestAblationCondition::test_all_four_conditions_defined PASSED                   [  4%]
-tests/test_dialogue_metrics.py::TestAblationCondition::test_enum_has_four_members PASSED                         [  8%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.BASELINE] PASSED [ 13%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DIALOGUE_ENGINE] PASSED [ 17%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.FIXY] PASSED [ 21%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DREAM] PASSED [ 26%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.BASELINE] PASSED [ 30%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DIALOGUE_ENGINE] PASSED [ 34%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.FIXY] PASSED   [ 39%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DREAM] PASSED  [ 43%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_reproducible_with_same_seed PASSED                        [ 47%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_different_seeds_differ PASSED                             [ 52%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_fixy_condition_contains_fixy_role PASSED                  [ 56%]
-tests/test_dialogue_metrics.py::TestRunCondition::test_baseline_no_fixy_role PASSED                              [ 60%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_returns_all_four_conditions PASSED                         [ 65%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_each_condition_has_metrics_and_series PASSED               [ 69%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_circularity_series_length PASSED                           [ 73%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_reproducible PASSED                                        [ 78%]
-tests/test_dialogue_metrics.py::TestRunAblation::test_baseline_higher_circularity_than_dialogue_engine PASSED    [ 82%]
-tests/test_dialogue_metrics.py::TestPrintResultsTable::test_smoke_no_crash PASSED                                [ 86%]
-tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_output PASSED                      [ 91%]
-tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED                            [ 95%]
-tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [100%]
-
-==================================================== tests coverage ====================================================
-Name                                     Stmts   Miss  Cover
-------------------------------------------------------------
-entelgia/__init__.py                        10      0   100%
-entelgia/ablation_study.py                 151     24    84%
-entelgia/context_manager.py                118    101    14%
-entelgia/dialogue_metrics.py                86     19    78%
-entelgia/energy_regulation.py               56      1    98%
-------------------------------------------------------------
-TOTAL                                     3752   3259    13%
 ================================================= 23 passed, 28 deselected in 0.77s ================================================
 ```
 
@@ -749,29 +639,6 @@ TOTAL                                     3752   3259    13%
 
 ```
 $ python -m pytest tests/test_enhanced_dialogue.py::test_context_enrichment -v
-================================================= test session starts ==================================================
-platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
-rootdir: /home/runner/work/Entelgia/Entelgia
-configfile: pyproject.toml
-plugins: cov-7.0.0
-collecting ... collected 1 item
-
-tests/test_enhanced_dialogue.py::test_context_enrichment PASSED                                                  [100%]
-
-=============================== warnings summary ===============================
-tests/test_enhanced_dialogue.py::test_context_enrichment
-  PytestReturnNotNoneWarning: Test functions should return None, but
-  test_context_enrichment returned <class 'bool'>.
-
-==================================================== tests coverage ====================================================
-Name                                     Stmts   Miss  Cover
-------------------------------------------------------------
-entelgia/__init__.py                        10      0   100%
-entelgia/context_manager.py                118     47    60%
-entelgia/dialogue_engine.py                 99     85    14%
-entelgia/enhanced_personas.py               31     23    26%
-------------------------------------------------------------
-TOTAL                                     3752   3503     7%
 ================================================== 1 passed, 1 warning in 0.72s ==================================================
 ```
 
