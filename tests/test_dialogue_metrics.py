@@ -462,5 +462,85 @@ class TestPlotCircularity:
         assert len(output) > 0
 
 
+# ---------------------------------------------------------------------------
+# Dialogue Metrics Demo — exact output validation
+# ---------------------------------------------------------------------------
+
+#: The canonical sample dialogue used by the __main__ demo in dialogue_metrics.py.
+_DEMO_DIALOG = [
+    {"role": "Socrates", "text": "Consciousness emerges from complex information processing systems."},
+    {"role": "Athena",   "text": "Consciousness arises from information processing in complex systems."},
+    {"role": "Socrates", "text": "Free will might be an illusion created by deterministic processes."},
+    {"role": "Athena",   "text": "Therefore integrating both views reveals a compatibilist position."},
+    {"role": "Fixy",     "text": "I notice we have circled back. Let us reframe: how does embodiment change this?"},
+    {"role": "Socrates", "text": "The boundaries of self dissolve when examined through neuroscience."},
+    {"role": "Athena",   "text": "Language shapes the very thoughts we believe are our own."},
+    {"role": "Socrates", "text": "Therefore connecting these threads: identity is narrative, not substance."},
+    {"role": "Athena",   "text": "Bridging neuroscience and philosophy opens new unified frameworks."},
+    {"role": "Socrates", "text": "Synthesis of empirical and phenomenal approaches bridges the gap."},
+]
+
+
+class TestDialogueMetricsDemo:
+    """Validate the exact metric values and per-turn series shown in the demo table."""
+
+    def test_circularity_rate(self):
+        rate = circularity_rate(_DEMO_DIALOG)
+        assert rate == pytest.approx(0.022, abs=1e-3), f"Expected 0.022, got {rate:.3f}"
+
+    def test_progress_rate(self):
+        rate = progress_rate(_DEMO_DIALOG)
+        assert rate == pytest.approx(0.889, abs=1e-3), f"Expected 0.889, got {rate:.3f}"
+
+    def test_intervention_utility(self):
+        utility = intervention_utility(_DEMO_DIALOG)
+        assert utility == pytest.approx(0.167, abs=1e-3), f"Expected 0.167, got {utility:.3f}"
+
+    def test_per_turn_circularity_series_length(self):
+        series = circularity_per_turn(_DEMO_DIALOG)
+        assert len(series) == 10
+
+    def test_per_turn_circularity_values(self):
+        expected = [0.00, 1.00, 0.33, 0.17, 0.10, 0.07, 0.00, 0.00, 0.00, 0.00]
+        series = circularity_per_turn(_DEMO_DIALOG)
+        for i, (got, exp) in enumerate(zip(series, expected), start=1):
+            assert got == pytest.approx(exp, abs=0.01), (
+                f"Turn {i}: expected {exp:.2f}, got {got:.2f}"
+            )
+
+    def test_demo_stdout_contains_header_and_metrics(self):
+        """Smoke-test: running the demo block produces the expected header and metric lines."""
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "entelgia/dialogue_metrics.py"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        output = result.stdout
+        assert "Dialogue Metrics Demo" in output
+        assert "Circularity Rate    : 0.022" in output
+        assert "Progress Rate       : 0.889" in output
+        assert "Intervention Utility: 0.167" in output
+
+    def test_demo_stdout_per_turn_bars(self):
+        """The per-turn bar chart lines are present in the demo output."""
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "entelgia/dialogue_metrics.py"],
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        output = result.stdout
+        assert "Turn  2: 1.00 |####################" in output
+        assert "Turn  3: 0.33 |#######" in output
+        assert "Turn  7: 0.00 |" in output
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
