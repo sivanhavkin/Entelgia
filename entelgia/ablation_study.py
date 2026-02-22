@@ -206,7 +206,7 @@ def _simulate_dream(turns: int, rng: random.Random) -> List[Dict[str, str]]:
     # NOTE: This function is not thread-safe because it modifies the global
     # random state; EntelgiaAgent uses random.uniform internally and cannot
     # accept an external RNG instance without modifying energy_regulation.py.
-    random.seed(rng.randint(0, 2 ** 31))
+    random.seed(rng.randint(0, 2**31))
     dialog: List[Dict[str, str]] = []
     agent_a = EntelgiaAgent("Socrates", energy_drain_min=12.0, energy_drain_max=18.0)
     agent_b = EntelgiaAgent("Athena", energy_drain_min=12.0, energy_drain_max=18.0)
@@ -361,7 +361,9 @@ def plot_circularity(
         fig, ax = plt.subplots(figsize=(10, 5))
         for label, data in results.items():
             series = data["circularity_series"]
-            ax.plot(range(1, len(series) + 1), series, marker="o", markersize=3, label=label)
+            ax.plot(
+                range(1, len(series) + 1), series, marker="o", markersize=3, label=label
+            )
 
         ax.set_xlabel("Turn")
         ax.set_ylabel("Circularity Rate")
@@ -388,12 +390,12 @@ def _ascii_circularity_chart(results: Dict[str, Dict]) -> None:
     print("  1.0 |")
 
     # Sample every 5 turns
-    max_turns = max(
-        len(d["circularity_series"]) for d in results.values()
-    )
+    max_turns = max(len(d["circularity_series"]) for d in results.values())
     sample_every = max(1, max_turns // 20)
 
-    rows: List[List[str]] = [[" "] * (max_turns // sample_every + 1) for _ in range(height)]
+    rows: List[List[str]] = [
+        [" "] * (max_turns // sample_every + 1) for _ in range(height)
+    ]
 
     labels = list(results.keys())
     markers = ["*", "o", "+", "#"]

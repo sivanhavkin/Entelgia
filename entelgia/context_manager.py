@@ -357,14 +357,26 @@ if __name__ == "__main__":
         {"text": "Embodiment plays a crucial role in shaping cognition."},
     ]
     sample_ltm = [
-        {"content": "Socrates argued that the unexamined life is not worth living.", "importance": 0.9},
-        {"content": "Athena synthesized Platonic idealism with empirical observation.", "importance": 0.75},
-        {"content": "Earlier dialogue resolved the free-will tension via compatibilism.", "importance": 0.6},
+        {
+            "content": "Socrates argued that the unexamined life is not worth living.",
+            "importance": 0.9,
+        },
+        {
+            "content": "Athena synthesized Platonic idealism with empirical observation.",
+            "importance": 0.75,
+        },
+        {
+            "content": "Earlier dialogue resolved the free-will tension via compatibilism.",
+            "importance": 0.6,
+        },
     ]
     sample_dialog = [
         {"role": "Socrates", "text": "What is the nature of consciousness?"},
-        {"role": "Athena",   "text": "It emerges from complex information processing."},
-        {"role": "Socrates", "text": "But does that account for subjective experience?"},
+        {"role": "Athena", "text": "It emerges from complex information processing."},
+        {
+            "role": "Socrates",
+            "text": "But does that account for subjective experience?",
+        },
     ]
     sample_debate_profile = {"style": "integrative"}
 
