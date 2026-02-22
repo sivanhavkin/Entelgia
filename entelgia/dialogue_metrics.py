@@ -17,7 +17,6 @@ intervention_utility  — Average reduction in circularity in the window followi
 import re
 from typing import Dict, List, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Keyword helpers
 # ---------------------------------------------------------------------------
@@ -85,7 +84,9 @@ def _topic_signature(turn: Dict[str, str]) -> frozenset:
     return _keywords(turn.get("text", ""))
 
 
-def _circularity_in_window(turns: List[Dict[str, str]], threshold: float = 0.5) -> float:
+def _circularity_in_window(
+    turns: List[Dict[str, str]], threshold: float = 0.5
+) -> float:
     """
     Compute the circularity rate for a list of turns.
 
@@ -311,16 +312,46 @@ def compute_all_metrics(
 
 if __name__ == "__main__":
     _sample_dialog: List[Dict[str, str]] = [
-        {"role": "Socrates", "text": "Consciousness emerges from complex information processing systems."},
-        {"role": "Athena",   "text": "Consciousness arises from information processing in complex systems."},
-        {"role": "Socrates", "text": "Free will might be an illusion created by deterministic processes."},
-        {"role": "Athena",   "text": "Therefore integrating both views reveals a compatibilist position."},
-        {"role": "Fixy",     "text": "I notice we have circled back. Let us reframe: how does embodiment change this?"},
-        {"role": "Socrates", "text": "The boundaries of self dissolve when examined through neuroscience."},
-        {"role": "Athena",   "text": "Language shapes the very thoughts we believe are our own."},
-        {"role": "Socrates", "text": "Therefore connecting these threads: identity is narrative, not substance."},
-        {"role": "Athena",   "text": "Bridging neuroscience and philosophy opens new unified frameworks."},
-        {"role": "Socrates", "text": "Synthesis of empirical and phenomenal approaches bridges the gap."},
+        {
+            "role": "Socrates",
+            "text": "Consciousness emerges from complex information processing systems.",
+        },
+        {
+            "role": "Athena",
+            "text": "Consciousness arises from information processing in complex systems.",
+        },
+        {
+            "role": "Socrates",
+            "text": "Free will might be an illusion created by deterministic processes.",
+        },
+        {
+            "role": "Athena",
+            "text": "Therefore integrating both views reveals a compatibilist position.",
+        },
+        {
+            "role": "Fixy",
+            "text": "I notice we have circled back. Let us reframe: how does embodiment change this?",
+        },
+        {
+            "role": "Socrates",
+            "text": "The boundaries of self dissolve when examined through neuroscience.",
+        },
+        {
+            "role": "Athena",
+            "text": "Language shapes the very thoughts we believe are our own.",
+        },
+        {
+            "role": "Socrates",
+            "text": "Therefore connecting these threads: identity is narrative, not substance.",
+        },
+        {
+            "role": "Athena",
+            "text": "Bridging neuroscience and philosophy opens new unified frameworks.",
+        },
+        {
+            "role": "Socrates",
+            "text": "Synthesis of empirical and phenomenal approaches bridges the gap.",
+        },
     ]
 
     print("=" * 60)

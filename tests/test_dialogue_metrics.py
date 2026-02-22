@@ -45,7 +45,6 @@ from entelgia.ablation_study import (
     _ascii_circularity_chart,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helper factories
 # ---------------------------------------------------------------------------
@@ -254,9 +253,14 @@ class TestInterventionUtility:
             "neuroscience biology evolution adaptation survival reproduction",
         ]
         turns_before = [{"role": "Socrates", "text": repetitive}] * 5
-        fixy_turn = [{"role": "Fixy", "text": "Let us reframe and integrate diverse views"}]
+        fixy_turn = [
+            {"role": "Fixy", "text": "Let us reframe and integrate diverse views"}
+        ]
         turns_after = [{"role": "Athena", "text": t} for t in diverse] + [
-            {"role": "Socrates", "text": "freedom justice democracy social contract theory"}
+            {
+                "role": "Socrates",
+                "text": "freedom justice democracy social contract theory",
+            }
         ]
         dialog = turns_before + fixy_turn + turns_after
         utility = intervention_utility(dialog, window=5)
@@ -268,9 +272,13 @@ class TestInterventionUtility:
         dialog = []
         for i in range(20):
             if i in (6, 13):
-                dialog.append({"role": "Fixy", "text": "Let us reframe and bridge perspectives"})
+                dialog.append(
+                    {"role": "Fixy", "text": "Let us reframe and bridge perspectives"}
+                )
             elif i > 6:
-                dialog.append({"role": _make_dialog([diverse])[0]["role"], "text": diverse})
+                dialog.append(
+                    {"role": _make_dialog([diverse])[0]["role"], "text": diverse}
+                )
             else:
                 dialog.append({"role": "Socrates", "text": repetitive})
         utility = intervention_utility(dialog, window=4)
@@ -388,14 +396,16 @@ class TestRunAblation:
         results = run_ablation(turns=10, seed=0)
         for label, data in results.items():
             assert "metrics" in data, f"Missing 'metrics' for {label}"
-            assert "circularity_series" in data, f"Missing 'circularity_series' for {label}"
+            assert (
+                "circularity_series" in data
+            ), f"Missing 'circularity_series' for {label}"
 
     def test_circularity_series_length(self):
         results = run_ablation(turns=15, seed=0)
         for label, data in results.items():
-            assert len(data["circularity_series"]) == 15, (
-                f"Wrong series length for {label}"
-            )
+            assert (
+                len(data["circularity_series"]) == 15
+            ), f"Wrong series length for {label}"
 
     def test_reproducible(self):
         r1 = run_ablation(turns=10, seed=99)
@@ -407,9 +417,9 @@ class TestRunAblation:
         results = run_ablation(turns=30, seed=42)
         baseline_cr = results["Baseline"]["metrics"]["circularity_rate"]
         de_cr = results["DialogueEngine/Seed"]["metrics"]["circularity_rate"]
-        assert baseline_cr > de_cr, (
-            f"Expected Baseline ({baseline_cr:.3f}) > DialogueEngine ({de_cr:.3f})"
-        )
+        assert (
+            baseline_cr > de_cr
+        ), f"Expected Baseline ({baseline_cr:.3f}) > DialogueEngine ({de_cr:.3f})"
 
 
 # ---------------------------------------------------------------------------
@@ -435,7 +445,9 @@ class TestPrintResultsTable:
             print_results_table(results)
         output = buf.getvalue()
         for condition in AblationCondition:
-            assert condition.value in output, f"Condition '{condition.value}' missing from table"
+            assert (
+                condition.value in output
+            ), f"Condition '{condition.value}' missing from table"
 
 
 # ---------------------------------------------------------------------------
@@ -468,16 +480,46 @@ class TestPlotCircularity:
 
 #: The canonical sample dialogue used by the __main__ demo in dialogue_metrics.py.
 _DEMO_DIALOG = [
-    {"role": "Socrates", "text": "Consciousness emerges from complex information processing systems."},
-    {"role": "Athena",   "text": "Consciousness arises from information processing in complex systems."},
-    {"role": "Socrates", "text": "Free will might be an illusion created by deterministic processes."},
-    {"role": "Athena",   "text": "Therefore integrating both views reveals a compatibilist position."},
-    {"role": "Fixy",     "text": "I notice we have circled back. Let us reframe: how does embodiment change this?"},
-    {"role": "Socrates", "text": "The boundaries of self dissolve when examined through neuroscience."},
-    {"role": "Athena",   "text": "Language shapes the very thoughts we believe are our own."},
-    {"role": "Socrates", "text": "Therefore connecting these threads: identity is narrative, not substance."},
-    {"role": "Athena",   "text": "Bridging neuroscience and philosophy opens new unified frameworks."},
-    {"role": "Socrates", "text": "Synthesis of empirical and phenomenal approaches bridges the gap."},
+    {
+        "role": "Socrates",
+        "text": "Consciousness emerges from complex information processing systems.",
+    },
+    {
+        "role": "Athena",
+        "text": "Consciousness arises from information processing in complex systems.",
+    },
+    {
+        "role": "Socrates",
+        "text": "Free will might be an illusion created by deterministic processes.",
+    },
+    {
+        "role": "Athena",
+        "text": "Therefore integrating both views reveals a compatibilist position.",
+    },
+    {
+        "role": "Fixy",
+        "text": "I notice we have circled back. Let us reframe: how does embodiment change this?",
+    },
+    {
+        "role": "Socrates",
+        "text": "The boundaries of self dissolve when examined through neuroscience.",
+    },
+    {
+        "role": "Athena",
+        "text": "Language shapes the very thoughts we believe are our own.",
+    },
+    {
+        "role": "Socrates",
+        "text": "Therefore connecting these threads: identity is narrative, not substance.",
+    },
+    {
+        "role": "Athena",
+        "text": "Bridging neuroscience and philosophy opens new unified frameworks.",
+    },
+    {
+        "role": "Socrates",
+        "text": "Synthesis of empirical and phenomenal approaches bridges the gap.",
+    },
 ]
 
 
@@ -494,7 +536,9 @@ class TestDialogueMetricsDemo:
 
     def test_intervention_utility(self):
         utility = intervention_utility(_DEMO_DIALOG)
-        assert utility == pytest.approx(0.167, abs=1e-3), f"Expected 0.167, got {utility:.3f}"
+        assert utility == pytest.approx(
+            0.167, abs=1e-3
+        ), f"Expected 0.167, got {utility:.3f}"
 
     def test_per_turn_circularity_series_length(self):
         series = circularity_per_turn(_DEMO_DIALOG)
@@ -504,9 +548,9 @@ class TestDialogueMetricsDemo:
         expected = [0.00, 1.00, 0.33, 0.17, 0.10, 0.07, 0.00, 0.00, 0.00, 0.00]
         series = circularity_per_turn(_DEMO_DIALOG)
         for i, (got, exp) in enumerate(zip(series, expected), start=1):
-            assert got == pytest.approx(exp, abs=0.01), (
-                f"Turn {i}: expected {exp:.2f}, got {got:.2f}"
-            )
+            assert got == pytest.approx(
+                exp, abs=0.01
+            ), f"Turn {i}: expected {exp:.2f}, got {got:.2f}"
 
     def test_demo_stdout_contains_header_and_metrics(self):
         """Smoke-test: running the demo block produces the expected header and metric lines."""
