@@ -434,7 +434,7 @@ entelgia/
 ├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
 ├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
 ├── memory_security.py       # HMAC-SHA256 signature helpers
-├── dialogue_metrics.py      # Circularity, progress & intervention-utility metrics (PR #111)
+├── dialogue_metrics.py      # Circularity, progress & intervention utility metrics (PR #111)
 └── ablation_study.py        # 4-condition reproducible ablation study (PR #111)
 ```
 
@@ -616,36 +616,281 @@ Tests verify the key-rotation and legacy-format migration logic in `MemoryCore`:
 ### 📋 Latest Test Run Results
 
 ```
-================================================= test session info ==================================================
-platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
+cachedir: .pytest_cache
 rootdir: /home/runner/work/Entelgia/Entelgia
+configfile: pyproject.toml
 plugins: cov-7.0.0
+collecting ... collected 209 items
 
-collected 209 items
+tests/test_behavioral_rules.py::TestRuleASocrates::test_returns_nonempty_rule_at_exactly_5 PASSED [  0%]
+tests/test_behavioral_rules.py::TestRuleASocrates::test_returns_nonempty_rule_above_5 PASSED [  0%]
+tests/test_behavioral_rules.py::TestRuleASocrates::test_returns_empty_below_5 PASSED [  1%]
+tests/test_behavioral_rules.py::TestRuleASocrates::test_rule_mentions_binary_choice PASSED [  1%]
+tests/test_behavioral_rules.py::TestRuleASocrates::test_rule_mentions_end_response PASSED [  2%]
+tests/test_behavioral_rules.py::TestRuleASocrates::test_non_socrates_not_triggered_even_with_high_conflict PASSED [  2%]
+tests/test_behavioral_rules.py::TestRuleBAnthena::test_returns_nonempty_rule_at_exactly_3 PASSED [  3%]
+tests/test_behavioral_rules.py::TestRuleBAnthena::test_returns_nonempty_rule_above_3 PASSED [  3%]
+tests/test_behavioral_rules.py::TestRuleBAnthena::test_returns_empty_below_3 PASSED [  4%]
+tests/test_behavioral_rules.py::TestRuleBAnthena::test_rule_mentions_however PASSED [  4%]
+tests/test_behavioral_rules.py::TestRuleBAnthena::test_rule_mentions_yet PASSED [  5%]
+tests/test_behavioral_rules.py::TestRuleBAnthena::test_rule_mentions_this_assumes PASSED [  5%]
+tests/test_behavioral_rules.py::TestRuleBAnthena::test_non_athena_not_triggered_even_with_high_dissent PASSED [  6%]
+tests/test_behavioral_rules.py::TestPromptInjection::test_rule_a_injected_before_respond_now PASSED [  6%]
+tests/test_behavioral_rules.py::TestPromptInjection::test_rule_b_injected_before_respond_now PASSED [  7%]
+tests/test_behavioral_rules.py::TestPromptInjection::test_no_rule_leaves_prompt_unchanged PASSED [  7%]
+tests/test_dialogue_metrics.py::TestKeywords::test_only_long_words PASSED [  8%]
+tests/test_dialogue_metrics.py::TestKeywords::test_lowercases PASSED     [  8%]
+tests/test_dialogue_metrics.py::TestJaccard::test_identical_sets PASSED  [  9%]
+tests/test_dialogue_metrics.py::TestJaccard::test_disjoint_sets PASSED   [  9%]
+tests/test_dialogue_metrics.py::TestJaccard::test_partial_overlap PASSED [ 10%]
+tests/test_dialogue_metrics.py::TestJaccard::test_empty_sets PASSED      [ 10%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_empty_dialog PASSED [ 11%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_single_turn PASSED [ 11%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_identical_turns_high_circularity PASSED [ 11%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_completely_distinct_turns_low_circularity PASSED [ 12%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_custom_threshold PASSED [ 12%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_result_in_range PASSED [ 13%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_series_length_equals_dialog_length PASSED [ 13%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_empty_dialog PASSED [ 14%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_first_turn_is_zero PASSED [ 14%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_values_in_range PASSED [ 15%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_empty_or_single_turn PASSED [ 15%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_synthesis_marker_increases_progress PASSED [ 16%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_topic_shift_counts_as_progress PASSED [ 16%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_question_resolution PASSED [ 17%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_repetitive_dialog_low_progress PASSED [ 17%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_result_in_range PASSED [ 18%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_no_fixy_turns PASSED [ 18%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_fixy_reduces_circularity PASSED [ 19%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_multiple_fixy_turns PASSED [ 19%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_result_is_float PASSED [ 20%]
+tests/test_dialogue_metrics.py::TestComputeAllMetrics::test_keys_present PASSED [ 20%]
+tests/test_dialogue_metrics.py::TestComputeAllMetrics::test_values_are_floats_in_range PASSED [ 21%]
+tests/test_dialogue_metrics.py::TestAblationCondition::test_all_four_conditions_defined PASSED [ 21%]
+tests/test_dialogue_metrics.py::TestAblationCondition::test_enum_has_four_members PASSED [ 22%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.BASELINE] PASSED [ 22%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DIALOGUE_ENGINE] PASSED [ 22%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.FIXY] PASSED [ 23%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DREAM] PASSED [ 23%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.BASELINE] PASSED [ 24%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DIALOGUE_ENGINE] PASSED [ 24%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.FIXY] PASSED [ 25%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DREAM] PASSED [ 25%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_reproducible_with_same_seed PASSED [ 26%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_different_seeds_differ PASSED [ 26%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_fixy_condition_contains_fixy_role PASSED [ 27%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_baseline_no_fixy_role PASSED [ 27%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_returns_all_four_conditions PASSED [ 28%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_each_condition_has_metrics_and_series PASSED [ 28%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_circularity_series_length PASSED [ 29%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_reproducible PASSED [ 29%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_baseline_higher_circularity_than_dialogue_engine PASSED [ 30%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_smoke_no_crash PASSED [ 30%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_output PASSED [ 31%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED [ 31%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [ 32%]
+tests/test_drive_correlations.py::TestConflictIndex::test_balanced_drives_zero_conflict PASSED [ 32%]
+tests/test_drive_correlations.py::TestConflictIndex::test_conflict_with_high_id_only PASSED [ 33%]
+tests/test_drive_correlations.py::TestConflictIndex::test_conflict_with_high_superego_only PASSED [ 33%]
+tests/test_drive_correlations.py::TestConflictIndex::test_symmetric_high_conflict PASSED [ 33%]
+tests/test_drive_correlations.py::TestConflictIndex::test_maximum_conflict PASSED [ 34%]
+tests/test_drive_correlations.py::TestConflictIndex::test_conflict_parametrized[2.9-8.8-8.7-expected0] PASSED [ 34%]
+tests/test_drive_correlations.py::TestConflictIndex::test_conflict_parametrized[5.0-5.0-5.0-expected1] PASSED [ 35%]
+tests/test_drive_correlations.py::TestConflictIndex::test_conflict_parametrized[10.0-5.0-0.0-expected2] PASSED [ 35%]
+tests/test_drive_correlations.py::TestEgoErosionUnderConflict::test_high_conflict_reduces_ego PASSED [ 36%]
+tests/test_drive_correlations.py::TestEgoErosionUnderConflict::test_low_conflict_does_not_erode_ego PASSED [ 36%]
+tests/test_drive_correlations.py::TestEgoErosionUnderConflict::test_erosion_proportional_to_conflict PASSED [ 37%]
+tests/test_drive_correlations.py::TestEgoErosionUnderConflict::test_ego_never_negative PASSED [ 37%]
+tests/test_drive_correlations.py::TestTemperatureConflictCorrelation::test_zero_conflict_baseline_temperature PASSED [ 38%]
+tests/test_drive_correlations.py::TestTemperatureConflictCorrelation::test_higher_conflict_raises_temperature PASSED [ 38%]
+tests/test_drive_correlations.py::TestTemperatureConflictCorrelation::test_temperature_stays_within_bounds[0.0-10.0-0.0] PASSED [ 39%]
+tests/test_drive_correlations.py::TestTemperatureConflictCorrelation::test_temperature_stays_within_bounds[10.0-0.0-10.0] PASSED [ 39%]
+tests/test_drive_correlations.py::TestTemperatureConflictCorrelation::test_temperature_stays_within_bounds[5.0-5.0-5.0] PASSED [ 40%]
+tests/test_drive_correlations.py::TestTemperatureConflictCorrelation::test_conflict_component_is_positive PASSED [ 40%]
+tests/test_drive_correlations.py::TestEnergyDrainConflictCorrelation::test_high_conflict_drains_more_energy PASSED [ 41%]
+tests/test_drive_correlations.py::TestEnergyDrainConflictCorrelation::test_energy_never_negative PASSED [ 41%]
+tests/test_drive_correlations.py::TestEnergyDrainConflictCorrelation::test_energy_drain_capped_at_twice_max PASSED [ 42%]
+tests/test_drive_pressure.py::TestComputeDrivePressure::test_default_initial_value PASSED [ 42%]
+tests/test_drive_pressure.py::TestComputeDrivePressure::test_output_clamped_to_range PASSED [ 43%]
+tests/test_drive_pressure.py::TestComputeDrivePressure::test_high_conflict_raises_pressure PASSED [ 43%]
+tests/test_drive_pressure.py::TestComputeDrivePressure::test_stagnation_raises_pressure PASSED [ 44%]
+tests/test_drive_pressure.py::TestComputeDrivePressure::test_decay_when_calm PASSED [ 44%]
+tests/test_drive_pressure.py::TestComputeDrivePressure::test_unresolved_raises_pressure PASSED [ 44%]
+tests/test_drive_pressure.py::TestComputeDrivePressure::test_smoothing_inertia PASSED [ 45%]
+tests/test_drive_pressure.py::TestPressureRisesDuringStagnation::test_pressure_rises_over_8_stagnant_turns PASSED [ 45%]
+tests/test_drive_pressure.py::TestPressureRisesDuringStagnation::test_pressure_at_turn_6_is_higher_than_baseline PASSED [ 46%]
+tests/test_drive_pressure.py::TestPressureForcedBrevity::test_trim_to_80_words PASSED [ 46%]
+tests/test_drive_pressure.py::TestPressureForcedBrevity::test_trim_to_120_words PASSED [ 47%]
+tests/test_drive_pressure.py::TestPressureForcedBrevity::test_short_text_unchanged PASSED [ 47%]
+tests/test_drive_pressure.py::TestPressureForcedBrevity::test_trim_preserves_sentence_boundary PASSED [ 48%]
+tests/test_drive_pressure.py::TestPressureForcedBrevity::test_high_pressure_produces_short_output PASSED [ 48%]
+tests/test_drive_pressure.py::TestPressureDecaysAfterProgress::test_pressure_decreases_after_resolution PASSED [ 49%]
+tests/test_drive_pressure.py::TestPressureDecaysAfterProgress::test_unresolved_count_decrements_on_answer PASSED [ 49%]
+tests/test_drive_pressure.py::TestPressureDecaysAfterProgress::test_unresolved_count_no_decrement_without_answer PASSED [ 50%]
+tests/test_drive_pressure.py::TestNoBreakingChanges::test_constants_present PASSED [ 50%]
+tests/test_drive_pressure.py::TestNoBreakingChanges::test_new_functions_importable PASSED [ 51%]
+tests/test_drive_pressure.py::TestNoBreakingChanges::test_topic_signature_returns_string PASSED [ 51%]
+tests/test_drive_pressure.py::TestNoBreakingChanges::test_topic_signature_same_for_similar_text PASSED [ 52%]
+tests/test_drive_pressure.py::TestNoBreakingChanges::test_topic_signature_different_for_different_topics PASSED [ 52%]
+tests/test_drive_pressure.py::TestNoBreakingChanges::test_compute_drive_pressure_is_deterministic PASSED [ 53%]
+tests/test_energy_regulation.py::TestFixyRegulatorDefaults::test_default_safety_threshold PASSED [ 53%]
+tests/test_energy_regulation.py::TestFixyRegulatorDefaults::test_custom_threshold PASSED [ 54%]
+tests/test_energy_regulation.py::TestFixyRegulatorDefaults::test_hallucination_risk_probability_constant PASSED [ 54%]
+tests/test_energy_regulation.py::TestFixyRegulatorDefaults::test_hallucination_risk_energy_cutoff_constant PASSED [ 55%]
+tests/test_energy_regulation.py::TestFixyRegulatorCheckStability::test_dream_triggered_when_energy_at_threshold PASSED [ 55%]
+tests/test_energy_regulation.py::TestFixyRegulatorCheckStability::test_dream_triggered_when_energy_below_threshold PASSED [ 55%]
+tests/test_energy_regulation.py::TestFixyRegulatorCheckStability::test_dream_recharges_energy PASSED [ 56%]
+tests/test_energy_regulation.py::TestFixyRegulatorCheckStability::test_no_action_when_energy_high PASSED [ 56%]
+tests/test_energy_regulation.py::TestFixyRegulatorCheckStability::test_hallucination_risk_possible_below_60 PASSED [ 57%]
+tests/test_energy_regulation.py::TestFixyRegulatorCheckStability::test_no_hallucination_risk_above_60 PASSED [ 57%]
+tests/test_energy_regulation.py::TestEntelgiaAgentInit::test_initial_energy_level PASSED [ 58%]
+tests/test_energy_regulation.py::TestEntelgiaAgentInit::test_initial_memory_empty PASSED [ 58%]
+tests/test_energy_regulation.py::TestEntelgiaAgentInit::test_has_regulator PASSED [ 59%]
+tests/test_energy_regulation.py::TestEntelgiaAgentInit::test_custom_safety_threshold_propagates PASSED [ 59%]
+tests/test_energy_regulation.py::TestEntelgiaAgentProcessStep::test_energy_drains_per_step PASSED [ 60%]
+tests/test_energy_regulation.py::TestEntelgiaAgentProcessStep::test_input_appended_to_memory PASSED [ 60%]
+tests/test_energy_regulation.py::TestEntelgiaAgentProcessStep::test_returns_recharged_after_dream PASSED [ 61%]
+tests/test_energy_regulation.py::TestEntelgiaAgentProcessStep::test_returns_ok_when_energy_high PASSED [ 61%]
+tests/test_energy_regulation.py::TestEntelgiaAgentProcessStep::test_energy_restored_after_dream_cycle PASSED [ 62%]
+tests/test_energy_regulation.py::TestEntelgiaAgentDreamCycle::test_dream_clears_subconscious_store PASSED [ 62%]
+tests/test_energy_regulation.py::TestEntelgiaAgentDreamCycle::test_dream_consolidates_subconscious_to_conscious PASSED [ 63%]
+tests/test_energy_regulation.py::TestEntelgiaAgentDreamCycle::test_dream_does_not_truncate_long_term_memories PASSED [ 63%]
+tests/test_energy_regulation.py::TestEntelgiaAgentDreamCycle::test_dream_forgets_irrelevant_stm_entries PASSED [ 64%]
+tests/test_energy_regulation.py::TestEntelgiaAgentDreamCycle::test_is_relevant_returns_true_for_non_empty PASSED [ 64%]
+tests/test_energy_regulation.py::TestEntelgiaAgentDreamCycle::test_is_relevant_returns_false_for_empty PASSED [ 65%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_long_term_memory_starts_empty PASSED [ 65%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_critical_entry_promoted_to_ltm PASSED [ 66%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_non_critical_entry_not_promoted PASSED [ 66%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_ltm_no_duplicates PASSED [ 66%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_is_critical_returns_true_for_substantive PASSED [ 67%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_is_critical_returns_false_for_trivial PASSED [ 67%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_is_critical_returns_false_for_empty PASSED [ 68%]
+tests/test_energy_regulation.py::TestEntelgiaAgentLTMPromotion::test_subconscious_critical_entry_promoted_to_ltm PASSED [ 68%]
+tests/test_energy_regulation.py::TestPackageImports::test_import_fixy_regulator PASSED [ 69%]
+tests/test_energy_regulation.py::TestPackageImports::test_import_entelgia_agent PASSED [ 69%]
+tests/test_enhanced_dialogue.py::test_dynamic_speaker_selection PASSED   [ 70%]
+tests/test_enhanced_dialogue.py::test_seed_variety PASSED                [ 70%]
+tests/test_enhanced_dialogue.py::test_context_enrichment PASSED          [ 71%]
+tests/test_enhanced_dialogue.py::test_fixy_interventions PASSED          [ 71%]
+tests/test_enhanced_dialogue.py::test_persona_formatting PASSED          [ 72%]
+tests/test_enhanced_dialogue.py::test_persona_pronouns PASSED            [ 72%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_repression_anger_above_threshold PASSED [ 73%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_repression_fear_above_threshold PASSED [ 73%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_repression_shame_above_threshold PASSED [ 74%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_repression_guilt_above_threshold PASSED [ 74%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_repression_anxiety_above_threshold PASSED [ 75%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_no_repression_below_threshold PASSED [ 75%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_no_repression_neutral_emotion PASSED [ 76%]
+tests/test_long_term_memory.py::TestDefenseMechanismRepression::test_no_repression_without_emotion PASSED [ 76%]
+tests/test_long_term_memory.py::TestDefenseMechanismSuppression::test_suppression_forbidden_keyword PASSED [ 77%]
+tests/test_long_term_memory.py::TestDefenseMechanismSuppression::test_suppression_secret_keyword PASSED [ 77%]
+tests/test_long_term_memory.py::TestDefenseMechanismSuppression::test_suppression_dangerous_keyword PASSED [ 77%]
+tests/test_long_term_memory.py::TestDefenseMechanismSuppression::test_no_suppression_clean_content PASSED [ 78%]
+tests/test_long_term_memory.py::TestDefenseMechanismSuppression::test_both_flags_set_simultaneously PASSED [ 78%]
+tests/test_long_term_memory.py::TestDefenseMechanismSuppression::test_suppression_case_insensitive PASSED [ 79%]
+tests/test_long_term_memory.py::TestFreudianSlipAttempt::test_no_slip_without_defended_memories PASSED [ 79%]
+tests/test_long_term_memory.py::TestFreudianSlipAttempt::test_slip_occurs_with_high_probability PASSED [ 80%]
+tests/test_long_term_memory.py::TestFreudianSlipAttempt::test_slip_sets_source_freudian_slip PASSED [ 80%]
+tests/test_long_term_memory.py::TestFreudianSlipAttempt::test_no_slip_with_zero_probability PASSED [ 81%]
+tests/test_long_term_memory.py::TestFreudianSlipAttempt::test_slip_returns_dict PASSED [ 81%]
+tests/test_long_term_memory.py::TestFreudianSlipAttempt::test_slip_does_not_modify_original PASSED [ 82%]
+tests/test_long_term_memory.py::TestFreudianSlipFormatting::test_format_slip_contains_slip_marker PASSED [ 82%]
+tests/test_long_term_memory.py::TestFreudianSlipFormatting::test_format_slip_contains_content PASSED [ 83%]
+tests/test_long_term_memory.py::TestSelfReplicationPatternDetection::test_no_promotion_without_recurring_patterns PASSED [ 83%]
+tests/test_long_term_memory.py::TestSelfReplicationPatternDetection::test_promotion_with_recurring_keywords PASSED [ 84%]
+tests/test_long_term_memory.py::TestSelfReplicationPatternDetection::test_promoted_memories_have_self_replication_source PASSED [ 84%]
+tests/test_long_term_memory.py::TestSelfReplicationPatternDetection::test_max_three_promoted PASSED [ 85%]
+tests/test_long_term_memory.py::TestSelfReplicationPatternDetection::test_highest_importance_promoted_first PASSED [ 85%]
+tests/test_long_term_memory.py::TestSelfReplicationPatternDetection::test_replication_does_not_modify_originals PASSED [ 86%]
+tests/test_long_term_memory.py::TestSelfReplicationFormatting::test_format_contains_self_repl_marker PASSED [ 86%]
+tests/test_long_term_memory.py::TestSelfReplicationFormatting::test_format_contains_content PASSED [ 87%]
+tests/test_long_term_memory.py::TestLongTermMemoryPackageImports::test_import_defense_mechanism PASSED [ 87%]
+tests/test_long_term_memory.py::TestLongTermMemoryPackageImports::test_import_freudian_slip PASSED [ 88%]
+tests/test_long_term_memory.py::TestLongTermMemoryPackageImports::test_import_self_replication PASSED [ 88%]
+tests/test_memory_security.py::TestSignatureCreation::test_create_signature_success PASSED [ 88%]
+tests/test_memory_security.py::TestSignatureCreation::test_create_signature_deterministic PASSED [ 89%]
+tests/test_memory_security.py::TestSignatureCreation::test_create_signature_different_messages PASSED [ 89%]
+tests/test_memory_security.py::TestSignatureCreation::test_create_signature_empty_message PASSED [ 90%]
+tests/test_memory_security.py::TestSignatureCreation::test_create_signature_empty_key PASSED [ 90%]
+tests/test_memory_security.py::TestSignatureCreation::test_create_signature_none_message PASSED [ 91%]
+tests/test_memory_security.py::TestSignatureCreation::test_create_signature_none_key PASSED [ 91%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_success PASSED [ 92%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_wrong_key PASSED [ 92%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_tampered_message PASSED [ 93%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_tampered_signature PASSED [ 93%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_none_message PASSED [ 94%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_none_key PASSED [ 94%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_none_signature PASSED [ 95%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_empty_values PASSED [ 95%]
+tests/test_memory_security.py::TestSignatureValidation::test_validate_signature_invalid_hex PASSED [ 96%]
+tests/test_memory_security.py::TestSecurityProperties::test_signature_uniqueness PASSED [ 96%]
+tests/test_memory_security.py::TestSecurityProperties::test_key_sensitivity PASSED [ 97%]
+tests/test_memory_security.py::TestSecurityProperties::test_unicode_support PASSED [ 97%]
+tests/test_memory_signing_migration.py::TestMigrateSigningKey::test_fingerprint_stored_on_first_init PASSED [ 98%]
+tests/test_memory_signing_migration.py::TestMigrateSigningKey::test_no_re_sign_when_fingerprint_matches PASSED [ 98%]
+tests/test_memory_signing_migration.py::TestMigrateSigningKey::test_re_sign_on_fingerprint_mismatch PASSED [ 99%]
+tests/test_memory_signing_migration.py::TestMigrateSigningKey::test_legacy_format_memory_recovered_after_migration PASSED [ 99%]
+tests/test_memory_signing_migration.py::TestMigrateSigningKey::test_settings_table_exists PASSED [100%]
 
-tests/test_behavioral_rules.py     ........ ........             [ 16 tests PASSED ]
-tests/test_dialogue_metrics.py     ........ ........ ........ ........ ........ .....  [ 45 tests PASSED ]
-tests/test_drive_correlations.py   ........ .........            [ 17 tests PASSED ]
-tests/test_drive_pressure.py       ........ ........ .......     [ 23 tests PASSED ]
-tests/test_energy_regulation.py    ........ ........ ........ ........ ...           [ 35 tests PASSED ]
-tests/test_enhanced_dialogue.py    ......                        [  6 tests PASSED ]
-tests/test_long_term_memory.py     ........ ........ ........ ........ .            [ 33 tests PASSED ]
-tests/test_memory_security.py      ........ ...........          [ 19 tests PASSED ]
-tests/test_memory_signing_migration.py .....                     [  5 tests PASSED ]
+=============================== warnings summary ===============================
+tests/test_enhanced_dialogue.py::test_dynamic_speaker_selection
+  PytestReturnNotNoneWarning: Test functions should return None, but
+  test_dynamic_speaker_selection returned <class 'bool'>.
+tests/test_enhanced_dialogue.py::test_seed_variety
+  PytestReturnNotNoneWarning: Test functions should return None, but
+  test_seed_variety returned <class 'bool'>.
+tests/test_enhanced_dialogue.py::test_context_enrichment
+  PytestReturnNotNoneWarning: Test functions should return None, but
+  test_context_enrichment returned <class 'bool'>.
+tests/test_enhanced_dialogue.py::test_fixy_interventions
+  PytestReturnNotNoneWarning: Test functions should return None, but
+  test_fixy_interventions returned <class 'bool'>.
+tests/test_enhanced_dialogue.py::test_persona_formatting
+  PytestReturnNotNoneWarning: Test functions should return None, but
+  test_persona_formatting returned <class 'bool'>.
+tests/test_enhanced_dialogue.py::test_persona_pronouns
+  PytestReturnNotNoneWarning: Test functions should return None, but
+  test_persona_pronouns returned <class 'bool'>.
+tests/test_memory_signing_migration.py
+  DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled
+  for removal in a future version. Use timezone-aware objects to represent
+  datetimes in UTC: datetime.datetime.now(datetime.UTC).
 
-============================== coverage summary ================================
-entelgia/__init__.py              100%
-entelgia/energy_regulation.py     100%
-entelgia/long_term_memory.py       99%
-entelgia/dialogue_metrics.py       80%
-entelgia/ablation_study.py         84%
-entelgia/memory_security.py        88%
-Entelgia_production_meta.py        22%
-TOTAL                              57%
-================================================ 209 passed in 5.19s ================================================
+================================ tests coverage ================================
+Name                                     Stmts   Miss  Cover
+------------------------------------------------------------
+Entelgia_production_meta.py               1522   1190    22%
+entelgia/__init__.py                        10      0   100%
+entelgia/ablation_study.py                 151     24    84%
+entelgia/context_manager.py                118     47    60%
+entelgia/dialogue_engine.py                 99     55    44%
+entelgia/dialogue_metrics.py                86     17    80%
+entelgia/energy_regulation.py               56      0   100%
+entelgia/enhanced_personas.py               31      6    81%
+entelgia/fixy_interactive.py                94     54    43%
+entelgia/long_term_memory.py                72      1    99%
+entelgia/memory_security.py                 17      2    88%
+entelgia_production_long.py                165    165     0%
+tests/__init__.py                            0      0   100%
+tests/conftest.py                           23      2    91%
+tests/test_behavioral_rules.py             113      0   100%
+tests/test_dialogue_metrics.py             251      1    99%
+tests/test_drive_correlations.py           147      4    97%
+tests/test_drive_pressure.py               114      0   100%
+tests/test_energy_regulation.py            177      0   100%
+tests/test_enhanced_dialogue.py            189     44    77%
+tests/test_long_term_memory.py             167      0   100%
+tests/test_memory_security.py               78      0   100%
+tests/test_memory_signing_migration.py      72      0   100%
+------------------------------------------------------------
+TOTAL                                     3752   1612    57%
+Coverage HTML written to dir htmlcov
+======================= 209 passed, 9 warnings in 4.50s ========================
 ```
 
-> ✅ **All 209 tests currently pass** (6 dialogue + 35 energy regulation + 33 long-term memory + 19 security + 17 drive correlations + 23 drive pressure + 16 behavioral rules + 45 dialogue metrics + 5 signing migration), providing confidence that all subsystems perform as expected.
+> ✅ **All 209 tests currently pass** (16 behavioral rules + 45 dialogue metrics + 17 drive correlations + 23 drive pressure + 35 energy regulation + 6 dialogue + 33 long-term memory + 19 security + 5 signing migration), providing confidence that all subsystems perform as expected.
 
 ---
 
