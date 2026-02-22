@@ -460,3 +460,7 @@ class TestPlotCircularity:
                 plot_circularity(results)
         output = buf.getvalue()
         assert len(output) > 0
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
