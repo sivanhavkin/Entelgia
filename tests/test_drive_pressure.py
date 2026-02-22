@@ -23,7 +23,6 @@ from Entelgia_production_meta import (
     _is_question_resolved,
 )
 
-
 # ---------------------------------------------------------------------------
 # Unit tests: compute_drive_pressure formula
 # ---------------------------------------------------------------------------
@@ -57,24 +56,36 @@ class TestComputeDrivePressure:
     def test_high_conflict_raises_pressure(self):
         """High conflict should increase pressure toward the target."""
         low = compute_drive_pressure(
-            prev_pressure=2.0, energy=80.0, conflict=1.0,
-            unresolved_count=0, stagnation=0.0,
+            prev_pressure=2.0,
+            energy=80.0,
+            conflict=1.0,
+            unresolved_count=0,
+            stagnation=0.0,
         )
         high = compute_drive_pressure(
-            prev_pressure=2.0, energy=80.0, conflict=9.0,
-            unresolved_count=0, stagnation=0.0,
+            prev_pressure=2.0,
+            energy=80.0,
+            conflict=9.0,
+            unresolved_count=0,
+            stagnation=0.0,
         )
         assert high > low, f"High conflict ({high:.3f}) should exceed low ({low:.3f})"
 
     def test_stagnation_raises_pressure(self):
         """Stagnation=1.0 should increase pressure compared to stagnation=0.0."""
         no_stag = compute_drive_pressure(
-            prev_pressure=2.0, energy=80.0, conflict=3.0,
-            unresolved_count=0, stagnation=0.0,
+            prev_pressure=2.0,
+            energy=80.0,
+            conflict=3.0,
+            unresolved_count=0,
+            stagnation=0.0,
         )
         full_stag = compute_drive_pressure(
-            prev_pressure=2.0, energy=80.0, conflict=3.0,
-            unresolved_count=0, stagnation=1.0,
+            prev_pressure=2.0,
+            energy=80.0,
+            conflict=3.0,
+            unresolved_count=0,
+            stagnation=1.0,
         )
         assert full_stag > no_stag
 
@@ -82,8 +93,11 @@ class TestComputeDrivePressure:
         """With conflict<4, stagnation<0.3, unresolved=0, pressure decays."""
         p0 = 5.0
         p1 = compute_drive_pressure(
-            prev_pressure=p0, energy=80.0, conflict=1.0,
-            unresolved_count=0, stagnation=0.0,
+            prev_pressure=p0,
+            energy=80.0,
+            conflict=1.0,
+            unresolved_count=0,
+            stagnation=0.0,
         )
         # Low conflict+stagnation → target is low AND decay of 0.4 applies
         assert p1 < p0, f"Pressure should decay; got {p1:.3f} from {p0:.3f}"
@@ -91,12 +105,18 @@ class TestComputeDrivePressure:
     def test_unresolved_raises_pressure(self):
         """More unresolved questions → higher pressure."""
         p_zero = compute_drive_pressure(
-            prev_pressure=2.0, energy=80.0, conflict=2.0,
-            unresolved_count=0, stagnation=0.0,
+            prev_pressure=2.0,
+            energy=80.0,
+            conflict=2.0,
+            unresolved_count=0,
+            stagnation=0.0,
         )
         p_three = compute_drive_pressure(
-            prev_pressure=2.0, energy=80.0, conflict=2.0,
-            unresolved_count=3, stagnation=0.0,
+            prev_pressure=2.0,
+            energy=80.0,
+            conflict=2.0,
+            unresolved_count=3,
+            stagnation=0.0,
         )
         assert p_three > p_zero
 
@@ -108,8 +128,11 @@ class TestComputeDrivePressure:
         # raw = 0.45*1 + 0.25*1 + 0.20*1 + 0.10*1 = 1.0  → target = 10.0
         # new_p = 0.65 * 2.0 + 0.35 * 10.0 = 1.3 + 3.5 = 4.8
         p = compute_drive_pressure(
-            prev_pressure=2.0, energy=0.0, conflict=10.0,
-            unresolved_count=3, stagnation=1.0,
+            prev_pressure=2.0,
+            energy=0.0,
+            conflict=10.0,
+            unresolved_count=3,
+            stagnation=1.0,
         )
         assert p == pytest.approx(4.8, abs=0.05)
 
@@ -156,9 +179,9 @@ class TestPressureRisesDuringStagnation:
                 stagnation=1.0,
             )
 
-        assert pressure >= baseline + 2.0, (
-            f"Turn-6 pressure ({pressure:.2f}) should be at least {baseline + 2.0:.2f}"
-        )
+        assert (
+            pressure >= baseline + 2.0
+        ), f"Turn-6 pressure ({pressure:.2f}) should be at least {baseline + 2.0:.2f}"
 
 
 # ---------------------------------------------------------------------------
@@ -290,10 +313,15 @@ class TestNoBreakingChanges:
 
     def test_topic_signature_returns_string(self):
         """_topic_signature must return a non-empty hex string and be deterministic."""
-        sig = _topic_signature("The nature of consciousness is debated by philosophers.")
+        sig = _topic_signature(
+            "The nature of consciousness is debated by philosophers."
+        )
         assert isinstance(sig, str) and len(sig) > 0
         # Deterministic: same input always produces same output
-        assert _topic_signature("The nature of consciousness is debated by philosophers.") == sig
+        assert (
+            _topic_signature("The nature of consciousness is debated by philosophers.")
+            == sig
+        )
 
     def test_topic_signature_same_for_similar_text(self):
         """Identical key-word sets must produce the same signature."""
