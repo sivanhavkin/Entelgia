@@ -312,6 +312,57 @@ For the complete list of configuration options, see the `Config` class definitio
 
 ---
 
+### 🔥 DrivePressure — Urgency/Tension (v2.6.0)
+
+**DrivePressure** is an invisible scalar (`0.0–10.0`) per agent that represents internal urgency to act now.
+It is **not** a character or a voice — it is an urgency modulator.
+
+**Why it exists:**
+- Prevents "stable attractor" stagnation (endless SuperEgo-dominant framing loops)
+- Reduces long moralized monologues when urgency is high
+- Increases initiative: sharper questions, topic shifts, resolution attempts
+
+**How it works:**
+
+| Input | Effect on Pressure |
+|---|---|
+| High conflict (`conflict >= 4.0`) | Increases pressure |
+| Open/unresolved questions | Increases pressure |
+| Topic stagnation (same topic ≥ 4 turns) | Increases pressure |
+| Low energy | Slightly increases pressure |
+| Progress (resolved questions, new topic) | Pressure decays naturally |
+
+**Behavior thresholds:**
+
+| Pressure | Effect |
+|---|---|
+| `< 6.5` | Normal behavior |
+| `>= 6.5` | Output capped at 120 words; prompt: *"Be concise. Prefer 1 key claim + 1 sharp question."* |
+| `>= 7.0` + SuperEgo > Ego | A/B binary dilemmas rewritten as "accept / resist / transform beyond both" |
+| `>= 8.0` | Output capped at 80 words; prompt: *"Stop framing. Choose a direction. Ask one decisive question."* |
+
+**META block output** (when `show_meta=True`):
+```
+Pressure: 6.42  Unresolved: 2  Stagnation: 0.75
+```
+
+**Sample log showing pressure rising then output shortening:**
+```
+[META: Socrates]
+  Id: 5.8  Ego: 5.1  SuperEgo: 6.4  SA: 0.57
+  Energy: 72.0  Conflict: 1.50
+  Pressure: 2.12  Unresolved: 0  Stagnation: 0.00    ← turn 1, baseline
+...
+[META: Socrates]
+  Pressure: 5.71  Unresolved: 2  Stagnation: 0.75    ← turn 5, rising
+...
+[META: Socrates]
+  Pressure: 8.03  Unresolved: 3  Stagnation: 1.00    ← turn 8, high pressure
+  → output trimmed to 80 words, decisive question forced
+```
+
+---
+
 ## 🗑️ Memory Management
 
 Entelgia provides a utility to clear stored memories when needed. The `clear_memory.py` script allows you to delete:

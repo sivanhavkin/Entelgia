@@ -562,6 +562,106 @@ def _first_sentence(text: str) -> str:
 
 
 # ============================================
+# DRIVE PRESSURE
+# ============================================
+
+_STOPWORDS = frozenset(
+    "a an the and or but in on at to of is are was were be been "
+    "this that these those it its with for from by about as into "
+    "do does did have has had will would could should may might "
+    "not no yes i me my we our you your he she they their what "
+    "which who when where how if then so just".split()
+)
+
+
+def _topic_signature(text: str) -> str:
+    """Return a cheap hash representing the main topic of *text*.
+
+    Used for stagnation detection: identical signatures across consecutive
+    turns imply the conversation is stuck on the same topic.
+    """
+    words = re.findall(r"[a-z]+", text.lower())
+    key_words = [w for w in words if w not in _STOPWORDS]
+    top = sorted(set(key_words), key=lambda w: -key_words.count(w))[:10]
+    payload = " ".join(sorted(top))
+    return hashlib.md5(payload.encode("utf-8")).hexdigest()[:8]
+
+
+def compute_drive_pressure(
+    prev_pressure: float,
+    energy: float,
+    conflict: float,
+    unresolved_count: int,
+    stagnation: float,
+    dt_turns: int = 1,
+) -> float:
+    """Compute the new DrivePressure (0.0–10.0) for an agent.
+
+    DrivePressure increases with unresolved loops + conflict + stagnation,
+    and also increases when energy is falling (fatigue/urgency).
+    It decays naturally if progress is made.
+
+    Args:
+        prev_pressure: Previous DrivePressure value (0.0–10.0).
+        energy: Current agent energy level (0–100).
+        conflict: Current conflict index (0–10 typical, unbounded).
+        unresolved_count: Number of open/unresolved questions (0–5).
+        stagnation: Repetition score (0.0–1.0).
+        dt_turns: Number of elapsed turns since last update (unused scalar,
+            kept for API compatibility).
+
+    Returns:
+        New DrivePressure clamped to [0.0, 10.0].
+    """
+    energy_term = (100.0 - energy) / 100.0          # 0..1
+    conflict_term = min(1.0, conflict / 10.0)        # 0..1  (clamp for conflict > 10)
+    unresolved_term = min(1.0, unresolved_count / 3.0)  # 0..1
+
+    raw = (
+        0.45 * conflict_term
+        + 0.25 * unresolved_term
+        + 0.20 * stagnation
+        + 0.10 * energy_term
+    )
+
+    target = 10.0 * raw
+
+    alpha = 0.35
+    new_p = (1 - alpha) * prev_pressure + alpha * target
+
+    if conflict < 4.0 and stagnation < 0.3 and unresolved_count == 0:
+        new_p -= 0.4
+
+    return max(0.0, min(10.0, new_p))
+
+
+def _trim_to_word_limit(text: str, max_words: int) -> str:
+    """Trim *text* to at most *max_words* words, ending at the last sentence boundary."""
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    truncated = " ".join(words[:max_words])
+    # Try to end at the last sentence boundary within the truncated text
+    m = re.search(r"^(.*[.!?])\s", truncated + " ", re.DOTALL)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    return truncated
+
+
+def _is_question_resolved(text: str) -> bool:
+    """Return True if *text* contains a clear resolution to an open question.
+
+    Used by Agent.speak() to decrement *open_questions* when the other agent
+    explicitly selects A/B, expresses a direct choice, or gives a yes/no reply.
+    """
+    lower = text.lower()
+    return bool(
+        re.search(r"\ba\)\b|\bb\)\b|i choose|i would|my answer\b", lower)
+        or re.match(r"^\s*(yes|no)\b", lower)
+    )
+
+
+# ============================================
 # PRIVACY / REDACTION
 # ============================================
 
@@ -1312,6 +1412,12 @@ class Agent:
         self._last_response_kind: str = "reflective"
         self._last_temperature: float = 0.6
         self._last_superego_rewrite: bool = False
+        # Drive Pressure state
+        self.drive_pressure: float = 2.0
+        self.open_questions: int = 0          # unresolved question counter (0..5)
+        self._topic_history: List[str] = []   # last N topic signatures for stagnation
+        self._same_topic_turns: int = 0       # consecutive turns with same signature
+        self._last_stagnation: float = 0.0
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -1580,6 +1686,22 @@ class Agent:
                     "\nRespond now:\n", f"\n{other_opener_rule}\nRespond now:\n"
                 )
 
+        # ── Drive Pressure: resolve open questions from the other agent's last reply ──
+        if other_texts and _is_question_resolved(other_texts[-1]):
+            self.open_questions = max(0, self.open_questions - 1)
+
+        # ── Drive Pressure: pressure-aware prompt injection ──
+        if self.drive_pressure >= 8.0:
+            prompt = prompt.replace(
+                "\nRespond now:\n",
+                "\nStop framing. Choose a direction. Ask one decisive question.\nRespond now:\n",
+            )
+        elif self.drive_pressure >= 6.5:
+            prompt = prompt.replace(
+                "\nRespond now:\n",
+                "\nBe concise. Avoid long exposition. Prefer 1 key claim + 1 sharp question.\nRespond now:\n",
+            )
+
         # Drives → temperature (cognition control); conflict raises volatility
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
@@ -1693,6 +1815,55 @@ class Agent:
                 if stripped:
                     out = stripped
                 break
+
+        # ── Drive Pressure: post-process output ──────────────────────────────────
+        # 1. Track open questions in this turn
+        if "?" in out:
+            self.open_questions = min(5, self.open_questions + 1)
+
+        # 2. Update stagnation tracking
+        sig = _topic_signature(out)
+        self._topic_history.append(sig)
+        if len(self._topic_history) > 6:
+            self._topic_history = self._topic_history[-6:]
+        recent_sigs = self._topic_history
+        if len(recent_sigs) >= 2 and recent_sigs[-1] == recent_sigs[-2]:
+            self._same_topic_turns = min(self._same_topic_turns + 1, 4)
+        else:
+            self._same_topic_turns = max(0, self._same_topic_turns - 1)
+        stagnation = (
+            1.0 if self._same_topic_turns >= 4
+            else self._same_topic_turns / 4.0
+        )
+        self._last_stagnation = stagnation
+
+        # 3. Compute new drive pressure
+        self.drive_pressure = compute_drive_pressure(
+            prev_pressure=self.drive_pressure,
+            energy=self.energy_level,
+            conflict=self.conflict_index(),
+            unresolved_count=self.open_questions,
+            stagnation=stagnation,
+        )
+
+        # 4. Anti-binary dilemma loop guard (pressure >= 7.0 and SuperEgo dominant)
+        # Pattern matches "A) <content> B) <content>" on the same line or across short text.
+        _ab_pattern = r"\bA\)\s[^\n.!?]*[.!?\n]?\s*\bB\)\s[^\n.!?]*[.!?\n]?"
+        if self.drive_pressure >= 7.0 and sup > ego:
+            if re.search(_ab_pattern, out):
+                out = re.sub(
+                    _ab_pattern,
+                    "accept / resist / transform beyond both",
+                    out,
+                    count=1,
+                ).strip()
+
+        # 5. Word-cap enforcement
+        if self.drive_pressure >= 8.0:
+            out = _trim_to_word_limit(out, 80)
+        elif self.drive_pressure >= 6.5:
+            out = _trim_to_word_limit(out, 120)
+        # ─────────────────────────────────────────────────────────────────────────
 
         return out
 
@@ -2483,6 +2654,13 @@ class MainScript:
         print(
             dim
             + f"  Energy: {agent.energy_level:.1f}  Conflict: {conflict:.2f}"
+            + reset
+        )
+        print(
+            dim
+            + f"  Pressure: {agent.drive_pressure:.2f}"
+            + f"  Unresolved: {agent.open_questions}"
+            + f"  Stagnation: {agent._last_stagnation:.2f}"
             + reset
         )
         print(
