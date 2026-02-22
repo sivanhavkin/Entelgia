@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data / databases / logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+entelgia_data/
+data/
+outputs/
+runs/
+/Live Dialog.txt
+# IDE
+.vscode/
+.idea/
+
+# Testing  
+.pytest_cache/
+htmlcov/
+.coverage
+*.coverage
+coverage.xml
+
+# Type checking
+.mypy_cache/
+
+
+# Local configs (if any)
+config.local.json
+settings.local.json

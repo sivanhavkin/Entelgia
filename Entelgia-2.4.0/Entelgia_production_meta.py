@@ -17,7 +17,7 @@ Advanced Multi-Agent Dialogue System with:
 - 10-MINUTE AUTO-TIMEOUT
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 2.5.0.
+Version Note: Latest release: 2.4.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -68,8 +68,8 @@ import io
 
 # Fix Windows Unicode encoding
 if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 #  LOAD .env FIRST - BEFORE logger setup
 try:
     from dotenv import load_dotenv
@@ -82,7 +82,6 @@ except ImportError as e:
 
 import json
 import os
-import random
 import re
 import time
 import uuid
@@ -109,35 +108,12 @@ try:
         InteractiveFixy,
         format_persona_for_prompt,
         get_persona,
-        DefenseMechanism,
-        FreudianSlip,
-        SelfReplication,
     )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
-
-    # No-op stubs for non-enhanced mode
-    class DefenseMechanism:  # type: ignore[no-redef]
-        def analyze(self, content, emotion=None, emotion_intensity=0.0):
-            return (0, 0)
-
-    class FreudianSlip:  # type: ignore[no-redef]
-        def attempt_slip(self, recent_memories):
-            return None
-
-        def format_slip(self, memory):
-            return ""
-
-    class SelfReplication:  # type: ignore[no-redef]
-        def replicate(self, recent_memories):
-            return []
-
-        def format_replication(self, memory):
-            return ""
-
 
 # Optional: FastAPI for REST API
 try:
@@ -191,20 +167,8 @@ def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
     logger = logging.getLogger("entelgia")
     logger.setLevel(log_level)
 
-    # Console handler – use a UTF-8 stream so emoji/non-ASCII chars never
-    # raise UnicodeEncodeError on Windows consoles with narrow code pages
-    # (e.g. cp1255).  errors="replace" silently substitutes any character
-    # that the underlying codec cannot encode.
-    try:
-        if sys.platform == "win32" and hasattr(sys.stderr, "buffer"):
-            _console_stream = io.TextIOWrapper(
-                sys.stderr.buffer, encoding="utf-8", errors="replace"
-            )
-        else:
-            _console_stream = sys.stderr
-    except Exception:
-        _console_stream = sys.stderr
-    console_handler = logging.StreamHandler(_console_stream)
+    # Console handler
+    console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
 
     # File handler
@@ -249,26 +213,6 @@ logger.info(
 
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
-MAX_RESPONSE_WORDS = 150
-
-# LLM First-Person Instruction - agents must speak as themselves using "I"
-LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
-
-# Phrases that agents must never produce (meta-commentary about the conversation)
-FORBIDDEN_PHRASES = [
-    "In our dialogue",
-    "We learn",
-    "Our conversations reveal",
-]
-
-# LLM instruction to avoid forbidden meta-commentary phrases
-LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
-    "FORBIDDEN PHRASES: Never use 'In our dialogue', 'We learn', "
-    "or 'Our conversations reveal'."
-)
-
-# Initial energy for all agents (restored after each dream cycle)
-AGENT_INITIAL_ENERGY: float = 100.0
 
 
 @dataclass
@@ -288,6 +232,7 @@ class Config:
     sessions_dir: str = "entelgia_data/sessions"
     stm_max_entries: int = 10000
     stm_trim_batch: int = 500
+    fixy_every_n_turns: int = 3
     dream_every_n_turns: int = 7
     promote_importance_threshold: float = 0.72
     promote_emotion_threshold: float = 0.65
@@ -301,21 +246,10 @@ class Config:
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
     llm_timeout: int = 300  # Reduced from 600 to 300 seconds for faster responses
+    max_prompt_tokens: int = 800
     show_pronoun: bool = False  # Show pronouns like (he), (she) after agent names
-    show_meta: bool = (
-        False  # Show agent meta-cognitive state (drives, energy, emotion) after each turn
-    )
+    log_level: int = logging.INFO
     timeout_minutes: int = 30
-    energy_safety_threshold: float = 35.0
-    energy_drain_min: float = 8.0
-    energy_drain_max: float = 15.0
-    drive_mean_reversion_rate: float = (
-        0.04  # pulls id/superego back toward 5.0 each turn
-    )
-    drive_oscillation_range: float = (
-        0.15  # max random nudge applied to id/superego each turn
-    )
-    self_replicate_every_n_turns: int = 10
 
     def __post_init__(self):
         """Validate configuration."""
@@ -521,7 +455,6 @@ def validate_output(text: str) -> str:
     Performs sanitization only (no truncation):
     - Removes control characters
     - Normalizes excessive newlines
-    - Removes sentences containing forbidden meta-commentary phrases
 
     Note: Response length is controlled by LLM prompt instructions, not by this function.
     """
@@ -533,22 +466,7 @@ def validate_output(text: str) -> str:
     # Normalize excessive newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
 
-    # Remove sentences containing forbidden meta-commentary phrases
-    sentences = re.split(r"(?<=[.!?])(?:\s+|$)", text)
-    sentences = [
-        s
-        for s in sentences
-        if s and not any(fp.lower() in s.lower() for fp in FORBIDDEN_PHRASES)
-    ]
-    text = " ".join(sentences)
-
     return text.strip()
-
-
-def _first_sentence(text: str) -> str:
-    """Extract the first sentence from text (up to the first .!? or first newline)."""
-    m = re.match(r"([^.!?\n]+[.!?])", text.strip())
-    return m.group(1).strip() if m else text.strip().split("\n")[0].strip()
 
 
 # ============================================
@@ -732,20 +650,9 @@ class TopicManager:
 class MemoryCore:
     """Unified memory system: JSON STM + SQLite LTM with cryptographic signatures."""
 
-    @staticmethod
-    def _build_ltm_payload(content: str, topic, emotion, ts: str) -> str:
-        """Build canonical payload string for LTM HMAC-SHA256 signature.
-
-        ``None`` values are normalised to empty string so that the
-        signed payload is stable regardless of whether the caller
-        passes ``None`` or ``""`` for optional fields.
-        """
-        return f"{content}|{topic or ''}|{emotion or ''}|{ts}"
-
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._init_db()
-        self._migrate_signing_key()
         logger.info(f"MemoryCore initialized: {db_path}")
 
     def _conn(self) -> sqlite3.Connection:
@@ -807,66 +714,10 @@ class MemoryCore:
                         self_awareness REAL
                     );
                 """)
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS settings (
-                        key TEXT PRIMARY KEY,
-                        value TEXT
-                    );
-                """)
                 conn.commit()
                 logger.info("Database schema initialized with memory security")
         except Exception as e:
             logger.error(f"DB Init Error: {e}")
-
-    def _migrate_signing_key(self):
-        """Re-sign all LTM rows when the HMAC key or payload format has changed.
-
-        On first initialisation (no ``key_fingerprint`` row in ``settings``),
-        every existing row is re-signed with the current key so that legacy
-        rows – created before this migration mechanism existed, or signed with
-        a different key – validate correctly going forward.
-
-        When the stored fingerprint differs from the current key fingerprint,
-        all rows are re-signed with the new key using the canonical
-        ``_build_ltm_payload`` format.
-        """
-        current_fingerprint = hashlib.sha256(MEMORY_SECRET_KEY_BYTES).hexdigest()
-        try:
-            with self._conn() as conn:
-                row = conn.execute(
-                    "SELECT value FROM settings WHERE key='key_fingerprint'"
-                ).fetchone()
-                stored_fingerprint = row["value"] if row else None
-
-                if stored_fingerprint == current_fingerprint:
-                    return  # Key hasn't changed; nothing to do.
-
-                # Key changed or first init — re-sign every row with the current
-                # canonical payload format so future validation always succeeds.
-                rows = conn.execute(
-                    "SELECT id, content, topic, emotion, ts FROM memories"
-                ).fetchall()
-
-                for r in rows:
-                    payload = MemoryCore._build_ltm_payload(
-                        r["content"], r["topic"], r["emotion"], r["ts"]
-                    )
-                    new_sig = create_signature(
-                        payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
-                    )
-                    conn.execute(
-                        "UPDATE memories SET signature_hex=? WHERE id=?",
-                        (new_sig.hex(), r["id"]),
-                    )
-
-                conn.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES ('key_fingerprint', ?)",
-                    (current_fingerprint,),
-                )
-                conn.commit()
-                logger.info(f"Memory signing key migrated; re-signed {len(rows)} rows.")
-        except Exception as e:
-            logger.error(f"Key migration error: {e}")
 
     def stm_path(self, agent_name: str) -> str:
         """Get STM file path for agent."""
@@ -919,7 +770,7 @@ class MemoryCore:
         ts = ts or now_iso()
 
         # Create payload for signature
-        payload_for_sig = MemoryCore._build_ltm_payload(content, topic, emotion, ts)
+        payload_for_sig = f"{content}|{topic}|{emotion}|{ts}"
         sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
 
@@ -977,13 +828,8 @@ class MemoryCore:
                 sig_hex = mem.get("signature_hex")
 
                 if sig_hex:
-                    # Validate signature using canonical payload (None → "")
-                    payload = MemoryCore._build_ltm_payload(
-                        mem["content"],
-                        mem.get("topic"),
-                        mem.get("emotion"),
-                        mem["ts"],
-                    )
+                    # Validate signature
+                    payload = f"{mem['content']}|{mem.get('topic', '')}|{mem.get('emotion', '')}|{mem['ts']}"
                     try:
                         sig_bytes = bytes.fromhex(sig_hex)
                         if validate_signature(
@@ -991,40 +837,9 @@ class MemoryCore:
                         ):
                             valid_memories.append(mem)
                         else:
-                            # Fallback: try legacy format where None was rendered
-                            # as the string "None" (used before _build_ltm_payload
-                            # was introduced).  If it validates, auto-heal the row
-                            # by re-signing with the canonical format.
-                            legacy_payload = (
-                                f"{mem['content']}"
-                                f"|{mem.get('topic')}"
-                                f"|{mem.get('emotion')}"
-                                f"|{mem['ts']}"
+                            logger.warning(
+                                f"🚨 INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
                             )
-                            if validate_signature(
-                                legacy_payload.encode("utf-8"),
-                                MEMORY_SECRET_KEY_BYTES,
-                                sig_bytes,
-                            ):
-                                # Re-sign with canonical format so future
-                                # lookups use the correct payload.
-                                new_sig = create_signature(
-                                    payload.encode("utf-8"), MEMORY_SECRET_KEY_BYTES
-                                )
-                                try:
-                                    with self._conn() as _conn:
-                                        _conn.execute(
-                                            "UPDATE memories SET signature_hex=? WHERE id=?",
-                                            (new_sig.hex(), mem["id"]),
-                                        )
-                                        _conn.commit()
-                                except Exception:
-                                    pass
-                                valid_memories.append(mem)
-                            else:
-                                logger.warning(
-                                    f" INVALID SIGNATURE - Memory forgotten: {mem['id'][:8]}..."
-                                )
                     except Exception as e:
                         logger.warning(f"Signature validation error: {e}")
                 else:
@@ -1187,6 +1002,86 @@ class ConsciousCore:
 
 
 # ============================================
+# OBSERVER / FIXY CORE
+# ============================================
+
+
+@dataclass
+class FixyReport:
+    """Report from Fixy observer."""
+
+    detected_issue: bool
+    issue_summary: str
+    proposed_patch: str
+    severity: str
+    rationale: str
+
+
+class ObserverCore:
+    """Meta-cognitive observer (Fixy)."""
+
+    def __init__(self, llm: LLM, model: str):
+        self.llm = llm
+        self.model = model
+        self.mistake_memory: List[Dict[str, Any]] = []
+        logger.info("ObserverCore (Fixy) initialized")
+
+    def review(self, context: str) -> FixyReport:
+        """Review recent context for issues."""
+        prompt = (
+            "Review for bugs/contradictions.\n"
+            'Return JSON: {"detected_issue": bool, "issue_summary": string, '
+            '"proposed_patch": string, "severity": string, "rationale": string}\n'
+            f"CONTEXT:\n{context[:300]}\n"
+        )
+        raw = self.llm.generate(self.model, prompt, temperature=0.2, use_cache=False)
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not m:
+            return FixyReport(
+                False, "No structured output.", "", "low", "Parser fallback."
+            )
+        try:
+            obj = json.loads(m.group(0))
+            return FixyReport(
+                bool(obj.get("detected_issue", False)),
+                str(obj.get("issue_summary", "")).strip()[:100],
+                str(obj.get("proposed_patch", "")).strip(),
+                str(obj.get("severity", "low")).strip().lower(),
+                str(obj.get("rationale", "")).strip()[:100],
+            )
+        except Exception as e:
+            logger.warning(f"Fixy parse error: {e}")
+            return FixyReport(False, "Parse error.", "", "low", "Could not parse JSON.")
+
+    def commentary(self, context: str, report: FixyReport) -> str:
+        """Generate intervention message."""
+        prompt = (
+            "Generate brief intervention (2-5 sentences).\n"
+            "If issue: state it and give ONE correction.\n"
+            "If no issue: suggest ONE way to increase depth.\n"
+            f"ISSUE: {report.detected_issue}\n"
+            f"CONTEXT:\n{context[:250]}\n"
+            f"{LLM_RESPONSE_LIMIT}\n"
+        )
+        msg = self.llm.generate(self.model, prompt, temperature=0.3, use_cache=False)
+        return validate_output(msg)
+
+    def remember(self, report: FixyReport):
+        """Store observation in memory."""
+        if report.detected_issue:
+            self.mistake_memory.append(
+                {
+                    "ts": now_iso(),
+                    "issue": report.issue_summary,
+                    "severity": report.severity,
+                    "rationale": report.rationale,
+                }
+            )
+            if len(self.mistake_memory) > 5000:
+                self.mistake_memory = self.mistake_memory[-4000:]
+
+
+# ============================================
 # BEHAVIOR CORE (HEURISTIC-BASED)
 # ============================================
 
@@ -1296,12 +1191,6 @@ class Agent:
 
         self.conscious.init_agent(self.name)
         self.drives = self.memory.get_agent_state(self.name)
-        self.energy_level: float = AGENT_INITIAL_ENERGY
-        self._last_emotion: str = "neutral"
-        self._last_emotion_intensity: float = 0.0
-        self._last_response_kind: str = "reflective"
-        self._last_temperature: float = 0.6
-        self._last_superego_rewrite: bool = False
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -1334,33 +1223,12 @@ class Agent:
             "opening_rule": opening,
         }
 
-    def _behavioral_rule_instruction(self) -> str:
-        """Return a behavioral rule instruction to inject into the prompt, if applicable.
-
-        Rule A (Socrates): If Conflict >= 5.0, end response with a sharp binary-choice question (A or B).
-        Rule B (Athena): If Dissent >= 3.0, include a sentence starting with 'However,' / 'Yet,' / 'This assumes…'
-        """
-        if self.name == "Socrates" and self.conflict_index() >= 5.0:
-            return (
-                "BEHAVIORAL RULE: You MUST end your response with one sharp question "
-                "that forces Athena to choose between exactly 2 options (A or B)."
-            )
-        if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
-            return (
-                "BEHAVIORAL RULE: Your response MUST include exactly one sentence that "
-                'begins with "However," or "Yet," or "This assumes…"'
-            )
-        return ""
-
     def update_drives_after_turn(self, response_kind: str, emo: str, inten: float):
         """Update internal drives after response."""
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
         sup = float(self.drives.get("superego_strength", 5.0))
         sa = float(self.drives.get("self_awareness", 0.55))
-
-        # Capture pre-update conflict (Id-Ego and SuperEgo-Ego tension)
-        pre_conflict = abs(ide - ego) + abs(sup - ego)
 
         ego = min(10.0, ego + 0.05)
         sa = min(1.0, sa + 0.01)
@@ -1384,20 +1252,6 @@ class Agent:
         if emo in ("fear", "anxiety"):
             sup = min(10.0, sup + 0.08)
 
-        # High conflict erodes Ego's mediating capacity (manifests as low Ego)
-        if pre_conflict > 4.0:
-            ego = max(0.0, ego - 0.03 * (pre_conflict - 4.0))
-
-        # Fluidity: each turn, id and superego are pulled back toward neutral (5.0)
-        # proportionally to how far they've drifted, plus a random oscillation so they
-        # can move in either direction.  This prevents either drive from stagnating at
-        # an extreme level and ensures changes ripple into the ego balance every turn.
-        _osc = CFG.drive_oscillation_range
-        ide += CFG.drive_mean_reversion_rate * (5.0 - ide) + random.uniform(-_osc, _osc)
-        sup += CFG.drive_mean_reversion_rate * (5.0 - sup) + random.uniform(-_osc, _osc)
-        ide = max(0.0, min(10.0, ide))
-        sup = max(0.0, min(10.0, sup))
-
         self.drives = {
             "id_strength": ide,
             "ego_strength": ego,
@@ -1405,13 +1259,6 @@ class Agent:
             "self_awareness": sa,
         }
         self.memory.save_agent_state(self.name, self.drives)
-        # Energy drain scales with conflict: high drive imbalance costs more energy
-        drain = (
-            random.uniform(CFG.energy_drain_min, CFG.energy_drain_max)
-            + 0.4 * pre_conflict
-        )
-        drain = min(drain, CFG.energy_drain_max * 2.0)
-        self.energy_level = max(0.0, self.energy_level - drain)
 
     def _build_compact_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
@@ -1422,16 +1269,8 @@ class Agent:
             return self._build_enhanced_prompt(user_seed, dialog_tail)
 
         # Legacy prompt building
-        # Drives → memory retrieval depth (what enters cognition)
-        ego = float(self.drives.get("ego_strength", 5.0))
-        sa = float(self.drives.get("self_awareness", 0.55))
-        ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))
-        stm_tail = max(3, min(12, int(3 + ego / 2)))
-
-        recent_ltm = self.memory.ltm_recent(
-            self.name, limit=ltm_limit, layer="conscious"
-        )
-        stm = self.memory.stm_load(self.name)[-stm_tail:]
+        recent_ltm = self.memory.ltm_recent(self.name, limit=4, layer="conscious")
+        stm = self.memory.stm_load(self.name)[-6:]
 
         # Format agent name with optional pronoun
         if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
@@ -1464,12 +1303,8 @@ class Agent:
             for m in recent_ltm[:2]:
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
-        # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
-        # Identity lock: drives are internal psychology metrics, not persona labels.
-        prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"
-        prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
-        prompt += f"{LLM_RESPONSE_LIMIT}\n"
-        prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
+        # Add 150-word limit instruction for LLM
+        prompt += f"\n{LLM_RESPONSE_LIMIT}\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -1534,69 +1369,13 @@ class Agent:
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
         """Generate dialogue response."""
         prompt = self._build_compact_prompt(seed, dialog_tail)
-
-        # Inject behavioral rule into prompt if applicable
-        behavioral_rule = self._behavioral_rule_instruction()
-        if behavioral_rule:
-            prompt = prompt.replace(
-                "\nRespond now:\n", f"\n{behavioral_rule}\nRespond now:\n"
-            )
-
-        # Prevent opening with a sentence this agent has already used in this dialog
-        own_texts = [
-            t.get("text", "")
-            for t in dialog_tail
-            if t.get("role") == self.name and t.get("text", "").strip()
-        ]
-        if own_texts:
-            last_opener = _first_sentence(own_texts[-1])
-            if last_opener:
-                opener_rule = f'FORBIDDEN OPENER: Do not begin your response with: "{last_opener}"'
-                prompt = prompt.replace(
-                    "\nRespond now:\n", f"\n{opener_rule}\nRespond now:\n"
-                )
-
-        # Drives → temperature (cognition control); conflict raises volatility
-        ide = float(self.drives.get("id_strength", 5.0))
-        ego = float(self.drives.get("ego_strength", 5.0))
-        sup = float(self.drives.get("superego_strength", 5.0))
-        temperature = max(
-            0.25,
-            min(
-                0.95,
-                0.60
-                + 0.03 * (ide - ego)
-                - 0.02 * (sup - ego)
-                + 0.015 * self.conflict_index(),
-            ),
-        )
-        self._last_temperature = temperature
-
         raw_response = (
-            self.llm.generate(
-                self.model, prompt, temperature=temperature, use_cache=False
-            )
+            self.llm.generate(self.model, prompt, temperature=0.75, use_cache=False)
             or "[No response]"
         )
 
         # Validate output (sanitization only, no truncation)
         out = validate_output(raw_response)
-        original_out = out  # preserve the agent's original response before any rewrite
-
-        # Superego → second-pass critique (internal governor)
-        self._last_superego_rewrite = sup >= 7.5
-        if self._last_superego_rewrite:
-            critique_prompt = (
-                "Rewrite the following response to be more principled, "
-                "less impulsive, remove contradictions, keep the core idea.\n\n"
-                f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
-            )
-            out = validate_output(
-                self.llm.generate(
-                    self.model, critique_prompt, temperature=0.25, use_cache=False
-                )
-                or out
-            )
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
@@ -1604,56 +1383,12 @@ class Agent:
             kind = "aggressive"
         elif emo in ("fear", "anxiety"):
             kind = "guilt"
-        self._last_emotion = emo
-        self._last_emotion_intensity = float(inten)
-        self._last_response_kind = kind
         self.update_drives_after_turn(kind, emo, float(inten))
-
-        # Restore original response for display; superego rewrite is used only
-        # for internal state (emotion/drive analysis), not shown in dialogue
-        if self._last_superego_rewrite:
-            out = original_out
 
         m = re.search(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]", out)
         if m:
             self.language.set(self.name, m.group(1))
             out = re.sub(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]\s*", "", out).strip()
-
-        # Strip agent name/pronoun prefix if LLM echoed the header (e.g. "Socrates (he): ...")
-        out = re.sub(
-            rf"^{re.escape(self.name)}\s*(\([^)]*\))?\s*:\s*",
-            "",
-            out,
-            count=1,
-        ).strip()
-
-        # Strip "Superego:" / "Super-ego:" / "Super ego:" / "s_ego:" prefix if LLM
-        # mistakenly echoed the superego drive label instead of speaking as the agent.
-        # The optional space/hyphen covers all common LLM formatting variants.
-        out = re.sub(r"^([Ss]uper[\s\-]?[Ee]go|s_ego)\s*:\s*", "", out).strip()
-
-        # Remove gender/script artifacts like "(he): " or bare "(she)"
-        out = re.sub(r"\(\s*(he|she|they)\s*\)\s*:\s*", ": ", out, flags=re.IGNORECASE)
-        out = re.sub(r"\(\s*(he|she|they)\s*\)", "", out, flags=re.IGNORECASE).strip()
-
-        # Remove stray scoring markers like "(5)" or "(4.5)"
-        out = re.sub(r"\(\d+(\.\d+)?\)", "", out).strip()
-
-        # Safety net: strip a repeated first sentence if the LLM still produced one
-        own_openings = {
-            " ".join(_first_sentence(t.get("text", "")).split()).lower()
-            for t in dialog_tail
-            if t.get("role") == self.name and t.get("text", "").strip()
-        }
-        out_first = _first_sentence(out)
-        if (
-            out_first
-            and " ".join(out_first.split()).lower() in own_openings
-            and out.lower().startswith(out_first.lower())
-        ):
-            remainder = out[len(out_first) :].strip()
-            if remainder:
-                out = remainder
 
         return out
 
@@ -1683,12 +1418,6 @@ class Agent:
         else:
             ltm_content = text if CFG.store_raw_subconscious_ltm else redacted
 
-        # Classify memory with defense mechanism
-        defense = DefenseMechanism()
-        intrusive, suppressed = defense.analyze(
-            ltm_content, emotion=emo, emotion_intensity=float(inten)
-        )
-
         self.memory.ltm_insert(
             agent=self.name,
             layer="subconscious",
@@ -1699,65 +1428,7 @@ class Agent:
             importance=float(imp),
             source=source,
             promoted_from=None,
-            intrusive=intrusive,
-            suppressed=suppressed,
         )
-
-    def apply_freudian_slip(self, topic: str) -> Optional[str]:
-        """Attempt a Freudian slip after a non-Fixy turn.
-
-        Returns the leaked fragment text if a slip occurs, otherwise None.
-        """
-        recent = self.memory.ltm_recent(self.name, limit=30, layer="subconscious")
-        slip_engine = FreudianSlip()
-        slipped = slip_engine.attempt_slip(recent)
-        if slipped is None:
-            return None
-
-        fragment = str(slipped.get("content", "")).strip()
-        msg = slip_engine.format_slip(slipped)
-        print(Fore.MAGENTA + msg + Style.RESET_ALL)
-
-        # Promote to conscious layer
-        self.memory.ltm_insert(
-            agent=self.name,
-            layer="conscious",
-            content=fragment[:500],
-            topic=topic,
-            emotion=slipped.get("emotion"),
-            emotion_intensity=float(slipped.get("emotion_intensity") or 0.0),
-            importance=float(slipped.get("importance") or 0.0),
-            source="freudian_slip",
-            promoted_from="subconscious",
-        )
-        return fragment
-
-    def self_replicate(self, topic: str) -> int:
-        """Promote recurring-pattern memories to the conscious layer.
-
-        Returns the count of memories promoted.
-        """
-        recent = self.memory.ltm_recent(self.name, limit=50, layer="subconscious")
-        replicator = SelfReplication()
-        promoted_list = replicator.replicate(recent)
-
-        for mem in promoted_list:
-            content = str(mem.get("content", "")).strip()
-            msg = replicator.format_replication(mem)
-            print(Fore.CYAN + msg + Style.RESET_ALL)
-            self.memory.ltm_insert(
-                agent=self.name,
-                layer="conscious",
-                content=content[:500],
-                topic=topic,
-                emotion=mem.get("emotion"),
-                emotion_intensity=float(mem.get("emotion_intensity") or 0.0),
-                importance=float(mem.get("importance") or 0.0),
-                source="self_replication",
-                promoted_from="subconscious",
-            )
-
-        return len(promoted_list)
 
 
 # ============================================
@@ -2202,6 +1873,22 @@ def test_language_core():
     logger.info("Language core tests passed")
 
 
+def test_fixy_report():
+    """Test Fixy report dataclass."""
+    report = FixyReport(
+        detected_issue=True,
+        issue_summary="Contradiction detected",
+        proposed_patch="FIX: ...",
+        severity="high",
+        rationale="Logic error",
+    )
+
+    assert report.detected_issue is True
+    assert report.severity == "high"
+
+    logger.info("Fixy report tests passed")
+
+
 def test_memory_signatures():
     """Test memory signature creation and validation."""
     test_msg = b"test message"
@@ -2332,6 +2019,7 @@ class MainScript:
         self.language = LanguageCore()
         self.conscious = ConsciousCore()
         self.behavior = BehaviorCore(self.llm)
+        self.fixy = ObserverCore(self.llm, cfg.model_fixy)
         self.vtrack = VersionTracker(cfg.version_dir)
         self.session_mgr = SessionManager(cfg.sessions_dir)
         self.async_proc = AsyncProcessor()
@@ -2350,7 +2038,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am Socratic, curious, and probing. I seek clarity and truth.",
+            persona="Socratic, curious, probing. Seeks clarity and truth.",
         )
         self.athena = Agent(
             name="Athena",
@@ -2362,7 +2050,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am strategic, integrative, and creative. I build frameworks and synthesis.",
+            persona="Strategic, integrative, creative. Builds frameworks and synthesis.",
         )
 
         # Language tracking removed for gender-neutral output
@@ -2383,7 +2071,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am an observer and fixer. I am brief, concrete, and point out contradictions.",
+            persona="Observer/fixer. Brief, concrete, points out contradictions.",
         )
 
         # Initialize enhanced dialogue components if available
@@ -2400,78 +2088,6 @@ class MainScript:
     def print_agent(self, agent: Agent, text: str):
         """Print agent message with color."""
         print(agent.color + f"{agent.name}: " + Style.RESET_ALL + text + "\n")
-
-    def print_meta_state(self, agent: Agent, actions: List[str]) -> None:
-        """Print agent meta-cognitive state when show_meta is enabled."""
-        if not self.cfg.show_meta:
-            return
-        ide = float(agent.drives.get("id_strength", 5.0))
-        ego = float(agent.drives.get("ego_strength", 5.0))
-        sup = float(agent.drives.get("superego_strength", 5.0))
-        sa = float(agent.drives.get("self_awareness", 0.55))
-        conflict = agent.conflict_index()
-        profile = agent.debate_profile()
-
-        # Tone label derived from LLM temperature (itself driven by Id/Ego/SuperEgo)
-        temp = agent._last_temperature
-        if temp >= 0.80:
-            tone_label = "impulsive / uninhibited (Id-driven)"
-        elif temp >= 0.70:
-            tone_label = "expressive / spontaneous"
-        elif temp >= 0.55:
-            tone_label = "balanced / exploratory"
-        elif temp >= 0.40:
-            tone_label = "reflective / measured"
-        else:
-            tone_label = "restrained / controlled (SuperEgo-driven)"
-
-        # Dominant drive
-        dominant_drive = max(
-            ("Id", ide), ("Ego", ego), ("SuperEgo", sup), key=lambda x: x[1]
-        )
-        dominant_label = f"{dominant_drive[0]} ({dominant_drive[1]:.1f})"
-
-        bar = "─" * 54
-        dim = Fore.WHITE + Style.DIM
-        reset = Style.RESET_ALL
-        print(dim + bar + reset)
-        print(dim + f"[META: {agent.name}]" + reset)
-        print(
-            dim
-            + f"  Id: {ide:.1f}  Ego: {ego:.1f}  SuperEgo: {sup:.1f}  SA: {sa:.2f}"
-            + reset
-        )
-        print(
-            dim
-            + f"  Energy: {agent.energy_level:.1f}  Conflict: {conflict:.2f}"
-            + reset
-        )
-        print(
-            dim
-            + f"  Emotion: {agent._last_emotion} ({agent._last_emotion_intensity:.2f})"
-            + f"  Kind: {agent._last_response_kind}"
-            + reset
-        )
-        print(
-            dim
-            + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
-            + reset
-        )
-        rewrite_tag = (
-            "  [SuperEgo critique applied; original shown in dialogue]"
-            if agent._last_superego_rewrite
-            else ""
-        )
-        print(
-            dim
-            + f"  Tone: temp={temp:.2f} → {tone_label}"
-            + f"  Dominant: {dominant_label}{rewrite_tag}"
-            + reset
-        )
-        if actions:
-            print(dim + f"  Actions: {', '.join(actions)}" + reset)
-        print(dim + bar + reset)
-        print()
 
     def log_turn(self, agent_name: str, text: str, topic: str):
         """Log dialogue turn to CSV."""
@@ -2556,19 +2172,58 @@ class MainScript:
             pass
 
         logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
-        agent.energy_level = AGENT_INITIAL_ENERGY
         print(
             Fore.YELLOW
             + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
             + Style.RESET_ALL
         )
 
-    def self_replicate_cycle(self, agent: "Agent", topic: str) -> int:
-        """Orchestrate self-replication for *agent* and return promotion count."""
-        count = agent.self_replicate(topic)
-        if count > 0:
-            logger.info(f"Self-replication {agent.name}: promoted={count}")
-        return count
+    def fixy_check(self, recent_context: str):
+        """Run Fixy observer check."""
+        report = self.fixy.review(recent_context)
+        self.fixy.remember(report)
+
+        msg = self.fixy.commentary(recent_context, report)
+
+        if report.detected_issue:
+            logger.warning(f"Fixy detected issue: {report.issue_summary}")
+            print(
+                Fore.YELLOW
+                + "Fixy detected issue: "
+                + Style.RESET_ALL
+                + report.issue_summary
+            )
+            if report.proposed_patch:
+                print(Fore.YELLOW + "Proposed patch:" + Style.RESET_ALL)
+                print(report.proposed_patch[:100] + "\n")
+
+        if msg:
+            self.dialog.append({"role": "Fixy", "text": msg})
+            self.fixy_agent.store_turn(msg, topic="observer", source="reflection")
+            self.log_turn("Fixy", msg, topic="observer")
+            print(Fore.YELLOW + "Fixy: " + Style.RESET_ALL + msg + "\n")
+
+        if (
+            report.detected_issue
+            and report.proposed_patch
+            and self.cfg.enable_auto_patch
+            and self.cfg.allow_write_self_file
+        ):
+            try:
+                this_file = os.path.abspath(__file__)
+                with open(this_file, "r", encoding="utf-8") as f:
+                    original = f.read()
+                ok, updated = safe_apply_patch(original, report.proposed_patch)
+                if ok and updated != original:
+                    self.vtrack.snapshot_text("before_patch", original)
+                    with open(this_file, "w", encoding="utf-8") as f:
+                        f.write(updated)
+                    self.vtrack.snapshot_text("after_patch", updated)
+                    logger.info("Auto-patch applied successfully")
+                    print(Fore.GREEN + "[AUTO-PATCH] Applied patch." + Style.RESET_ALL)
+            except Exception as ex:
+                logger.error(f"Auto-patch failed: {ex}")
+                print(Fore.RED + f"[AUTO-PATCH] Failed: {ex}" + Style.RESET_ALL)
 
     def run(self):
         """Main execution loop (timeout configurable in minutes)."""
@@ -2601,16 +2256,11 @@ class MainScript:
                 if self.turn_index == 1:
                     speaker = self.socrates  # Start with Socrates
                 else:
-                    # Find last non-Fixy speaker so Fixy interventions don't break alternation
-                    last_speaker = self.athena  # default
-                    for turn in reversed(self.dialog):
-                        role = turn.get("role", "")
-                        if role == "Socrates":
-                            last_speaker = self.socrates
-                            break
-                        elif role == "Athena":
-                            last_speaker = self.athena
-                            break
+                    last_speaker = (
+                        self.socrates
+                        if self.dialog[-1].get("role") == "Socrates"
+                        else self.athena
+                    )
                     agents = [self.socrates, self.athena]
                     if allow_fixy:
                         agents.append(self.fixy_agent)
@@ -2650,18 +2300,6 @@ class MainScript:
             self.log_turn(speaker.name, out, topic_label)
             self.print_agent(speaker, out)
 
-            # Collect meta-actions performed this turn
-            _meta_actions: List[str] = []
-
-            # Freudian slip attempt after each non-Fixy turn
-            if speaker.name != "Fixy":
-                slip = speaker.apply_freudian_slip(topic_label)
-                if slip is not None:
-                    _meta_actions.append("freudian_slip")
-
-            # Display meta-cognitive state for this speaker
-            self.print_meta_state(speaker, _meta_actions)
-
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             if self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
@@ -2680,52 +2318,15 @@ class MainScript:
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
                     logger.info(f"Fixy intervention: {reason}")
-                    if self.cfg.show_meta:
-                        print(
-                            Fore.WHITE
-                            + Style.DIM
-                            + f"[META-ACTION] Fixy intervened: {reason}"
-                            + Style.RESET_ALL
-                            + "\n"
-                        )
+            elif self.turn_index % self.cfg.fixy_every_n_turns == 0:
+                # Legacy scheduled Fixy
+                tail = self.dialog[-10:]
+                ctx = "\n".join([f"{t['role']}: {t['text'][:50]}" for t in tail])
+                self.fixy_check(ctx)
 
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
-                if self.cfg.show_meta:
-                    print(
-                        Fore.WHITE
-                        + Style.DIM
-                        + "[META-ACTION] Dream cycle completed; energy restored to 100"
-                        + Style.RESET_ALL
-                        + "\n"
-                    )
-
-            # Energy-based dream cycle: Fixy forces agents to sleep when energy is critically low
-            for _agent in (self.socrates, self.athena):
-                if _agent.energy_level <= self.cfg.energy_safety_threshold:
-                    self.dream_cycle(_agent, topic_label)
-                    if self.cfg.show_meta:
-                        print(
-                            Fore.WHITE
-                            + Style.DIM
-                            + f"[META-ACTION] {_agent.name} energy critical ({_agent.energy_level:.1f}); dream cycle forced"
-                            + Style.RESET_ALL
-                            + "\n"
-                        )
-
-            # Self-replication cycle
-            if self.turn_index % self.cfg.self_replicate_every_n_turns == 0:
-                count_s = self.self_replicate_cycle(self.socrates, topic_label)
-                count_a = self.self_replicate_cycle(self.athena, topic_label)
-                if self.cfg.show_meta and (count_s + count_a) > 0:
-                    print(
-                        Fore.WHITE
-                        + Style.DIM
-                        + f"[META-ACTION] Self-replication: Socrates promoted={count_s}, Athena promoted={count_a}"
-                        + Style.RESET_ALL
-                        + "\n"
-                    )
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
                 logger.info("Stop signal received from agent")
@@ -2779,7 +2380,7 @@ class MainScript:
 def run_cli():
     """Run command line interface - configurable timeout dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=30, show_meta=True)
+    CFG = Config(max_turns=200, timeout_minutes=30)
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(
@@ -2797,7 +2398,7 @@ def run_cli():
     try:
         app_script = MainScript(CFG)
         app_script.run()
-        print(Fore.GREEN + "\nSession completed successfully!" + Style.RESET_ALL)
+        print(Fore.GREEN + "\n✓ Session completed successfully!" + Style.RESET_ALL)
     except KeyboardInterrupt:
         print(
             Fore.YELLOW + "\n[INTERRUPTED] Session cancelled by user" + Style.RESET_ALL
@@ -2824,19 +2425,20 @@ def run_tests():
         test_topic_manager()
         test_behavior_core()
         test_language_core()
+        test_fixy_report()
         test_memory_signatures()
         test_session_manager()
 
         print()
         print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
-        print(Fore.GREEN + "All tests passed!" + Style.RESET_ALL)
+        print(Fore.GREEN + "✓ All tests passed!" + Style.RESET_ALL)
         print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     except AssertionError as e:
-        print(Fore.RED + f"Test failed: {e}" + Style.RESET_ALL)
+        print(Fore.RED + f"✗ Test failed: {e}" + Style.RESET_ALL)
         logger.error(f"Test failed: {e}")
         sys.exit(1)
     except Exception as e:
-        print(Fore.RED + f"Test error: {e}" + Style.RESET_ALL)
+        print(Fore.RED + f"✗ Test error: {e}" + Style.RESET_ALL)
         logger.error(f"Test error: {e}", exc_info=True)
         sys.exit(1)
 
@@ -2855,9 +2457,9 @@ def run_api():
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(Fore.GREEN + "Entelgia REST API Server" + Style.RESET_ALL)
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
-    print(f"\nStarting API server on http://0.0.0.0:8000")
-    print(f"API Docs: http://localhost:8000/docs")
-    print(f"API Spec: http://localhost:8000/redoc")
+    print(f"\n🚀 Starting API server on http://0.0.0.0:8000")
+    print(f"📚 API Docs: http://localhost:8000/docs")
+    print(f"🔄 API Spec: http://localhost:8000/redoc")
     print()
 
     try:
@@ -2922,7 +2524,7 @@ def main():
             print("  • Session persistence & metrics tracking")
             print("  • REST API interface (FastAPI)")
             print("  • Unit tests (pytest)")
-            print("  • MEMORY SECURITY with HMAC-SHA256 signatures")
+            print("  • 🔐 MEMORY SECURITY with HMAC-SHA256 signatures")
             print("     - Cryptographic signatures on all memories")
             print("     - Automatic forgetting of tampered memories")
             print("     - Constant-time comparison to prevent timing attacks")

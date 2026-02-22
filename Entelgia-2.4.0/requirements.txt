@@ -1,0 +1,17 @@
+# Core dependencies
+requests>=2.31.0
+colorama>=0.4.6
+python-dotenv>=1.0.0
+
+# API server (optional if running REST mode)
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+
+# Optional utilities
+python-dateutil>=2.8.2
+
+# Development / testing (optional)
+pytest>=7.4.0
+pytest-mock>=3.12.0
+

@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "entelgia"
+version = "2.4.0"
+description = "Multi-Agent AI Architecture with Persistent Identity and Memory"
+readme = "README.md"
+authors = [
+    {name = "Sivan Havkin", email = "sivanhavkin@gmail.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["ai", "multi-agent", "consciousness", "memory", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "requests>=2.31.0",
+    "colorama>=0.4.6",
+    "python-dotenv>=1.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-mock>=3.12.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/sivanhavkin/Entelgia"
+Documentation = "https://github.com/sivanhavkin/Entelgia/blob/main/README.md"
+Repository = "https://github.com/sivanhavkin/Entelgia"
+Issues = "https://github.com/sivanhavkin/Entelgia/issues"
+
+[project.scripts]
+entelgia = "Entelgia_production_meta:main"
+
+[tool.setuptools]
+py-modules = ["Entelgia_production_meta"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --cov=. --cov-report=html --cov-report=term"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
