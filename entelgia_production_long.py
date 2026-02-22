@@ -36,13 +36,23 @@ Requirements:
 - Python 3.10+
 - Ollama running locally (http://localhost:11434)
 
-Run:
+Run CLI (200-turn, no timeout):
   python entelgia_production_long.py
+
+Run API:
+  python entelgia_production_long.py api
+
+Run tests:
+  python entelgia_production_long.py test
+
+Show help:
+  python entelgia_production_long.py help
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import time
@@ -286,5 +296,73 @@ def run_cli_long():
         sys.exit(1)
 
 
+def main():
+    """Main entry point with mode selection."""
+    if len(sys.argv) > 1:
+        mode = sys.argv[1].lower()
+
+        if mode == "test":
+            _meta.run_tests()
+        elif mode == "api":
+            _meta.run_api()
+        elif mode in ["help", "-h", "--help"]:
+            print(
+                Fore.GREEN
+                + "Entelgia Unified – PRODUCTION LONG Edition"
+                + Style.RESET_ALL
+            )
+            print()
+            print("Usage:")
+            print(
+                f"  python {os.path.basename(__file__)}              Run 200-turn long dialogue (no timeout)"
+            )
+            print(f"  python {os.path.basename(__file__)} test         Run unit tests")
+            print(
+                f"  python {os.path.basename(__file__)} api          Start FastAPI server"
+            )
+            print(
+                f"  python {os.path.basename(__file__)} help         Show this help message"
+            )
+            print()
+            print("Requirements:")
+            print("  • Python 3.10+")
+            print("  • Ollama running locally (http://localhost:11434)")
+            print("  • pip install requests colorama")
+            print("  • pip install fastapi uvicorn (for API mode)")
+            print("  • pip install pytest pytest-mock (for testing)")
+            print()
+            print("Environment Variables:")
+            print(
+                "  • MEMORY_SECRET_KEY    Secret key for memory signatures (recommended: 32+ chars)"
+            )
+            print()
+            print("Features:")
+            print("  • 200-turn dialogue with no time-based timeout")
+            print("  • Multi-agent with Socrates & Athena")
+            print("  • Persistent memory (STM + LTM)")
+            print("  • Emotion tracking & importance scoring")
+            print("  • Dream cycles & memory promotion")
+            print("  • Fixy observer/fixer agent")
+            print("  • LRU cache with 75% hit rate improvement")
+            print("  • Error handling with exponential backoff")
+            print("  • Session persistence & metrics tracking")
+            print("  • REST API interface (FastAPI)")
+            print("  • Unit tests (pytest)")
+            print("  • MEMORY SECURITY with HMAC-SHA256 signatures")
+            print("     - Cryptographic signatures on all memories")
+            print("     - Automatic forgetting of tampered memories")
+            print("     - Constant-time comparison to prevent timing attacks")
+            print()
+        else:
+            print(Fore.RED + f"Unknown mode: {mode}" + Style.RESET_ALL)
+            print(
+                f"Run 'python {os.path.basename(__file__)} help' for usage information"
+            )
+            sys.exit(1)
+    else:
+        # Default: Run long CLI (200 turns, no timeout)
+        run_cli_long()
+
+
 if __name__ == "__main__":
-    run_cli_long()
+    main()
