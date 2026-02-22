@@ -615,14 +615,44 @@ Tests verify the key-rotation and legacy-format migration logic in `MemoryCore`:
 
 ### 📋 New Tests — `test_dialogue_metrics.py` (PR #111)
 
+#### Metrics
+
+| Metric | What it measures |
+|---|---|
+| `circularity_rate` | Fraction of turn-pairs with topic-signature Jaccard similarity ≥ threshold — how much the dialogue loops |
+| `progress_rate` | Forward steps per turn: topic shifts + synthesis markers + open-question resolutions |
+| `intervention_utility` | Mean circularity reduction in the post-Fixy window vs. pre-Fixy window |
+
+#### Ablation Conditions
+
+| Condition | Active modules |
+|---|---|
+| `BASELINE` | Fixed A-B round-robin, repetitive content only |
+| `DIALOGUE_ENGINE` | + dynamic speaker selection & varied seeds (`dialogue_engine.py`) |
+| `FIXY` | + need-based interventions every 6 turns (`fixy_interactive.py`) |
+| `DREAM` | + dream-cycle energy consolidation (`energy_regulation.py`) |
+
+#### Ablation Results
+
+```
+from entelgia import run_ablation, print_results_table
+results = run_ablation(turns=30, seed=42)
+print_results_table(results)
+
++----------------------------+----------------------------+----------------------------+----------------------------+
+| Condition                  | Circularity Rate           | Progress Rate              | Intervention Utility       |
++----------------------------+----------------------------+----------------------------+----------------------------+
+| Baseline                   | 0.630                      | 0.414                      | 0.000                      |
+| DialogueEngine/Seed        | 0.097                      | 1.000                      | 0.000                      |
+| Fixy Interventions         | 0.409                      | 0.517                      | 0.333                      |
+| Dream/Energy               | 0.421                      | 0.517                      | 0.000                      |
++----------------------------+----------------------------+----------------------------+----------------------------+
+```
+
+#### Test Results
+
 ```
 $ python -m pytest tests/test_dialogue_metrics.py -v
-================================================= test session starts ==================================================
-platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
-rootdir: /home/runner/work/Entelgia/Entelgia
-configfile: pyproject.toml
-plugins: cov-7.0.0
-collecting ... collected 51 items
 
 tests/test_dialogue_metrics.py::TestKeywords::test_only_long_words PASSED                                        [  1%]
 tests/test_dialogue_metrics.py::TestKeywords::test_lowercases PASSED                                             [  3%]
@@ -676,17 +706,7 @@ tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_ou
 tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED                            [ 98%]
 tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [100%]
 
-==================================================== tests coverage ====================================================
-Name                                     Stmts   Miss  Cover
-------------------------------------------------------------
-entelgia/__init__.py                        10      0   100%
-entelgia/ablation_study.py                 151     24    84%
-entelgia/dialogue_metrics.py                86     17    80%
-entelgia/energy_regulation.py               56      1    98%
-tests/test_dialogue_metrics.py             251      1    99%
-------------------------------------------------------------
-TOTAL                                     3752   3151    16%
-================================================== 51 passed in 1.20s ==================================================
+================================================== 51 passed in 0.09s ==================================================
 ```
 
 > ✅ **51 new tests pass** covering `dialogue_metrics.py` and `ablation_study.py` (PR #111).
@@ -697,12 +717,6 @@ TOTAL                                     3752   3151    16%
 
 ```
 $ python -m pytest tests/test_dialogue_metrics.py -v -k "ablation or Ablation or RunCondition or RunAblation or PrintResults or PlotCircularity"
-================================================= test session starts ==================================================
-platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
-rootdir: /home/runner/work/Entelgia/Entelgia
-configfile: pyproject.toml
-plugins: cov-7.0.0
-collecting ... collected 51 items / 28 deselected / 23 selected
 
 tests/test_dialogue_metrics.py::TestAblationCondition::test_all_four_conditions_defined PASSED                   [  4%]
 tests/test_dialogue_metrics.py::TestAblationCondition::test_enum_has_four_members PASSED                         [  8%]
@@ -728,17 +742,7 @@ tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_ou
 tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED                            [ 95%]
 tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [100%]
 
-==================================================== tests coverage ====================================================
-Name                                     Stmts   Miss  Cover
-------------------------------------------------------------
-entelgia/__init__.py                        10      0   100%
-entelgia/ablation_study.py                 151     24    84%
-entelgia/context_manager.py                118    101    14%
-entelgia/dialogue_metrics.py                86     19    78%
-entelgia/energy_regulation.py               56      1    98%
-------------------------------------------------------------
-TOTAL                                     3752   3259    13%
-================================================= 23 passed, 28 deselected in 0.77s ================================================
+========================================== 23 passed, 28 deselected in 0.06s ===========================================
 ```
 
 > ✅ **23 ablation study tests pass** covering `ablation_study.py` (PR #111, #115).
@@ -749,30 +753,10 @@ TOTAL                                     3752   3259    13%
 
 ```
 $ python -m pytest tests/test_enhanced_dialogue.py::test_context_enrichment -v
-================================================= test session starts ==================================================
-platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
-rootdir: /home/runner/work/Entelgia/Entelgia
-configfile: pyproject.toml
-plugins: cov-7.0.0
-collecting ... collected 1 item
 
 tests/test_enhanced_dialogue.py::test_context_enrichment PASSED                                                  [100%]
 
-=============================== warnings summary ===============================
-tests/test_enhanced_dialogue.py::test_context_enrichment
-  PytestReturnNotNoneWarning: Test functions should return None, but
-  test_context_enrichment returned <class 'bool'>.
-
-==================================================== tests coverage ====================================================
-Name                                     Stmts   Miss  Cover
-------------------------------------------------------------
-entelgia/__init__.py                        10      0   100%
-entelgia/context_manager.py                118     47    60%
-entelgia/dialogue_engine.py                 99     85    14%
-entelgia/enhanced_personas.py               31     23    26%
-------------------------------------------------------------
-TOTAL                                     3752   3503     7%
-================================================== 1 passed, 1 warning in 0.72s ==================================================
+============================================= 1 passed, 1 warning in 0.02s =============================================
 ```
 
 > ✅ **1 context_manager test passes** — verifies `ContextManager.build_enriched_context()` returns a non-empty prompt with 8 recent turns, 6 thoughts, and 5 memories (PR #117).
