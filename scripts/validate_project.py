@@ -13,6 +13,7 @@ from typing import List, Dict, Optional, Set
 from dataclasses import dataclass
 from enum import Enum
 
+
 class ImplementationStatus(Enum):
     FULLY_IMPLEMENTED = ""
     PARTIALLY_IMPLEMENTED = ""
@@ -736,7 +737,7 @@ def print_summary(features: List[FeatureCheck]):
 
 @dataclass
 class ConsistencyIssue:
-    kind: str        # "missing_in_md" | "missing_in_code"
+    kind: str  # "missing_in_md" | "missing_in_code"
     item: str
     files_checked: List[str]
 
@@ -769,9 +770,7 @@ class MarkdownConsistencyChecker:
     def _load_py_sources(self) -> Dict[str, str]:
         """Load all Python sources that contribute to the public API."""
         sources: Dict[str, str] = {}
-        candidates = [self.main_py] + list(
-            (self.root / "entelgia").glob("*.py")
-        )
+        candidates = [self.main_py] + list((self.root / "entelgia").glob("*.py"))
         for path in candidates:
             if path.exists():
                 sources[path.name] = path.read_text(encoding="utf-8")
@@ -839,11 +838,11 @@ class MarkdownConsistencyChecker:
         """Verify that every public class name appears in at least one MD file."""
         # Internal implementation details intentionally not documented in user-facing MD
         skip = {
-            "Agent",           # generic stub in dialogue_engine.py
-            "LRUCache",        # caching implementation detail
+            "Agent",  # generic stub in dialogue_engine.py
+            "LRUCache",  # caching implementation detail
             "MetricsTracker",  # internal metrics collector
-            "LLM",             # thin HTTP wrapper
-            "TopicManager",    # internal topic rotation helper
+            "LLM",  # thin HTTP wrapper
+            "TopicManager",  # internal topic rotation helper
             "VersionTracker",  # internal version snapshot helper
         }
         issues: List[ConsistencyIssue] = []
@@ -901,9 +900,7 @@ class MarkdownConsistencyChecker:
             in_md = symbol in self._md_content
             # Search for it as a Config dataclass field
             in_config = bool(
-                re.search(
-                    rf"^\s*{re.escape(symbol)}\s*:", all_py, re.MULTILINE
-                )
+                re.search(rf"^\s*{re.escape(symbol)}\s*:", all_py, re.MULTILINE)
             )
             if in_md and not in_config:
                 issues.append(
@@ -939,12 +936,16 @@ class MarkdownConsistencyChecker:
             stale = [i for i in all_issues if i.kind == "missing_in_code"]
 
             if missing_in_md:
-                print(f"\n Items in code but MISSING from markdown ({len(missing_in_md)}):")
+                print(
+                    f"\n Items in code but MISSING from markdown ({len(missing_in_md)}):"
+                )
                 for issue in missing_in_md:
                     print(f"   {issue.item}")
 
             if stale:
-                print(f"\n Stale markdown references (in MD but absent from code) ({len(stale)}):")
+                print(
+                    f"\n Stale markdown references (in MD but absent from code) ({len(stale)}):"
+                )
                 for issue in stale:
                     print(f"   {issue.item}")
 
