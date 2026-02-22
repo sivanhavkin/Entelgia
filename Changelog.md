@@ -8,6 +8,42 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`entelgia/dialogue_metrics.py`** 📊 — Three quantitative dialogue-quality metrics (PR #111)
+  - `circularity_rate` — fraction of turn-pairs with topic-signature Jaccard similarity ≥ threshold; measures how much the dialogue loops
+  - `progress_rate` — forward steps per turn: topic shifts + synthesis markers + open-question resolutions
+  - `intervention_utility` — mean circularity reduction in the post-Fixy window vs. pre-Fixy window
+  - `circularity_per_turn()` — rolling time-series for graphing
+  - `compute_all_metrics()` — runs all three metrics in one call
+  - `if __name__ == "__main__"` demo block: prints all three metrics plus a per-turn ASCII circularity bar chart (PR #117)
+
+- **`entelgia/ablation_study.py`** 🔬 — Reproducible 4-condition ablation study (PR #111)
+  - `BASELINE` — fixed A-B round-robin with repetitive content
+  - `DIALOGUE_ENGINE` — adds dynamic speaker selection and varied seeds
+  - `FIXY` — adds need-based Fixy interventions every 6 turns
+  - `DREAM` — adds dream-cycle energy consolidation
+  - `run_ablation(turns, seed)` — fully reproducible across conditions
+  - `print_results_table()` — formatted metrics table output
+  - `plot_circularity()` — matplotlib line chart with ASCII fallback
+  - `if __name__ == "__main__"` block for direct script execution (PR #115)
+
+- **`entelgia/__init__.py`** updated exports: `run_ablation`, `print_results_table`, `plot_circularity`, and all metrics functions (PR #111)
+
+- **`entelgia/context_manager.py`** — `if __name__ == "__main__"` demo block added; prints enriched prompt and relevant memories when run directly (PR #117)
+
+- **`tests/test_dialogue_metrics.py`** 🧪 — 45 unit tests covering metrics correctness, edge cases, reproducibility, and inter-condition ordering guarantees (PR #111)
+
+### Fixed
+
+- `tests/test_dialogue_metrics.py` produced no output when executed directly from the command line; added `if __name__ == "__main__": pytest.main([__file__, "-v"])` guard (PR #112)
+- `entelgia/ablation_study.py` raised `ModuleNotFoundError` when imported as `entelgia.ablation_study`; `dialogue_metrics` was missing the `.py` extension (PR #113)
+- `entelgia/ablation_study.py` raised `ImportError: attempted relative import with no known parent package` when executed directly; added try/except import fallback (relative imports first, then absolute via `sys.path`) and a `__main__` entry point (PR #115)
+
+---
+
 ## [2.5.0] - 2026-02-21
 
 ## 🚀 Highlights
