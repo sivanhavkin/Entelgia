@@ -25,21 +25,36 @@ Outputs
 
 from __future__ import annotations
 
+import os
 import random
 import re
+import sys
 from enum import Enum
 from typing import Dict, List, Optional
 
-from .dialogue_metrics import (
-    circularity_per_turn,
-    circularity_rate,
-    compute_all_metrics,
-    intervention_utility,
-    progress_rate,
-)
-from .dialogue_engine import DialogueEngine
-from .fixy_interactive import InteractiveFixy
-from .energy_regulation import EntelgiaAgent, FixyRegulator
+try:
+    from .dialogue_metrics import (
+        circularity_per_turn,
+        circularity_rate,
+        compute_all_metrics,
+        intervention_utility,
+        progress_rate,
+    )
+    from .dialogue_engine import DialogueEngine
+    from .fixy_interactive import InteractiveFixy
+    from .energy_regulation import EntelgiaAgent, FixyRegulator
+except ImportError:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from entelgia.dialogue_metrics import (
+        circularity_per_turn,
+        circularity_rate,
+        compute_all_metrics,
+        intervention_utility,
+        progress_rate,
+    )
+    from entelgia.dialogue_engine import DialogueEngine
+    from entelgia.fixy_interactive import InteractiveFixy
+    from entelgia.energy_regulation import EntelgiaAgent, FixyRegulator
 
 
 # ---------------------------------------------------------------------------
@@ -402,3 +417,14 @@ def _ascii_circularity_chart(results: Dict[str, Dict]) -> None:
 
     for idx, label in enumerate(labels):
         print(f"  {markers[idx % len(markers)]} = {label}")
+
+
+# ---------------------------------------------------------------------------
+# Entry point — allows running directly: python entelgia/ablation_study.py
+# ---------------------------------------------------------------------------
+
+
+if __name__ == "__main__":
+    results = run_ablation()
+    print_results_table(results)
+    plot_circularity(results)
