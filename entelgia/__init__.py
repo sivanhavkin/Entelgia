@@ -23,6 +23,14 @@ from .context_manager import ContextManager, EnhancedMemoryIntegration
 from .fixy_interactive import InteractiveFixy
 from .energy_regulation import FixyRegulator, EntelgiaAgent
 from .long_term_memory import DefenseMechanism, FreudianSlip, SelfReplication
+from .dialogue_metrics import (
+    circularity_rate,
+    circularity_per_turn,
+    progress_rate,
+    intervention_utility,
+    compute_all_metrics,
+)
+from .ablation_study import AblationCondition, run_condition, run_ablation, print_results_table, plot_circularity
 
 __all__ = [
     "DialogueEngine",
@@ -42,6 +50,16 @@ __all__ = [
     "DefenseMechanism",
     "FreudianSlip",
     "SelfReplication",
+    "circularity_rate",
+    "circularity_per_turn",
+    "progress_rate",
+    "intervention_utility",
+    "compute_all_metrics",
+    "AblationCondition",
+    "run_condition",
+    "run_ablation",
+    "print_results_table",
+    "plot_circularity",
 ]
 
 __version__ = "2.5.0"
