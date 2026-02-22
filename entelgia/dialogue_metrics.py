@@ -302,3 +302,40 @@ def compute_all_metrics(
         "progress_rate": progress_rate(dialog),
         "intervention_utility": intervention_utility(dialog),
     }
+
+
+# ---------------------------------------------------------------------------
+# Entry point — allows running directly: python entelgia/dialogue_metrics.py
+# ---------------------------------------------------------------------------
+
+
+if __name__ == "__main__":
+    _sample_dialog: List[Dict[str, str]] = [
+        {"role": "Socrates", "text": "Consciousness emerges from complex information processing systems."},
+        {"role": "Athena",   "text": "Consciousness arises from information processing in complex systems."},
+        {"role": "Socrates", "text": "Free will might be an illusion created by deterministic processes."},
+        {"role": "Athena",   "text": "Therefore integrating both views reveals a compatibilist position."},
+        {"role": "Fixy",     "text": "I notice we have circled back. Let us reframe: how does embodiment change this?"},
+        {"role": "Socrates", "text": "The boundaries of self dissolve when examined through neuroscience."},
+        {"role": "Athena",   "text": "Language shapes the very thoughts we believe are our own."},
+        {"role": "Socrates", "text": "Therefore connecting these threads: identity is narrative, not substance."},
+        {"role": "Athena",   "text": "Bridging neuroscience and philosophy opens new unified frameworks."},
+        {"role": "Socrates", "text": "Synthesis of empirical and phenomenal approaches bridges the gap."},
+    ]
+
+    print("=" * 60)
+    print("Dialogue Metrics Demo")
+    print("=" * 60)
+
+    metrics = compute_all_metrics(_sample_dialog)
+    print(f"\nCircularity Rate    : {metrics['circularity_rate']:.3f}")
+    print(f"Progress Rate       : {metrics['progress_rate']:.3f}")
+    print(f"Intervention Utility: {metrics['intervention_utility']:.3f}")
+
+    print("\nPer-turn circularity (rolling window=6):")
+    series = circularity_per_turn(_sample_dialog)
+    for i, val in enumerate(series, start=1):
+        bar = "#" * int(round(val * 20))
+        print(f"  Turn {i:2d}: {val:.2f} |{bar}")
+
+    print("\nDone.")
