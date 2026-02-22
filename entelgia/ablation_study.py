@@ -30,16 +30,28 @@ import re
 from enum import Enum
 from typing import Dict, List, Optional
 
-from .dialogue_metrics import (
-    circularity_per_turn,
-    circularity_rate,
-    compute_all_metrics,
-    intervention_utility,
-    progress_rate,
-)
-from .dialogue_engine import DialogueEngine
-from .fixy_interactive import InteractiveFixy
-from .energy_regulation import EntelgiaAgent, FixyRegulator
+try:
+    from .dialogue_metrics import (
+        circularity_per_turn,
+        circularity_rate,
+        compute_all_metrics,
+        intervention_utility,
+        progress_rate,
+    )
+    from .dialogue_engine import DialogueEngine
+    from .fixy_interactive import InteractiveFixy
+    from .energy_regulation import EntelgiaAgent, FixyRegulator
+except ImportError:
+    from dialogue_metrics import (  # type: ignore[no-redef]
+        circularity_per_turn,
+        circularity_rate,
+        compute_all_metrics,
+        intervention_utility,
+        progress_rate,
+    )
+    from dialogue_engine import DialogueEngine  # type: ignore[no-redef]
+    from fixy_interactive import InteractiveFixy  # type: ignore[no-redef]
+    from energy_regulation import EntelgiaAgent, FixyRegulator  # type: ignore[no-redef]
 
 
 # ---------------------------------------------------------------------------
@@ -402,3 +414,9 @@ def _ascii_circularity_chart(results: Dict[str, Dict]) -> None:
 
     for idx, label in enumerate(labels):
         print(f"  {markers[idx % len(markers)]} = {label}")
+
+
+if __name__ == "__main__":
+    results = run_ablation()
+    print_results_table(results)
+    plot_circularity(results)
