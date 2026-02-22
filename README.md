@@ -615,6 +615,42 @@ Tests verify the key-rotation and legacy-format migration logic in `MemoryCore`:
 
 ### 📋 New Tests — `test_dialogue_metrics.py` (PR #111)
 
+#### Metrics
+
+| Metric | What it measures |
+|---|---|
+| `circularity_rate` | Fraction of turn-pairs with topic-signature Jaccard similarity ≥ threshold — how much the dialogue loops |
+| `progress_rate` | Forward steps per turn: topic shifts + synthesis markers + open-question resolutions |
+| `intervention_utility` | Mean circularity reduction in the post-Fixy window vs. pre-Fixy window |
+
+#### Ablation Conditions
+
+| Condition | Active modules |
+|---|---|
+| `BASELINE` | Fixed A-B round-robin, repetitive content only |
+| `DIALOGUE_ENGINE` | + dynamic speaker selection & varied seeds (`dialogue_engine.py`) |
+| `FIXY` | + need-based interventions every 6 turns (`fixy_interactive.py`) |
+| `DREAM` | + dream-cycle energy consolidation (`energy_regulation.py`) |
+
+#### Ablation Results
+
+```
+from entelgia import run_ablation, print_results_table
+results = run_ablation(turns=30, seed=42)
+print_results_table(results)
+
++----------------------------+----------------------------+----------------------------+----------------------------+
+| Condition                  | Circularity Rate           | Progress Rate              | Intervention Utility       |
++----------------------------+----------------------------+----------------------------+----------------------------+
+| Baseline                   | 0.630                      | 0.414                      | 0.000                      |
+| DialogueEngine/Seed        | 0.097                      | 1.000                      | 0.000                      |
+| Fixy Interventions         | 0.409                      | 0.517                      | 0.333                      |
+| Dream/Energy               | 0.421                      | 0.517                      | 0.000                      |
++----------------------------+----------------------------+----------------------------+----------------------------+
+```
+
+#### Test Results
+
 ```
 $ python -m pytest tests/test_dialogue_metrics.py -v
 
