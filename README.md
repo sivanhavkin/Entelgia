@@ -236,14 +236,15 @@ Entelgia can be customized through the `Config` class in `Entelgia_production_me
 
 ### Response Quality Settings (v2.2.0+)
 
+> **Note:** Response length is controlled by the module-level constant `MAX_RESPONSE_WORDS = 150`
+> in `Entelgia_production_meta.py` (not a `Config` field). The LLM prompt instructs the model
+> to answer in maximum 150 words; responses are never truncated by the runtime.
+
 ```python
 config = Config()
 
-# Response length control (via LLM prompt instruction)
-config.max_output_words = 150       # LLM prompt asks for maximum 150 words (default: 150)
-
-# LLM timeout
-config.llm_timeout = 60             # Seconds to wait for LLM response (default: 60, reduced from 600)
+# LLM request timeout (seconds to wait per request)
+config.llm_timeout = 300            # Default: 300 s (reduced from 600 s)
 ```
 
 **Response Length Control** (v2.2.0+):
@@ -260,27 +261,46 @@ This approach ensures:
 - Users see full responses without artificial truncation
 
 **Reduced Timeout** improves responsiveness:
-- Maximum timeout reduced from 10 minutes to 60 seconds
-- Faster failure detection when LLM is unresponsive
+- LLM request timeout reduced from 600 s to 300 s (`config.llm_timeout`) for faster failure detection
 - Better user experience with more predictable behavior
 - Most responses complete much faster than the timeout limit
 
 ### Other Key Settings
 
 ```python
-config.max_turns = 200              # Maximum dialogue turns
+config.max_turns = 200              # Maximum dialogue turns (default: 200)
 config.timeout_minutes = 30         # Session timeout in minutes (set to 9999 to disable)
-config.dream_every_n_turns = 7     # Dream cycle frequency
+config.dream_every_n_turns = 7      # Dream cycle frequency (default: 7)
+config.llm_max_retries = 3          # LLM request retry count (default: 3)
+config.show_pronoun = False         # Show agent pronouns in output (default: False)
+config.show_meta = False            # Show meta-state after each turn (default: False)
+config.stm_max_entries = 10000      # Short-term memory capacity (default: 10000)
+config.stm_trim_batch = 500         # Entries pruned per trim pass (default: 500)
+config.promote_importance_threshold = 0.72  # Min importance to promote to LTM (default: 0.72)
+config.promote_emotion_threshold = 0.65     # Min emotion score to promote to LTM (default: 0.65)
+config.store_raw_stm = False        # Store un-redacted text in STM (default: False)
+config.store_raw_subconscious_ltm = False   # Store un-redacted text in LTM (default: False)
+```
+
+### ⚡ Energy & Dream Cycle Settings (v2.5.0)
+
+```python
+config.energy_safety_threshold = 35.0  # Energy level that triggers a dream cycle (default: 35.0)
+config.energy_drain_min = 8.0           # Minimum energy drained per step (default: 8.0)
+config.energy_drain_max = 15.0          # Maximum energy drained per step (default: 15.0)
+config.self_replicate_every_n_turns = 10  # Turns between self-replication scans (default: 10)
 ```
 
 ### Drive-Aware Cognition Settings (v2.5.0)
 
-These `Config` fields control how Freudian drives influence LLM behaviour at runtime:
+These `Config` fields control how Freudian drives evolve and influence LLM behaviour at runtime:
 
 ```python
+config.drive_mean_reversion_rate = 0.04   # Rate drives revert toward 5.0 each turn (default: 0.04)
+config.drive_oscillation_range = 0.15     # ±random noise added to drives per turn (default: 0.15)
+
 # LLM temperature is computed automatically from drive values:
 # temperature = max(0.25, min(0.95, 0.60 + 0.03*(id - ego) - 0.02*(superego - ego)))
-# No separate config — driven by id_strength / ego_strength / superego_strength in agent state.
 
 # Superego critique (second-pass rewrite) fires when superego_strength >= 7.5
 # Memory depth scales automatically:
@@ -361,7 +381,8 @@ entelgia/
 ├── context_manager.py       # Smart context enrichment
 ├── fixy_interactive.py      # Need-based interventions
 ├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
-└── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
+├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
+└── memory_security.py       # HMAC-SHA256 signature helpers
 ```
 
 **Key improvements:**

@@ -35,7 +35,7 @@ mechanism rather than from a single prompt.
 
 ## Core Components
 
-### Agents
+### Agents (`Agent` base class — `Socrates`, `Athena`, `Fixy`)
 Primary conversational entities with persistent identity.
 
 Examples:
@@ -43,11 +43,23 @@ Examples:
 - **Athena** — synthesis and reflection
 
 Agents maintain evolving internal variables such as drives, coherence,
-and interaction history.
+and interaction history. Each agent delegates cognitive sub-tasks to
+core components (`ConsciousCore`, `EmotionCore`, `LanguageCore`, `BehaviorCore`).
 
 ---
 
-### DialogueEngine
+### Core Mind Modules
+
+| Class | Role |
+|---|---|
+| `ConsciousCore` | Reflective narrative construction; tracks the agent's self-model |
+| `EmotionCore` | Affective state inference; weights memories and responses by emotion |
+| `LanguageCore` | Pronoun and language preference management per agent |
+| `BehaviorCore` | Goal-oriented response shaping; importance scoring and dream reflection |
+
+---
+
+### DialogueEngine (`SeedGenerator`, `DialogueEngine`)
 Responsible for managing conversation dynamics.
 
 Functions:
@@ -74,7 +86,7 @@ Its goal is contextual coherence under token constraints.
 
 ---
 
-### Memory System
+### Memory System (`MemoryCore`)
 
 #### Short-Term Memory (STM)
 - recent interaction buffer
@@ -87,6 +99,17 @@ Its goal is contextual coherence under token constraints.
 - enables identity continuity
 
 Memory influences behavior without requiring explicit recall in every turn.
+
+---
+
+### Session & API Support
+
+| Class | Role |
+|---|---|
+| `SessionManager` | Persist and restore dialogue sessions across restarts |
+| `AsyncProcessor` | Concurrent agent processing via `asyncio` |
+| `DialogRequest` | Pydantic model for REST API dialogue requests |
+| `DialogResponse` | Pydantic model for REST API dialogue responses |
 
 ---
 

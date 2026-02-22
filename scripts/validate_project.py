@@ -2,16 +2,16 @@
 """
 Entelgia Deep Implementation Validator - IMPROVED
 ===================================================
-Enhanced validation with better pattern matching and fallback detection.
+Enhanced validation with better pattern matching, fallback detection,
+and markdown consistency checking.
 """
 
 import re
 import ast
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from dataclasses import dataclass
 from enum import Enum
-
 
 class ImplementationStatus(Enum):
     FULLY_IMPLEMENTED = ""
@@ -634,10 +634,11 @@ class DeepValidator:
         checks_passed = 0
         total_checks = 8
 
+        # Check actual Config dataclass fields (not module constants)
         config_params = [
             "max_turns",
             "timeout_minutes",
-            "max_output_words",
+            "energy_safety_threshold",
             "llm_timeout",
             "dream_every_n_turns",
         ]
@@ -649,6 +650,13 @@ class DeepValidator:
                 checks_passed += 1
             else:
                 details.append(f"{param} not found")
+
+        # Also check that the module-level constant MAX_RESPONSE_WORDS exists
+        if re.search(r"MAX_RESPONSE_WORDS\s*=\s*\d+", self.content):
+            details.append("MAX_RESPONSE_WORDS constant found")
+            checks_passed += 1
+        else:
+            details.append("MAX_RESPONSE_WORDS not found")
 
         config_classes = self.find_classes([r"^Config$", r"Configuration"])
         if config_classes:
@@ -721,12 +729,240 @@ def print_summary(features: List[FeatureCheck]):
     print("=" * 70 + "\n")
 
 
+# ---------------------------------------------------------------------------
+# Markdown Consistency Checker
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ConsistencyIssue:
+    kind: str        # "missing_in_md" | "missing_in_code"
+    item: str
+    files_checked: List[str]
+
+
+class MarkdownConsistencyChecker:
+    """Checks that key code symbols and Config attributes are documented
+    in the project's main markdown files, and flags stale references in
+    the markdown that no longer match the code.
+    """
+
+    # Markdown files to scan for documentation coverage
+    MD_FILES = [
+        "README.md",
+        "ARCHITECTURE.md",
+        "SPEC.md",
+        "whitepaper.md",
+    ]
+
+    def __init__(self, project_root: Path) -> None:
+        self.root = project_root
+        self.main_py = project_root / "Entelgia_production_meta.py"
+        self._md_files_found: List[str] = []
+        self._py_sources: Dict[str, str] = self._load_py_sources()
+        self._md_content: str = self._load_md_content()
+
+    # ------------------------------------------------------------------
+    # Source loading helpers
+    # ------------------------------------------------------------------
+
+    def _load_py_sources(self) -> Dict[str, str]:
+        """Load all Python sources that contribute to the public API."""
+        sources: Dict[str, str] = {}
+        candidates = [self.main_py] + list(
+            (self.root / "entelgia").glob("*.py")
+        )
+        for path in candidates:
+            if path.exists():
+                sources[path.name] = path.read_text(encoding="utf-8")
+        return sources
+
+    def _load_md_content(self) -> str:
+        """Concatenate all target markdown files into a single searchable string."""
+        parts: List[str] = []
+        for rel in self.MD_FILES:
+            p = self.root / rel
+            if p.exists():
+                parts.append(p.read_text(encoding="utf-8"))
+                self._md_files_found.append(rel)
+        return "\n".join(parts)
+
+    # ------------------------------------------------------------------
+    # Code introspection helpers
+    # ------------------------------------------------------------------
+
+    def _get_all_class_names(self) -> Set[str]:
+        """Return all class names defined across the Python sources."""
+        names: Set[str] = set()
+        for src in self._py_sources.values():
+            try:
+                tree = ast.parse(src)
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    names.add(node.name)
+        return names
+
+    def _get_config_attrs(self) -> Dict[str, str]:
+        """Return {attr_name: default_value_str} for the Config dataclass."""
+        attrs: Dict[str, str] = {}
+        src = self._py_sources.get("Entelgia_production_meta.py", "")
+        if not src:
+            return attrs
+        try:
+            tree = ast.parse(src)
+        except SyntaxError:
+            return attrs
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == "Config":
+                for item in node.body:
+                    if isinstance(item, ast.AnnAssign) and isinstance(
+                        item.target, ast.Name
+                    ):
+                        default = ast.unparse(item.value) if item.value else "?"
+                        attrs[item.target.id] = default
+        return attrs
+
+    def _get_module_files(self) -> Set[str]:
+        """Return the set of .py file names present in the entelgia/ package."""
+        pkg = self.root / "entelgia"
+        if not pkg.exists():
+            return set()
+        return {p.name for p in pkg.glob("*.py") if p.name != "__init__.py"}
+
+    # ------------------------------------------------------------------
+    # Consistency checks
+    # ------------------------------------------------------------------
+
+    def check_classes_in_markdown(self) -> List[ConsistencyIssue]:
+        """Verify that every public class name appears in at least one MD file."""
+        # Internal implementation details intentionally not documented in user-facing MD
+        skip = {
+            "Agent",           # generic stub in dialogue_engine.py
+            "LRUCache",        # caching implementation detail
+            "MetricsTracker",  # internal metrics collector
+            "LLM",             # thin HTTP wrapper
+            "TopicManager",    # internal topic rotation helper
+            "VersionTracker",  # internal version snapshot helper
+        }
+        issues: List[ConsistencyIssue] = []
+        for cls in sorted(self._get_all_class_names()):
+            if cls in skip:
+                continue
+            if cls not in self._md_content:
+                issues.append(
+                    ConsistencyIssue(
+                        kind="missing_in_md",
+                        item=f"class {cls}",
+                        files_checked=self._md_files_found,
+                    )
+                )
+        return issues
+
+    def check_config_attrs_in_markdown(self) -> List[ConsistencyIssue]:
+        """Verify that every Config attribute is mentioned in at least one MD file."""
+        issues: List[ConsistencyIssue] = []
+        for attr, default in sorted(self._get_config_attrs().items()):
+            if attr not in self._md_content:
+                issues.append(
+                    ConsistencyIssue(
+                        kind="missing_in_md",
+                        item=f"Config.{attr} (default={default})",
+                        files_checked=self._md_files_found,
+                    )
+                )
+        return issues
+
+    def check_module_files_in_markdown(self) -> List[ConsistencyIssue]:
+        """Verify that every entelgia/*.py module file is mentioned in at least one MD."""
+        issues: List[ConsistencyIssue] = []
+        for fname in sorted(self._get_module_files()):
+            if fname not in self._md_content:
+                issues.append(
+                    ConsistencyIssue(
+                        kind="missing_in_md",
+                        item=f"entelgia/{fname}",
+                        files_checked=self._md_files_found,
+                    )
+                )
+        return issues
+
+    def check_stale_md_references(self) -> List[ConsistencyIssue]:
+        """Detect markdown references to symbols that no longer exist in the code."""
+        issues: List[ConsistencyIssue] = []
+        # Symbols that were removed or renamed
+        stale_candidates = [
+            ("max_output_words", "Config attribute"),
+        ]
+        all_py = "\n".join(self._py_sources.values())
+        for symbol, description in stale_candidates:
+            # Check if it appears in markdown but NOT as a proper attribute in code
+            in_md = symbol in self._md_content
+            # Search for it as a Config dataclass field
+            in_config = bool(
+                re.search(
+                    rf"^\s*{re.escape(symbol)}\s*:", all_py, re.MULTILINE
+                )
+            )
+            if in_md and not in_config:
+                issues.append(
+                    ConsistencyIssue(
+                        kind="missing_in_code",
+                        item=f"{symbol} ({description}) referenced in MD but absent from Config",
+                        files_checked=self._md_files_found,
+                    )
+                )
+        return issues
+
+    # ------------------------------------------------------------------
+    # Public report
+    # ------------------------------------------------------------------
+
+    def run(self) -> None:
+        print("\n" + "=" * 70)
+        print("MARKDOWN CONSISTENCY CHECK")
+        print(f"   Scanning: {', '.join(self._md_files_found)}")
+        print("=" * 70)
+
+        cls_issues = self.check_classes_in_markdown()
+        cfg_issues = self.check_config_attrs_in_markdown()
+        mod_issues = self.check_module_files_in_markdown()
+        stale_issues = self.check_stale_md_references()
+
+        all_issues = cls_issues + cfg_issues + mod_issues + stale_issues
+
+        if not all_issues:
+            print("\n All code symbols are documented in the markdown files.")
+        else:
+            missing_in_md = [i for i in all_issues if i.kind == "missing_in_md"]
+            stale = [i for i in all_issues if i.kind == "missing_in_code"]
+
+            if missing_in_md:
+                print(f"\n Items in code but MISSING from markdown ({len(missing_in_md)}):")
+                for issue in missing_in_md:
+                    print(f"   {issue.item}")
+
+            if stale:
+                print(f"\n Stale markdown references (in MD but absent from code) ({len(stale)}):")
+                for issue in stale:
+                    print(f"   {issue.item}")
+
+        total = len(all_issues)
+        print(
+            f"\n  Result: {total} issue(s) found"
+            f" ({len(cls_issues)} classes, {len(cfg_issues)} Config attrs,"
+            f" {len(mod_issues)} modules, {len(stale_issues)} stale refs)"
+        )
+        print("=" * 70 + "\n")
+
+
 def main():
     root = Path(__file__).parent.parent
 
     print("\n" + "=" * 70)
-    print("ENTELGIA DEEP IMPLEMENTATION VALIDATOR v2.0")
-    print("   Enhanced pattern matching & fallback detection")
+    print("ENTELGIA DEEP IMPLEMENTATION VALIDATOR v3.0")
+    print("   Enhanced pattern matching, fallback detection & markdown sync")
     print("=" * 70)
 
     validator = DeepValidator(root)
@@ -754,6 +990,12 @@ def main():
         print_feature_report(feature)
 
     print_summary(features)
+
+    # ----------------------------------------------------------------
+    # Markdown consistency check
+    # ----------------------------------------------------------------
+    checker = MarkdownConsistencyChecker(root)
+    checker.run()
 
 
 if __name__ == "__main__":
