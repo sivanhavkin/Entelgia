@@ -18,10 +18,12 @@ LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 # LLM First-Person Instruction - agents must speak as themselves using "I"
 LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
 
-# LLM instruction to avoid forbidden meta-commentary phrases
+# LLM instruction to avoid forbidden meta-commentary phrases and opening patterns
 LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "FORBIDDEN PHRASES: Never use 'In our dialogue', 'We learn', "
-    "or 'Our conversations reveal'."
+    "or 'Our conversations reveal'. "
+    "FORBIDDEN OPENERS: Never begin your response with 'Recent thought', "
+    "'A recent thought', 'I ponder', or any variation of these phrases."
 )
 
 

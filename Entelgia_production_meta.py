@@ -261,10 +261,20 @@ FORBIDDEN_PHRASES = [
     "Our conversations reveal",
 ]
 
-# LLM instruction to avoid forbidden meta-commentary phrases
+# Phrases that must never appear at the start of an agent's response
+FORBIDDEN_STARTERS = [
+    "recent thought",
+    "a recent thought",
+    "in a recent thought",
+    "i ponder",
+]
+
+# LLM instruction to avoid forbidden meta-commentary phrases and opening patterns
 LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "FORBIDDEN PHRASES: Never use 'In our dialogue', 'We learn', "
-    "or 'Our conversations reveal'."
+    "or 'Our conversations reveal'. "
+    "FORBIDDEN OPENERS: Never begin your response with 'Recent thought', "
+    "'A recent thought', 'I ponder', or any variation of these phrases."
 )
 
 # Initial energy for all agents (restored after each dream cycle)
@@ -1556,6 +1566,22 @@ class Agent:
                     "\nRespond now:\n", f"\n{opener_rule}\nRespond now:\n"
                 )
 
+        # Prevent opening with the same sentence the last OTHER agent used
+        other_texts = [
+            t.get("text", "")
+            for t in dialog_tail
+            if t.get("role") != self.name and t.get("text", "").strip()
+        ]
+        if other_texts:
+            other_last_opener = _first_sentence(other_texts[-1])
+            if other_last_opener:
+                other_opener_rule = (
+                    f'FORBIDDEN OPENER: Do not begin your response with: "{other_last_opener}"'
+                )
+                prompt = prompt.replace(
+                    "\nRespond now:\n", f"\n{other_opener_rule}\nRespond now:\n"
+                )
+
         # Drives → temperature (cognition control); conflict raises volatility
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
@@ -1654,6 +1680,21 @@ class Agent:
             remainder = out[len(out_first) :].strip()
             if remainder:
                 out = remainder
+
+        # Safety net: strip forbidden starter phrases if LLM still began with one
+        out_stripped = out.lstrip()
+        out_lower = out_stripped.lower()
+        for starter in FORBIDDEN_STARTERS:
+            if out_lower.startswith(starter):
+                # Remove only the forbidden prefix and any immediately following punctuation/whitespace
+                stripped = re.sub(
+                    r"(?i)^" + re.escape(starter) + r"\s*[,:]?\s*",
+                    "",
+                    out_stripped,
+                ).strip()
+                if stripped:
+                    out = stripped
+                break
 
         return out
 
