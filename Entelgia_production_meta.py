@@ -1575,9 +1575,7 @@ class Agent:
         if other_texts:
             other_last_opener = _first_sentence(other_texts[-1])
             if other_last_opener:
-                other_opener_rule = (
-                    f'FORBIDDEN OPENER: Do not begin your response with: "{other_last_opener}"'
-                )
+                other_opener_rule = f'FORBIDDEN OPENER: Do not begin your response with: "{other_last_opener}"'
                 prompt = prompt.replace(
                     "\nRespond now:\n", f"\n{other_opener_rule}\nRespond now:\n"
                 )
