@@ -617,7 +617,60 @@ Tests verify the key-rotation and legacy-format migration logic in `MemoryCore`:
 
 ```
 $ python -m pytest tests/test_dialogue_metrics.py -v
-================================================== 51 passed in 1.20s ==================================================
+
+tests/test_dialogue_metrics.py::TestKeywords::test_only_long_words PASSED                                        [  1%]
+tests/test_dialogue_metrics.py::TestKeywords::test_lowercases PASSED                                             [  3%]
+tests/test_dialogue_metrics.py::TestJaccard::test_identical_sets PASSED                                          [  5%]
+tests/test_dialogue_metrics.py::TestJaccard::test_disjoint_sets PASSED                                           [  7%]
+tests/test_dialogue_metrics.py::TestJaccard::test_partial_overlap PASSED                                         [  9%]
+tests/test_dialogue_metrics.py::TestJaccard::test_empty_sets PASSED                                              [ 11%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_empty_dialog PASSED                                    [ 13%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_single_turn PASSED                                     [ 15%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_identical_turns_high_circularity PASSED                [ 17%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_completely_distinct_turns_low_circularity PASSED       [ 19%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_custom_threshold PASSED                                [ 21%]
+tests/test_dialogue_metrics.py::TestCircularityRate::test_result_in_range PASSED                                 [ 23%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_series_length_equals_dialog_length PASSED           [ 25%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_empty_dialog PASSED                                 [ 27%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_first_turn_is_zero PASSED                           [ 29%]
+tests/test_dialogue_metrics.py::TestCircularityPerTurn::test_values_in_range PASSED                              [ 31%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_empty_or_single_turn PASSED                               [ 33%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_synthesis_marker_increases_progress PASSED                [ 35%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_topic_shift_counts_as_progress PASSED                     [ 37%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_question_resolution PASSED                                [ 39%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_repetitive_dialog_low_progress PASSED                     [ 41%]
+tests/test_dialogue_metrics.py::TestProgressRate::test_result_in_range PASSED                                    [ 43%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_no_fixy_turns PASSED                               [ 45%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_fixy_reduces_circularity PASSED                    [ 47%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_multiple_fixy_turns PASSED                         [ 49%]
+tests/test_dialogue_metrics.py::TestInterventionUtility::test_result_is_float PASSED                             [ 50%]
+tests/test_dialogue_metrics.py::TestComputeAllMetrics::test_keys_present PASSED                                  [ 52%]
+tests/test_dialogue_metrics.py::TestComputeAllMetrics::test_values_are_floats_in_range PASSED                    [ 54%]
+tests/test_dialogue_metrics.py::TestAblationCondition::test_all_four_conditions_defined PASSED                   [ 56%]
+tests/test_dialogue_metrics.py::TestAblationCondition::test_enum_has_four_members PASSED                         [ 58%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.BASELINE] PASSED [ 60%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DIALOGUE_ENGINE] PASSED [ 62%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.FIXY] PASSED [ 64%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DREAM] PASSED [ 66%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.BASELINE] PASSED [ 68%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DIALOGUE_ENGINE] PASSED [ 70%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.FIXY] PASSED   [ 72%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DREAM] PASSED  [ 74%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_reproducible_with_same_seed PASSED                        [ 76%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_different_seeds_differ PASSED                             [ 78%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_fixy_condition_contains_fixy_role PASSED                  [ 80%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_baseline_no_fixy_role PASSED                              [ 82%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_returns_all_four_conditions PASSED                         [ 84%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_each_condition_has_metrics_and_series PASSED               [ 86%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_circularity_series_length PASSED                           [ 88%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_reproducible PASSED                                        [ 90%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_baseline_higher_circularity_than_dialogue_engine PASSED    [ 92%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_smoke_no_crash PASSED                                [ 94%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_output PASSED                      [ 96%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED                            [ 98%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [100%]
+
+================================================== 51 passed in 0.09s ==================================================
 ```
 
 > ✅ **51 new tests pass** covering `dialogue_metrics.py` and `ablation_study.py` (PR #111).
@@ -628,7 +681,32 @@ $ python -m pytest tests/test_dialogue_metrics.py -v
 
 ```
 $ python -m pytest tests/test_dialogue_metrics.py -v -k "ablation or Ablation or RunCondition or RunAblation or PrintResults or PlotCircularity"
-================================================= 23 passed, 28 deselected in 0.77s ================================================
+
+tests/test_dialogue_metrics.py::TestAblationCondition::test_all_four_conditions_defined PASSED                   [  4%]
+tests/test_dialogue_metrics.py::TestAblationCondition::test_enum_has_four_members PASSED                         [  8%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.BASELINE] PASSED [ 13%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DIALOGUE_ENGINE] PASSED [ 17%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.FIXY] PASSED [ 21%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DREAM] PASSED [ 26%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.BASELINE] PASSED [ 30%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DIALOGUE_ENGINE] PASSED [ 34%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.FIXY] PASSED   [ 39%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DREAM] PASSED  [ 43%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_reproducible_with_same_seed PASSED                        [ 47%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_different_seeds_differ PASSED                             [ 52%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_fixy_condition_contains_fixy_role PASSED                  [ 56%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_baseline_no_fixy_role PASSED                              [ 60%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_returns_all_four_conditions PASSED                         [ 65%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_each_condition_has_metrics_and_series PASSED               [ 69%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_circularity_series_length PASSED                           [ 73%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_reproducible PASSED                                        [ 78%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_baseline_higher_circularity_than_dialogue_engine PASSED    [ 82%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_smoke_no_crash PASSED                                [ 86%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_output PASSED                      [ 91%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED                            [ 95%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [100%]
+
+========================================== 23 passed, 28 deselected in 0.06s ===========================================
 ```
 
 > ✅ **23 ablation study tests pass** covering `ablation_study.py` (PR #111, #115).
@@ -639,7 +717,10 @@ $ python -m pytest tests/test_dialogue_metrics.py -v -k "ablation or Ablation or
 
 ```
 $ python -m pytest tests/test_enhanced_dialogue.py::test_context_enrichment -v
-================================================== 1 passed, 1 warning in 0.72s ==================================================
+
+tests/test_enhanced_dialogue.py::test_context_enrichment PASSED                                                  [100%]
+
+============================================= 1 passed, 1 warning in 0.02s =============================================
 ```
 
 > ✅ **1 context_manager test passes** — verifies `ContextManager.build_enriched_context()` returns a non-empty prompt with 8 recent turns, 6 thoughts, and 5 memories (PR #117).
