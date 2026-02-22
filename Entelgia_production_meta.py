@@ -613,8 +613,8 @@ def compute_drive_pressure(
     Returns:
         New DrivePressure clamped to [0.0, 10.0].
     """
-    energy_term = (100.0 - energy) / 100.0          # 0..1
-    conflict_term = min(1.0, conflict / 10.0)        # 0..1  (clamp for conflict > 10)
+    energy_term = (100.0 - energy) / 100.0  # 0..1
+    conflict_term = min(1.0, conflict / 10.0)  # 0..1  (clamp for conflict > 10)
     unresolved_term = min(1.0, unresolved_count / 3.0)  # 0..1
 
     raw = (
@@ -1414,9 +1414,9 @@ class Agent:
         self._last_superego_rewrite: bool = False
         # Drive Pressure state
         self.drive_pressure: float = 2.0
-        self.open_questions: int = 0          # unresolved question counter (0..5)
-        self._topic_history: List[str] = []   # last N topic signatures for stagnation
-        self._same_topic_turns: int = 0       # consecutive turns with same signature
+        self.open_questions: int = 0  # unresolved question counter (0..5)
+        self._topic_history: List[str] = []  # last N topic signatures for stagnation
+        self._same_topic_turns: int = 0  # consecutive turns with same signature
         self._last_stagnation: float = 0.0
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
@@ -1832,8 +1832,7 @@ class Agent:
         else:
             self._same_topic_turns = max(0, self._same_topic_turns - 1)
         stagnation = (
-            1.0 if self._same_topic_turns >= 4
-            else self._same_topic_turns / 4.0
+            1.0 if self._same_topic_turns >= 4 else self._same_topic_turns / 4.0
         )
         self._last_stagnation = stagnation
 
