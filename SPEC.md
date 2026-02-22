@@ -361,14 +361,48 @@ A session is considered working when:
 
 ## Appendix: Config Expectations (Example)
 
-* `dream_every_n_turns`
-* `promote_importance_threshold`
-* `promote_emotion_threshold`
-* `enable_auto_patch`
-* `allow_write_self_file`
-* `energy_safety_threshold` (v2.5.0)
-* `energy_drain_min` / `energy_drain_max` (v2.5.0)
-* `self_replicate_every_n_turns` (v2.5.0)
+All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.py`.
+
+### LLM / Session
+
+* `ollama_url` — Ollama API endpoint (default: `http://localhost:11434/api/generate`)
+* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `phi3:latest`)
+* `max_turns` — Maximum dialogue turns (default: `200`)
+* `timeout_minutes` — Session wall-clock timeout in minutes (default: `30`)
+* `llm_timeout` — Per-request LLM timeout in seconds (default: `300`)
+* `llm_max_retries` — Retry attempts on LLM failure (default: `3`)
+* `seed_topic` — Opening topic when none is provided (default: `"what would you like to talk about?"`)
+* `cache_size` — LRU response cache capacity (default: `5000`)
+* `emotion_cache_ttl` — Emotion cache time-to-live in seconds (default: `3600`)
+* `show_pronoun` — Include agent pronouns in output (default: `False`)
+* `show_meta` — Print meta-state after each turn (default: `False`)
+
+### Memory
+
+* `data_dir` — Base directory for all persisted data (default: `entelgia_data`)
+* `db_path` — SQLite database path (default: `entelgia_data/entelgia_memory.sqlite`)
+* `csv_log_path` — CSV dialogue log path (default: `entelgia_data/entelgia_log.csv`)
+* `gexf_path` — GEXF graph export path (default: `entelgia_data/entelgia_graph.gexf`)
+* `metrics_path` — JSON metrics output path (default: `entelgia_data/metrics.json`)
+* `sessions_dir` — Directory for persisted session files (default: `entelgia_data/sessions`)
+* `version_dir` — Directory for version snapshots (default: `entelgia_data/versions`)
+* `stm_max_entries` — Short-term memory capacity (default: `10000`)
+* `stm_trim_batch` — Entries pruned per trim pass (default: `500`)
+* `dream_every_n_turns` — Turns between dream-cycle consolidation passes (default: `7`)
+* `promote_importance_threshold` — Min importance score to promote to LTM (default: `0.72`)
+* `promote_emotion_threshold` — Min emotion score to promote to LTM (default: `0.65`)
+* `store_raw_stm` — Store un-redacted text in STM (default: `False`)
+* `store_raw_subconscious_ltm` — Store un-redacted text in subconscious LTM (default: `False`)
+* `enable_auto_patch` — Enable automatic self-patching (default: `False`)
+* `allow_write_self_file` — Allow the agent to write to its own source file (default: `False`)
+
+### Energy & Drive (v2.5.0)
+
+* `energy_safety_threshold` — Energy floor that triggers a dream cycle (default: `35.0`)
+* `energy_drain_min` / `energy_drain_max` — Per-step energy drain range (default: `8.0` / `15.0`)
+* `self_replicate_every_n_turns` — Turns between self-replication keyword scans (default: `10`)
+* `drive_mean_reversion_rate` — Rate at which drives revert toward 5.0 each turn (default: `0.04`)
+* `drive_oscillation_range` — ±random noise added to drive values per turn (default: `0.15`)
 
 ---
 
