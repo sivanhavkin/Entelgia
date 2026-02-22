@@ -693,7 +693,89 @@ TOTAL                                     3752   3151    16%
 
 ---
 
-### 🔄 CI/CD Pipeline
+### 📋 New Tests — `ablation_study.py` (PR #111, PR #115)
+
+```
+$ python -m pytest tests/test_dialogue_metrics.py -v -k "ablation or Ablation or RunCondition or RunAblation or PrintResults or PlotCircularity"
+================================================= test session starts ==================================================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
+rootdir: /home/runner/work/Entelgia/Entelgia
+configfile: pyproject.toml
+plugins: cov-7.0.0
+collecting ... collected 51 items / 28 deselected / 23 selected
+
+tests/test_dialogue_metrics.py::TestAblationCondition::test_all_four_conditions_defined PASSED                   [  4%]
+tests/test_dialogue_metrics.py::TestAblationCondition::test_enum_has_four_members PASSED                         [  8%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.BASELINE] PASSED [ 13%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DIALOGUE_ENGINE] PASSED [ 17%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.FIXY] PASSED [ 21%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_returns_correct_number_of_turns[AblationCondition.DREAM] PASSED [ 26%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.BASELINE] PASSED [ 30%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DIALOGUE_ENGINE] PASSED [ 34%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.FIXY] PASSED   [ 39%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_turns_have_role_and_text[AblationCondition.DREAM] PASSED  [ 43%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_reproducible_with_same_seed PASSED                        [ 47%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_different_seeds_differ PASSED                             [ 52%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_fixy_condition_contains_fixy_role PASSED                  [ 56%]
+tests/test_dialogue_metrics.py::TestRunCondition::test_baseline_no_fixy_role PASSED                              [ 60%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_returns_all_four_conditions PASSED                         [ 65%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_each_condition_has_metrics_and_series PASSED               [ 69%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_circularity_series_length PASSED                           [ 73%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_reproducible PASSED                                        [ 78%]
+tests/test_dialogue_metrics.py::TestRunAblation::test_baseline_higher_circularity_than_dialogue_engine PASSED    [ 82%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_smoke_no_crash PASSED                                [ 86%]
+tests/test_dialogue_metrics.py::TestPrintResultsTable::test_all_conditions_in_output PASSED                      [ 91%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_ascii_fallback_smoke PASSED                            [ 95%]
+tests/test_dialogue_metrics.py::TestPlotCircularity::test_plot_circularity_uses_ascii_when_matplotlib_absent PASSED [100%]
+
+==================================================== tests coverage ====================================================
+Name                                     Stmts   Miss  Cover
+------------------------------------------------------------
+entelgia/__init__.py                        10      0   100%
+entelgia/ablation_study.py                 151     24    84%
+entelgia/context_manager.py                118    101    14%
+entelgia/dialogue_metrics.py                86     19    78%
+entelgia/energy_regulation.py               56      1    98%
+------------------------------------------------------------
+TOTAL                                     3752   3259    13%
+================================================= 23 passed, 28 deselected in 0.77s ================================================
+```
+
+> ✅ **23 ablation study tests pass** covering `ablation_study.py` (PR #111, #115).
+
+---
+
+### 📋 New Tests — `context_manager.py` (PR #117)
+
+```
+$ python -m pytest tests/test_enhanced_dialogue.py::test_context_enrichment -v
+================================================= test session starts ==================================================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /usr/bin/python
+rootdir: /home/runner/work/Entelgia/Entelgia
+configfile: pyproject.toml
+plugins: cov-7.0.0
+collecting ... collected 1 item
+
+tests/test_enhanced_dialogue.py::test_context_enrichment PASSED                                                  [100%]
+
+=============================== warnings summary ===============================
+tests/test_enhanced_dialogue.py::test_context_enrichment
+  PytestReturnNotNoneWarning: Test functions should return None, but
+  test_context_enrichment returned <class 'bool'>.
+
+==================================================== tests coverage ====================================================
+Name                                     Stmts   Miss  Cover
+------------------------------------------------------------
+entelgia/__init__.py                        10      0   100%
+entelgia/context_manager.py                118     47    60%
+entelgia/dialogue_engine.py                 99     85    14%
+entelgia/enhanced_personas.py               31     23    26%
+------------------------------------------------------------
+TOTAL                                     3752   3503     7%
+================================================== 1 passed, 1 warning in 0.72s ==================================================
+```
+
+> ✅ **1 context_manager test passes** — verifies `ContextManager.build_enriched_context()` returns a non-empty prompt with 8 recent turns, 6 thoughts, and 5 memories (PR #117).
 
 In addition to the unit tests, the continuous-integration (CI/CD) pipeline automatically runs a suite of quality and security checks:
 
