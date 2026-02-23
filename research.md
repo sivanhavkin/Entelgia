@@ -99,11 +99,11 @@ All experiments used identical dialogue duration and evaluation procedures.
 <div align="center">
 
 ```mermaid
-graph TD;
-    A[Baseline: 0.630] -->|Red| A1[0.630]
-    B[DialogueEngine/Seed: 0.097] -->|Green| B1[0.097]
-    C[Fixy Interventions: 0.409] -->|Yellow| C1[0.409]
-    D[Dream/Energy: 0.421] -->|Yellow| D1[0.421]
+xychart-beta
+    title "Circularity Rate by Condition"
+    x-axis ["Baseline", "Seed", "Fixy", "Dream"]
+    y-axis "Circularity Rate" 0 --> 1
+    bar [0.630, 0.097, 0.409, 0.421]
 ```
 
 </div>
@@ -113,11 +113,11 @@ graph TD;
 <div align="center">
 
 ```mermaid
-graph TD;
-    A[Baseline: 0.414] -->|Yellow| A1[0.414]
-    B[DialogueEngine/Seed: 1.000] -->|Green| B1[1.000]
-    C[Fixy Interventions: 0.517] -->|Blue| C1[0.517]
-    D[Dream/Energy: 0.517] -->|Blue| D1[0.517]
+xychart-beta
+    title "Progress Rate by Condition"
+    x-axis ["Baseline", "Seed", "Fixy", "Dream"]
+    y-axis "Progress Rate" 0 --> 1
+    bar [0.414, 1.000, 0.517, 0.517]
 ```
 
 </div>
@@ -127,11 +127,11 @@ graph TD;
 <div align="center">
 
 ```mermaid
-graph TD;
-    A[Baseline: 0.000] -->|Gray| A1[0.000]
-    B[DialogueEngine/Seed: 0.000] -->|Gray| B1[0.000]
-    C[Fixy Interventions: 0.333] -->|Blue| C1[0.333]
-    D[Dream/Energy: 0.000] -->|Gray| D1[0.000]
+xychart-beta
+    title "Intervention Utility by Condition"
+    x-axis ["Baseline", "Seed", "Fixy", "Dream"]
+    y-axis "Intervention Utility" 0 --> 1
+    bar [0.000, 0.000, 0.333, 0.000]
 ```
 
 </div>
@@ -181,16 +181,11 @@ Per-turn analysis revealed an early spike in circularity followed by rapid decay
 <div align="center">
 
 ```mermaid
-graph TD;
-    A[t=1: 0.85] -->|Dark Red| B[t=2: 0.70]
-    B -->|Dark Red| C[t=3: 0.60]
-    C -->|Dark Red| D[t=4: 0.50]
-    D -->|Dark Red| E[t=5: 0.40]
-    E -->|Dark Red| F[t=6: 0.30]
-    F -->|Dark Red| G[t=7: 0.20]
-    G -->|Dark Red| H[t=8: 0.10]
-    H -->|Dark Red| I[t=9: 0.05]
-    I -->|Nearly White| J[t=10: 0.01]
+xychart-beta
+    title "Temporal Circularity Profile"
+    x-axis "Turn" [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    y-axis "Circularity" 0 --> 1
+    line [0.85, 0.70, 0.60, 0.50, 0.40, 0.30, 0.20, 0.10, 0.05, 0.01]
 ```
 
 </div>
@@ -226,6 +221,34 @@ These findings suggest a shift in agent design perspective: instead of treating 
 ---
 
 ## References
+
+1. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). *Attention Is All You Need*. Advances in Neural Information Processing Systems, 30. https://arxiv.org/abs/1706.03762
+
+2. Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J., Dhariwal, P., Neelakantan, A., et al. (2020). *Language Models are Few-Shot Learners*. Advances in Neural Information Processing Systems, 33, 1877–1901. https://arxiv.org/abs/2005.14165
+
+3. Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C. L., Mishkin, P., Zhang, C., et al. (2022). *Training language models to follow instructions with human feedback*. Advances in Neural Information Processing Systems, 35. https://arxiv.org/abs/2203.02155
+
+4. Wei, J., Wang, X., Schuurmans, D., Bosma, M., Ichter, B., Xia, F., Chi, E., Le, Q., & Zhou, D. (2022). *Chain-of-Thought Prompting Elicits Reasoning in Large Language Models*. Advances in Neural Information Processing Systems, 35. https://arxiv.org/abs/2201.11903
+
+5. Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., & Bernstein, M. S. (2023). *Generative Agents: Interactive Simulacra of Human Behavior*. Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST '23). https://arxiv.org/abs/2304.03442
+
+6. Li, G., Hammoud, H. A. A. K., Itani, H., Khizbullin, D., & Ghanem, B. (2023). *CAMEL: Communicative Agents for "Mind" Exploration of Large Language Model Society*. Advances in Neural Information Processing Systems, 36. https://arxiv.org/abs/2303.17760
+
+7. Shinn, N., Cassano, F., Labash, B., Gopalan, A., Narasimhan, K., & Yao, S. (2023). *Reflexion: Language Agents with Verbal Reinforcement Learning*. Advances in Neural Information Processing Systems, 36. https://arxiv.org/abs/2303.11366
+
+8. Wu, Q., Bansal, G., Zhang, J., Wu, Y., Zhang, S., Zhu, E., Li, B., Jiang, L., Zhang, X., & Wang, C. (2023). *AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation Framework*. arXiv preprint arXiv:2308.08155. https://arxiv.org/abs/2308.08155
+
+9. Hong, S., Zhuge, M., Chen, J., Zheng, X., Cheng, Y., Zhang, C., Wang, J., et al. (2024). *MetaGPT: Meta Programming for A Multi-Agent Collaborative Framework*. Proceedings of the 12th International Conference on Learning Representations (ICLR 2024). https://arxiv.org/abs/2308.00352
+
+10. Liang, T., He, Z., Jiao, W., Wang, X., Wang, Y., Wang, R., Yang, Y., Shi, S., & Xu, T. (2023). *Encouraging Divergent Thinking in Large Language Models through Multi-Round Dialogue*. arXiv preprint arXiv:2305.19118. https://arxiv.org/abs/2305.19118
+
+11. Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., & Cao, Y. (2023). *ReAct: Synergizing Reasoning and Acting in Language Models*. Proceedings of the 11th International Conference on Learning Representations (ICLR 2023). https://arxiv.org/abs/2210.03629
+
+12. Wang, L., Ma, C., Feng, X., Zhang, Z., Yang, H., Zhang, J., Chen, Z., et al. (2024). *A Survey on Large Language Model based Autonomous Agents*. Frontiers of Computer Science, 18(6), 186345. https://arxiv.org/abs/2308.11432
+
+---
+
+### Internal Project References
 
 - Entelgia Whitepaper — [whitepaper.md](whitepaper.md)
 - Entelgia Architecture Overview — [ARCHITECTURE.md](ARCHITECTURE.md)
