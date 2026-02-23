@@ -75,10 +75,13 @@ try:
     from dotenv import load_dotenv
 
     load_dotenv()
-except ImportError as e:
-    raise ImportError(
-        "python-dotenv is required. Install it with: pip install python-dotenv"
-    ) from e
+except ImportError:
+    import warnings
+    warnings.warn(
+        "python-dotenv is not installed; .env file will not be loaded. "
+        "Install it with: pip install python-dotenv",
+        stacklevel=2,
+    )
 
 import json
 import os
