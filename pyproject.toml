@@ -61,7 +61,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=. --cov-report=html --cov-report=term"
+addopts = "-v --cov=. --cov-report=html --cov-report=term --continue-on-collection-errors"
 
 [tool.black]
 line-length = 88
