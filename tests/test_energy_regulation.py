@@ -295,3 +295,7 @@ class TestPackageImports:
         from entelgia import EntelgiaAgent as EA
 
         assert EA is EntelgiaAgent
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

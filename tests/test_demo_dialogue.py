@@ -169,4 +169,4 @@ def test_full_dialogue_demo(capsys):
 
 
 if __name__ == "__main__":
-    print(format_demo_dialogue(DEMO_DIALOGUE))
+    pytest.main([__file__, "-v", "-s"])

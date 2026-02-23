@@ -330,3 +330,7 @@ class TestLongTermMemoryPackageImports:
         from entelgia import SelfReplication as SR
 
         assert SR is SelfReplication
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

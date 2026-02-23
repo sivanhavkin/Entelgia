@@ -346,3 +346,7 @@ class TestNoBreakingChanges:
             stagnation=0.5,
         )
         assert compute_drive_pressure(**args) == compute_drive_pressure(**args)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])
