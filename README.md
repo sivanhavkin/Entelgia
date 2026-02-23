@@ -32,6 +32,7 @@
 * 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
 * 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
 * 🗺️ **[Roadmap (ROADMAP.md)](ROADMAP.md)** - Project development roadmap and future plans
+* 🔬 **[Research Paper (research.md)](research.md)** - Ablation study on internal structural mechanisms and dialogue stability
 * 📖  [Entelgia Demo(entelgia_demo.py)](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md) - See the system in action
 * ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
 * 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
