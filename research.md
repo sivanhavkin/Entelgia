@@ -136,18 +136,6 @@ xychart-beta
 
 </div>
 
-#### Figure 4: Overall Performance Summary
-
-<div align="center">
-
-| Condition             | Performance Indicator |
-|-----------------------|-----------------------|
-| Baseline              | 🔴                    |
-| DialogueEngine/Seed   | 🟢                    |
-| Fixy Interventions    | 🔵                    |
-| Dream/Energy          | 🔴                    |
-
-</div>
 
 ### 5.2 Observations
 
