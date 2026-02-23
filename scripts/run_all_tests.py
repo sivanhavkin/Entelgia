@@ -18,13 +18,47 @@ Exit codes mirror pytest:
     1  – one or more tests failed (or collection error)
 """
 
+import platform
 import sys
 import subprocess
 from pathlib import Path
 
 
+def _fix_pyreadline_windows() -> None:
+    """Replace the broken ``pyreadline`` package with ``pyreadline3`` on Windows.
+
+    ``pyreadline`` (unmaintained) uses ``collections.Callable`` which was
+    removed in Python 3.10, causing pytest to crash during startup on Windows
+    when it tries the readline workaround.  ``pyreadline3`` is the maintained
+    fork that supports Python 3.10+.
+    """
+    if platform.system() != "Windows":
+        return
+    check = subprocess.run(
+        [sys.executable, "-m", "pip", "show", "pyreadline"],
+        capture_output=True,
+    )
+    if check.returncode != 0:
+        # returncode 1 means the package is not installed – nothing to do.
+        # Any other value (e.g. pip unavailable) is also safely skipped here,
+        # because without pyreadline the readline crash cannot occur.
+        return
+    print("Replacing incompatible 'pyreadline' with 'pyreadline3' for Python 3.10+ …")
+    uninstall = subprocess.run(
+        [sys.executable, "-m", "pip", "uninstall", "pyreadline", "-y", "-q"],
+    )
+    if uninstall.returncode != 0:
+        print("Warning: failed to uninstall pyreadline; continuing anyway.")
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "pyreadline3", "-q"],
+    )
+    if result.returncode != 0:
+        print("Warning: failed to install pyreadline3.")
+
+
 def _install_requirements(repo_root: Path) -> None:
     """Install project dependencies so imports work during test collection."""
+    _fix_pyreadline_windows()
     req_file = repo_root / "requirements.txt"
     if req_file.exists():
         result = subprocess.run(
