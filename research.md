@@ -99,6 +99,7 @@ All experiments used identical dialogue duration and evaluation procedures.
 <div align="center">
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'xyChart': {'plotColorPalette': '#e74c3c,#2ecc71,#3498db,#9b59b6'}}}}%%
 xychart-beta
     title "Circularity Rate by Condition"
     x-axis ["Baseline", "Seed", "Fixy", "Dream"]
@@ -113,6 +114,7 @@ xychart-beta
 <div align="center">
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'xyChart': {'plotColorPalette': '#e74c3c,#2ecc71,#3498db,#9b59b6'}}}}%%
 xychart-beta
     title "Progress Rate by Condition"
     x-axis ["Baseline", "Seed", "Fixy", "Dream"]
@@ -127,6 +129,7 @@ xychart-beta
 <div align="center">
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'xyChart': {'plotColorPalette': '#e74c3c,#2ecc71,#3498db,#9b59b6'}}}}%%
 xychart-beta
     title "Intervention Utility by Condition"
     x-axis ["Baseline", "Seed", "Fixy", "Dream"]
@@ -169,6 +172,7 @@ Per-turn analysis revealed an early spike in circularity followed by rapid decay
 <div align="center">
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'xyChart': {'plotColorPalette': '#e74c3c'}}}}%%
 xychart-beta
     title "Temporal Circularity Profile"
     x-axis "Turn" [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
