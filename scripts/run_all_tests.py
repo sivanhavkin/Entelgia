@@ -23,6 +23,26 @@ import subprocess
 from pathlib import Path
 
 
+def _install_requirements(repo_root: Path) -> None:
+    """Install project dependencies so imports work during test collection."""
+    req_file = repo_root / "requirements.txt"
+    if req_file.exists():
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q"],
+            cwd=str(repo_root),
+        )
+        if result.returncode != 0:
+            print("Warning: failed to install requirements.txt dependencies.")
+    # Install dev extras (pytest-cov etc.) defined in pyproject.toml
+    if (repo_root / "pyproject.toml").exists():
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-e", ".[dev]", "-q"],
+            cwd=str(repo_root),
+        )
+        if result.returncode != 0:
+            print("Warning: failed to install dev extras from pyproject.toml.")
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
     tests_dir = repo_root / "tests"
@@ -31,11 +51,13 @@ def main() -> None:
         print(f"Error: tests directory not found at {tests_dir}")
         sys.exit(1)
 
-    cmd = [sys.executable, "-m", "pytest", str(tests_dir)] + sys.argv[1:]
-
     print("=" * 60)
     print("  Entelgia – Running All Tests")
     print("=" * 60)
+
+    _install_requirements(repo_root)
+
+    cmd = [sys.executable, "-m", "pytest", str(tests_dir)] + sys.argv[1:]
     print(f"Command: {' '.join(cmd)}\n")
 
     result = subprocess.run(cmd, cwd=str(repo_root))

@@ -75,8 +75,10 @@ try:
     from dotenv import load_dotenv
 
     load_dotenv()
-except ImportError:
-    pass  # python-dotenv not installed; environment variables must be set manually
+    print("DEBUG: .env loaded successfully")
+except ImportError as e:
+    print(f"ERROR: python-dotenv not installed: {e}")
+    sys.exit(1)
 
 import json
 import os
