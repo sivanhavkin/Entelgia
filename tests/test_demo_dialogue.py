@@ -78,8 +78,8 @@ DEMO_DIALOGUE = [
 _BAR_SCALE = 20
 
 # Metric thresholds used in the demo test assertions
-_MAX_DEMO_CIRCULARITY = 0.1   # circularity_rate should stay below this
-_MIN_DEMO_PROGRESS = 0.5      # progress_rate should stay above this
+_MAX_DEMO_CIRCULARITY = 0.1  # circularity_rate should stay below this
+_MIN_DEMO_PROGRESS = 0.5  # progress_rate should stay above this
 _AGENT_EMOJI = {"Socrates": "🏛️ ", "Athena": "🦉 ", "Fixy": "🔍 "}
 
 
@@ -157,15 +157,23 @@ def test_full_dialogue_demo(capsys):
 
     # --- metric assertions ---
     metrics = compute_all_metrics(DEMO_DIALOGUE)
-    assert metrics["circularity_rate"] < _MAX_DEMO_CIRCULARITY, "Demo circularity should be low (< 0.1)"
-    assert metrics["progress_rate"] > _MIN_DEMO_PROGRESS, "Demo progress should be high (> 0.5)"
+    assert (
+        metrics["circularity_rate"] < _MAX_DEMO_CIRCULARITY
+    ), "Demo circularity should be low (< 0.1)"
+    assert (
+        metrics["progress_rate"] > _MIN_DEMO_PROGRESS
+    ), "Demo progress should be high (> 0.5)"
     assert (
         metrics["intervention_utility"] >= 0.0
     ), "Fixy intervention utility must be non-negative"
 
     series = circularity_per_turn(DEMO_DIALOGUE)
-    assert len(series) == len(DEMO_DIALOGUE), "Per-turn series length must match dialogue length"
-    assert series[0] == pytest.approx(0.0), "First turn has no prior context, circularity must be 0"
+    assert len(series) == len(
+        DEMO_DIALOGUE
+    ), "Per-turn series length must match dialogue length"
+    assert series[0] == pytest.approx(
+        0.0
+    ), "First turn has no prior context, circularity must be 0"
 
 
 if __name__ == "__main__":

@@ -77,6 +77,7 @@ try:
     load_dotenv()
 except ImportError:
     import warnings
+
     warnings.warn(
         "python-dotenv is not installed; .env file will not be loaded. "
         "Install it with: pip install python-dotenv",
