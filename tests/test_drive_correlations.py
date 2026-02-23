@@ -339,3 +339,7 @@ class TestEnergyDrainConflictCorrelation:
             assert (
                 drain <= ENERGY_DRAIN_MAX * 2.0 + 1e-9
             ), f"Drain {drain:.2f} exceeded cap of {ENERGY_DRAIN_MAX * 2.0}"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

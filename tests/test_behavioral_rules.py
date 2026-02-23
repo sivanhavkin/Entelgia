@@ -230,3 +230,7 @@ class TestPromptInjection:
         dummy_prompt = "PERSONA: ...\nSEED: ...\n\nRespond now:\n"
         result = self._simulate_inject(dummy_prompt, "")
         assert result == dummy_prompt
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

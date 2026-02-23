@@ -152,3 +152,7 @@ class TestSecurityProperties:
             signature = create_signature(msg, test_secret_key)
             assert len(signature) == 64
             assert validate_signature(msg, test_secret_key, signature)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])
