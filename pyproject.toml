@@ -40,6 +40,7 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.5.0",
+    "pyreadline3>=3.4.1; sys_platform == 'win32'",
 ]
 
 [project.urls]
