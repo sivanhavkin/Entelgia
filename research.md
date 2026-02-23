@@ -226,18 +226,6 @@ These findings suggest a shift in agent design perspective: instead of treating 
 
 6. Li, G., Hammoud, H. A. A. K., Itani, H., Khizbullin, D., & Ghanem, B. (2023). *CAMEL: Communicative Agents for "Mind" Exploration of Large Language Model Society*. Advances in Neural Information Processing Systems, 36. https://arxiv.org/abs/2303.17760
 
-7. Shinn, N., Cassano, F., Labash, B., Gopalan, A., Narasimhan, K., & Yao, S. (2023). *Reflexion: Language Agents with Verbal Reinforcement Learning*. Advances in Neural Information Processing Systems, 36. https://arxiv.org/abs/2303.11366
-
-8. Wu, Q., Bansal, G., Zhang, J., Wu, Y., Zhang, S., Zhu, E., Li, B., Jiang, L., Zhang, X., & Wang, C. (2023). *AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation Framework*. arXiv preprint arXiv:2308.08155. https://arxiv.org/abs/2308.08155
-
-9. Hong, S., Zhuge, M., Chen, J., Zheng, X., Cheng, Y., Zhang, C., Wang, J., et al. (2024). *MetaGPT: Meta Programming for A Multi-Agent Collaborative Framework*. Proceedings of the 12th International Conference on Learning Representations (ICLR 2024). https://arxiv.org/abs/2308.00352
-
-10. Liang, T., He, Z., Jiao, W., Wang, X., Wang, Y., Wang, R., Yang, Y., Shi, S., & Xu, T. (2023). *Encouraging Divergent Thinking in Large Language Models through Multi-Round Dialogue*. arXiv preprint arXiv:2305.19118. https://arxiv.org/abs/2305.19118
-
-11. Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., & Cao, Y. (2023). *ReAct: Synergizing Reasoning and Acting in Language Models*. Proceedings of the 11th International Conference on Learning Representations (ICLR 2023). https://arxiv.org/abs/2210.03629
-
-12. Wang, L., Ma, C., Feng, X., Zhang, Z., Yang, H., Zhang, J., Chen, Z., et al. (2024). *A Survey on Large Language Model based Autonomous Agents*. Frontiers of Computer Science, 18(6), 186345. https://arxiv.org/abs/2308.11432
-
 ---
 
 ### Internal Project References
