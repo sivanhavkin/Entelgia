@@ -39,6 +39,19 @@
 
 ---
 
+## 📄 Research Paper
+
+**Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study**
+
+Sivan Havkin (2026)  
+Independent Researcher, Entelgia Labs
+
+DOI:
+https://doi.org/10.5281/zenodo.18752028
+
+This paper presents an ablation study examining how internal structural mechanisms influence dialogue stability and progression in multi-agent language systems.
+
+
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
 > **⚡ Get started fast with our automated installer!**
