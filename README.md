@@ -850,7 +850,22 @@ Conceived and developed by **Sivan Havkin**.
 * **Status:** Research / Production Hybrid
 * **Version:** 2.5.0 
 * **Last Updated:** 18 February 2026
+---
 
+## 📚 Citation
+
+If you use or reference this work, please cite:
+
+```bibtex
+@misc{havkin2026entelgia,
+  author = {Havkin, Sivan},
+  title = {Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study},
+  year = {2026},
+  publisher = {Zenodo},
+  doi = {10.5281/zenodo.18752028},
+  url = {https://doi.org/10.5281/zenodo.18752028}
+}
+```
 ### What is "Research Hybrid"?
 
 The "Research Hybrid" status signals that Entelgia is both a forward-looking research project and a robust, production-grade system.  
