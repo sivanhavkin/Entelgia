@@ -16,17 +16,19 @@
 
 ## Abstract
 
-Recent work in language-model–based agents has largely focused on external tooling, prompt engineering, and retrieval augmentation. Less attention has been given to the role of internal structural mechanisms such as reflective loops, intervention processes, and state-dependent dialogue dynamics.
+Large language models have achieved remarkable progress through foundational architectural innovations [1], scaling of training data and parameters [2], and alignment with human preferences through reinforcement learning from human feedback [3]. The dominant research trajectory has concentrated on enhancing external capabilities: chain-of-thought reasoning [4], tool use, planning chains, and retrieval-augmented generation [9]. Less attention has been given to the role of internal structural mechanisms — such as reflective loops, observer-based intervention processes, and state-dependent dialogue dynamics — in shaping conversational behavior over extended multi-turn interactions.
 
-This study examines how internal architectural components influence conversational stability and progression within a multi-agent dialogue system. Using controlled ablation experiments, we evaluate four system conditions: a baseline configuration, a seeded dialogue engine, observer-based interventions, and an energy/dream modulation mechanism. Results indicate that structured dialogue seeding substantially reduces conversational circularity while maximizing semantic progression. Observer interventions demonstrate measurable utility in mitigating stagnation, while internal state modulation contributes to balanced but moderate improvements. The findings suggest that dialogue stability emerges primarily from interaction structure rather than model capability alone.
+This study examines how internal architectural components influence conversational stability and progression within a multi-agent dialogue system. While prior work on generative agents has demonstrated that LLM-based architectures can simulate persistent human behavior over long horizons [5], and communicative agent frameworks such as CAMEL have explored emergent collaborative dynamics between language model agents [6], the specific contribution of internal regulation mechanisms — as distinct from raw model capability — has received comparatively little systematic study. Frameworks such as ReAct [7] and Reflexion [8] have begun to bridge internal reasoning and external action, yet the structural properties of dialogue itself remain underexplored.
+
+Using controlled ablation experiments, we evaluate four system conditions: a baseline configuration, a seeded dialogue engine, observer-based interventions, and an energy/dream modulation mechanism. We introduce three quantitative metrics — circularity rate, progress rate, and intervention utility — to assess structural dialogue behavior as a temporal process rather than evaluating isolated outputs. Results indicate that structured dialogue seeding substantially reduces conversational circularity (by approximately 85%) while maximizing semantic progression. Observer interventions demonstrate measurable utility in mitigating stagnation, while internal state modulation contributes to balanced but moderate improvements. The findings suggest that dialogue stability emerges primarily from interaction structure rather than model capability alone, with implications for the design of multi-agent language systems in which coherent, non-repetitive conversation is a first-class architectural concern.
 
 ---
 
 ## 1. Introduction
 
-Large language models are typically evaluated as isolated generators of text. However, when embedded within persistent agent architectures, conversational behavior becomes a dynamical process shaped by memory, internal state, and recursive interaction.
+Large language models are typically evaluated as isolated generators of text [2]. However, when embedded within persistent agent architectures [5, 6], conversational behavior becomes a dynamical process shaped by memory, internal state, and recursive interaction.
 
-Most contemporary agent frameworks emphasize external capabilities — tools, planning chains, or retrieval pipelines — while assuming dialogue coherence emerges implicitly from the model itself. This work explores an alternative hypothesis:
+Most contemporary agent frameworks emphasize external capabilities — tools, planning chains [4, 7], or retrieval pipelines [9] — while assuming dialogue coherence emerges implicitly from the model itself [5]. This work explores an alternative hypothesis:
 
 > Conversational stability is partly an architectural property arising from internal regulation mechanisms.
 
@@ -36,12 +38,12 @@ To investigate this claim, we analyze a multi-agent dialogue system composed of 
 
 ## 2. System Overview
 
-The experimental system consists of two conversational agents engaged in dialectical dialogue and an optional observer module capable of intervening when conversational degradation is detected.
+The experimental system consists of two conversational agents engaged in dialectical dialogue and an optional observer module capable of intervening when conversational degradation is detected. This architecture is conceptually related to generative agent frameworks [5] and communicative agent systems [6], but introduces explicit internal regulatory mechanisms not present in those designs.
 
 Three internal mechanisms are examined:
 
-- **Dialogue Seeding** – structured cognitive prompts introducing topic diversification.
-- **Observer Intervention (Fixy)** – a monitoring process detecting loops or stagnation.
+- **Dialogue Seeding** – structured cognitive prompts introducing topic diversification, analogous in spirit to chain-of-thought prompting strategies [4].
+- **Observer Intervention (Fixy)** – a monitoring process detecting loops or stagnation, bearing resemblance to the self-reflection loop in Reflexion [8].
 - **Energy/Dream Modulation** – internal state dynamics influencing conversational transitions.
 
 Each mechanism represents an internal structural constraint rather than an external capability.
@@ -188,13 +190,13 @@ xychart-beta
 
 The results support three main insights:
 
-1. **Structure dominates capability.** Dialogue stability depends more on interaction design than model intelligence alone.
+1. **Structure dominates capability.** Dialogue stability depends more on interaction design than model intelligence alone [2, 5]. Unlike generative agent systems that primarily rely on model memory and retrieval [5], our results show that pre-interaction structural mechanisms yield larger measurable effects.
 
-2. **Diversification precedes regulation.** Preventing loops through structured variation is more effective than correcting them afterward.
+2. **Diversification precedes regulation.** Preventing loops through structured variation [4] is more effective than correcting them afterward. This parallels findings in chain-of-thought research, where upfront reasoning scaffolds outperform post-hoc correction [4].
 
-3. **Observer mechanisms act as corrective feedback** rather than primary drivers.
+3. **Observer mechanisms act as corrective feedback** rather than primary drivers, analogous to the reflective feedback role in Reflexion [8] and the action-grounding provided by ReAct [7].
 
-Importantly, improvements arise without changing the underlying language model, implying that conversational behavior is an emergent property of architecture.
+Importantly, improvements arise without changing the underlying language model [1, 2], implying that conversational behavior is an emergent property of architecture.
 
 ---
 
@@ -208,7 +210,7 @@ The experiments were conducted within controlled dialogue sessions and do not ye
 
 This study demonstrates that internal structural mechanisms significantly influence dialogue stability in multi-agent language systems. Topic seeding reduces circularity most effectively, observer interventions provide measurable corrective value, and internal state modulation contributes secondary stabilization effects.
 
-These findings suggest a shift in agent design perspective: instead of treating language models as complete cognitive systems, stability may emerge from layered internal regulation governing interaction dynamics.
+These findings suggest a shift in agent design perspective: instead of treating language models as complete cognitive systems [2], stability may emerge from layered internal regulation governing interaction dynamics. This complements the growing body of work on structured agent reasoning [7, 8] and suggests that internal dialogue architecture warrants the same attention currently given to external capability augmentation [3, 4, 9].
 
 ---
 
@@ -225,6 +227,12 @@ These findings suggest a shift in agent design perspective: instead of treating 
 5. Park, J. S., O'Brien, J. C., Cai, C. J., Morris, M. R., Liang, P., & Bernstein, M. S. (2023). *Generative Agents: Interactive Simulacra of Human Behavior*. Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology (UIST '23). https://arxiv.org/abs/2304.03442
 
 6. Li, G., Hammoud, H. A. A. K., Itani, H., Khizbullin, D., & Ghanem, B. (2023). *CAMEL: Communicative Agents for "Mind" Exploration of Large Language Model Society*. Advances in Neural Information Processing Systems, 36. https://arxiv.org/abs/2303.17760
+
+7. Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., & Cao, Y. (2023). *ReAct: Synergizing Reasoning and Acting in Language Models*. International Conference on Learning Representations (ICLR 2023). https://arxiv.org/abs/2210.03629
+
+8. Shinn, N., Cassano, F., Gopinath, A., Narasimhan, K., & Yao, S. (2023). *Reflexion: Language Agents with Verbal Reinforcement Learning*. Advances in Neural Information Processing Systems, 36. https://arxiv.org/abs/2303.11366
+
+9. Gao, Y., Xiong, Y., Gao, X., Jia, K., Pan, J., Bi, Y., Dai, Y., Sun, J., Wang, M., & Wang, H. (2023). *Retrieval-Augmented Generation for Large Language Models: A Survey*. arXiv preprint arXiv:2312.10997. https://arxiv.org/abs/2312.10997
 
 ---
 
