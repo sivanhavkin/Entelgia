@@ -62,7 +62,6 @@ from entelgia.dialogue_metrics import (  # noqa: E402
 )
 from entelgia.energy_regulation import EntelgiaAgent  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Condition enum (mirrors AblationCondition in ablation_study.py)
 # ---------------------------------------------------------------------------
@@ -220,18 +219,54 @@ def simulate_condition(
 # ---------------------------------------------------------------------------
 
 _CONFLICT_MARKERS = frozenset(
-    ["no", "but", "disagree", "however", "wrong", "incorrect",
-     "actually", "contrary", "opposite", "mistake", "error"]
+    [
+        "no",
+        "but",
+        "disagree",
+        "however",
+        "wrong",
+        "incorrect",
+        "actually",
+        "contrary",
+        "opposite",
+        "mistake",
+        "error",
+    ]
 )
 _DEPTH_MARKERS = frozenset(
-    ["why", "because", "how", "reason", "therefore", "implies",
-     "consequence", "deeper", "fundamental", "underlying", "depth",
-     "foundation", "implication"]
+    [
+        "why",
+        "because",
+        "how",
+        "reason",
+        "therefore",
+        "implies",
+        "consequence",
+        "deeper",
+        "fundamental",
+        "underlying",
+        "depth",
+        "foundation",
+        "implication",
+    ]
 )
 _SYNTHESIS_MARKERS = frozenset(
-    ["therefore", "integrating", "combining", "synthesis", "synthesize",
-     "connect", "connecting", "both", "together", "unified", "merging",
-     "bridge", "converge", "overall"]
+    [
+        "therefore",
+        "integrating",
+        "combining",
+        "synthesis",
+        "synthesize",
+        "connect",
+        "connecting",
+        "both",
+        "together",
+        "unified",
+        "merging",
+        "bridge",
+        "converge",
+        "overall",
+    ]
 )
 
 
@@ -240,7 +275,8 @@ def _marker_rate(dialog: List[Dict[str, str]], markers: frozenset) -> float:
     if not dialog:
         return 0.0
     hits = sum(
-        1 for t in dialog
+        1
+        for t in dialog
         if markers & set(re.findall(r"\b\w+\b", t.get("text", "").lower()))
     )
     return hits / len(dialog)
@@ -278,8 +314,12 @@ def _energy_stats(
     # reproducible given the same seed parameter.
     random.seed(rng.randint(0, 2**31))
 
-    agent_a = EntelgiaAgent("Socrates", energy_drain_min=drain_min, energy_drain_max=drain_max)
-    agent_b = EntelgiaAgent("Athena", energy_drain_min=drain_min, energy_drain_max=drain_max)
+    agent_a = EntelgiaAgent(
+        "Socrates", energy_drain_min=drain_min, energy_drain_max=drain_max
+    )
+    agent_b = EntelgiaAgent(
+        "Athena", energy_drain_min=drain_min, energy_drain_max=drain_max
+    )
     agents = [agent_a, agent_b]
 
     energy_readings: List[float] = []
@@ -308,10 +348,19 @@ def _energy_stats(
 
 # Energy-drain parameters per condition
 _CONDITION_DRAIN: Dict[str, Tuple[float, float]] = {
-    ResearchCondition.BASELINE.value:        (EntelgiaAgent.ENERGY_DRAIN_MIN, EntelgiaAgent.ENERGY_DRAIN_MAX),
-    ResearchCondition.DIALOGUE_ENGINE.value: (EntelgiaAgent.ENERGY_DRAIN_MIN, EntelgiaAgent.ENERGY_DRAIN_MAX),
-    ResearchCondition.FIXY.value:            (EntelgiaAgent.ENERGY_DRAIN_MIN, EntelgiaAgent.ENERGY_DRAIN_MAX),
-    ResearchCondition.DREAM.value:           (12.0, 18.0),  # higher drain for Dream condition
+    ResearchCondition.BASELINE.value: (
+        EntelgiaAgent.ENERGY_DRAIN_MIN,
+        EntelgiaAgent.ENERGY_DRAIN_MAX,
+    ),
+    ResearchCondition.DIALOGUE_ENGINE.value: (
+        EntelgiaAgent.ENERGY_DRAIN_MIN,
+        EntelgiaAgent.ENERGY_DRAIN_MAX,
+    ),
+    ResearchCondition.FIXY.value: (
+        EntelgiaAgent.ENERGY_DRAIN_MIN,
+        EntelgiaAgent.ENERGY_DRAIN_MAX,
+    ),
+    ResearchCondition.DREAM.value: (12.0, 18.0),  # higher drain for Dream condition
 }
 
 
@@ -349,14 +398,10 @@ def compute_all_statistics(
     avg_turn_length = total_chars / total_turns if total_turns else 0.0
 
     all_words = re.findall(r"\b[a-z]+\b", " ".join(texts).lower())
-    vocab_diversity = (
-        len(set(all_words)) / len(all_words) if all_words else 0.0
-    )
+    vocab_diversity = len(set(all_words)) / len(all_words) if all_words else 0.0
 
     unique_speakers = float(len({t.get("role", "") for t in dialog}))
-    fixy_interventions = float(
-        sum(1 for t in dialog if t.get("role") == "Fixy")
-    )
+    fixy_interventions = float(sum(1 for t in dialog if t.get("role") == "Fixy"))
 
     conflict_rate = _marker_rate(dialog, _CONFLICT_MARKERS)
     depth_rate = _marker_rate(dialog, _DEPTH_MARKERS)
@@ -423,31 +468,31 @@ def run_research(
 _STAT_META: List[Tuple[str, str, str]] = [
     # (key, display_label, format_spec)
     # ── Core Dialogue Metrics ──────────────────────────────────────────────
-    ("circularity_rate",      "Circularity Rate",       ".3f"),
-    ("progress_rate",         "Progress Rate",          ".3f"),
-    ("intervention_utility",  "Intervention Utility",   ".3f"),
+    ("circularity_rate", "Circularity Rate", ".3f"),
+    ("progress_rate", "Progress Rate", ".3f"),
+    ("intervention_utility", "Intervention Utility", ".3f"),
     # ── Dialogue Characteristics ───────────────────────────────────────────
-    ("total_turns",           "Total Turns",            ".0f"),
-    ("avg_turn_length",       "Avg Turn Length (chars)",".1f"),
-    ("vocab_diversity",       "Vocab Diversity (TTR)",  ".3f"),
-    ("unique_speakers",       "Unique Speakers",        ".0f"),
-    ("fixy_interventions",    "Fixy Interventions",     ".0f"),
-    ("conflict_rate",         "Conflict Rate",          ".3f"),
-    ("depth_rate",            "Depth Rate",             ".3f"),
-    ("synthesis_rate",        "Synthesis Rate",         ".3f"),
+    ("total_turns", "Total Turns", ".0f"),
+    ("avg_turn_length", "Avg Turn Length (chars)", ".1f"),
+    ("vocab_diversity", "Vocab Diversity (TTR)", ".3f"),
+    ("unique_speakers", "Unique Speakers", ".0f"),
+    ("fixy_interventions", "Fixy Interventions", ".0f"),
+    ("conflict_rate", "Conflict Rate", ".3f"),
+    ("depth_rate", "Depth Rate", ".3f"),
+    ("synthesis_rate", "Synthesis Rate", ".3f"),
     # ── Energy-System Metrics ──────────────────────────────────────────────
-    ("avg_energy",            "Avg Energy (%)",         ".1f"),
-    ("min_energy",            "Min Energy (%)",         ".1f"),
-    ("dream_cycle_count",     "Dream Cycles",           ".0f"),
-    ("ltm_size",              "LTM Size (entries)",     ".0f"),
-    ("conscious_mem_size",    "Conscious Mem (entries)",".0f"),
+    ("avg_energy", "Avg Energy (%)", ".1f"),
+    ("min_energy", "Min Energy (%)", ".1f"),
+    ("dream_cycle_count", "Dream Cycles", ".0f"),
+    ("ltm_size", "LTM Size (entries)", ".0f"),
+    ("conscious_mem_size", "Conscious Mem (entries)", ".0f"),
 ]
 
 # Section divider rows: (insert_before_key, section_title)
 _SECTION_HEADERS: Dict[str, str] = {
-    "circularity_rate":     "CORE DIALOGUE METRICS",
-    "total_turns":          "DIALOGUE CHARACTERISTICS",
-    "avg_energy":           "ENERGY-SYSTEM METRICS",
+    "circularity_rate": "CORE DIALOGUE METRICS",
+    "total_turns": "DIALOGUE CHARACTERISTICS",
+    "avg_energy": "ENERGY-SYSTEM METRICS",
 }
 
 
@@ -461,8 +506,8 @@ def print_statistics_table(results: Dict[str, Dict[str, float]]) -> None:
         Output of :func:`run_research`.
     """
     conditions = list(results.keys())
-    stat_col_w = 28   # width of the Statistic column
-    val_col_w  = 24   # width of each condition-value column
+    stat_col_w = 28  # width of the Statistic column
+    val_col_w = 24  # width of each condition-value column
 
     all_cols = ["Statistic"] + conditions
     col_widths = [stat_col_w] + [val_col_w] * len(conditions)
@@ -494,10 +539,7 @@ def print_statistics_table(results: Dict[str, Dict[str, float]]) -> None:
             print(section_row(_SECTION_HEADERS[key]))
             print(sep)
 
-        values = [
-            format(results[c].get(key, 0.0), fmt)
-            for c in conditions
-        ]
+        values = [format(results[c].get(key, 0.0), fmt) for c in conditions]
         print(data_row(display_label, values))
 
     print(sep)
@@ -519,13 +561,21 @@ def main() -> None:
 
     print("\nLegend")
     print("  Circularity Rate      : fraction of turn-pairs with ≥50% keyword overlap")
-    print("  Progress Rate         : forward steps (topic shift / synthesis / resolution) per turn")
-    print("  Intervention Utility  : avg circularity reduction after Fixy interventions")
+    print(
+        "  Progress Rate         : forward steps (topic shift / synthesis / resolution) per turn"
+    )
+    print(
+        "  Intervention Utility  : avg circularity reduction after Fixy interventions"
+    )
     print("  Vocab Diversity (TTR) : unique words / total words (type-token ratio)")
     print("  Conflict Rate         : fraction of turns with conflict markers")
     print("  Depth Rate            : fraction of turns with depth/reasoning markers")
-    print("  Synthesis Rate        : fraction of turns with synthesis/integration markers")
-    print("  Avg/Min Energy        : agent energy level (%) — Dream condition only varies")
+    print(
+        "  Synthesis Rate        : fraction of turns with synthesis/integration markers"
+    )
+    print(
+        "  Avg/Min Energy        : agent energy level (%) — Dream condition only varies"
+    )
     print("  Dream Cycles          : number of energy-recharge cycles triggered")
     print("  LTM Size              : long-term memory entries after all turns")
     print("  Conscious Mem         : conscious memory entries after all turns\n")
