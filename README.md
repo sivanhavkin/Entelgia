@@ -40,7 +40,7 @@
 
 ---
 
-## 📄 Research Paperד
+## 📄 Research Papers
 
 **1. Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study**
 
