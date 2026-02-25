@@ -27,6 +27,48 @@ from Entelgia_production_meta import (  # noqa: E402
 )
 
 # ---------------------------------------------------------------------------
+# Terminal display helpers – tables and ASCII bar charts
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Terminal display helpers – tables and ASCII bar charts
+# ---------------------------------------------------------------------------
+
+
+def _print_table(headers, rows, title=None):
+    """Print a neatly formatted ASCII table to stdout."""
+    if title:
+        print(f"\n  ╔{'═' * (len(title) + 4)}╗")
+        print(f"  ║  {title}  ║")
+        print(f"  ╚{'═' * (len(title) + 4)}╝")
+    col_widths = [len(str(h)) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(str(cell)))
+    sep = "─┼─".join("─" * w for w in col_widths)
+    header_line = " │ ".join(str(h).ljust(col_widths[i]) for i, h in enumerate(headers))
+    print(f"  {header_line}")
+    print(f"  {sep}")
+    for row in rows:
+        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+    print()
+
+
+def _print_bar_chart(data_pairs, title=None, max_width=36):
+    """Print a horizontal ASCII bar chart.  *data_pairs* is [(label, value), ...]."""
+    if title:
+        print(f"\n  📊 {title}")
+        print(f"  {'─' * 52}")
+    if not data_pairs:
+        return
+    max_val = max(v for _, v in data_pairs) or 1.0
+    for label, value in data_pairs:
+        bar_len = max(1, int(round((value / max_val) * max_width)))
+        bar = "█" * bar_len
+        print(f"  {str(label):>10} │ {bar:<{max_width}} {value:.4f}")
+    print()
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -89,6 +131,13 @@ class TestMigrateSigningKey:
     def test_fingerprint_stored_on_first_init(self, temp_db_path):
         """A fresh DB should have the current key fingerprint in settings."""
         MemoryCore(temp_db_path)
+        stored = _stored_fingerprint(temp_db_path)
+        current = _current_fingerprint()
+        _print_table(
+            ["stored_fingerprint", "current_fingerprint", "match?"],
+            [[stored[:16] + "...", current[:16] + "...", str(stored == current)]],
+            title="test_fingerprint_stored_on_first_init",
+        )
         assert _stored_fingerprint(temp_db_path) == _current_fingerprint()
 
     def test_no_re_sign_when_fingerprint_matches(self, temp_db_path):
@@ -114,6 +163,11 @@ class TestMigrateSigningKey:
         ]
         conn.close()
 
+        _print_table(
+            ["sig_before", "sig_after", "unchanged?"],
+            [[sig_before[:16] + "...", sig_after[:16] + "...", str(sig_before == sig_after)]],
+            title="test_no_re_sign_when_fingerprint_matches",
+        )
         assert sig_before == sig_after
 
     def test_re_sign_on_fingerprint_mismatch(self, temp_db_path):
@@ -129,6 +183,14 @@ class TestMigrateSigningKey:
 
         # Memory should still be retrievable without INVALID SIGNATURE
         mems = mc2.ltm_recent("agent")
+        new_fp = _stored_fingerprint(temp_db_path)
+        expected_fp = _current_fingerprint()
+        _print_table(
+            ["new_fingerprint", "expected_fingerprint", "match?", "memories_retrieved", "content"],
+            [[new_fp[:16] + "...", expected_fp[:16] + "...", str(new_fp == expected_fp),
+              str(len(mems)), mems[0]["content"] if mems else ""]],
+            title="test_re_sign_on_fingerprint_mismatch",
+        )
         assert len(mems) == 1
         assert mems[0]["content"] == "test memory"
 
@@ -150,6 +212,12 @@ class TestMigrateSigningKey:
 
         mc = MemoryCore(temp_db_path)
         mems = mc.ltm_recent("Socrates")
+        content_match = mems[0]["content"] == "Memory about truth" if mems else False
+        _print_table(
+            ["memory_content", "retrieved_count", "content_match?"],
+            [["Memory about truth", str(len(mems)), str(content_match)]],
+            title="test_legacy_format_memory_recovered_after_migration",
+        )
         assert len(mems) == 1
         assert mems[0]["content"] == "Memory about truth"
 
@@ -164,6 +232,11 @@ class TestMigrateSigningKey:
             ).fetchall()
         ]
         conn.close()
+        _print_table(
+            ["tables_found", "settings_in_tables?"],
+            [[str(tables), str("settings" in tables)]],
+            title="test_settings_table_exists",
+        )
         assert "settings" in tables
 
 

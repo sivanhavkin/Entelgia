@@ -73,6 +73,45 @@ _MIN_DEMO_PROGRESS = 0.5  # progress_rate should stay above this
 
 
 # ---------------------------------------------------------------------------
+# Terminal display helpers – tables and ASCII bar charts
+# ---------------------------------------------------------------------------
+
+
+def _print_table(headers, rows, title=None):
+    """Print a neatly formatted ASCII table to stdout."""
+    if title:
+        print(f"\n  ╔{'═' * (len(title) + 4)}╗")
+        print(f"  ║  {title}  ║")
+        print(f"  ╚{'═' * (len(title) + 4)}╝")
+    col_widths = [len(str(h)) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(str(cell)))
+    sep = "─┼─".join("─" * w for w in col_widths)
+    header_line = " │ ".join(str(h).ljust(col_widths[i]) for i, h in enumerate(headers))
+    print(f"  {header_line}")
+    print(f"  {sep}")
+    for row in rows:
+        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+    print()
+
+
+def _print_bar_chart(data_pairs, title=None, max_width=36):
+    """Print a horizontal ASCII bar chart.  *data_pairs* is [(label, value), ...]."""
+    if title:
+        print(f"\n  📊 {title}")
+        print(f"  {'─' * 52}")
+    if not data_pairs:
+        return
+    max_val = max(v for _, v in data_pairs) or 1.0
+    for label, value in data_pairs:
+        bar_len = max(1, int(round((value / max_val) * max_width)))
+        bar = "█" * bar_len
+        print(f"  {str(label):>10} │ {bar:<{max_width}} {value:.4f}")
+    print()
+
+
+# ---------------------------------------------------------------------------
 # Demo test — asserts structural and metric correctness of the demo dialogue
 # ---------------------------------------------------------------------------
 
@@ -90,33 +129,23 @@ def test_full_dialogue_demo():
     series = circularity_per_turn(DEMO_DIALOGUE)
 
     # --- human-readable results for this test ---
-    print(f"\n--- test_full_dialogue_demo results ---")
-    print(f"  Dialogue turns   : {len(DEMO_DIALOGUE)}")
-    print(f"  Roles present    : {sorted({t['role'] for t in DEMO_DIALOGUE})}")
-    print(
-        f"  Circularity Rate : {metrics['circularity_rate']:.3f}"
-        f"  (expected < {_MAX_DEMO_CIRCULARITY})"
-        f"  {'✓ PASS' if metrics['circularity_rate'] < _MAX_DEMO_CIRCULARITY else '✗ FAIL'}"
+    roles = sorted({t["role"] for t in DEMO_DIALOGUE})
+    _print_table(
+        ["Metric", "Value", "Threshold", "Pass?"],
+        [
+            ["Turns", str(len(DEMO_DIALOGUE)), "== 10", "✓" if len(DEMO_DIALOGUE) == 10 else "✗"],
+            ["Roles present", str(roles), "all 3", "✓" if len(roles) == 3 else "✗"],
+            ["Circularity Rate", f"{metrics['circularity_rate']:.3f}", f"< {_MAX_DEMO_CIRCULARITY}", "✓" if metrics['circularity_rate'] < _MAX_DEMO_CIRCULARITY else "✗"],
+            ["Progress Rate", f"{metrics['progress_rate']:.3f}", f"> {_MIN_DEMO_PROGRESS}", "✓" if metrics['progress_rate'] > _MIN_DEMO_PROGRESS else "✗"],
+            ["Intervention Utility", f"{metrics['intervention_utility']:.3f}", ">= 0.0", "✓" if metrics['intervention_utility'] >= 0.0 else "✗"],
+            ["Per-turn series length", str(len(series)), f"== {len(DEMO_DIALOGUE)}", "✓" if len(series) == len(DEMO_DIALOGUE) else "✗"],
+            ["First-turn circularity", f"{series[0]:.3f}", "== 0.0", "✓" if abs(series[0]) < 1e-9 else "✗"],
+        ],
+        title="test_full_dialogue_demo  –  metrics summary",
     )
-    print(
-        f"  Progress Rate    : {metrics['progress_rate']:.3f}"
-        f"  (expected > {_MIN_DEMO_PROGRESS})"
-        f"  {'✓ PASS' if metrics['progress_rate'] > _MIN_DEMO_PROGRESS else '✗ FAIL'}"
-    )
-    print(
-        f"  Intervention Utility : {metrics['intervention_utility']:.3f}"
-        f"  (expected >= 0.0)"
-        f"  {'✓ PASS' if metrics['intervention_utility'] >= 0.0 else '✗ FAIL'}"
-    )
-    print(
-        f"  Per-turn series length : {len(series)}"
-        f"  (expected {len(DEMO_DIALOGUE)})"
-        f"  {'✓ PASS' if len(series) == len(DEMO_DIALOGUE) else '✗ FAIL'}"
-    )
-    print(
-        f"  First-turn circularity : {series[0]:.3f}"
-        f"  (expected 0.0)"
-        f"  {'✓ PASS' if abs(series[0]) < 1e-9 else '✗ FAIL'}"
+    _print_bar_chart(
+        [(f"T{i+1}", v) for i, v in enumerate(series)],
+        title="Per-turn circularity series  (turn 1→10)",
     )
 
     # --- structural assertions ---
