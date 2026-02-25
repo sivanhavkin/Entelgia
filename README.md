@@ -58,6 +58,7 @@ DOI: https://doi.org/10.5281/zenodo.18774720
 
 This publication describes the cognitive-agent framework, META behavioral metrics,
 and the reproducibility methodology behind the project.
+
 ---
 
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
