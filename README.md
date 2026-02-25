@@ -15,6 +15,8 @@
 [![Maintenance](https://img.shields.io/maintenance/yes/2026)](https://github.com/sivanhavkin/Entelgia)
 [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://github.com/sivanhavkin/Entelgia/tree/main/docs)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18752028.svg)](https://doi.org/10.5281/zenodo.18754895)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18774720.svg)](https://doi.org/10.5281/zenodo.18774720)
+
 ---
 
 ## Entelgia — A Dialogue-Governed Multi-Agent AI Architecture
@@ -38,9 +40,9 @@
 
 ---
 
-## 📄 Research Paper
+## 📄 Research Paperד
 
-**Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study**
+**1. Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study**
 
 Sivan Havkin (2026)  
 Independent Researcher, Entelgia Labs
@@ -50,6 +52,13 @@ https://doi.org/10.5281/zenodo.18754895
 
 This paper presents an ablation study examining how internal structural mechanisms influence dialogue stability and progression in multi-agent language systems.
 
+**2. The Entelgia architecture is documented in the following research preprint:**
+
+DOI: https://doi.org/10.5281/zenodo.18774720
+
+This publication describes the cognitive-agent framework, META behavioral metrics,
+and the reproducibility methodology behind the project.
+---
 
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
