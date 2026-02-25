@@ -20,10 +20,47 @@ from entelgia import (
     format_persona_for_prompt,
 )
 
+# ---------------------------------------------------------------------------
+# Terminal display helpers – tables and ASCII bar charts
+# ---------------------------------------------------------------------------
+
+
+def _print_table(headers, rows, title=None):
+    """Print a neatly formatted ASCII table to stdout."""
+    if title:
+        print(f"\n  ╔{'═' * (len(title) + 4)}╗")
+        print(f"  ║  {title}  ║")
+        print(f"  ╚{'═' * (len(title) + 4)}╝")
+    col_widths = [len(str(h)) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(str(cell)))
+    sep = "─┼─".join("─" * w for w in col_widths)
+    header_line = " │ ".join(str(h).ljust(col_widths[i]) for i, h in enumerate(headers))
+    print(f"  {header_line}")
+    print(f"  {sep}")
+    for row in rows:
+        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+    print()
+
+
+def _print_bar_chart(data_pairs, title=None, max_width=36):
+    """Print a horizontal ASCII bar chart.  *data_pairs* is [(label, value), ...]."""
+    if title:
+        print(f"\n  📊 {title}")
+        print(f"  {'─' * 52}")
+    if not data_pairs:
+        return
+    max_val = max(v for _, v in data_pairs) or 1.0
+    for label, value in data_pairs:
+        bar_len = max(1, int(round((value / max_val) * max_width)))
+        bar = "█" * bar_len
+        print(f"  {str(label):>10} │ {bar:<{max_width}} {value:.4f}")
+    print()
+
 
 def test_dynamic_speaker_selection():
     """Test that speakers are selected dynamically."""
-    print("\n=== Test 1: Dynamic Speaker Selection ===")
 
     engine = DialogueEngine()
 
@@ -69,20 +106,25 @@ def test_dynamic_speaker_selection():
         else:
             consecutive = 1
 
-    print(f"Speaker sequence: {[s.name[:3] for s in speakers]}")
-    print(f"Max consecutive turns: {max_consecutive}")
-
+    socrates_count = sum(1 for s in speakers if s.name == "Socrates")
+    athena_count = sum(1 for s in speakers if s.name == "Athena")
+    _print_table(
+        ["check_name", "result", "pass?"],
+        [["Max consecutive turns", str(max_consecutive), "✓" if max_consecutive < 3 else "✗"]],
+        title="test_dynamic_speaker_selection",
+    )
+    _print_bar_chart(
+        [("Socrates", float(socrates_count)), ("Athena", float(athena_count))],
+        title="Speaker distribution (20 turns)",
+    )
     if max_consecutive >= 3:
-        print("FAIL: Same speaker spoke 3+ times in a row")
         return False
     else:
-        print("PASS: No speaker spoke 3+ times consecutively")
         return True
 
 
 def test_seed_variety():
     """Test that seeds vary across different strategies."""
-    print("\n=== Test 2: Seed Variety ===")
 
     engine = DialogueEngine()
 
@@ -127,20 +169,27 @@ def test_seed_variety():
         elif "REFLECT" in seed:
             strategies_found.add("meta_reflect")
 
-    print(f"Strategies found: {strategies_found}")
-    print(f"Number of unique strategies: {len(strategies_found)}")
-
+    all_strategies = [
+        "agree_and_expand", "question_assumption", "synthesize",
+        "constructive_disagree", "explore_implication", "introduce_analogy", "meta_reflect",
+    ]
+    _print_table(
+        ["strategy", "found?"],
+        [[s, "✓" if s in strategies_found else "✗"] for s in all_strategies],
+        title="test_seed_variety",
+    )
+    _print_bar_chart(
+        [("found", float(len(strategies_found))), ("threshold", 4.0)],
+        title="Strategies found vs threshold",
+    )
     if len(strategies_found) >= 4:
-        print(f"PASS: Found {len(strategies_found)} different seed strategies")
         return True
     else:
-        print(f"FAIL: Only {len(strategies_found)} strategies found (expected 4+)")
         return False
 
 
 def test_context_enrichment():
     """Test that context includes enhanced elements."""
-    print("\n=== Test 3: Context Enrichment ===")
 
     mgr = ContextManager()
 
@@ -209,23 +258,17 @@ def test_context_enrichment():
         and "150 words" in prompt_with_pronoun,
     }
 
-    print("Context checks:")
-    for check, passed in checks.items():
-        status = "PASS" if passed else "FAIL"
-        print(f"  {status} {check}")
-
     all_passed = all(checks.values())
-    if all_passed:
-        print("PASS: All context enrichment checks passed")
-    else:
-        print("FAIL: Some context enrichment checks failed")
-
+    _print_table(
+        ["check_name", "pass?"],
+        [[name, "✓" if ok else "✗"] for name, ok in checks.items()],
+        title="test_context_enrichment",
+    )
     return all_passed
 
 
 def test_fixy_interventions():
     """Test that Fixy intervenes based on need, not schedule."""
-    print("\n=== Test 4: Fixy Interventions ===")
 
     class MockLLM:
         def generate(self, model, prompt, temperature=0.7, use_cache=True):
@@ -235,15 +278,8 @@ def test_fixy_interventions():
 
     # Test 1: Early turns - should not intervene
     dialog_early = [{"role": "Socrates", "text": "Hello"}]
-    should, reason = fixy.should_intervene(dialog_early, turn_count=2)
-
-    print(f"Early turns (turn 2): should_intervene={should}")
-    if not should:
-        print("  Correctly does not intervene early")
-        early_pass = True
-    else:
-        print("  Incorrectly wants to intervene early")
-        early_pass = False
+    should1, reason1 = fixy.should_intervene(dialog_early, turn_count=2)
+    early_pass = not should1
 
     # Test 2: Repetitive dialogue - should intervene
     dialog_repetitive = [
@@ -253,17 +289,8 @@ def test_fixy_interventions():
         {"role": "Athena", "text": "Autonomy is similar to freedom and liberty"},
         {"role": "Socrates", "text": "Freedom liberty autonomy are interconnected"},
     ]
-    should, reason = fixy.should_intervene(dialog_repetitive, turn_count=5)
-
-    print(f"Repetitive dialogue (turn 5): should_intervene={should}, reason={reason}")
-    if should and reason == "circular_reasoning":
-        print("  Correctly detects circular reasoning")
-        repetitive_pass = True
-    else:
-        print(
-            f"  Failed to detect circular reasoning (should={should}, reason={reason})"
-        )
-        repetitive_pass = False
+    should2, reason2 = fixy.should_intervene(dialog_repetitive, turn_count=5)
+    repetitive_pass = should2 and reason2 == "circular_reasoning"
 
     # Test 3: Normal dialogue - should not intervene
     dialog_normal = [
@@ -272,28 +299,25 @@ def test_fixy_interventions():
         {"role": "Socrates", "text": "But can we truly know anything?"},
         {"role": "Athena", "text": "Perhaps certainty exists on a spectrum."},
     ]
-    should, reason = fixy.should_intervene(dialog_normal, turn_count=4)
+    should3, reason3 = fixy.should_intervene(dialog_normal, turn_count=4)
+    normal_pass = not should3
 
-    print(f"Normal dialogue (turn 4): should_intervene={should}")
-    if not should:
-        print("  Correctly does not intervene in normal dialogue")
-        normal_pass = True
-    else:
-        print(f"  Incorrectly wants to intervene (reason={reason})")
-        normal_pass = False
+    _print_table(
+        ["scenario", "should_intervene", "reason", "expected", "pass?"],
+        [
+            ["early (turn 2)", str(should1), str(reason1), "False", "✓" if early_pass else "✗"],
+            ["repetitive (turn 5)", str(should2), str(reason2), "True/circular_reasoning", "✓" if repetitive_pass else "✗"],
+            ["normal (turn 4)", str(should3), str(reason3), "False", "✓" if normal_pass else "✗"],
+        ],
+        title="test_fixy_interventions",
+    )
 
     all_passed = early_pass and repetitive_pass and normal_pass
-    if all_passed:
-        print("PASS: Fixy intervention logic works correctly")
-    else:
-        print("FAIL: Some Fixy intervention checks failed")
-
     return all_passed
 
 
 def test_persona_formatting():
     """Test that personas are rich and distinctive."""
-    print("\n=== Test 5: Persona Formatting ===")
 
     socrates = get_persona("Socrates")
     athena = get_persona("Athena")
@@ -310,29 +334,22 @@ def test_persona_formatting():
         ),
     }
 
-    print("Persona checks:")
-    for check, passed in checks.items():
-        status = "PASS" if passed else "FAIL"
-        print(f"  {status} {check}")
-
     # Test formatting with drives
     drives = {"id_strength": 7.0, "ego_strength": 5.0, "superego_strength": 4.0}
     formatted = format_persona_for_prompt(socrates, drives)
-
-    print(f"\nFormatted Socrates persona (snippet):\n{formatted[:200]}...")
-
     all_passed = all(checks.values()) and len(formatted) > 100
-    if all_passed:
-        print("\nPASS: Personas are rich and well-formatted")
-    else:
-        print("\nFAIL: Some persona checks failed")
-
+    _print_table(
+        ["check_name", "pass?"],
+        [[name, "✓" if ok else "✗"] for name, ok in checks.items()]
+        + [["formatted_len > 100", "✓" if len(formatted) > 100 else "✗"]],
+        title="test_persona_formatting",
+    )
+    print(f"\n  Formatted Socrates persona (snippet):\n  {formatted[:200]}...")
     return all_passed
 
 
 def test_persona_pronouns():
     """Test that persona data includes correct pronouns."""
-    print("\n=== Test 6: Persona Pronouns ===")
 
     from entelgia import SOCRATES_PERSONA, ATHENA_PERSONA, FIXY_PERSONA
 
@@ -342,17 +359,19 @@ def test_persona_pronouns():
         "Fixy has 'he' pronoun": FIXY_PERSONA.get("pronoun") == "he",
     }
 
-    print("Pronoun checks:")
-    for check, passed in checks.items():
-        status = "PASS" if passed else "FAIL"
-        print(f"  {status} {check}")
-
     all_passed = all(checks.values())
-    if all_passed:
-        print("PASS: All pronoun checks passed")
-    else:
-        print("FAIL: Some pronoun checks failed")
-
+    _print_table(
+        ["agent", "pronoun", "expected", "match?"],
+        [
+            ["Socrates", str(SOCRATES_PERSONA.get("pronoun")), "he",
+             "✓" if SOCRATES_PERSONA.get("pronoun") == "he" else "✗"],
+            ["Athena", str(ATHENA_PERSONA.get("pronoun")), "she",
+             "✓" if ATHENA_PERSONA.get("pronoun") == "she" else "✗"],
+            ["Fixy", str(FIXY_PERSONA.get("pronoun")), "he",
+             "✓" if FIXY_PERSONA.get("pronoun") == "he" else "✗"],
+        ],
+        title="test_persona_pronouns",
+    )
     return all_passed
 
 
