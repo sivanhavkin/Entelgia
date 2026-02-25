@@ -43,7 +43,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -75,7 +78,15 @@ class TestComputeDrivePressure:
         value = 2.0
         _print_table(
             ["Parameter", "Value", "Min", "Max", "In Range?"],
-            [["initial_pressure", f"{value:.1f}", "0.0", "10.0", str(0.0 <= value <= 10.0)]],
+            [
+                [
+                    "initial_pressure",
+                    f"{value:.1f}",
+                    "0.0",
+                    "10.0",
+                    str(0.0 <= value <= 10.0),
+                ]
+            ],
             title="Default Initial Pressure",
         )
         assert 0.0 <= 2.0 <= 10.0
@@ -101,7 +112,9 @@ class TestComputeDrivePressure:
             in_range = 0.0 <= p <= 10.0
             if not in_range:
                 all_in_range = False
-            rows.append([conflict, energy, unresolved, stagnation, f"{p:.4f}", str(in_range)])
+            rows.append(
+                [conflict, energy, unresolved, stagnation, f"{p:.4f}", str(in_range)]
+            )
 
         for conflict in (0.0, 5.0, 10.0, 20.0):
             for energy in (0.0, 50.0, 100.0):
@@ -120,7 +133,14 @@ class TestComputeDrivePressure:
                         )
 
         _print_table(
-            ["conflict", "energy", "unresolved", "stagnation", "pressure", "in [0,10]?"],
+            [
+                "conflict",
+                "energy",
+                "unresolved",
+                "stagnation",
+                "pressure",
+                "in [0,10]?",
+            ],
             rows,
             title="Clamped Range – Extreme Inputs Summary",
         )
@@ -143,7 +163,14 @@ class TestComputeDrivePressure:
             stagnation=0.0,
         )
         _print_table(
-            ["conflict", "prev_pressure", "energy", "unresolved", "stagnation", "pressure"],
+            [
+                "conflict",
+                "prev_pressure",
+                "energy",
+                "unresolved",
+                "stagnation",
+                "pressure",
+            ],
             [
                 ["1.0", "2.0", "80.0", "0", "0.0", f"{low:.4f}"],
                 ["9.0", "2.0", "80.0", "0", "0.0", f"{high:.4f}"],
@@ -485,7 +512,11 @@ class TestPressureDecaysAfterProgress:
         _print_table(
             ["phase", "pressure", "note"],
             [
-                ["after 6 stagnant turns (high)", f"{high_pressure:.4f}", "unresolved=3, stag=0.8"],
+                [
+                    "after 6 stagnant turns (high)",
+                    f"{high_pressure:.4f}",
+                    "unresolved=3, stag=0.8",
+                ],
                 ["resolution turn 1 (p1)", f"{p1:.4f}", "unresolved=0, stag=0.1"],
                 ["resolution turn 2 (p2)", f"{p2:.4f}", "unresolved=0, stag=0.0"],
                 ["drop (high→p2)", f"{high_pressure - p2:.4f}", "must be > 0.5"],
@@ -506,7 +537,9 @@ class TestPressureDecaysAfterProgress:
         open_questions = 2
         text = "A) I choose the first option."
         resolved = _is_question_resolved(text)
-        open_questions_after = max(0, open_questions - 1) if resolved else open_questions
+        open_questions_after = (
+            max(0, open_questions - 1) if resolved else open_questions
+        )
         _print_table(
             ["field", "value"],
             [
@@ -547,6 +580,7 @@ class TestNoBreakingChanges:
     def test_constants_present(self):
         """Required constants must still be importable."""
         import Entelgia_production_meta as m
+
         checks = [
             ("LLM_RESPONSE_LIMIT", hasattr(m, "LLM_RESPONSE_LIMIT")),
             ("MAX_RESPONSE_WORDS", hasattr(m, "MAX_RESPONSE_WORDS")),
@@ -566,11 +600,18 @@ class TestNoBreakingChanges:
     def test_new_functions_importable(self):
         """New drive-pressure helpers must be importable."""
         import Entelgia_production_meta as m
+
         checks = [
-            ("compute_drive_pressure", callable(getattr(m, "compute_drive_pressure", None))),
+            (
+                "compute_drive_pressure",
+                callable(getattr(m, "compute_drive_pressure", None)),
+            ),
             ("_topic_signature", callable(getattr(m, "_topic_signature", None))),
             ("_trim_to_word_limit", callable(getattr(m, "_trim_to_word_limit", None))),
-            ("_is_question_resolved", callable(getattr(m, "_is_question_resolved", None))),
+            (
+                "_is_question_resolved",
+                callable(getattr(m, "_is_question_resolved", None)),
+            ),
         ]
         _print_table(
             ["function", "callable?"],

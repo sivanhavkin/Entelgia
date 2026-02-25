@@ -34,7 +34,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -51,6 +54,7 @@ def _print_bar_chart(data_pairs, title=None, max_width=36):
         bar = "█" * bar_len
         print(f"  {str(label):>10} │ {bar:<{max_width}} {value:.4f}")
     print()
+
 
 # ============================================================================
 # DefenseMechanism tests
@@ -216,7 +220,16 @@ class TestDefenseMechanismSuppression:
         )
         _print_table(
             ["Content", "Emotion", "Intensity", "intrusive", "suppressed", "Expected"],
-            [["forbidden rage", "anger", "0.9", str(intrusive), str(suppressed), "1, 1"]],
+            [
+                [
+                    "forbidden rage",
+                    "anger",
+                    "0.9",
+                    str(intrusive),
+                    str(suppressed),
+                    "1, 1",
+                ]
+            ],
             title="test_both_flags_set_simultaneously",
         )
         assert intrusive == 1
@@ -326,7 +339,13 @@ class TestFreudianSlipAttempt:
         source_after = original.get("source")
         _print_table(
             ["original_source_before", "original_source_after", "modified?"],
-            [[str(original_source), str(source_after), str(source_after != original_source)]],
+            [
+                [
+                    str(original_source),
+                    str(source_after),
+                    str(source_after != original_source),
+                ]
+            ],
             title="test_slip_does_not_modify_original",
         )
         assert original.get("source") == original_source
@@ -396,7 +415,13 @@ class TestSelfReplicationPatternDetection:
         keyword_in_result = any("freedom" in r["content"] for r in result)
         _print_table(
             ["memories", "promoted_count", "keyword_in_result"],
-            [["freedom matters.../freedom cannot.../unrelated...", str(len(result)), str(keyword_in_result)]],
+            [
+                [
+                    "freedom matters.../freedom cannot.../unrelated...",
+                    str(len(result)),
+                    str(keyword_in_result),
+                ]
+            ],
             title="test_promotion_with_recurring_keywords",
         )
         _print_bar_chart(
@@ -475,8 +500,14 @@ class TestSelfReplicationPatternDetection:
         sources_after = [m.get("source") for m in memories]
         _print_table(
             ["original_source_before", "after_replicate", "modified?"],
-            [[str(original_sources[i]), str(sources_after[i]), str(sources_after[i] != original_sources[i])]
-             for i in range(len(memories))],
+            [
+                [
+                    str(original_sources[i]),
+                    str(sources_after[i]),
+                    str(sources_after[i] != original_sources[i]),
+                ]
+                for i in range(len(memories))
+            ],
             title="test_replication_does_not_modify_originals",
         )
         for mem, orig_src in zip(memories, original_sources):

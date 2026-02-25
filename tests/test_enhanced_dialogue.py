@@ -40,7 +40,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -110,7 +113,13 @@ def test_dynamic_speaker_selection():
     athena_count = sum(1 for s in speakers if s.name == "Athena")
     _print_table(
         ["check_name", "result", "pass?"],
-        [["Max consecutive turns", str(max_consecutive), "✓" if max_consecutive < 3 else "✗"]],
+        [
+            [
+                "Max consecutive turns",
+                str(max_consecutive),
+                "✓" if max_consecutive < 3 else "✗",
+            ]
+        ],
         title="test_dynamic_speaker_selection",
     )
     _print_bar_chart(
@@ -170,8 +179,13 @@ def test_seed_variety():
             strategies_found.add("meta_reflect")
 
     all_strategies = [
-        "agree_and_expand", "question_assumption", "synthesize",
-        "constructive_disagree", "explore_implication", "introduce_analogy", "meta_reflect",
+        "agree_and_expand",
+        "question_assumption",
+        "synthesize",
+        "constructive_disagree",
+        "explore_implication",
+        "introduce_analogy",
+        "meta_reflect",
     ]
     _print_table(
         ["strategy", "found?"],
@@ -305,9 +319,27 @@ def test_fixy_interventions():
     _print_table(
         ["scenario", "should_intervene", "reason", "expected", "pass?"],
         [
-            ["early (turn 2)", str(should1), str(reason1), "False", "✓" if early_pass else "✗"],
-            ["repetitive (turn 5)", str(should2), str(reason2), "True/circular_reasoning", "✓" if repetitive_pass else "✗"],
-            ["normal (turn 4)", str(should3), str(reason3), "False", "✓" if normal_pass else "✗"],
+            [
+                "early (turn 2)",
+                str(should1),
+                str(reason1),
+                "False",
+                "✓" if early_pass else "✗",
+            ],
+            [
+                "repetitive (turn 5)",
+                str(should2),
+                str(reason2),
+                "True/circular_reasoning",
+                "✓" if repetitive_pass else "✗",
+            ],
+            [
+                "normal (turn 4)",
+                str(should3),
+                str(reason3),
+                "False",
+                "✓" if normal_pass else "✗",
+            ],
         ],
         title="test_fixy_interventions",
     )
@@ -363,12 +395,24 @@ def test_persona_pronouns():
     _print_table(
         ["agent", "pronoun", "expected", "match?"],
         [
-            ["Socrates", str(SOCRATES_PERSONA.get("pronoun")), "he",
-             "✓" if SOCRATES_PERSONA.get("pronoun") == "he" else "✗"],
-            ["Athena", str(ATHENA_PERSONA.get("pronoun")), "she",
-             "✓" if ATHENA_PERSONA.get("pronoun") == "she" else "✗"],
-            ["Fixy", str(FIXY_PERSONA.get("pronoun")), "he",
-             "✓" if FIXY_PERSONA.get("pronoun") == "he" else "✗"],
+            [
+                "Socrates",
+                str(SOCRATES_PERSONA.get("pronoun")),
+                "he",
+                "✓" if SOCRATES_PERSONA.get("pronoun") == "he" else "✗",
+            ],
+            [
+                "Athena",
+                str(ATHENA_PERSONA.get("pronoun")),
+                "she",
+                "✓" if ATHENA_PERSONA.get("pronoun") == "she" else "✗",
+            ],
+            [
+                "Fixy",
+                str(FIXY_PERSONA.get("pronoun")),
+                "he",
+                "✓" if FIXY_PERSONA.get("pronoun") == "he" else "✗",
+            ],
         ],
         title="test_persona_pronouns",
     )

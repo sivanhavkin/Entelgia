@@ -29,7 +29,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -172,7 +175,11 @@ class TestSignatureValidation:
         _print_table(
             ["message (truncated)", "key (truncated)", "is_valid?"],
             [
-                [sample_message[:30] + "...", test_secret_key[:12] + "...", str(is_valid)],
+                [
+                    sample_message[:30] + "...",
+                    test_secret_key[:12] + "...",
+                    str(is_valid),
+                ],
             ],
             title="Validate Signature – Success",
         )
@@ -246,7 +253,14 @@ class TestSignatureValidation:
         is_valid = validate_signature(sample_message, test_secret_key, None)
         _print_table(
             ["message (truncated)", "key (truncated)", "sig", "is_valid?"],
-            [[sample_message[:20] + "...", test_secret_key[:12] + "...", "None", str(is_valid)]],
+            [
+                [
+                    sample_message[:20] + "...",
+                    test_secret_key[:12] + "...",
+                    "None",
+                    str(is_valid),
+                ]
+            ],
             title="Validate – None Signature",
         )
         assert is_valid is False
@@ -315,10 +329,10 @@ class TestSecurityProperties:
     def test_unicode_support(self, test_secret_key):
         """Test that unicode messages are handled correctly."""
         messages = [
-            "Hello World",   # English
-            "Hello 世界",    # Mixed
-            "مرحبا",         # Arabic
-            "αβγδ",          # Greek letters
+            "Hello World",  # English
+            "Hello 世界",  # Mixed
+            "مرحبا",  # Arabic
+            "αβγδ",  # Greek letters
         ]
         rows = []
         for msg in messages:
@@ -332,7 +346,10 @@ class TestSecurityProperties:
             title="Unicode Support",
         )
         _print_bar_chart(
-            [(msg[:8], float(len(create_signature(msg, test_secret_key)))) for msg in messages],
+            [
+                (msg[:8], float(len(create_signature(msg, test_secret_key))))
+                for msg in messages
+            ],
             title="Signature length per unicode message (all = 64 chars)",
         )
         for msg in messages:

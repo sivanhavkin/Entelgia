@@ -117,7 +117,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -150,7 +153,14 @@ class TestRuleASocrates:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "Rule triggered?", "Rule (truncated)"],
-            [["Socrates", f"{agent.conflict_index():.2f}", str(rule != ""), rule[:50] + "..." if len(rule) > 50 else rule]],
+            [
+                [
+                    "Socrates",
+                    f"{agent.conflict_index():.2f}",
+                    str(rule != ""),
+                    rule[:50] + "..." if len(rule) > 50 else rule,
+                ]
+            ],
             title="test_returns_nonempty_rule_at_exactly_5",
         )
         assert rule != ""
@@ -160,12 +170,31 @@ class TestRuleASocrates:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "Rule triggered?", "Rule (truncated)"],
-            [["Socrates", f"{agent.conflict_index():.2f}", str(rule != ""), rule[:50] + "..." if len(rule) > 50 else rule]],
+            [
+                [
+                    "Socrates",
+                    f"{agent.conflict_index():.2f}",
+                    str(rule != ""),
+                    rule[:50] + "..." if len(rule) > 50 else rule,
+                ]
+            ],
             title="test_returns_nonempty_rule_above_5",
         )
-        sweep = [(f"c={c:.0f}", 1.0 if _socrates_with_conflict(float(c))._behavioral_rule_instruction() != "" else 0.0)
-                 for c in range(0, 11)]
-        _print_bar_chart(sweep, title="Rule A (Socrates) triggered vs conflict_index (0→10)")
+        sweep = [
+            (
+                f"c={c:.0f}",
+                (
+                    1.0
+                    if _socrates_with_conflict(float(c))._behavioral_rule_instruction()
+                    != ""
+                    else 0.0
+                ),
+            )
+            for c in range(0, 11)
+        ]
+        _print_bar_chart(
+            sweep, title="Rule A (Socrates) triggered vs conflict_index (0→10)"
+        )
         assert rule != ""
 
     def test_returns_empty_below_5(self):
@@ -174,7 +203,14 @@ class TestRuleASocrates:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "Rule triggered?", "Expected"],
-            [["Socrates", f"{agent.conflict_index():.2f}", str(rule != ""), "False (empty)"]],
+            [
+                [
+                    "Socrates",
+                    f"{agent.conflict_index():.2f}",
+                    str(rule != ""),
+                    "False (empty)",
+                ]
+            ],
             title="test_returns_empty_below_5",
         )
         assert rule == ""
@@ -184,7 +220,14 @@ class TestRuleASocrates:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "'A or B' in rule?", "Rule (truncated)"],
-            [["Socrates", f"{agent.conflict_index():.2f}", str("A or B" in rule), rule[:60] + "..." if len(rule) > 60 else rule]],
+            [
+                [
+                    "Socrates",
+                    f"{agent.conflict_index():.2f}",
+                    str("A or B" in rule),
+                    rule[:60] + "..." if len(rule) > 60 else rule,
+                ]
+            ],
             title="test_rule_mentions_binary_choice",
         )
         assert "A or B" in rule
@@ -194,7 +237,14 @@ class TestRuleASocrates:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "'end' in rule?", "Rule (truncated)"],
-            [["Socrates", f"{agent.conflict_index():.2f}", str("end" in rule.lower()), rule[:60] + "..." if len(rule) > 60 else rule]],
+            [
+                [
+                    "Socrates",
+                    f"{agent.conflict_index():.2f}",
+                    str("end" in rule.lower()),
+                    rule[:60] + "..." if len(rule) > 60 else rule,
+                ]
+            ],
             title="test_rule_mentions_end_response",
         )
         assert "end" in rule.lower()
@@ -208,7 +258,14 @@ class TestRuleASocrates:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "Rule triggered?", "Expected"],
-            [["Fixy", f"{agent.conflict_index():.2f}", str(rule != ""), "False (not Socrates)"]],
+            [
+                [
+                    "Fixy",
+                    f"{agent.conflict_index():.2f}",
+                    str(rule != ""),
+                    "False (not Socrates)",
+                ]
+            ],
             title="test_non_socrates_not_triggered_even_with_high_conflict",
         )
         assert rule == ""
@@ -228,7 +285,14 @@ class TestRuleBAnthena:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "dissent_level", "Rule triggered?", "Rule (truncated)"],
-            [["Athena", f"{agent.debate_profile()['dissent_level']:.2f}", str(rule != ""), rule[:50] + "..." if len(rule) > 50 else rule]],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str(rule != ""),
+                    rule[:50] + "..." if len(rule) > 50 else rule,
+                ]
+            ],
             title="test_returns_nonempty_rule_at_exactly_3",
         )
         assert rule != ""
@@ -238,12 +302,31 @@ class TestRuleBAnthena:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "dissent_level", "Rule triggered?", "Rule (truncated)"],
-            [["Athena", f"{agent.debate_profile()['dissent_level']:.2f}", str(rule != ""), rule[:50] + "..." if len(rule) > 50 else rule]],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str(rule != ""),
+                    rule[:50] + "..." if len(rule) > 50 else rule,
+                ]
+            ],
             title="test_returns_nonempty_rule_above_3",
         )
-        sweep = [(f"d={d:.0f}", 1.0 if _athena_with_dissent(float(d))._behavioral_rule_instruction() != "" else 0.0)
-                 for d in range(0, 8)]
-        _print_bar_chart(sweep, title="Rule B (Athena) triggered vs dissent_level (0→7)")
+        sweep = [
+            (
+                f"d={d:.0f}",
+                (
+                    1.0
+                    if _athena_with_dissent(float(d))._behavioral_rule_instruction()
+                    != ""
+                    else 0.0
+                ),
+            )
+            for d in range(0, 8)
+        ]
+        _print_bar_chart(
+            sweep, title="Rule B (Athena) triggered vs dissent_level (0→7)"
+        )
         assert rule != ""
 
     def test_returns_empty_below_3(self):
@@ -252,7 +335,14 @@ class TestRuleBAnthena:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "dissent_level", "Rule triggered?", "Expected"],
-            [["Athena", f"{agent.debate_profile()['dissent_level']:.2f}", str(rule != ""), "False (empty)"]],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str(rule != ""),
+                    "False (empty)",
+                ]
+            ],
             title="test_returns_empty_below_3",
         )
         assert rule == ""
@@ -262,7 +352,14 @@ class TestRuleBAnthena:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "dissent_level", "'However,' in rule?", "Rule (truncated)"],
-            [["Athena", f"{agent.debate_profile()['dissent_level']:.2f}", str("However," in rule), rule[:55] + "..." if len(rule) > 55 else rule]],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str("However," in rule),
+                    rule[:55] + "..." if len(rule) > 55 else rule,
+                ]
+            ],
             title="test_rule_mentions_however",
         )
         assert "However," in rule
@@ -272,7 +369,14 @@ class TestRuleBAnthena:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "dissent_level", "'Yet,' in rule?", "Rule (truncated)"],
-            [["Athena", f"{agent.debate_profile()['dissent_level']:.2f}", str("Yet," in rule), rule[:55] + "..." if len(rule) > 55 else rule]],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str("Yet," in rule),
+                    rule[:55] + "..." if len(rule) > 55 else rule,
+                ]
+            ],
             title="test_rule_mentions_yet",
         )
         assert "Yet," in rule
@@ -282,7 +386,14 @@ class TestRuleBAnthena:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "dissent_level", "'This assumes' in rule?", "Rule (truncated)"],
-            [["Athena", f"{agent.debate_profile()['dissent_level']:.2f}", str("This assumes" in rule), rule[:55] + "..." if len(rule) > 55 else rule]],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str("This assumes" in rule),
+                    rule[:55] + "..." if len(rule) > 55 else rule,
+                ]
+            ],
             title="test_rule_mentions_this_assumes",
         )
         assert "This assumes" in rule
@@ -296,7 +407,14 @@ class TestRuleBAnthena:
         rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "dissent_level", "Rule triggered?", "Expected"],
-            [["Fixy", f"{agent.debate_profile()['dissent_level']:.2f}", str(rule != ""), "False (not Athena)"]],
+            [
+                [
+                    "Fixy",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str(rule != ""),
+                    "False (not Athena)",
+                ]
+            ],
             title="test_non_athena_not_triggered_even_with_high_dissent",
         )
         assert rule == ""

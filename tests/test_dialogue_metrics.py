@@ -78,7 +78,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -170,7 +173,16 @@ class TestJaccard:
         union = len(a | b)
         _print_table(
             ["Set A", "Set B", "Intersection", "Union", "Jaccard", "Expected"],
-            [[str(sorted(a)), str(sorted(b)), str(intersection), str(union), f"{result:.4f}", f"{intersection/union:.4f}"]],
+            [
+                [
+                    str(sorted(a)),
+                    str(sorted(b)),
+                    str(intersection),
+                    str(union),
+                    f"{result:.4f}",
+                    f"{intersection/union:.4f}",
+                ]
+            ],
             title="test_partial_overlap",
         )
         # intersection=2, union=4
@@ -217,7 +229,15 @@ class TestCircularityRate:
         rate = circularity_rate(d)
         _print_table(
             ["Turns", "Text (truncated)", "circularity_rate", "Threshold", "Pass?"],
-            [["6 (identical)", text[:40] + "...", f"{rate:.4f}", ">= 0.8", "✓" if rate >= 0.8 else "✗"]],
+            [
+                [
+                    "6 (identical)",
+                    text[:40] + "...",
+                    f"{rate:.4f}",
+                    ">= 0.8",
+                    "✓" if rate >= 0.8 else "✗",
+                ]
+            ],
             title="test_identical_turns_high_circularity",
         )
         assert rate >= 0.8, f"Expected high circularity, got {rate}"
@@ -233,8 +253,16 @@ class TestCircularityRate:
         rate = circularity_rate(d)
         _print_table(
             ["Turn", "Text (truncated)", "circularity_rate", "Threshold", "Pass?"],
-            [[str(i + 1), t[:40] + "...", f"{rate:.4f}" if i == 0 else "", "< 0.4" if i == 0 else "", "✓" if rate < 0.4 else "✗" if i == 0 else ""]
-             for i, t in enumerate(texts)],
+            [
+                [
+                    str(i + 1),
+                    t[:40] + "...",
+                    f"{rate:.4f}" if i == 0 else "",
+                    "< 0.4" if i == 0 else "",
+                    "✓" if rate < 0.4 else "✗" if i == 0 else "",
+                ]
+                for i, t in enumerate(texts)
+            ],
             title="test_completely_distinct_turns_low_circularity",
         )
         assert rate < 0.4, f"Expected low circularity, got {rate}"
@@ -267,7 +295,14 @@ class TestCircularityRate:
         rate = circularity_rate(d)
         _print_table(
             ["Turns", "circularity_rate", "Range", "Pass?"],
-            [["3 (2 identical + 1 distinct)", f"{rate:.4f}", "[0.0, 1.0]", "✓" if 0.0 <= rate <= 1.0 else "✗"]],
+            [
+                [
+                    "3 (2 identical + 1 distinct)",
+                    f"{rate:.4f}",
+                    "[0.0, 1.0]",
+                    "✓" if 0.0 <= rate <= 1.0 else "✗",
+                ]
+            ],
             title="test_result_in_range (circularity_rate)",
         )
         assert 0.0 <= rate <= 1.0
@@ -315,7 +350,10 @@ class TestCircularityPerTurn:
         series = circularity_per_turn(d)
         _print_table(
             ["Turn", "Value", "In [0,1]?"],
-            [[str(i + 1), f"{v:.4f}", "✓" if 0.0 <= v <= 1.0 else "✗"] for i, v in enumerate(series)],
+            [
+                [str(i + 1), f"{v:.4f}", "✓" if 0.0 <= v <= 1.0 else "✗"]
+                for i, v in enumerate(series)
+            ],
             title="test_values_in_range (circularity_per_turn)",
         )
         for v in series:
@@ -354,7 +392,12 @@ class TestProgressRate:
             ["Turn", "Text (truncated)", "progress_rate", "Pass?"],
             [
                 ["1", texts[0][:45] + "...", "", ""],
-                ["2 (synthesis)", texts[1][:45] + "...", f"{rate:.4f}", "✓" if rate > 0.0 else "✗"],
+                [
+                    "2 (synthesis)",
+                    texts[1][:45] + "...",
+                    f"{rate:.4f}",
+                    "✓" if rate > 0.0 else "✗",
+                ],
             ],
             title="test_synthesis_marker_increases_progress",
         )
@@ -371,7 +414,12 @@ class TestProgressRate:
             ["Turn", "Text (truncated)", "progress_rate", "Pass?"],
             [
                 ["1", texts[0][:40] + "...", "", ""],
-                ["2 (topic shift)", texts[1][:40] + "...", f"{rate:.4f}", "✓" if rate > 0.0 else "✗"],
+                [
+                    "2 (topic shift)",
+                    texts[1][:40] + "...",
+                    f"{rate:.4f}",
+                    "✓" if rate > 0.0 else "✗",
+                ],
             ],
             title="test_topic_shift_counts_as_progress",
         )
@@ -388,7 +436,12 @@ class TestProgressRate:
             ["Turn", "Text (truncated)", "progress_rate", "Pass?"],
             [
                 ["1 (question)", texts[0][:45] + "...", "", ""],
-                ["2 (answer)", texts[1][:45] + "...", f"{rate:.4f}", "✓" if rate > 0.0 else "✗"],
+                [
+                    "2 (answer)",
+                    texts[1][:45] + "...",
+                    f"{rate:.4f}",
+                    "✓" if rate > 0.0 else "✗",
+                ],
             ],
             title="test_question_resolution",
         )
@@ -416,7 +469,14 @@ class TestProgressRate:
         rate = progress_rate(d)
         _print_table(
             ["Turns", "progress_rate", "Range", "Pass?"],
-            [["4 (diverse)", f"{rate:.4f}", "[0.0, 1.0]", "✓" if 0.0 <= rate <= 1.0 else "✗"]],
+            [
+                [
+                    "4 (diverse)",
+                    f"{rate:.4f}",
+                    "[0.0, 1.0]",
+                    "✓" if 0.0 <= rate <= 1.0 else "✗",
+                ]
+            ],
             title="test_result_in_range (progress_rate)",
         )
         assert 0.0 <= rate <= 1.0
@@ -462,7 +522,16 @@ class TestInterventionUtility:
         utility = intervention_utility(dialog, window=5)
         _print_table(
             ["Scenario", "Turns before", "Fixy?", "Turns after", "utility", "Pass?"],
-            [["repetitive→diverse", "5", "Yes", str(len(turns_after)), f"{utility:.4f}", "✓" if utility > 0.0 else "✗"]],
+            [
+                [
+                    "repetitive→diverse",
+                    "5",
+                    "Yes",
+                    str(len(turns_after)),
+                    f"{utility:.4f}",
+                    "✓" if utility > 0.0 else "✗",
+                ]
+            ],
             title="test_fixy_reduces_circularity",
         )
         assert utility > 0.0, f"Expected positive utility, got {utility}"
@@ -485,7 +554,15 @@ class TestInterventionUtility:
         utility = intervention_utility(dialog, window=4)
         _print_table(
             ["Scenario", "Total turns", "Fixy at turns", "utility", "Is float?"],
-            [["2 Fixy interventions", "20", "7, 14", f"{utility:.4f}", str(isinstance(utility, float))]],
+            [
+                [
+                    "2 Fixy interventions",
+                    "20",
+                    "7, 14",
+                    f"{utility:.4f}",
+                    str(isinstance(utility, float)),
+                ]
+            ],
             title="test_multiple_fixy_turns",
         )
         # Should return a float (sign depends on simulation)
@@ -497,7 +574,13 @@ class TestInterventionUtility:
         result = intervention_utility(d)
         _print_table(
             ["Scenario", "intervention_utility", "Is float?"],
-            [["10 turns, 1 Fixy at pos 4", f"{result:.4f}", str(isinstance(result, float))]],
+            [
+                [
+                    "10 turns, 1 Fixy at pos 4",
+                    f"{result:.4f}",
+                    str(isinstance(result, float)),
+                ]
+            ],
             title="test_result_is_float",
         )
         assert isinstance(result, float)
@@ -514,7 +597,10 @@ class TestComputeAllMetrics:
         metrics = compute_all_metrics(d)
         _print_table(
             ["Key", "Present?", "Expected"],
-            [[k, str(k in metrics), "True"] for k in ["circularity_rate", "progress_rate", "intervention_utility"]],
+            [
+                [k, str(k in metrics), "True"]
+                for k in ["circularity_rate", "progress_rate", "intervention_utility"]
+            ],
             title="test_keys_present",
         )
         assert set(metrics.keys()) == {
@@ -533,8 +619,15 @@ class TestComputeAllMetrics:
         metrics = compute_all_metrics(d)
         _print_table(
             ["Metric", "Value", "Is float?", "In [-1.0, 1.0]?"],
-            [[k, f"{v:.4f}", str(isinstance(v, float)), "✓" if -1.0 <= v <= 1.0 else "✗"]
-             for k, v in metrics.items()],
+            [
+                [
+                    k,
+                    f"{v:.4f}",
+                    str(isinstance(v, float)),
+                    "✓" if -1.0 <= v <= 1.0 else "✗",
+                ]
+                for k, v in metrics.items()
+            ],
             title="test_values_are_floats_in_range",
         )
         for k, v in metrics.items():
@@ -594,7 +687,10 @@ class TestRunCondition:
     @pytest.mark.parametrize("condition", list(AblationCondition))
     def test_turns_have_role_and_text(self, condition):
         dialog = run_condition(condition, turns=10, seed=0)
-        rows = [[str(i + 1), t["role"], t["text"][:30] + "...", "✓"] for i, t in enumerate(dialog)]
+        rows = [
+            [str(i + 1), t["role"], t["text"][:30] + "...", "✓"]
+            for i, t in enumerate(dialog)
+        ]
         _print_table(
             ["Turn", "Role", "Text (truncated)", "Has role+text?"],
             rows,
@@ -651,7 +747,13 @@ class TestRunCondition:
         roles = {t["role"] for t in dialog}
         _print_table(
             ["Condition", "Roles present", "Fixy absent?"],
-            [[AblationCondition.BASELINE.value, str(sorted(roles)), str("Fixy" not in roles)]],
+            [
+                [
+                    AblationCondition.BASELINE.value,
+                    str(sorted(roles)),
+                    str("Fixy" not in roles),
+                ]
+            ],
             title="test_baseline_no_fixy_role",
         )
         assert "Fixy" not in roles
@@ -677,8 +779,10 @@ class TestRunAblation:
         results = run_ablation(turns=10, seed=0)
         _print_table(
             ["Condition", "Has 'metrics'?", "Has 'circularity_series'?"],
-            [[label, str("metrics" in data), str("circularity_series" in data)]
-             for label, data in results.items()],
+            [
+                [label, str("metrics" in data), str("circularity_series" in data)]
+                for label, data in results.items()
+            ],
             title="test_each_condition_has_metrics_and_series",
         )
         for label, data in results.items():
@@ -691,8 +795,10 @@ class TestRunAblation:
         results = run_ablation(turns=15, seed=0)
         _print_table(
             ["Condition", "Series length", "Expected"],
-            [[label, str(len(data["circularity_series"])), "15"]
-             for label, data in results.items()],
+            [
+                [label, str(len(data["circularity_series"])), "15"]
+                for label, data in results.items()
+            ],
             title="test_circularity_series_length",
         )
         for label, data in results.items():
@@ -705,10 +811,15 @@ class TestRunAblation:
         r2 = run_ablation(turns=10, seed=99)
         _print_table(
             ["Condition", "Run1 circularity_rate", "Run2 circularity_rate", "Match?"],
-            [[label, f"{r1[label]['metrics']['circularity_rate']:.4f}",
-              f"{r2[label]['metrics']['circularity_rate']:.4f}",
-              str(r1[label]["metrics"] == r2[label]["metrics"])]
-             for label in r1],
+            [
+                [
+                    label,
+                    f"{r1[label]['metrics']['circularity_rate']:.4f}",
+                    f"{r2[label]['metrics']['circularity_rate']:.4f}",
+                    str(r1[label]["metrics"] == r2[label]["metrics"]),
+                ]
+                for label in r1
+            ],
             title="test_reproducible",
         )
         for label in r1:
@@ -722,13 +833,19 @@ class TestRunAblation:
             ["Condition", "circularity_rate", "Pass?"],
             [
                 ["Baseline", f"{baseline_cr:.4f}", ""],
-                ["DialogueEngine/Seed", f"{de_cr:.4f}", "✓" if baseline_cr > de_cr else "✗"],
+                [
+                    "DialogueEngine/Seed",
+                    f"{de_cr:.4f}",
+                    "✓" if baseline_cr > de_cr else "✗",
+                ],
             ],
             title="test_baseline_higher_circularity_than_dialogue_engine",
         )
         _print_bar_chart(
-            [(label, data["metrics"]["circularity_rate"])
-             for label, data in results.items()],
+            [
+                (label, data["metrics"]["circularity_rate"])
+                for label, data in results.items()
+            ],
             title="Circularity rate by condition",
         )
         assert (
@@ -769,7 +886,10 @@ class TestPrintResultsTable:
         output = buf.getvalue()
         _print_table(
             ["Condition", "Found in output?"],
-            [[condition.value, str(condition.value in output)] for condition in AblationCondition],
+            [
+                [condition.value, str(condition.value in output)]
+                for condition in AblationCondition
+            ],
             title="test_all_conditions_in_output",
         )
         for condition in AblationCondition:
@@ -806,7 +926,13 @@ class TestPlotCircularity:
         output = buf.getvalue()
         _print_table(
             ["Scenario", "Output length", "Has output?"],
-            [["matplotlib absent → ASCII fallback", str(len(output)), str(len(output) > 0)]],
+            [
+                [
+                    "matplotlib absent → ASCII fallback",
+                    str(len(output)),
+                    str(len(output) > 0),
+                ]
+            ],
             title="test_plot_circularity_uses_ascii_when_matplotlib_absent",
         )
         assert len(output) > 0
@@ -868,7 +994,14 @@ class TestDialogueMetricsDemo:
         rate = circularity_rate(_DEMO_DIALOG)
         _print_table(
             ["Metric", "Got", "Expected", "Pass?"],
-            [["circularity_rate", f"{rate:.3f}", "0.022", "✓" if abs(rate - 0.022) < 1e-3 else "✗"]],
+            [
+                [
+                    "circularity_rate",
+                    f"{rate:.3f}",
+                    "0.022",
+                    "✓" if abs(rate - 0.022) < 1e-3 else "✗",
+                ]
+            ],
             title="test_circularity_rate (demo)",
         )
         assert rate == pytest.approx(0.022, abs=1e-3), f"Expected 0.022, got {rate:.3f}"
@@ -877,7 +1010,14 @@ class TestDialogueMetricsDemo:
         rate = progress_rate(_DEMO_DIALOG)
         _print_table(
             ["Metric", "Got", "Expected", "Pass?"],
-            [["progress_rate", f"{rate:.3f}", "0.889", "✓" if abs(rate - 0.889) < 1e-3 else "✗"]],
+            [
+                [
+                    "progress_rate",
+                    f"{rate:.3f}",
+                    "0.889",
+                    "✓" if abs(rate - 0.889) < 1e-3 else "✗",
+                ]
+            ],
             title="test_progress_rate (demo)",
         )
         assert rate == pytest.approx(0.889, abs=1e-3), f"Expected 0.889, got {rate:.3f}"
@@ -886,7 +1026,14 @@ class TestDialogueMetricsDemo:
         utility = intervention_utility(_DEMO_DIALOG)
         _print_table(
             ["Metric", "Got", "Expected", "Pass?"],
-            [["intervention_utility", f"{utility:.3f}", "0.167", "✓" if abs(utility - 0.167) < 1e-3 else "✗"]],
+            [
+                [
+                    "intervention_utility",
+                    f"{utility:.3f}",
+                    "0.167",
+                    "✓" if abs(utility - 0.167) < 1e-3 else "✗",
+                ]
+            ],
             title="test_intervention_utility (demo)",
         )
         assert utility == pytest.approx(
@@ -897,7 +1044,14 @@ class TestDialogueMetricsDemo:
         series = circularity_per_turn(_DEMO_DIALOG)
         _print_table(
             ["Metric", "Got", "Expected", "Pass?"],
-            [["series length", str(len(series)), "10", "✓" if len(series) == 10 else "✗"]],
+            [
+                [
+                    "series length",
+                    str(len(series)),
+                    "10",
+                    "✓" if len(series) == 10 else "✗",
+                ]
+            ],
             title="test_per_turn_circularity_series_length (demo)",
         )
         assert len(series) == 10
@@ -907,8 +1061,15 @@ class TestDialogueMetricsDemo:
         series = circularity_per_turn(_DEMO_DIALOG)
         _print_table(
             ["Turn", "Expected", "Got", "Pass?"],
-            [[str(i + 1), f"{exp:.2f}", f"{got:.2f}", "✓" if abs(got - exp) < 0.01 else "✗"]
-             for i, (got, exp) in enumerate(zip(series, expected))],
+            [
+                [
+                    str(i + 1),
+                    f"{exp:.2f}",
+                    f"{got:.2f}",
+                    "✓" if abs(got - exp) < 0.01 else "✗",
+                ]
+                for i, (got, exp) in enumerate(zip(series, expected))
+            ],
             title="test_per_turn_circularity_values (demo)",
         )
         _print_bar_chart(
@@ -936,9 +1097,18 @@ class TestDialogueMetricsDemo:
             ["Expected string", "Found?"],
             [
                 ["Dialogue Metrics Demo", str("Dialogue Metrics Demo" in output)],
-                ["Circularity Rate    : 0.022", str("Circularity Rate    : 0.022" in output)],
-                ["Progress Rate       : 0.889", str("Progress Rate       : 0.889" in output)],
-                ["Intervention Utility: 0.167", str("Intervention Utility: 0.167" in output)],
+                [
+                    "Circularity Rate    : 0.022",
+                    str("Circularity Rate    : 0.022" in output),
+                ],
+                [
+                    "Progress Rate       : 0.889",
+                    str("Progress Rate       : 0.889" in output),
+                ],
+                [
+                    "Intervention Utility: 0.167",
+                    str("Intervention Utility: 0.167" in output),
+                ],
             ],
             title="test_demo_stdout_contains_header_and_metrics",
         )
@@ -962,7 +1132,10 @@ class TestDialogueMetricsDemo:
         _print_table(
             ["Expected bar-chart line", "Found?"],
             [
-                ["Turn  2: 1.00 |####################", str("Turn  2: 1.00 |####################" in output)],
+                [
+                    "Turn  2: 1.00 |####################",
+                    str("Turn  2: 1.00 |####################" in output),
+                ],
                 ["Turn  3: 0.33 |#######", str("Turn  3: 0.33 |#######" in output)],
                 ["Turn  7: 0.00 |", str("Turn  7: 0.00 |" in output)],
             ],

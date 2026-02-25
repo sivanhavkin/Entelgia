@@ -34,7 +34,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -243,7 +246,13 @@ class TestEntelgiaAgentInit:
         actual_type = type(agent.regulator).__name__
         _print_table(
             ["Attribute", "Type", "Is FixyRegulator?"],
-            [["regulator", actual_type, str(isinstance(agent.regulator, FixyRegulator))]],
+            [
+                [
+                    "regulator",
+                    actual_type,
+                    str(isinstance(agent.regulator, FixyRegulator)),
+                ]
+            ],
             title="Agent Has FixyRegulator",
         )
         assert isinstance(agent.regulator, FixyRegulator)
@@ -355,8 +364,16 @@ class TestEntelgiaAgentDreamCycle:
         _print_table(
             ["entry", "in_subconscious_before", "in_conscious_after"],
             [
-                ["memory A", "memory A" in before_sub, "memory A" in agent.conscious_memory],
-                ["memory B", "memory B" in before_sub, "memory B" in agent.conscious_memory],
+                [
+                    "memory A",
+                    "memory A" in before_sub,
+                    "memory A" in agent.conscious_memory,
+                ],
+                [
+                    "memory B",
+                    "memory B" in before_sub,
+                    "memory B" in agent.conscious_memory,
+                ],
             ],
             title="Dream Consolidates Sub → Conscious",
         )
@@ -386,7 +403,10 @@ class TestEntelgiaAgentDreamCycle:
         _print_table(
             ["entry", "kept_after_dream?"],
             [
-                ["'important thought'", str("important thought" in agent.conscious_memory)],
+                [
+                    "'important thought'",
+                    str("important thought" in agent.conscious_memory),
+                ],
                 ["'useful data'", str("useful data" in agent.conscious_memory)],
                 ["'' (empty)", str("" in agent.conscious_memory)],
                 ["'   ' (spaces)", str("   " in agent.conscious_memory)],
@@ -553,6 +573,7 @@ class TestPackageImports:
     def test_import_fixy_regulator(self):
         """FixyRegulator should be importable from entelgia package."""
         from entelgia import FixyRegulator as FR
+
         matches = FR is FixyRegulator
         _print_table(
             ["imported_as", "matches_class?"],
@@ -564,6 +585,7 @@ class TestPackageImports:
     def test_import_entelgia_agent(self):
         """EntelgiaAgent should be importable from entelgia package."""
         from entelgia import EntelgiaAgent as EA
+
         matches = EA is EntelgiaAgent
         _print_table(
             ["imported_as", "matches_class?"],

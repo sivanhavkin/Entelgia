@@ -50,7 +50,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -67,6 +70,7 @@ def _print_bar_chart(data_pairs, title=None, max_width=36):
         bar = "█" * bar_len
         print(f"  {str(label):>10} │ {bar:<{max_width}} {value:.4f}")
     print()
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -165,7 +169,13 @@ class TestMigrateSigningKey:
 
         _print_table(
             ["sig_before", "sig_after", "unchanged?"],
-            [[sig_before[:16] + "...", sig_after[:16] + "...", str(sig_before == sig_after)]],
+            [
+                [
+                    sig_before[:16] + "...",
+                    sig_after[:16] + "...",
+                    str(sig_before == sig_after),
+                ]
+            ],
             title="test_no_re_sign_when_fingerprint_matches",
         )
         assert sig_before == sig_after
@@ -186,9 +196,22 @@ class TestMigrateSigningKey:
         new_fp = _stored_fingerprint(temp_db_path)
         expected_fp = _current_fingerprint()
         _print_table(
-            ["new_fingerprint", "expected_fingerprint", "match?", "memories_retrieved", "content"],
-            [[new_fp[:16] + "...", expected_fp[:16] + "...", str(new_fp == expected_fp),
-              str(len(mems)), mems[0]["content"] if mems else ""]],
+            [
+                "new_fingerprint",
+                "expected_fingerprint",
+                "match?",
+                "memories_retrieved",
+                "content",
+            ],
+            [
+                [
+                    new_fp[:16] + "...",
+                    expected_fp[:16] + "...",
+                    str(new_fp == expected_fp),
+                    str(len(mems)),
+                    mems[0]["content"] if mems else "",
+                ]
+            ],
             title="test_re_sign_on_fingerprint_mismatch",
         )
         assert len(mems) == 1

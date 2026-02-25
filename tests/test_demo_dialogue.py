@@ -92,7 +92,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -133,13 +136,43 @@ def test_full_dialogue_demo():
     _print_table(
         ["Metric", "Value", "Threshold", "Pass?"],
         [
-            ["Turns", str(len(DEMO_DIALOGUE)), "== 10", "✓" if len(DEMO_DIALOGUE) == 10 else "✗"],
+            [
+                "Turns",
+                str(len(DEMO_DIALOGUE)),
+                "== 10",
+                "✓" if len(DEMO_DIALOGUE) == 10 else "✗",
+            ],
             ["Roles present", str(roles), "all 3", "✓" if len(roles) == 3 else "✗"],
-            ["Circularity Rate", f"{metrics['circularity_rate']:.3f}", f"< {_MAX_DEMO_CIRCULARITY}", "✓" if metrics['circularity_rate'] < _MAX_DEMO_CIRCULARITY else "✗"],
-            ["Progress Rate", f"{metrics['progress_rate']:.3f}", f"> {_MIN_DEMO_PROGRESS}", "✓" if metrics['progress_rate'] > _MIN_DEMO_PROGRESS else "✗"],
-            ["Intervention Utility", f"{metrics['intervention_utility']:.3f}", ">= 0.0", "✓" if metrics['intervention_utility'] >= 0.0 else "✗"],
-            ["Per-turn series length", str(len(series)), f"== {len(DEMO_DIALOGUE)}", "✓" if len(series) == len(DEMO_DIALOGUE) else "✗"],
-            ["First-turn circularity", f"{series[0]:.3f}", "== 0.0", "✓" if abs(series[0]) < 1e-9 else "✗"],
+            [
+                "Circularity Rate",
+                f"{metrics['circularity_rate']:.3f}",
+                f"< {_MAX_DEMO_CIRCULARITY}",
+                "✓" if metrics["circularity_rate"] < _MAX_DEMO_CIRCULARITY else "✗",
+            ],
+            [
+                "Progress Rate",
+                f"{metrics['progress_rate']:.3f}",
+                f"> {_MIN_DEMO_PROGRESS}",
+                "✓" if metrics["progress_rate"] > _MIN_DEMO_PROGRESS else "✗",
+            ],
+            [
+                "Intervention Utility",
+                f"{metrics['intervention_utility']:.3f}",
+                ">= 0.0",
+                "✓" if metrics["intervention_utility"] >= 0.0 else "✗",
+            ],
+            [
+                "Per-turn series length",
+                str(len(series)),
+                f"== {len(DEMO_DIALOGUE)}",
+                "✓" if len(series) == len(DEMO_DIALOGUE) else "✗",
+            ],
+            [
+                "First-turn circularity",
+                f"{series[0]:.3f}",
+                "== 0.0",
+                "✓" if abs(series[0]) < 1e-9 else "✗",
+            ],
         ],
         title="test_full_dialogue_demo  –  metrics summary",
     )

@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Terminal display helpers – tables and ASCII bar charts
 # ---------------------------------------------------------------------------
@@ -37,7 +36,10 @@ def _print_table(headers, rows, title=None):
     print(f"  {header_line}")
     print(f"  {sep}")
     for row in rows:
-        print("  " + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row)))
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
     print()
 
 
@@ -54,6 +56,7 @@ def _print_bar_chart(data_pairs, title=None, max_width=36):
         bar = "█" * bar_len
         print(f"  {str(label):>10} │ {bar:<{max_width}} {value:.4f}")
     print()
+
 
 # ---------------------------------------------------------------------------
 # Minimal stubs replicating the relevant Agent logic without LLM / DB deps
@@ -229,16 +232,25 @@ class TestConflictIndex:
         result = agent.conflict_index()
         _print_table(
             ["Id", "Ego", "SuperEgo", "conflict_index", "Expected", "Formula"],
-            [["10.0", "0.0", "10.0", f"{result:.4f}", "20.0000", "|10-0|+|10-0|=10+10"]],
+            [
+                [
+                    "10.0",
+                    "0.0",
+                    "10.0",
+                    f"{result:.4f}",
+                    "20.0000",
+                    "|10-0|+|10-0|=10+10",
+                ]
+            ],
             title="test_maximum_conflict",
         )
         # Summary bar chart across all key scenarios
         scenarios = [
             ("balanced", _DriveStub(5.0, 5.0, 5.0).conflict_index()),
-            ("high-Id",  _DriveStub(8.0, 5.0, 5.0).conflict_index()),
+            ("high-Id", _DriveStub(8.0, 5.0, 5.0).conflict_index()),
             ("high-Sup", _DriveStub(5.0, 5.0, 9.0).conflict_index()),
             ("symmetric", _DriveStub(9.0, 5.0, 9.0).conflict_index()),
-            ("maximum",  _DriveStub(10.0, 0.0, 10.0).conflict_index()),
+            ("maximum", _DriveStub(10.0, 0.0, 10.0).conflict_index()),
         ]
         _print_bar_chart(scenarios, title="conflict_index across scenarios")
         assert result == pytest.approx(20.0)
@@ -286,12 +298,30 @@ class TestEgoErosionUnderConflict:
         # should bring it below the no-conflict baseline
         no_conflict_ego = ego_before + 0.05 + 0.06  # maximum reflective gain
         _print_table(
-            ["Drives (id/ego/sup)", "Conflict", "Ego Before", "Ego After", "No-conflict Baseline"],
-            [["9.0 / 5.0 / 8.0", "7.0", f"{ego_before:.4f}", f"{ego_after:.4f}", f"{no_conflict_ego:.4f}"]],
+            [
+                "Drives (id/ego/sup)",
+                "Conflict",
+                "Ego Before",
+                "Ego After",
+                "No-conflict Baseline",
+            ],
+            [
+                [
+                    "9.0 / 5.0 / 8.0",
+                    "7.0",
+                    f"{ego_before:.4f}",
+                    f"{ego_after:.4f}",
+                    f"{no_conflict_ego:.4f}",
+                ]
+            ],
             title="test_high_conflict_reduces_ego",
         )
         _print_bar_chart(
-            [("before", ego_before), ("after", ego_after), ("baseline", no_conflict_ego)],
+            [
+                ("before", ego_before),
+                ("after", ego_after),
+                ("baseline", no_conflict_ego),
+            ],
             title="Ego levels: before turn vs after (high conflict)",
         )
         assert (
@@ -309,7 +339,15 @@ class TestEgoErosionUnderConflict:
         expected = min(10.0, ego_before + 0.05 + 0.06)
         _print_table(
             ["Drives (id/ego/sup)", "Conflict", "Ego Before", "Ego After", "Expected"],
-            [["5.0 / 5.0 / 5.0", "0.0", f"{ego_before:.4f}", f"{ego_after:.4f}", f"{expected:.4f}"]],
+            [
+                [
+                    "5.0 / 5.0 / 5.0",
+                    "0.0",
+                    f"{ego_before:.4f}",
+                    f"{ego_after:.4f}",
+                    f"{expected:.4f}",
+                ]
+            ],
             title="test_low_conflict_does_not_erode_ego",
         )
         assert abs(ego_after - expected) < 1e-9
@@ -329,8 +367,15 @@ class TestEgoErosionUnderConflict:
         _print_table(
             ["Scenario", "Id", "Ego", "SuperEgo", "Conflict", "Ego After Turn"],
             [
-                ["low conflict",  "7.0", "5.0", "5.0", "2.0", f"{ego_low_conflict:.4f}"],
-                ["high conflict", "9.0", "5.0", "9.0", "8.0", f"{ego_high_conflict:.4f}"],
+                ["low conflict", "7.0", "5.0", "5.0", "2.0", f"{ego_low_conflict:.4f}"],
+                [
+                    "high conflict",
+                    "9.0",
+                    "5.0",
+                    "9.0",
+                    "8.0",
+                    f"{ego_high_conflict:.4f}",
+                ],
             ],
             title="test_erosion_proportional_to_conflict",
         )
@@ -349,8 +394,22 @@ class TestEgoErosionUnderConflict:
         agent.update_drives_after_turn("aggressive", "anger", 1.0)
         ego_result = float(agent.drives["ego_strength"])
         _print_table(
-            ["Drives (id/ego/sup)", "Response Kind", "Emotion", "Ego After", "Min Allowed"],
-            [["10.0 / 0.0 / 10.0", "aggressive", "anger", f"{ego_result:.4f}", "0.0000"]],
+            [
+                "Drives (id/ego/sup)",
+                "Response Kind",
+                "Emotion",
+                "Ego After",
+                "Min Allowed",
+            ],
+            [
+                [
+                    "10.0 / 0.0 / 10.0",
+                    "aggressive",
+                    "anger",
+                    f"{ego_result:.4f}",
+                    "0.0000",
+                ]
+            ],
             title="test_ego_never_negative",
         )
         assert ego_result >= 0.0
@@ -397,14 +456,16 @@ class TestTemperatureConflictCorrelation:
         _print_table(
             ["Scenario", "conflict_index", "temperature"],
             [
-                ["low (c=2.0)",  f"{low.conflict_index():.4f}",  f"{temp_low:.4f}"],
+                ["low (c=2.0)", f"{low.conflict_index():.4f}", f"{temp_low:.4f}"],
                 ["high (c=8.0)", f"{high.conflict_index():.4f}", f"{temp_high:.4f}"],
             ],
             title="test_higher_conflict_raises_temperature",
         )
         # Full sweep graph: conflict 0..10 → temperature
-        sweep = [(f"c={c}", self._make_symmetric_conflict(float(c)).compute_temperature())
-                 for c in range(0, 11)]
+        sweep = [
+            (f"c={c}", self._make_symmetric_conflict(float(c)).compute_temperature())
+            for c in range(0, 11)
+        ]
         _print_bar_chart(sweep, title="Temperature vs conflict_index  (conflict 0→10)")
         assert temp_high > temp_low
 
@@ -422,8 +483,16 @@ class TestTemperatureConflictCorrelation:
         temp = agent.compute_temperature()
         _print_table(
             ["Id", "Ego", "SuperEgo", "conflict_index", "temperature", "Bounds"],
-            [[str(ide), str(ego), str(sup),
-              f"{agent.conflict_index():.4f}", f"{temp:.4f}", "[0.25, 0.95]"]],
+            [
+                [
+                    str(ide),
+                    str(ego),
+                    str(sup),
+                    f"{agent.conflict_index():.4f}",
+                    f"{temp:.4f}",
+                    "[0.25, 0.95]",
+                ]
+            ],
             title=f"test_temperature_stays_within_bounds  id={ide} ego={ego} sup={sup}",
         )
         assert (
@@ -466,7 +535,7 @@ class TestEnergyDrainConflictCorrelation:
         _print_table(
             ["Scenario", "Id", "Ego", "SuperEgo", "Conflict", "Energy Drain"],
             [
-                ["low conflict",  "5.0", "5.0", "5.0", "0.0", f"{drain_low:.4f}"],
+                ["low conflict", "5.0", "5.0", "5.0", "0.0", f"{drain_low:.4f}"],
                 ["high conflict", "9.0", "5.0", "9.0", "8.0", f"{drain_high:.4f}"],
             ],
             title="test_high_conflict_drains_more_energy",
@@ -506,7 +575,14 @@ class TestEnergyDrainConflictCorrelation:
             )
             agent.update_drives_after_turn("aggressive", "anger", 1.0, rng_seed=seed)
             drain = 100.0 - agent.energy_level
-            rows.append([str(seed), f"{drain:.4f}", f"{cap:.4f}", "✓" if drain <= cap + 1e-9 else "✗"])
+            rows.append(
+                [
+                    str(seed),
+                    f"{drain:.4f}",
+                    f"{cap:.4f}",
+                    "✓" if drain <= cap + 1e-9 else "✗",
+                ]
+            )
         _print_table(
             ["seed", "drain", "cap (2×max)", "within cap?"],
             rows,
