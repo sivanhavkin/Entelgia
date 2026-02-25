@@ -6,32 +6,9 @@ This file is automatically discovered by pytest and provides
 fixtures that are available to all test modules.
 """
 
-import pytest
 import os
-import sys
+import pytest
 import tempfile
-from pathlib import Path
-
-# ---------------------------------------------------------------------------
-# Terminal summary hook — always prints one full dialogue demo at the end of
-# every test session so you can see the actual agent conversation.
-# ---------------------------------------------------------------------------
-
-
-def pytest_terminal_summary(terminalreporter, exitstatus, config):  # noqa: ARG001
-    """Print a complete Entelgia dialogue demo in the terminal summary section."""
-    # Import here to avoid breaking collection if the package is not installed
-    try:
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from tests.test_demo_dialogue import format_demo_dialogue, DEMO_DIALOGUE
-    except Exception:
-        try:
-            from test_demo_dialogue import format_demo_dialogue, DEMO_DIALOGUE
-        except Exception:
-            return  # Silently skip if the module is not yet available
-
-    terminalreporter.write_sep("=", "ENTELGIA DIALOGUE DEMO", bold=True)
-    terminalreporter.write_line(format_demo_dialogue(DEMO_DIALOGUE))
 
 
 @pytest.fixture
