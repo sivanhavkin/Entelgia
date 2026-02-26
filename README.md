@@ -271,20 +271,33 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
 
 Entelgia can be customized through the `Config` class in `Entelgia_production_meta.py`. Key configuration options:
 
-### Response Quality Settings (v2.2.0+)
+### Core Session Settings
+
+```python
+config = Config()
+
+config.max_turns = 200              # Maximum dialogue turns (default: 200)
+config.timeout_minutes = 30         # Session timeout in minutes (set to 9999 to disable)
+config.dream_every_n_turns = 7      # Dream cycle frequency (default: 7)
+config.llm_max_retries = 3          # LLM request retry count (default: 3)
+config.llm_timeout = 300            # LLM request timeout in seconds (default: 300)
+config.show_pronoun = False         # Show agent pronouns in output (default: False)
+config.show_meta = False            # Show meta-state after each turn (default: False)
+config.stm_max_entries = 10000      # Short-term memory capacity (default: 10000)
+config.stm_trim_batch = 500         # Entries pruned per trim pass (default: 500)
+config.promote_importance_threshold = 0.72  # Min importance to promote to LTM (default: 0.72)
+config.promote_emotion_threshold = 0.65     # Min emotion score to promote to LTM (default: 0.65)
+config.store_raw_stm = False        # Store un-redacted text in STM (default: False)
+config.store_raw_subconscious_ltm = False   # Store un-redacted text in LTM (default: False)
+```
+
+### Response Quality Settings
 
 > **Note:** Response length is controlled by the module-level constant `MAX_RESPONSE_WORDS = 150`
 > in `Entelgia_production_meta.py` (not a `Config` field). The LLM prompt instructs the model
 > to answer in maximum 150 words; responses are never truncated by the runtime.
 
-```python
-config = Config()
-
-# LLM request timeout (seconds to wait per request)
-config.llm_timeout = 300            # Default: 300 s (reduced from 600 s)
-```
-
-**Response Length Control** (v2.2.0+):
+**Response Length Control:**
 - ✅ **No truncation/cutting** - All agent responses are displayed in full
 - 📝 **LLM guidance** - Explicit instruction added to LLM prompts: "Please answer in maximum 150 words"
 - 🎭 **Role-playing maintained** - Agents receive the 150-word request but responses are never truncated
@@ -297,29 +310,12 @@ This approach ensures:
 - Role-playing dynamic remains authentic with requested brevity
 - Users see full responses without artificial truncation
 
-**Reduced Timeout** improves responsiveness:
-- LLM request timeout reduced from 600 s to 300 s (`config.llm_timeout`) for faster failure detection
+**Timeout Settings:**
+- LLM request timeout is set to 300 s (`config.llm_timeout`) for faster failure detection
 - Better user experience with more predictable behavior
 - Most responses complete much faster than the timeout limit
 
-### Other Key Settings
-
-```python
-config.max_turns = 200              # Maximum dialogue turns (default: 200)
-config.timeout_minutes = 30         # Session timeout in minutes (set to 9999 to disable)
-config.dream_every_n_turns = 7      # Dream cycle frequency (default: 7)
-config.llm_max_retries = 3          # LLM request retry count (default: 3)
-config.show_pronoun = False         # Show agent pronouns in output (default: False)
-config.show_meta = False            # Show meta-state after each turn (default: False)
-config.stm_max_entries = 10000      # Short-term memory capacity (default: 10000)
-config.stm_trim_batch = 500         # Entries pruned per trim pass (default: 500)
-config.promote_importance_threshold = 0.72  # Min importance to promote to LTM (default: 0.72)
-config.promote_emotion_threshold = 0.65     # Min emotion score to promote to LTM (default: 0.65)
-config.store_raw_stm = False        # Store un-redacted text in STM (default: False)
-config.store_raw_subconscious_ltm = False   # Store un-redacted text in LTM (default: False)
-```
-
-### ⚡ Energy & Dream Cycle Settings (v2.5.0)
+### ⚡ Energy & Dream Cycle Settings
 
 ```python
 config.energy_safety_threshold = 35.0  # Energy level that triggers a dream cycle (default: 35.0)
@@ -328,7 +324,7 @@ config.energy_drain_max = 15.0          # Maximum energy drained per step (defau
 config.self_replicate_every_n_turns = 10  # Turns between self-replication scans (default: 10)
 ```
 
-### Drive-Aware Cognition Settings (v2.5.0)
+### Drive-Aware Cognition Settings
 
 These `Config` fields control how Freudian drives evolve and influence LLM behaviour at runtime:
 
