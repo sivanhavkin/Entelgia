@@ -31,6 +31,48 @@ from Entelgia_production_meta import (
 )
 
 # ---------------------------------------------------------------------------
+# Terminal display helpers – tables and ASCII bar charts
+# ---------------------------------------------------------------------------
+
+
+def _print_table(headers, rows, title=None):
+    """Print a neatly formatted ASCII table to stdout."""
+    if title:
+        print(f"\n  ╔{'═' * (len(title) + 4)}╗")
+        print(f"  ║  {title}  ║")
+        print(f"  ╚{'═' * (len(title) + 4)}╝")
+    col_widths = [len(str(h)) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(str(cell)))
+    sep = "─┼─".join("─" * w for w in col_widths)
+    header_line = " │ ".join(str(h).ljust(col_widths[i]) for i, h in enumerate(headers))
+    print(f"  {header_line}")
+    print(f"  {sep}")
+    for row in rows:
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
+    print()
+
+
+def _print_bar_chart(data_pairs, title=None, max_width=36):
+    """Print a horizontal ASCII bar chart.  *data_pairs* is [(label, value), ...]."""
+    if title:
+        print(f"\n  📊 {title}")
+        print(f"  {'─' * 52}")
+    if not data_pairs:
+        return
+    max_val = max(v for _, v in data_pairs) or 1.0
+    for label, value in data_pairs:
+        bar_len = max(1, int(round((value / max_val) * max_width)))
+        bar = "█" * bar_len
+        print(f"  {str(label):>10} │ {bar:<{max_width}} {value:.4f}")
+    print()
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -70,6 +112,11 @@ class TestEgoDominantScenario:
             superego_strength=8.8,
             conflict=7.3,
         )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "should_apply", "reason", "expected"],
+            [["2.5", "9.3", "8.8", "7.3", str(dec.should_apply), dec.reason, "False"]],
+            title="test_critique_not_applied_when_ego_dominant",
+        )
         assert (
             dec.should_apply is False
         ), f"Expected critique NOT applied when Ego is dominant, got reason={dec.reason}"
@@ -80,6 +127,11 @@ class TestEgoDominantScenario:
             ego_strength=9.3,
             superego_strength=8.8,
             conflict=7.3,
+        )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "reason", "contains_Ego?"],
+            [["2.5", "9.3", "8.8", "7.3", dec.reason, str("Ego" in dec.reason)]],
+            title="test_reason_mentions_ego_dominant",
         )
         assert (
             "Ego" in dec.reason
@@ -101,6 +153,11 @@ class TestPositiveCritique:
             superego_strength=9.4,
             conflict=6.0,
         )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "should_apply", "reason", "expected"],
+            [["2.0", "8.6", "9.4", "6.0", str(dec.should_apply), dec.reason, "True"]],
+            title="test_critique_applied_when_superego_dominant",
+        )
         assert (
             dec.should_apply is True
         ), f"Expected critique applied when SuperEgo is dominant, got reason={dec.reason}"
@@ -111,6 +168,11 @@ class TestPositiveCritique:
             ego_strength=8.6,
             superego_strength=9.4,
             conflict=6.0,
+        )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "reason", "expected"],
+            [["2.0", "8.6", "9.4", "6.0", dec.reason, "superego_dominant"]],
+            title="test_reason_is_superego_dominant",
         )
         assert dec.reason == "superego_dominant"
 
@@ -138,6 +200,11 @@ class TestDominanceMargin:
             conflict=6.0,
             dominance_margin=margin,
         )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "margin", "should_apply", "reason", "expected"],
+            [["1.0", "8.7", "9.0", "6.0", str(margin), str(dec.should_apply), dec.reason, str(expected_apply)]],
+            title="test_margin_boundary",
+        )
         assert dec.should_apply is expected_apply, (
             f"margin={margin}: expected should_apply={expected_apply}, "
             f"got {dec.should_apply} (reason={dec.reason})"
@@ -151,6 +218,11 @@ class TestDominanceMargin:
             superego_strength=9.0,  # gap exactly 0.5
             conflict=6.0,
             dominance_margin=0.5,
+        )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "margin", "gap", "should_apply", "reason", "expected"],
+            [["1.0", "8.5", "9.0", "6.0", "0.5", "0.5", str(dec.should_apply), dec.reason, "True"]],
+            title="test_exact_margin_boundary_applies",
         )
         assert (
             dec.should_apply is True
@@ -173,6 +245,11 @@ class TestConflictMin:
             conflict=1.0,  # below default 2.0
             conflict_min=2.0,
         )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "conflict_min", "should_apply", "reason", "expected"],
+            [["1.0", "5.0", "9.0", "1.0", "2.0", str(dec.should_apply), dec.reason, "False"]],
+            title="test_low_conflict_skips_critique",
+        )
         assert dec.should_apply is False
 
     def test_low_conflict_reason_contains_conflict(self):
@@ -182,6 +259,11 @@ class TestConflictMin:
             superego_strength=9.0,
             conflict=1.0,
             conflict_min=2.0,
+        )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "conflict_min", "reason", "contains_conflict?"],
+            [["1.0", "5.0", "9.0", "1.0", "2.0", dec.reason, str("conflict" in dec.reason.lower())]],
+            title="test_low_conflict_reason_contains_conflict",
         )
         assert (
             "conflict" in dec.reason.lower()
@@ -195,6 +277,11 @@ class TestConflictMin:
             superego_strength=9.0,
             conflict=2.0,
             conflict_min=2.0,
+        )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "conflict_min", "should_apply", "reason", "expected"],
+            [["1.0", "5.0", "9.0", "2.0", "2.0", str(dec.should_apply), dec.reason, "True"]],
+            title="test_conflict_at_minimum_applies",
         )
         assert (
             dec.should_apply is True
@@ -217,6 +304,11 @@ class TestCritiqueDisabled:
             conflict=8.0,
             enabled=False,
         )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "enabled", "should_apply", "reason", "expected"],
+            [["1.0", "5.0", "9.0", "8.0", "False", str(dec.should_apply), dec.reason, "False"]],
+            title="test_disabled_skips_even_when_superego_dominant",
+        )
         assert dec.should_apply is False
 
     def test_disabled_reason(self):
@@ -226,6 +318,11 @@ class TestCritiqueDisabled:
             superego_strength=9.0,
             conflict=8.0,
             enabled=False,
+        )
+        _print_table(
+            ["id", "ego", "superego", "conflict", "enabled", "reason", "expected"],
+            [["1.0", "5.0", "9.0", "8.0", "False", dec.reason, "disabled"]],
+            title="test_disabled_reason",
         )
         assert dec.reason == "disabled"
 
@@ -238,6 +335,15 @@ class TestCritiqueDisabled:
 class TestCritiqueDecisionDataclass:
     def test_fields(self):
         cd = CritiqueDecision(should_apply=True, reason="superego_dominant")
+        _print_table(
+            ["field", "value", "expected"],
+            [
+                ["should_apply", str(cd.should_apply), "True"],
+                ["reason", cd.reason, "superego_dominant"],
+                ["critic", cd.critic, "superego"],
+            ],
+            title="test_fields",
+        )
         assert cd.should_apply is True
         assert cd.reason == "superego_dominant"
         assert cd.critic == "superego"
@@ -248,6 +354,18 @@ class TestCritiqueDecisionDataclass:
             ego_strength=5.0,
             superego_strength=9.0,
             conflict=5.0,
+        )
+        _print_table(
+            ["result_type", "should_apply", "reason", "expected_type"],
+            [
+                [
+                    type(result).__name__,
+                    str(result.should_apply),
+                    result.reason,
+                    "CritiqueDecision",
+                ]
+            ],
+            title="test_evaluate_returns_critique_decision",
         )
         assert isinstance(result, CritiqueDecision)
 
@@ -328,6 +446,11 @@ class TestAgentSpeakCritiqueStateReset:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("What is justice?", [])
 
+        _print_table(
+            ["stale_rewrite_before", "_last_superego_rewrite", "expected"],
+            [["True", str(agent._last_superego_rewrite), "False"]],
+            title="test_stale_rewrite_flag_cleared_when_ego_dominant",
+        )
         assert agent._last_superego_rewrite is False, (
             "Expected _last_superego_rewrite=False when Ego is dominant; "
             "stale True value from previous turn must not persist."
@@ -347,6 +470,17 @@ class TestAgentSpeakCritiqueStateReset:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("What is justice?", [])
 
+        _print_table(
+            ["stale_reason_before", "_last_critique_reason", "is_stale?"],
+            [
+                [
+                    "superego_dominant",
+                    agent._last_critique_reason,
+                    str(agent._last_critique_reason == "superego_dominant"),
+                ]
+            ],
+            title="test_critique_reason_reflects_current_turn",
+        )
         assert (
             agent._last_critique_reason != "superego_dominant"
         ), "_last_critique_reason must reflect the current turn, not the previous one."
@@ -362,6 +496,18 @@ class TestAgentSpeakCritiqueStateReset:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("What is justice?", [])
 
+        _print_table(
+            ["_last_superego_rewrite", "expected", "_last_critique_reason", "expected_reason"],
+            [
+                [
+                    str(agent._last_superego_rewrite),
+                    "True",
+                    agent._last_critique_reason,
+                    "superego_dominant",
+                ]
+            ],
+            title="test_critique_applied_when_superego_dominant",
+        )
         assert (
             agent._last_superego_rewrite is True
         ), "Expected _last_superego_rewrite=True when SuperEgo is dominant."
@@ -382,6 +528,18 @@ class TestAgentSpeakCritiqueStateReset:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("Explain virtue.", [])
 
+        _print_table(
+            ["stale_rewrite_before", "_last_superego_rewrite", "_last_critique_reason", "is_stale_reason?"],
+            [
+                [
+                    "True",
+                    str(agent._last_superego_rewrite),
+                    agent._last_critique_reason,
+                    str(agent._last_critique_reason == "superego_dominant"),
+                ]
+            ],
+            title="test_fields_reset_at_start_regardless_of_prior_state",
+        )
         assert agent._last_superego_rewrite is False
         assert agent._last_critique_reason != "superego_dominant"
 

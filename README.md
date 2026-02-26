@@ -499,7 +499,7 @@ Entelgia ships with comprehensive test coverage across **235 tests** in 11 suite
 ### Enhanced Dialogue Tests (6 tests)
 
 ```bash
-python tests/test_enhanced_dialogue.py
+pytest tests/test_enhanced_dialogue.py -v
 ```
 
 Tests verify:
