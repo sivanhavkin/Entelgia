@@ -344,8 +344,8 @@ class Config:
             raise ValueError("llm_timeout must be >= 5")
         if not self.ollama_url.startswith("http"):
             raise ValueError("ollama_url must be a valid URL")
-        if self.timeout_minutes < 0:
-            raise ValueError("timeout_minutes must be >= 0 (0 = no time limit)")
+        if self.timeout_minutes < 1:
+            raise ValueError("timeout_minutes must be >= 1")
         logger.info(
             f"Config validated: max_turns={self.max_turns}, timeout={self.timeout_minutes}min"
         )
@@ -2876,17 +2876,15 @@ class MainScript:
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
 
-        timeout_seconds = self.cfg.timeout_minutes * 60 if self.cfg.timeout_minutes > 0 else float("inf")
+        timeout_seconds = self.cfg.timeout_minutes * 60
 
-        _timeout_label = f"{self.cfg.timeout_minutes}-minute" if self.cfg.timeout_minutes > 0 else "no-timeout"
         print(
             Fore.GREEN
-            + f"\n[Session {self.session_id}] Starting {_timeout_label} dialogue..."
+            + f"\n[Session {self.session_id}] Starting {self.cfg.timeout_minutes}-minute dialogue..."
             + Style.RESET_ALL
         )
-        _log_timeout = f"{timeout_seconds}s" if self.cfg.timeout_minutes > 0 else "unlimited"
         logger.info(
-            f"Starting session {self.session_id} with {_log_timeout} timeout"
+            f"Starting session {self.session_id} with {timeout_seconds}s timeout"
         )
 
         while time.time() - self.start_time < timeout_seconds:
@@ -3045,17 +3043,6 @@ class MainScript:
                 print(
                     Fore.YELLOW
                     + f"\n[TIMEOUT] {self.cfg.timeout_minutes} minutes reached at turn {self.turn_index}"
-                    + Style.RESET_ALL
-                )
-                break
-
-            if self.turn_index >= self.cfg.max_turns:
-                logger.info(
-                    f"max_turns={self.cfg.max_turns} reached at turn {self.turn_index}"
-                )
-                print(
-                    Fore.YELLOW
-                    + f"\n[DONE] {self.cfg.max_turns} turns completed."
                     + Style.RESET_ALL
                 )
                 break
