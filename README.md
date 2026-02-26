@@ -637,7 +637,7 @@ Conceived and developed by **Sivan Havkin**.
 
 * **Status:** Research / Production Hybrid
 * **Version:** 2.6.0 
-* **Last Updated:** 18 February 2026
+* **Last Updated:** 26 February 2026
 ---
 
 ## 📚 Citation
