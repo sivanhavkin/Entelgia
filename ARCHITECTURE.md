@@ -278,7 +278,7 @@ Agents with stronger ego / higher self-awareness pull deeper context and stabili
 
 ## Long-Duration Dialogue
 
-`entelgia_production_long.py` provides a turn-count-gated variant of the main runner:
+`Entelgia_production_meta_200t.py` provides a turn-count-gated variant of the main runner:
 
 ```python
 class MainScriptLong(MainScript):
@@ -289,4 +289,4 @@ class MainScriptLong(MainScript):
 
 - Uses `Config(max_turns=200, timeout_minutes=9999)` to disable time-based stopping.
 - All other behaviour (memory, emotions, Fixy, dream cycles, logging) is inherited unchanged.
-- Run via: `python entelgia_production_long.py`
+- Run via: `python Entelgia_production_meta_200t.py`
