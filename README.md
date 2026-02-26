@@ -488,7 +488,7 @@ The system runs via two executable entry points:
 
 ```
 Entelgia_production_meta.py   # Standard 30-minute session (time-bounded)
-entelgia_production_long.py   # 200-turn session, no time-based stopping
+Entelgia_production_meta_200t.py  # 200-turn session, no time-based stopping
 ```
 
 ---
