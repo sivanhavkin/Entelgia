@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-209%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-235%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -494,7 +494,7 @@ entelgia_production_long.py   # 200-turn session, no time-based stopping
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **209 tests** in 9 suites:
+Entelgia ships with comprehensive test coverage across **235 tests** in 11 suites:
 
 ### Enhanced Dialogue Tests (6 tests)
 
@@ -570,7 +570,7 @@ Tests assert that:
 
 ---
 
-### 🔗 Drive Correlation Tests (17 tests)
+### 🔗 Drive Correlation Tests (21 tests)
 
 ```bash
 pytest tests/test_drive_correlations.py -v
@@ -578,9 +578,11 @@ pytest tests/test_drive_correlations.py -v
 
 Tests verify the coherent Freudian drive correlations added in PR #92:
 - ✅ **conflict_index boundaries** — zero conflict at balance, maximum at extremes
+- ✅ **conflict_index parametrized** — spot-check against three known Id/Ego/SuperEgo scenarios
 - ✅ **Ego erosion magnitude** — proportional reduction above the 4.0 threshold
 - ✅ **Ego erosion monotonicity** — higher conflict → greater erosion
 - ✅ **Temperature–conflict correlation** — temperature rises with conflict index
+- ✅ **Temperature conflict component** — conflict component always positive
 - ✅ **Energy drain scaling** — conflict adds to base drain
 - ✅ **Energy drain cap** — drain never exceeds `2 × energy_drain_max`
 
@@ -616,7 +618,7 @@ Tests verify drive-triggered behavioral rules for Socrates and Athena:
 
 ---
 
-### 📊 Dialogue Metrics Tests (45 tests)
+### 📊 Dialogue Metrics Tests (58 tests)
 
 ```bash
 pytest tests/test_dialogue_metrics.py -v
@@ -632,6 +634,7 @@ Tests verify the three dialogue-quality metrics and the ablation study (PR #111)
 - ✅ **Inter-condition ordering** — BASELINE circularity > DIALOGUE_ENGINE
 - ✅ **print_results_table** — formatted output without crash
 - ✅ **plot_circularity ASCII fallback** — works without matplotlib
+- ✅ **Demo metric values** — exact circularity (0.022), progress (0.889), and intervention utility (0.167) match the demo dialogue
 
 ---
 
@@ -647,6 +650,40 @@ Tests verify the key-rotation and legacy-format migration logic in `MemoryCore`:
 - ✅ **Re-sign on fingerprint mismatch** — all rows updated on key rotation
 - ✅ **Legacy format recovery** — `None`→`"None"` format auto-healed after migration
 - ✅ **Settings table existence** — created during `_init_db`
+
+---
+
+### 🎭 Demo Dialogue Tests (1 test)
+
+```bash
+pytest tests/test_demo_dialogue.py -v
+```
+
+Tests verify the structural and metric properties of the canonical 10-turn demo dialogue (Socrates / Athena / Fixy):
+- ✅ **Turn count** — exactly 10 turns in the demo dialogue
+- ✅ **All three roles present** — Socrates, Athena, and Fixy must each appear
+- ✅ **Turn structure** — every turn has non-empty `role` and `text` fields
+- ✅ **Low circularity** — `circularity_rate` below 0.1 for a well-structured demo
+- ✅ **High progress** — `progress_rate` above 0.5, confirming forward movement
+- ✅ **Non-negative intervention utility** — Fixy's contributions are tracked
+- ✅ **Per-turn series length** — rolling circularity series matches dialogue length
+
+---
+
+### 🧬 SuperEgo Critique Tests (18 tests)
+
+```bash
+pytest tests/test_superego_critique.py -v
+```
+
+Tests verify the `evaluate_superego_critique()` function and the `Agent.speak()` state-reset behaviour:
+- ✅ **Ego-dominant → no critique** — repro test: critique must NOT fire when Ego leads
+- ✅ **SuperEgo-dominant → critique fires** — positive test with known drive values
+- ✅ **Dominance margin boundary** — gap below margin skips; gap at/above margin applies
+- ✅ **Conflict minimum** — SuperEgo-dominant but `conflict < conflict_min` → skip with conflict reason
+- ✅ **Disabled flag** — `critique_enabled=False` always returns `should_apply=False`
+- ✅ **CritiqueDecision dataclass** — fields (`should_apply`, `reason`, `critic`) correct
+- ✅ **Stale-state regression** — `_last_superego_rewrite` and `_last_critique_reason` are reset each turn
 
 ---
 
@@ -728,7 +765,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 209 total tests (6 dialogue + 35 energy + 33 LTM + 19 security + 17 drive correlations + 23 drive pressure + 16 behavioral rules + 45 dialogue metrics + 5 signing migration) |
+| **Unit Tests** | `pytest` | Runs 235 total tests (6 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 16 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 18 superego critique) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
