@@ -1712,6 +1712,10 @@ class Agent:
 
     def speak(self, seed: str, dialog_tail: List[Dict[str, str]]) -> str:
         """Generate dialogue response."""
+        # Reset per-turn critique state before any early returns or alternate paths
+        self._last_superego_rewrite = False
+        self._last_critique_reason = ""
+
         prompt = self._build_compact_prompt(seed, dialog_tail)
 
         # Inject behavioral rule into prompt if applicable

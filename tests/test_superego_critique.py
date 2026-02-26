@@ -16,8 +16,19 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+from unittest.mock import MagicMock, patch
 
-from Entelgia_production_meta import CritiqueDecision, evaluate_superego_critique
+import Entelgia_production_meta as _meta
+from Entelgia_production_meta import (
+    Agent,
+    BehaviorCore,
+    Config,
+    ConsciousCore,
+    CritiqueDecision,
+    EmotionCore,
+    LanguageCore,
+    evaluate_superego_critique,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +251,140 @@ class TestCritiqueDecisionDataclass:
             conflict=5.0,
         )
         assert isinstance(result, CritiqueDecision)
+
+
+# ---------------------------------------------------------------------------
+# 7. Agent.speak() stale-state regression
+# ---------------------------------------------------------------------------
+
+
+def _make_agent(ego_dominant: bool = True) -> "tuple[Agent, Config]":
+    """Return a minimal Agent whose LLM and memory calls are fully mocked."""
+    cfg = Config()
+
+    # Stub LLM: generate() returns a canned response
+    llm_mock = MagicMock()
+    llm_mock.generate.return_value = "I think deeply about this matter."
+
+    # Drives that make Ego dominant (no critique should fire)
+    if ego_dominant:
+        drives = {
+            "id_strength": 2.7,
+            "ego_strength": 9.3,
+            "superego_strength": 8.7,
+            "self_awareness": 0.55,
+        }
+    else:
+        # Drives that make SuperEgo dominant (critique should fire)
+        drives = {
+            "id_strength": 2.0,
+            "ego_strength": 8.0,
+            "superego_strength": 9.5,
+            "self_awareness": 0.55,
+        }
+
+    memory_mock = MagicMock()
+    memory_mock.get_agent_state.return_value = drives
+    memory_mock.ltm_recent.return_value = []
+    memory_mock.stm_load.return_value = []
+
+    emotion_mock = MagicMock(spec=EmotionCore)
+    emotion_mock.infer.return_value = ("neutral", 0.3)
+
+    language_mock = LanguageCore()
+    conscious_mock = ConsciousCore()
+    behavior_mock = MagicMock(spec=BehaviorCore)
+
+    agent = Agent(
+        name="Socrates",
+        model="phi3",
+        color="",
+        llm=llm_mock,
+        memory=memory_mock,
+        emotion=emotion_mock,
+        behavior=behavior_mock,
+        language=language_mock,
+        conscious=conscious_mock,
+        persona="A philosopher who seeks truth.",
+        use_enhanced=False,
+        cfg=cfg,
+    )
+    return agent, cfg
+
+
+class TestAgentSpeakCritiqueStateReset:
+    """Regression: stale _last_superego_rewrite must not leak across turns."""
+
+    def test_stale_rewrite_flag_cleared_when_ego_dominant(self):
+        """
+        Simulate a previous turn where critique was applied (True), then drive
+        conditions become Ego-dominant.  After speak(), flag must be False.
+        """
+        agent, cfg = _make_agent(ego_dominant=True)
+
+        # Simulate stale state from a previous turn
+        agent._last_superego_rewrite = True
+        agent._last_critique_reason = "superego_dominant"
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent._last_superego_rewrite is False, (
+            "Expected _last_superego_rewrite=False when Ego is dominant; "
+            "stale True value from previous turn must not persist."
+        )
+        assert agent._last_critique_reason != "superego_dominant", (
+            "_last_critique_reason must reflect the current turn, not the previous one."
+        )
+
+    def test_critique_reason_reflects_current_turn(self):
+        """After speak() with Ego-dominant drives, reason must not be superego_dominant."""
+        agent, cfg = _make_agent(ego_dominant=True)
+
+        # Simulate stale state from a previous turn
+        agent._last_superego_rewrite = True
+        agent._last_critique_reason = "superego_dominant"
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent._last_critique_reason != "superego_dominant", (
+            "_last_critique_reason must reflect the current turn, not the previous one."
+        )
+
+    def test_critique_applied_when_superego_dominant(self):
+        """When SuperEgo dominates, critique should be applied after speak()."""
+        agent, cfg = _make_agent(ego_dominant=False)
+
+        # Start from a clean slate (no previous stale state)
+        agent._last_superego_rewrite = False
+        agent._last_critique_reason = ""
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent._last_superego_rewrite is True, (
+            "Expected _last_superego_rewrite=True when SuperEgo is dominant."
+        )
+        assert agent._last_critique_reason == "superego_dominant"
+
+    def test_fields_reset_at_start_regardless_of_prior_state(self):
+        """
+        Even if the first speak() sets rewrite=True, the next speak() with
+        ego-dominant drives must reset it to False.
+        """
+        agent, cfg = _make_agent(ego_dominant=True)
+
+        # First: manually place agent in the 'rewrite was True' state
+        agent._last_superego_rewrite = True
+        agent._last_critique_reason = "superego_dominant"
+
+        # Second call: ego is dominant → rewrite must be False
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("Explain virtue.", [])
+
+        assert agent._last_superego_rewrite is False
+        assert agent._last_critique_reason != "superego_dominant"
 
 
 if __name__ == "__main__":
