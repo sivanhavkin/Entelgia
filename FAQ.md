@@ -193,7 +193,7 @@ python examples/demo_enhanced_dialogue.py
 python Entelgia_production_meta.py
 
 # Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
-python entelgia_production_long.py
+python Entelgia_production_meta_200t.py
 ```
 
 ### What happens during a typical session?
@@ -214,7 +214,7 @@ python entelgia_production_long.py
 
 - **Demo mode** (`demo_enhanced_dialogue.py`): ~2 minutes (10 turns)
 - **Full session** (`Entelgia_production_meta.py`): ~30 minutes (default 200 turns, time-bounded)
-- **Long session** (`entelgia_production_long.py`): turn-count-bounded (200 turns, no time limit)
+- **Long session** (`Entelgia_production_meta_200t.py`): turn-count-bounded (200 turns, no time limit)
 - Duration depends on:
   - Number of turns configured
   - LLM response time

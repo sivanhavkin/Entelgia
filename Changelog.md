@@ -79,7 +79,7 @@ All notable changes to this project will be documented in this file. The format 
   - `FORBIDDEN_STARTERS` runtime list with post-processing strip in `speak()`
   - Cross-agent opener deduplication: injects `FORBIDDEN OPENER` for last other-agent's opening sentence
 
-- **`entelgia_production_long.py`** — CLI mode dispatch aligned with `Entelgia_production_meta.py` (PR #105)
+- **`Entelgia_production_meta_200t.py`** — CLI mode dispatch aligned with `Entelgia_production_meta.py` (PR #105)
   - `main()` entry point with `test` / `api` / `help` / default (`run_cli_long()`) modes
   - Module docstring updated to document all run modes
 
@@ -158,7 +158,7 @@ All notable changes to this project will be documented in this file. The format 
 - **Personal Long-Term Memory System** — psychoanalytically-inspired memory regulation
 - **Drive-aware cognition** — dynamic LLM temperature, ego-driven memory depth, superego second-pass critique
 - **Coherent Freudian drive correlations** — high conflict now directly erodes ego, raises temperature, and amplifies energy drain (PR #92)
-- **`entelgia_production_long.py`** — guaranteed 200-turn dialogue without time-based stopping
+- **`Entelgia_production_meta_200t.py`** — guaranteed 200-turn dialogue without time-based stopping
 - **Dialogue bug fixes** — third body calling to first body, double turn (agent answering twice in one turn), and pronoun issue all resolved
 - **Super ego persona fix** — dialogue now displays the agent's original authentic voice; the superego rewrite is applied only for internal state updates (PR #95)
 - **Output quality rules** — forbidden meta-commentary phrases removed at sentence level, dissent marker capped to exactly one sentence, hard word truncation removed (PR #96)
@@ -169,14 +169,14 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
-- **`entelgia_production_long.py`** 🔁 — 200-turn companion script
+- **`Entelgia_production_meta_200t.py`** 🔁 — 200-turn companion script
   - `MainScriptLong(MainScript)` — subclass that overrides only `run()`, replacing the
     time-based `while time < timeout` condition with a turn-count gate `while turn_index < max_turns`
   - `_NO_TIMEOUT_MINUTES = 9999` sentinel disables time-based stopping entirely
   - `run_cli_long()` entry point: `Config(max_turns=200, timeout_minutes=9999)`
   - All other behaviour (memory, emotions, Fixy interventions, dream cycles, session
     persistence) inherited from `MainScript` unchanged
-  - Run via: `python entelgia_production_long.py`
+  - Run via: `python Entelgia_production_meta_200t.py`
   - EntelgiaAgent.long_term_memory — persistent list that accumulates critical memories promoted from short-term memory during every dream cycle.
   - EntelgiaAgent._is_critical(memory) — relevance gate that determines whether a STM entry is substantive enough (contains at least one word ≥ 4 characters) to be promoted to long-term memory; designed to be overridden in subclasses for richer emotional / importance-based scoring.
   - Dream cycle STM → LTM promotion — _run_dream_cycle() now iterates conscious memory and copies every critical, relevant entry to long_term_memory (no duplicates). Existing integration and relevance-filtering  behavior is unchanged.
@@ -328,7 +328,7 @@ All notable changes to this project will be documented in this file. The format 
 - **`ObserverCore` / `FixyReport`** — legacy observer classes and the `fixy_check()` method
   are removed; Fixy now intervenes exclusively via `InteractiveFixy.should_intervene()`.
 - **Legacy scheduled Fixy path** — the `elif not self.interactive_fixy and turn % fixy_every_n_turns == 0`
-  block has been deleted from both `Entelgia_production_meta.py` and `entelgia_production_long.py`.
+  block has been deleted from both `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`.
 
 ### Changed
 - **`Config.energy_safety_threshold`** — was defined but silently ignored; now actively

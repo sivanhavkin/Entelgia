@@ -526,7 +526,7 @@ It is a structured architectural investigation into whether identity continuity 
 * Robust security features (HMAC-SHA256, PII redaction)
 * Developer-friendly tooling (automated installation, memory management)
 * Drive-aware cognition (dynamic temperature, superego critique, ego-driven memory depth)
-* Long-duration 200-turn dialogue mode (`entelgia_production_long.py`)
+* Long-duration 200-turn dialogue mode (`Entelgia_production_meta_200t.py`)
 
 Entelgia demonstrates that persistent identity and internal regulation can coexist with production-grade reliability.
 
@@ -615,9 +615,9 @@ After all validate/critique passes, `speak()` performs a final cleanup sweep:
 
 ---
 
-## 22. Long-Duration Dialogue (`entelgia_production_long.py`)
+## 22. Long-Duration Dialogue (`Entelgia_production_meta_200t.py`)
 
-The standard `Entelgia_production_meta.py` runner enforces a 30-minute session timeout, which can terminate a session before all configured turns complete. `entelgia_production_long.py` addresses this with a minimal subclass:
+The standard `Entelgia_production_meta.py` runner enforces a 30-minute session timeout, which can terminate a session before all configured turns complete. `Entelgia_production_meta_200t.py` addresses this with a minimal subclass:
 
 ```python
 class MainScriptLong(MainScript):
@@ -630,7 +630,7 @@ Key characteristics:
 - **Turn-count gate only** — `while turn_index < max_turns` replaces `while time < timeout`.
 - **`_NO_TIMEOUT_MINUTES = 9999`** sentinel passed to `Config.timeout_minutes`.
 - **Full inheritance** — memory, emotions, Fixy interventions, dream cycles, session persistence, and logging are all inherited unchanged from `MainScript`.
-- **Run via**: `python entelgia_production_long.py`
+- **Run via**: `python Entelgia_production_meta_200t.py`
 
 ---
 

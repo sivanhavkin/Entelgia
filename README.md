@@ -98,7 +98,7 @@ python examples/demo_enhanced_dialogue.py
 python Entelgia_production_meta.py
 
 # Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
-python entelgia_production_long.py
+python Entelgia_production_meta_200t.py
 ```
 
 > 💡 **Having issues?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) for common problems and solutions.
