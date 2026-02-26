@@ -213,6 +213,28 @@ python Entelgia_production_meta.py
 
 ---
 
+## 📦 Installation from GitHub
+
+For development or integration purposes:
+
+```bash
+# Install from GitHub (recommended)
+pip install git+https://github.com/sivanhavkin/Entelgia.git
+
+# Or clone and install in editable mode
+git clone https://github.com/sivanhavkin/Entelgia.git
+cd Entelgia
+pip install -e .
+```
+
+### 🔄 Upgrading
+
+```bash
+pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
+```
+
+---
+
 ## 🗑️ Memory Management
 
 Entelgia provides a utility to clear stored memories when needed. The `clear_memory.py` script allows you to delete:
@@ -255,28 +277,6 @@ What would you like to delete?
 - **Storage management** - Free up disk space
 
 **Note:** Deleting memories will remove all dialogue history and context. The system will start fresh on the next run.
-
----
-
-## 📦 Installation from GitHub
-
-For development or integration purposes:
-
-```bash
-# Install from GitHub (recommended)
-pip install git+https://github.com/sivanhavkin/Entelgia.git
-
-# Or clone and install in editable mode
-git clone https://github.com/sivanhavkin/Entelgia.git
-cd Entelgia
-pip install -e .
-```
-
-### 🔄 Upgrading
-
-```bash
-pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
-```
 
 ---
 
