@@ -35,12 +35,114 @@ All notable changes to this project will be documented in this file. The format 
 - **`entelgia/context_manager.py`** — `if __name__ == "__main__"` demo block added; prints enriched prompt and relevant memories when run directly (PR #117)
 
 - **`tests/test_dialogue_metrics.py`** 🧪 — 45 unit tests covering metrics correctness, edge cases, reproducibility, and inter-condition ordering guarantees (PR #111)
+  - `TestDialogueMetricsDemo` class added: pins exact demo output values as regression tests (PR #121)
+    - Exact metric values: Circularity Rate `0.022`, Progress Rate `0.889`, Intervention Utility `0.167`
+    - Validates the full 10-value per-turn circularity series
+    - Subprocess smoke-tests confirm script stdout output
+
+- **`tests/test_demo_dialogue.py`** 🎭 — Live dialogue demo test (PR #127)
+  - Canonical 10-turn Socrates / Athena / Fixy conversation on consciousness, free will, and identity
+  - `test_full_dialogue_demo()` validates circularity, progress, and intervention utility metrics
+  - Shows per-test metric summary with expected thresholds and ✓/✗ results (PR #138)
+
+- **`tests/conftest.py`** — pytest session hooks (PR #127)
+
+- **All test files** — `if __name__ == "__main__": pytest.main([__file__, "-v", "-s"])` entry point added for direct execution (PR #128)
+  - `test_behavioral_rules.py`, `test_drive_correlations.py`, `test_drive_pressure.py`, `test_energy_regulation.py`, `test_long_term_memory.py`, `test_memory_security.py`, `test_memory_signing_migration.py`
+
+- **All test files** — Unique per-test ASCII tables and bar charts (PR #139)
+  - `_print_table(headers, rows, title)` — auto-sized bordered ASCII table per test
+  - `_print_bar_chart(data_pairs, title)` — horizontal `█`-bar chart per test
+  - Every test prints its own specific computed data (inputs, outputs, thresholds, pass/fail) with `-s`
+
+- **Fluid drive dynamics** — `Config.drive_mean_reversion_rate` and `Config.drive_oscillation_range` (PR #102)
+  - `drive_mean_reversion_rate: float = 0.04` — pulls Id/Superego back toward 5.0 each turn
+  - `drive_oscillation_range: float = 0.15` — max random nudge applied to Id/Superego each turn
+  - Prevents monotonic drift to extremes; `Agent.update_drives_after_turn` fluidity block applied after ego-erosion step
+
+- **`DrivePressure`** 📈 — Per-agent urgency/tension scalar 0.0–10.0 (PR #107)
+  - `compute_drive_pressure()` — weighted formula: conflict (45%) + unresolved questions (25%) + stagnation (20%) + energy depletion (10%) with α=0.35 smoothing
+  - `_topic_signature(text)` — MD5-based stagnation detection
+  - `_trim_to_word_limit(text, max_words)` — trims to last sentence boundary within limit
+  - `_is_question_resolved(text)` — detects A)/B)/yes/no resolution patterns
+  - `Agent` fields: `drive_pressure=2.0`, `open_questions`, `_topic_history`, `_same_topic_turns`
+  - `speak()` injects directives at pressure ≥6.5 (concise) and ≥8.0 (decisive); word caps 120/80
+  - `print_meta_state()` prints `Pressure:` line after Energy/Conflict
+  - **`tests/test_drive_pressure.py`** 🧪 — 4 acceptance test classes (pressure rise, word caps, decay, determinism)
+
+- **Forbidden opener phrases** — Agents no longer open with `"Recent thought"`, `"A recent thought"`, or `"I ponder"` (PR #104)
+  - Extended `LLM_FORBIDDEN_PHRASES_INSTRUCTION` in both `context_manager.py` and `Entelgia_production_meta.py`
+  - `FORBIDDEN_STARTERS` runtime list with post-processing strip in `speak()`
+  - Cross-agent opener deduplication: injects `FORBIDDEN OPENER` for last other-agent's opening sentence
+
+- **`entelgia_production_long.py`** — CLI mode dispatch aligned with `Entelgia_production_meta.py` (PR #105)
+  - `main()` entry point with `test` / `api` / `help` / default (`run_cli_long()`) modes
+  - Module docstring updated to document all run modes
+
+- **`scripts/validate_project.py`** v3.0 — `MarkdownConsistencyChecker` added (PR #106)
+  - `check_classes_in_markdown()`, `check_config_attrs_in_markdown()`, `check_module_files_in_markdown()`, `check_stale_md_references()` via AST introspection
+  - Validates all public classes, all `Config` fields, all `entelgia/*.py` modules, and stale symbol references
+  - Overall project score improved: 88.3% → 90.8%
+
+- **`scripts/validate_implementations.py`** 🔍 — Data-driven code vs. documentation cross-checker (PR #109)
+  - `MarkdownExtractor` — scans README, ARCHITECTURE, SPEC, whitepaper; extracts backtick symbols and `.py` references
+  - `CodeInspector` — AST-parses all Python sources; extracts classes, `Config` fields, module filenames, public functions
+  - `ImplementationComparator` — reports discrepancies in both directions across 4 categories
+  - Usage: `python scripts/validate_implementations.py`; exits `0` on full sync, `1` on discrepancies
+
+- **`scripts/run_all_tests.py`** 🏃 — Single script to discover and run the full test suite (PR #123)
+  - Delegates to `pytest` as a subprocess; extra arguments forwarded verbatim
+  - Auto-installs `requirements.txt` and `.[dev]` extras before running (PR #124)
+  - Detects and replaces incompatible `pyreadline` with `pyreadline3` on Windows (PR #125)
+
+- **`scripts/research_statistics.py`** 📊 — Comprehensive measurable-factors table across all 4 ablation conditions (PR #136)
+  - Reports 16 statistics: core dialogue metrics, dialogue characteristics (vocab diversity, TTR, etc.), energy-system metrics (avg energy, dream cycles, LTM size)
+  - Usage: `python scripts/research_statistics.py`
+
+- **`research.md`** 📄 — Reformatted as a proper structured scientific paper (PR #132)
+  - Standard repo logo/title header; article metadata (Author, Affiliation, Date, Status, Keywords)
+  - `##`/`###` headings; aligned markdown tables; Discussion as numbered subsections
+  - Figures moved into corresponding subsections; References section with internal doc links
+  - `README.md`: Added `🔬 Research Paper (research.md)` entry to Documentation section
+  - `xychart-beta` Mermaid charts with vivid color palette for Figures 1–5 (PR #133, #134)
+  - Expanded abstract (3 paragraphs), in-text numeric citations, and 12-entry peer-reviewed bibliography (PR #135)
 
 ### Fixed
 
 - `tests/test_dialogue_metrics.py` produced no output when executed directly from the command line; added `if __name__ == "__main__": pytest.main([__file__, "-v"])` guard (PR #112)
 - `entelgia/ablation_study.py` raised `ModuleNotFoundError` when imported as `entelgia.ablation_study`; `dialogue_metrics` was missing the `.py` extension (PR #113)
 - `entelgia/ablation_study.py` raised `ImportError: attempted relative import with no known parent package` when executed directly; added try/except import fallback (relative imports first, then absolute via `sys.path`) and a `__main__` entry point (PR #115)
+
+- **Agents echoing Superego voice** — Superego identity bleed fixed in three layers (PR #98)
+  - `entelgia/enhanced_personas.py`: `format_persona_for_prompt` now uses `Current mode (as {name}):` to anchor agent identity
+  - `entelgia/context_manager.py`: Drive label renamed `superego=` → `s_ego=` → `val=` to prevent LLM persona-switch
+  - `Entelgia_production_meta.py` `speak()`: Safety-net `re.sub` strips `Superego:` / `Super-ego:` / `s_ego:` prefixes
+
+- **Superego persona bleed and repeated first sentence** — PR #98 regression fixes (PR #101)
+  - `val=` drive label (further renamed from `s_ego=`); identity-lock instruction added to both prompt paths: `"IMPORTANT: You are {agent_name}. Never adopt a different identity..."`
+  - `_first_sentence()` helper; `FORBIDDEN OPENER` injection prevents agent from repeating its own or other agent's opening sentences
+
+- **Fixy agent silently disabled when package installed** — `pyproject.toml` was missing `packages = ["entelgia"]`, causing `InteractiveFixy` import to fail silently (PR #103)
+
+- **`python-dotenv` hard crash converted to soft warning** — `Entelgia_production_meta.py` no longer raises `ImportError` at module level when dotenv is absent; emits `warnings.warn()` instead, allowing all 217 tests to collect and run without the package (PR #129)
+
+- **pytest INTERNALERROR on test collection** — `sys.exit(1)` in `Entelgia_production_meta.py` replaced with `raise ImportError(...)` (PR #126); `--continue-on-collection-errors` added to `pyproject.toml` addopts so 188+ tests still run when 2 files have missing-dependency errors
+
+- **pytest crash on Windows Python 3.10+** — `pyreadline` (unmaintained, uses removed `collections.Callable`) replaced with `pyreadline3` (maintained fork); `requirements.txt` and `pyproject.toml` updated with `pyreadline3>=3.4.1; sys_platform == "win32"` (PR #125)
+
+- **Noisy demo dialogue in test output** — `conftest.py` `pytest_terminal_summary` hook removed; `test_demo_dialogue.py` replaced `capsys.disabled()` full transcript with targeted per-test metric result printing (PR #138)
+
+### Changed
+
+- **`entelgia/context_manager.py`** and **`README.md`** — Docs corrected for accuracy (PR #106)
+  - `config.max_output_words` removed (it is a module-level constant, not a `Config` field)
+  - `llm_timeout` default corrected: `60` → `300` s
+  - `memory_security.py` and undocumented `Config` fields added to README
+  - `ARCHITECTURE.md`: class names added to Core Components; Session & API table added
+  - `SPEC.md`: 5 missing output-path fields and new drive-fluidity fields added
+
+- **Black formatting** applied across Python codebase (PR #100, #108, #110, #122, #137)
+  - `Entelgia_production_meta.py`, `entelgia/context_manager.py`, `tests/test_drive_correlations.py`, `tests/test_drive_pressure.py`, `entelgia/__init__.py`, `entelgia/ablation_study.py`, `entelgia/dialogue_metrics.py`, `scripts/validate_implementations.py`, `scripts/research_statistics.py`
 
 ---
 
