@@ -30,7 +30,6 @@ from Entelgia_production_meta import (
     evaluate_superego_critique,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -71,9 +70,9 @@ class TestEgoDominantScenario:
             superego_strength=8.8,
             conflict=7.3,
         )
-        assert dec.should_apply is False, (
-            f"Expected critique NOT applied when Ego is dominant, got reason={dec.reason}"
-        )
+        assert (
+            dec.should_apply is False
+        ), f"Expected critique NOT applied when Ego is dominant, got reason={dec.reason}"
 
     def test_reason_mentions_ego_dominant(self):
         dec = _decision(
@@ -82,9 +81,9 @@ class TestEgoDominantScenario:
             superego_strength=8.8,
             conflict=7.3,
         )
-        assert "Ego" in dec.reason, (
-            f"Expected reason to identify Ego as dominant drive, got: {dec.reason}"
-        )
+        assert (
+            "Ego" in dec.reason
+        ), f"Expected reason to identify Ego as dominant drive, got: {dec.reason}"
 
 
 # ---------------------------------------------------------------------------
@@ -102,9 +101,9 @@ class TestPositiveCritique:
             superego_strength=9.4,
             conflict=6.0,
         )
-        assert dec.should_apply is True, (
-            f"Expected critique applied when SuperEgo is dominant, got reason={dec.reason}"
-        )
+        assert (
+            dec.should_apply is True
+        ), f"Expected critique applied when SuperEgo is dominant, got reason={dec.reason}"
 
     def test_reason_is_superego_dominant(self):
         dec = _decision(
@@ -128,7 +127,7 @@ class TestDominanceMargin:
         "margin,expected_apply",
         [
             (0.5, False),  # gap 0.3 < margin 0.5 → skip
-            (0.2, True),   # gap 0.3 >= margin 0.2 → apply
+            (0.2, True),  # gap 0.3 >= margin 0.2 → apply
         ],
     )
     def test_margin_boundary(self, margin: float, expected_apply: bool):
@@ -153,9 +152,9 @@ class TestDominanceMargin:
             conflict=6.0,
             dominance_margin=0.5,
         )
-        assert dec.should_apply is True, (
-            f"Gap equal to margin should trigger critique, got reason={dec.reason}"
-        )
+        assert (
+            dec.should_apply is True
+        ), f"Gap equal to margin should trigger critique, got reason={dec.reason}"
 
 
 # ---------------------------------------------------------------------------
@@ -184,9 +183,9 @@ class TestConflictMin:
             conflict=1.0,
             conflict_min=2.0,
         )
-        assert "conflict" in dec.reason.lower(), (
-            f"Expected reason to mention conflict, got: {dec.reason}"
-        )
+        assert (
+            "conflict" in dec.reason.lower()
+        ), f"Expected reason to mention conflict, got: {dec.reason}"
 
     def test_conflict_at_minimum_applies(self):
         """Conflict exactly at conflict_min → critique fires."""
@@ -197,9 +196,9 @@ class TestConflictMin:
             conflict=2.0,
             conflict_min=2.0,
         )
-        assert dec.should_apply is True, (
-            f"Conflict at minimum should trigger critique, got reason={dec.reason}"
-        )
+        assert (
+            dec.should_apply is True
+        ), f"Conflict at minimum should trigger critique, got reason={dec.reason}"
 
 
 # ---------------------------------------------------------------------------
@@ -333,9 +332,9 @@ class TestAgentSpeakCritiqueStateReset:
             "Expected _last_superego_rewrite=False when Ego is dominant; "
             "stale True value from previous turn must not persist."
         )
-        assert agent._last_critique_reason != "superego_dominant", (
-            "_last_critique_reason must reflect the current turn, not the previous one."
-        )
+        assert (
+            agent._last_critique_reason != "superego_dominant"
+        ), "_last_critique_reason must reflect the current turn, not the previous one."
 
     def test_critique_reason_reflects_current_turn(self):
         """After speak() with Ego-dominant drives, reason must not be superego_dominant."""
@@ -348,9 +347,9 @@ class TestAgentSpeakCritiqueStateReset:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("What is justice?", [])
 
-        assert agent._last_critique_reason != "superego_dominant", (
-            "_last_critique_reason must reflect the current turn, not the previous one."
-        )
+        assert (
+            agent._last_critique_reason != "superego_dominant"
+        ), "_last_critique_reason must reflect the current turn, not the previous one."
 
     def test_critique_applied_when_superego_dominant(self):
         """When SuperEgo dominates, critique should be applied after speak()."""
@@ -363,9 +362,9 @@ class TestAgentSpeakCritiqueStateReset:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("What is justice?", [])
 
-        assert agent._last_superego_rewrite is True, (
-            "Expected _last_superego_rewrite=True when SuperEgo is dominant."
-        )
+        assert (
+            agent._last_superego_rewrite is True
+        ), "Expected _last_superego_rewrite=True when SuperEgo is dominant."
         assert agent._last_critique_reason == "superego_dominant"
 
     def test_fields_reset_at_start_regardless_of_prior_state(self):
