@@ -201,8 +201,28 @@ class TestDominanceMargin:
             dominance_margin=margin,
         )
         _print_table(
-            ["id", "ego", "superego", "conflict", "margin", "should_apply", "reason", "expected"],
-            [["1.0", "8.7", "9.0", "6.0", str(margin), str(dec.should_apply), dec.reason, str(expected_apply)]],
+            [
+                "id",
+                "ego",
+                "superego",
+                "conflict",
+                "margin",
+                "should_apply",
+                "reason",
+                "expected",
+            ],
+            [
+                [
+                    "1.0",
+                    "8.7",
+                    "9.0",
+                    "6.0",
+                    str(margin),
+                    str(dec.should_apply),
+                    dec.reason,
+                    str(expected_apply),
+                ]
+            ],
             title="test_margin_boundary",
         )
         assert dec.should_apply is expected_apply, (
@@ -220,8 +240,30 @@ class TestDominanceMargin:
             dominance_margin=0.5,
         )
         _print_table(
-            ["id", "ego", "superego", "conflict", "margin", "gap", "should_apply", "reason", "expected"],
-            [["1.0", "8.5", "9.0", "6.0", "0.5", "0.5", str(dec.should_apply), dec.reason, "True"]],
+            [
+                "id",
+                "ego",
+                "superego",
+                "conflict",
+                "margin",
+                "gap",
+                "should_apply",
+                "reason",
+                "expected",
+            ],
+            [
+                [
+                    "1.0",
+                    "8.5",
+                    "9.0",
+                    "6.0",
+                    "0.5",
+                    "0.5",
+                    str(dec.should_apply),
+                    dec.reason,
+                    "True",
+                ]
+            ],
             title="test_exact_margin_boundary_applies",
         )
         assert (
@@ -246,8 +288,28 @@ class TestConflictMin:
             conflict_min=2.0,
         )
         _print_table(
-            ["id", "ego", "superego", "conflict", "conflict_min", "should_apply", "reason", "expected"],
-            [["1.0", "5.0", "9.0", "1.0", "2.0", str(dec.should_apply), dec.reason, "False"]],
+            [
+                "id",
+                "ego",
+                "superego",
+                "conflict",
+                "conflict_min",
+                "should_apply",
+                "reason",
+                "expected",
+            ],
+            [
+                [
+                    "1.0",
+                    "5.0",
+                    "9.0",
+                    "1.0",
+                    "2.0",
+                    str(dec.should_apply),
+                    dec.reason,
+                    "False",
+                ]
+            ],
             title="test_low_conflict_skips_critique",
         )
         assert dec.should_apply is False
@@ -261,8 +323,26 @@ class TestConflictMin:
             conflict_min=2.0,
         )
         _print_table(
-            ["id", "ego", "superego", "conflict", "conflict_min", "reason", "contains_conflict?"],
-            [["1.0", "5.0", "9.0", "1.0", "2.0", dec.reason, str("conflict" in dec.reason.lower())]],
+            [
+                "id",
+                "ego",
+                "superego",
+                "conflict",
+                "conflict_min",
+                "reason",
+                "contains_conflict?",
+            ],
+            [
+                [
+                    "1.0",
+                    "5.0",
+                    "9.0",
+                    "1.0",
+                    "2.0",
+                    dec.reason,
+                    str("conflict" in dec.reason.lower()),
+                ]
+            ],
             title="test_low_conflict_reason_contains_conflict",
         )
         assert (
@@ -279,8 +359,28 @@ class TestConflictMin:
             conflict_min=2.0,
         )
         _print_table(
-            ["id", "ego", "superego", "conflict", "conflict_min", "should_apply", "reason", "expected"],
-            [["1.0", "5.0", "9.0", "2.0", "2.0", str(dec.should_apply), dec.reason, "True"]],
+            [
+                "id",
+                "ego",
+                "superego",
+                "conflict",
+                "conflict_min",
+                "should_apply",
+                "reason",
+                "expected",
+            ],
+            [
+                [
+                    "1.0",
+                    "5.0",
+                    "9.0",
+                    "2.0",
+                    "2.0",
+                    str(dec.should_apply),
+                    dec.reason,
+                    "True",
+                ]
+            ],
             title="test_conflict_at_minimum_applies",
         )
         assert (
@@ -305,8 +405,28 @@ class TestCritiqueDisabled:
             enabled=False,
         )
         _print_table(
-            ["id", "ego", "superego", "conflict", "enabled", "should_apply", "reason", "expected"],
-            [["1.0", "5.0", "9.0", "8.0", "False", str(dec.should_apply), dec.reason, "False"]],
+            [
+                "id",
+                "ego",
+                "superego",
+                "conflict",
+                "enabled",
+                "should_apply",
+                "reason",
+                "expected",
+            ],
+            [
+                [
+                    "1.0",
+                    "5.0",
+                    "9.0",
+                    "8.0",
+                    "False",
+                    str(dec.should_apply),
+                    dec.reason,
+                    "False",
+                ]
+            ],
             title="test_disabled_skips_even_when_superego_dominant",
         )
         assert dec.should_apply is False
@@ -497,7 +617,12 @@ class TestAgentSpeakCritiqueStateReset:
             agent.speak("What is justice?", [])
 
         _print_table(
-            ["_last_superego_rewrite", "expected", "_last_critique_reason", "expected_reason"],
+            [
+                "_last_superego_rewrite",
+                "expected",
+                "_last_critique_reason",
+                "expected_reason",
+            ],
             [
                 [
                     str(agent._last_superego_rewrite),
@@ -529,7 +654,12 @@ class TestAgentSpeakCritiqueStateReset:
             agent.speak("Explain virtue.", [])
 
         _print_table(
-            ["stale_rewrite_before", "_last_superego_rewrite", "_last_critique_reason", "is_stale_reason?"],
+            [
+                "stale_rewrite_before",
+                "_last_superego_rewrite",
+                "_last_critique_reason",
+                "is_stale_reason?",
+            ],
             [
                 [
                     "True",
