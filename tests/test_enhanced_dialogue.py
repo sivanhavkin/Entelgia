@@ -126,10 +126,9 @@ def test_dynamic_speaker_selection():
         [("Socrates", float(socrates_count)), ("Athena", float(athena_count))],
         title="Speaker distribution (20 turns)",
     )
-    if max_consecutive >= 3:
-        return False
-    else:
-        return True
+    assert max_consecutive < 3, (
+        f"Expected no agent to speak 3+ consecutive turns, got max_consecutive={max_consecutive}"
+    )
 
 
 def test_seed_variety():
@@ -196,10 +195,9 @@ def test_seed_variety():
         [("found", float(len(strategies_found))), ("threshold", 4.0)],
         title="Strategies found vs threshold",
     )
-    if len(strategies_found) >= 4:
-        return True
-    else:
-        return False
+    assert len(strategies_found) >= 4, (
+        f"Expected at least 4 distinct strategies, found {len(strategies_found)}: {strategies_found}"
+    )
 
 
 def test_context_enrichment():
@@ -272,13 +270,13 @@ def test_context_enrichment():
         and "150 words" in prompt_with_pronoun,
     }
 
-    all_passed = all(checks.values())
     _print_table(
         ["check_name", "pass?"],
         [[name, "✓" if ok else "✗"] for name, ok in checks.items()],
         title="test_context_enrichment",
     )
-    return all_passed
+    failed_checks = [name for name, ok in checks.items() if not ok]
+    assert not failed_checks, f"Failed context enrichment checks: {failed_checks}"
 
 
 def test_fixy_interventions():
@@ -344,8 +342,16 @@ def test_fixy_interventions():
         title="test_fixy_interventions",
     )
 
-    all_passed = early_pass and repetitive_pass and normal_pass
-    return all_passed
+    assert early_pass, (
+        f"Early turns (turn 2): Fixy should NOT intervene, got should_intervene={should1}, reason={reason1}"
+    )
+    assert repetitive_pass, (
+        f"Repetitive dialogue (turn 5): Fixy SHOULD intervene with reason='circular_reasoning', "
+        f"got should_intervene={should2}, reason={reason2}"
+    )
+    assert normal_pass, (
+        f"Normal dialogue (turn 4): Fixy should NOT intervene, got should_intervene={should3}, reason={reason3}"
+    )
 
 
 def test_persona_formatting():
@@ -369,7 +375,6 @@ def test_persona_formatting():
     # Test formatting with drives
     drives = {"id_strength": 7.0, "ego_strength": 5.0, "superego_strength": 4.0}
     formatted = format_persona_for_prompt(socrates, drives)
-    all_passed = all(checks.values()) and len(formatted) > 100
     _print_table(
         ["check_name", "pass?"],
         [[name, "✓" if ok else "✗"] for name, ok in checks.items()]
@@ -377,7 +382,9 @@ def test_persona_formatting():
         title="test_persona_formatting",
     )
     print(f"\n  Formatted Socrates persona (snippet):\n  {formatted[:200]}...")
-    return all_passed
+    failed_checks = [name for name, ok in checks.items() if not ok]
+    assert not failed_checks, f"Failed persona formatting checks: {failed_checks}"
+    assert len(formatted) > 100, f"Expected formatted persona length > 100, got {len(formatted)}"
 
 
 def test_persona_pronouns():
@@ -391,7 +398,6 @@ def test_persona_pronouns():
         "Fixy has 'he' pronoun": FIXY_PERSONA.get("pronoun") == "he",
     }
 
-    all_passed = all(checks.values())
     _print_table(
         ["agent", "pronoun", "expected", "match?"],
         [
@@ -416,50 +422,11 @@ def test_persona_pronouns():
         ],
         title="test_persona_pronouns",
     )
-    return all_passed
-
-
-def main():
-    """Run all tests."""
-    print("=" * 70)
-    print("ENHANCED DIALOGUE FEATURES TEST SUITE")
-    print("=" * 70)
-
-    tests = [
-        test_dynamic_speaker_selection,
-        test_seed_variety,
-        test_context_enrichment,
-        test_fixy_interventions,
-        test_persona_formatting,
-        test_persona_pronouns,
-    ]
-
-    results = []
-    for test in tests:
-        try:
-            result = test()
-            results.append(result)
-        except Exception as e:
-            print(f"\nTEST FAILED WITH EXCEPTION: {e}")
-            import traceback
-
-            traceback.print_exc()
-            results.append(False)
-
-    print("\n" + "=" * 70)
-    print("SUMMARY")
-    print("=" * 70)
-    passed = sum(results)
-    total = len(results)
-    print(f"Tests passed: {passed}/{total}")
-
-    if all(results):
-        print("\nALL TESTS PASSED!")
-        return 0
-    else:
-        print("\nSOME TESTS FAILED")
-        return 1
+    failed_checks = [name for name, ok in checks.items() if not ok]
+    assert not failed_checks, f"Failed pronoun checks: {failed_checks}"
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    import pytest
+
+    pytest.main([__file__, "-v", "-s"])
