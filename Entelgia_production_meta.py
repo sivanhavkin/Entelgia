@@ -330,6 +330,9 @@ class Config:
         0.15  # max random nudge applied to id/superego each turn
     )
     self_replicate_every_n_turns: int = 10
+    superego_critique_enabled: bool = True
+    superego_dominance_margin: float = 0.5
+    superego_critique_conflict_min: float = 2.0
 
     def __post_init__(self):
         """Validate configuration."""
@@ -350,6 +353,59 @@ class Config:
 
 # Global CFG instance
 CFG: Config = None  # type: ignore
+
+
+@dataclass
+class CritiqueDecision:
+    """Decision record for the SuperEgo critique pipeline."""
+
+    should_apply: bool
+    reason: str
+    critic: str = "superego"
+
+
+def evaluate_superego_critique(
+    id_strength: float,
+    ego_strength: float,
+    superego_strength: float,
+    conflict: float,
+    enabled: bool = True,
+    dominance_margin: float = 0.5,
+    conflict_min: float = 2.0,
+) -> CritiqueDecision:
+    """Decide whether to apply the SuperEgo critique pass this turn.
+
+    Replaces the old absolute-threshold trigger (``sup >= 7.5``) with a
+    relative-dominance check so the critique fires only when SuperEgo is
+    actually the dominant drive by at least *dominance_margin* over both
+    Id and Ego.
+    """
+    if not enabled:
+        return CritiqueDecision(should_apply=False, reason="disabled")
+
+    is_dominant = (
+        superego_strength >= ego_strength + dominance_margin
+        and superego_strength >= id_strength + dominance_margin
+    )
+    if not is_dominant:
+        dominant = max(
+            ("Id", id_strength),
+            ("Ego", ego_strength),
+            ("SuperEgo", superego_strength),
+            key=lambda x: x[1],
+        )
+        return CritiqueDecision(
+            should_apply=False,
+            reason=f"dominant_drive={dominant[0]}",
+        )
+
+    if conflict < conflict_min:
+        return CritiqueDecision(
+            should_apply=False,
+            reason=f"conflict={conflict:.1f}<{conflict_min:.1f}",
+        )
+
+    return CritiqueDecision(should_apply=True, reason="superego_dominant")
 
 
 # ============================================
@@ -1376,6 +1432,7 @@ class Agent:
         conscious: ConsciousCore,
         persona: str,
         use_enhanced: bool = True,
+        cfg: Optional["Config"] = None,
     ):
         self.name = name
         self.model = model
@@ -1387,6 +1444,7 @@ class Agent:
         self.language = language
         self.conscious = conscious
         self.use_enhanced = use_enhanced and ENTELGIA_ENHANCED
+        self.cfg = cfg
 
         # Set persona - either rich dict or simple string
         if self.use_enhanced:
@@ -1416,6 +1474,7 @@ class Agent:
         self._last_response_kind: str = "reflective"
         self._last_temperature: float = 0.6
         self._last_superego_rewrite: bool = False
+        self._last_critique_reason: str = ""
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
@@ -1734,7 +1793,18 @@ class Agent:
         original_out = out  # preserve the agent's original response before any rewrite
 
         # Superego → second-pass critique (internal governor)
-        self._last_superego_rewrite = sup >= 7.5
+        _cfg = self.cfg
+        _critique = evaluate_superego_critique(
+            id_strength=ide,
+            ego_strength=ego,
+            superego_strength=sup,
+            conflict=self.conflict_index(),
+            enabled=getattr(_cfg, "superego_critique_enabled", True),
+            dominance_margin=getattr(_cfg, "superego_dominance_margin", 0.5),
+            conflict_min=getattr(_cfg, "superego_critique_conflict_min", 2.0),
+        )
+        self._last_superego_rewrite = _critique.should_apply
+        self._last_critique_reason = _critique.reason
         if self._last_superego_rewrite:
             critique_prompt = (
                 "Rewrite the following response to be more principled, "
@@ -2564,6 +2634,7 @@ class MainScript:
             language=self.language,
             conscious=self.conscious,
             persona="I am Socratic, curious, and probing. I seek clarity and truth.",
+            cfg=cfg,
         )
         self.athena = Agent(
             name="Athena",
@@ -2576,6 +2647,7 @@ class MainScript:
             language=self.language,
             conscious=self.conscious,
             persona="I am strategic, integrative, and creative. I build frameworks and synthesis.",
+            cfg=cfg,
         )
 
         # Language tracking removed for gender-neutral output
@@ -2597,6 +2669,7 @@ class MainScript:
             language=self.language,
             conscious=self.conscious,
             persona="I am an observer and fixer. I am brief, concrete, and point out contradictions.",
+            cfg=cfg,
         )
 
         # Initialize enhanced dialogue components if available
@@ -2677,11 +2750,14 @@ class MainScript:
             + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
             + reset
         )
-        rewrite_tag = (
-            "  [SuperEgo critique applied; original shown in dialogue]"
-            if agent._last_superego_rewrite
-            else ""
-        )
+        if agent._last_superego_rewrite:
+            rewrite_tag = "  [SuperEgo critique applied; original shown in dialogue]"
+        elif getattr(agent, "_last_critique_reason", ""):
+            rewrite_tag = (
+                f"  [SuperEgo critique skipped: reason={agent._last_critique_reason}]"
+            )
+        else:
+            rewrite_tag = ""
         print(
             dim
             + f"  Tone: temp={temp:.2f} → {tone_label}"
