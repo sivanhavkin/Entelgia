@@ -214,56 +214,55 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * Short-term memory (JSON)
   * Long-term memory (SQLite)
   * 🔐 HMAC-SHA256 cryptographic integrity protection
-* **🆕 Enhanced Dialogue Engine** (v2.2.0+)
-  * **Dynamic speaker selection** - Intelligent turn-taking (no 3+ consecutive turns)
-  * **Varied seed generation** - 6+ strategy types (analogy, disagree, reflect, etc.)
-  * **Rich context enrichment** - Full dialogue history + thoughts + memories
-  * **Smart Fixy interventions** - Need-based (not scheduled) meta-cognitive monitoring
-  * **Enhanced personas** - Deep character traits and speech patterns
-  * **🐛 Dialogue bug fixes** (v2.5.0):
-    * **Third body calling to first body** — after Fixy (3rd agent) intervened, the turn was incorrectly assigned back to Socrates (1st agent); fixed by tracking the last non-Fixy speaker
-    * **Double turn** (agent answering twice in one turn) — duplicate Fixy response per turn caused by legacy scheduled check firing alongside `InteractiveFixy`; fully resolved in PR #87 by removing the legacy scheduled path entirely
-    * **Pronoun issue** — LLM echoed its own prompt header (e.g. `"Socrates (he):"`) into the response; now stripped automatically when `show_pronoun=False`
-* **⚡ Energy-Based Regulation** (v2.5.0)
-  * **FixyRegulator** — Meta-level energy supervisor with configurable safety threshold
-  * **Dream cycle consolidation** — automatic recharge when energy falls below threshold; critical STM entries are promoted to long-term memory
-  * **Hallucination-risk detection** — stochastic check when energy is below 60 %
-* **🧠 Personal Long-Term Memory System** (v2.5.0)
-  * **DefenseMechanism** — classifies memories as repressed or suppressed on write
-  * **FreudianSlip** — probabilistically surfaces defended memory fragments
-  * **SelfReplication** — promotes recurring-pattern memories to consciousness
-* **🎛️ Drive-Aware Cognition** (v2.5.0)
-  * **Dynamic LLM temperature** — derived from id/ego/superego drive balance
-  * **Superego second-pass critique** — response is internally rewritten by a principled governor when `superego_strength ≥ 7.5`; the rewrite is used only for emotion/drive state updates — the **agent's original voice is always displayed in dialogue** (PR #95)
-  * **Ego-driven memory depth** — long-term and short-term retrieval limits scale with ego/self-awareness
-  * **Output artifact cleanup** — strips echoed name/pronoun headers, gender tags, scoring markers
-  * **Coherent drive correlations** (PR #92) — conflict now directly erodes ego capacity, raises LLM temperature, and scales energy drain
-* **🗣️ Output Quality Rules** (v2.5.0, PR #96)
-  * **Forbidden meta-commentary phrases** — `validate_output()` removes any sentence containing `"In our dialogue"`, `"We learn"`, or `"Our conversations reveal"`; the same instruction is injected into LLM prompts to prevent generation up-front
-  * **Dissent marker capped to exactly one sentence** — Athena's behavioral rule now requires *exactly* one dissent opener (e.g. `"However,"`, `"Yet,"`) rather than *at least* one
-  * **Hard word truncation removed** — the post-processing 150-word cut is removed; response length is governed solely by the LLM prompt instruction, preventing mid-sentence clips
-* **📊 Dialogue Quality Metrics** (v2.6.0, PR #111)
-  * **`circularity_rate`** — fraction of turn-pairs with high topic-signature similarity; measures dialogue looping
-  * **`progress_rate`** — forward steps per turn: topic shifts + synthesis markers + open-question resolutions
-  * **`intervention_utility`** — mean circularity reduction in the post-Fixy window vs. pre-Fixy window
-  * **`compute_all_metrics()`** — runs all three metrics in one call
-* **🔬 Ablation Study** (v2.6.0, PR #111)
-  * **4-condition reproducible study**: `BASELINE`, `DIALOGUE_ENGINE`, `FIXY`, `DREAM`
+* **Enhanced Dialogue Engine**
+  * Dynamic speaker selection — intelligent turn-taking (no 3+ consecutive turns)
+  * Varied seed generation — 6+ strategy types (analogy, disagree, reflect, etc.)
+  * Rich context enrichment — full dialogue history + thoughts + memories
+  * Smart Fixy interventions — need-based meta-cognitive monitoring
+  * Enhanced personas — deep character traits and speech patterns
+  * 🐛 Dialogue bug fixes:
+    * **Third body calling to first body** — fixed by tracking the last non-Fixy speaker
+    * **Double turn** — duplicate Fixy response resolved by removing the legacy scheduled path
+    * **Pronoun issue** — LLM-echoed prompt headers now stripped automatically when `show_pronoun=False`
+* **⚡ Energy-Based Regulation**
+  * FixyRegulator — meta-level energy supervisor with configurable safety threshold
+  * Dream cycle consolidation — automatic recharge when energy falls below threshold; critical STM entries promoted to long-term memory
+  * Hallucination-risk detection — stochastic check when energy is below 60 %
+* **🧠 Personal Long-Term Memory System**
+  * DefenseMechanism — classifies memories as repressed or suppressed on write
+  * FreudianSlip — probabilistically surfaces defended memory fragments
+  * SelfReplication — promotes recurring-pattern memories to consciousness
+* **🎛️ Drive-Aware Cognition**
+  * Dynamic LLM temperature — derived from id/ego/superego drive balance
+  * Superego second-pass critique — response internally rewritten by a principled governor when `superego_strength ≥ 7.5`; the agent's original voice is always displayed in dialogue
+  * Ego-driven memory depth — retrieval limits scale with ego/self-awareness
+  * Output artifact cleanup — strips echoed name/pronoun headers, gender tags, scoring markers
+  * Coherent drive correlations — conflict directly erodes ego capacity, raises LLM temperature, and scales energy drain
+* **🗣️ Output Quality Rules**
+  * Forbidden meta-commentary phrases — `validate_output()` removes sentences containing `"In our dialogue"`, `"We learn"`, or `"Our conversations reveal"`
+  * Dissent marker capped to exactly one sentence — Athena's behavioral rule requires *exactly* one dissent opener (e.g. `"However,"`, `"Yet,"`)
+  * Hard word truncation removed — response length governed solely by the LLM prompt instruction
+* **📊 Dialogue Quality Metrics** (v2.6.0)
+  * `circularity_rate` — fraction of turn-pairs with high topic-signature similarity; measures dialogue looping
+  * `progress_rate` — forward steps per turn: topic shifts + synthesis markers + open-question resolutions
+  * `intervention_utility` — mean circularity reduction in the post-Fixy window vs. pre-Fixy window
+  * `compute_all_metrics()` — runs all three metrics in one call
+* **🔬 Ablation Study** (v2.6.0)
+  * 4-condition reproducible study: `BASELINE`, `DIALOGUE_ENGINE`, `FIXY`, `DREAM`
   * `run_ablation(turns, seed)` — fully reproducible across conditions; `print_results_table()` — formatted output
-* **🔥 Drive Pressure** (v2.6.0, PR #107)
+* **🔥 Drive Pressure** (v2.6.0)
   * Per-agent urgency/tension scalar `0.0–10.0` injecting conciseness directives at pressure ≥ 6.5 and decisive prompts at ≥ 8.0
-  * Fluid drive dynamics: mean reversion and oscillation prevent monotonic drift (PR #102)
-* **🚫 Forbidden Opener Phrases** (v2.6.0, PR #104)
+  * Fluid drive dynamics: mean reversion and oscillation prevent monotonic drift
+* **🚫 Forbidden Opener Phrases** (v2.6.0)
   * Agents no longer open with `"Recent thought"`, `"A recent thought"`, or `"I ponder"`
   * Cross-agent opener deduplication prevents repeated opening sentences
-* **Psychological drive modeling**
-  * Id / Ego / Superego dynamics
+* **Psychological drive modeling** — id / ego / superego dynamics
 * **Emotion tracking & importance scoring**
 * **Dream cycles & memory promotion**
 * **Observer-based meta-cognition**
 * **Memory poisoning protection**
 * **PII redaction & privacy safeguards**
-* **Resilient error handling (exponential backoff)**
+* **Resilient error handling** (exponential backoff)
 * **Structured logging**
 
 ---
