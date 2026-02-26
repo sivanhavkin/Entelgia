@@ -213,6 +213,51 @@ python Entelgia_production_meta.py
 
 ---
 
+## 🗑️ Memory Management
+
+Entelgia provides a utility to clear stored memories when needed. The `clear_memory.py` script allows you to delete:
+
+- **Short-term memory** (JSON files in `entelgia_data/stm_*.json`)
+- **Long-term memory** (SQLite database in `entelgia_data/entelgia_memory.sqlite`)
+- **All memories** (both short-term and long-term)
+
+### Usage
+
+```bash
+python scripts/clear_memory.py
+```
+
+The script will prompt you with an interactive menu:
+
+```
+============================================================
+Entelgia Memory Deletion Utility
+============================================================
+
+What would you like to delete?
+
+1. Short-term memory (JSON files)
+2. Long-term memory (SQLite database)
+3. All memories (both short-term and long-term)
+4. Exit
+```
+
+**Safety features:**
+- ⚠️ Confirmation required before deletion
+- 📊 Shows count of files/entries before deletion
+- 🔒 Cannot be undone - use with caution
+
+### When to Use
+
+- **Reset experiments** - Start fresh with new dialogue sessions
+- **Privacy concerns** - Remove stored conversation data
+- **Testing** - Clear state between test runs
+- **Storage management** - Free up disk space
+
+**Note:** Deleting memories will remove all dialogue history and context. The system will start fresh on the next run.
+
+---
+
 ## 📦 Installation from GitHub
 
 For development or integration purposes:
@@ -424,66 +469,81 @@ Pressure: 6.42  Unresolved: 2  Stagnation: 0.75
 
 ---
 
-## 🗑️ Memory Management
-
-Entelgia provides a utility to clear stored memories when needed. The `clear_memory.py` script allows you to delete:
-
-- **Short-term memory** (JSON files in `entelgia_data/stm_*.json`)
-- **Long-term memory** (SQLite database in `entelgia_data/entelgia_memory.sqlite`)
-- **All memories** (both short-term and long-term)
-
-### Usage
-
-```bash
-python scripts/clear_memory.py
-```
-
-The script will prompt you with an interactive menu:
-
-```
-============================================================
-Entelgia Memory Deletion Utility
-============================================================
-
-What would you like to delete?
-
-1. Short-term memory (JSON files)
-2. Long-term memory (SQLite database)
-3. All memories (both short-term and long-term)
-4. Exit
-```
-
-**Safety features:**
-- ⚠️ Confirmation required before deletion
-- 📊 Shows count of files/entries before deletion
-- 🔒 Cannot be undone - use with caution
-
-### When to Use
-
-- **Reset experiments** - Start fresh with new dialogue sessions
-- **Privacy concerns** - Remove stored conversation data
-- **Testing** - Clear state between test runs
-- **Storage management** - Free up disk space
-
-**Note:** Deleting memories will remove all dialogue history and context. The system will start fresh on the next run.
-
----
-
 ## 🏗 Architecture Overview
 
-Entelgia is built as a modular CoreMind system:
+Entelgia is built around a modular **CoreMind** system — a layered stack of cognitive modules that work together to enable persistent, reflective, and psychologically grounded multi-agent dialogue.
 
-* `Conscious` — reflective narrative construction
-* `Memory` — persistent identity continuity
-* `Emotion` — affective weighting & regulation
-* `Language` — dialogue-driven cognition
-* `Behavior` — goal-oriented response shaping
-* `Observer` — meta-level monitoring & correction
-* `EnergyRegulator` — cognitive energy supervision & dream cycles (v2.5.0)
+### 🧩 CoreMind Modules
 
-### 🆕 Enhanced Dialogue Module (v2.2.0+)
+| Module | Role |
+|--------|------|
+| `Conscious` | Reflective narrative construction |
+| `Memory` | Persistent identity continuity across sessions |
+| `Emotion` | Affective weighting & regulation |
+| `Language` | Dialogue-driven cognition |
+| `Behavior` | Goal-oriented response shaping |
+| `Observer` | Meta-level monitoring & correction |
+| `EnergyRegulator` | Cognitive energy supervision & dream cycles |
 
-The new `entelgia/` package provides modular components:
+### 🤝 The Three Agents
+
+Each dialogue is driven by three agents with distinct psychological profiles:
+
+| Agent | Personality | Role |
+|-------|-------------|------|
+| 🏛️ **Socrates** | Philosophical questioner | Drives inquiry and productive tension |
+| 🦉 **Athena** | Principled reasoner | Models ethical grounding and structure |
+| 🔍 **Fixy** | Meta-cognitive supervisor | Monitors and regulates dialogue health |
+
+### ✨ Key Capabilities
+
+#### 🔁 Enhanced Dialogue Engine
+- **Dynamic speaker selection** — intelligent turn-taking; no agent speaks 3+ times in a row
+- **6+ seed strategies** — analogy, disagree, reflect, challenge, and more
+- **Rich context enrichment** — full dialogue history + agent thoughts + memories
+- **Smart Fixy interventions** — need-based monitoring (not just scheduled checks)
+- **Enhanced personas** — deep character traits and consistent speech patterns
+
+#### ⚡ Energy-Based Regulation
+- **FixyRegulator** — meta-level energy supervisor with a configurable safety threshold
+- **Dream cycle consolidation** — automatic recharge when energy falls below threshold, with critical STM entries promoted to long-term memory
+- **Hallucination-risk detection** — stochastic check when energy drops below 60%
+
+#### 🧠 Personal Long-Term Memory System
+- **DefenseMechanism** — classifies memories as repressed or suppressed on every write
+- **FreudianSlip** — probabilistically surfaces defended memory fragments
+- **SelfReplication** — promotes recurring-pattern memories to consciousness
+
+#### 🎛️ Drive-Aware Cognition
+- **Dynamic LLM temperature** — computed automatically from id/ego/superego balance
+- **Superego second-pass critique** — rewrites responses when `superego_strength ≥ 7.5`
+- **Ego-driven memory depth** — retrieval limits scale with ego and self-awareness
+- **Coherent drive correlations** — conflict erodes ego capacity, raises temperature, scales energy drain
+
+#### 🔥 Drive Pressure
+- Per-agent urgency/tension scalar (`0.0–10.0`)
+- Conciseness directives kick in at pressure ≥ 6.5; decisive prompts at ≥ 8.0
+- Mean reversion and oscillation prevent monotonic drift
+
+#### 📊 Dialogue Quality Metrics
+- **`circularity_rate`** — fraction of turn-pairs with high topic-signature similarity
+- **`progress_rate`** — forward steps per turn: topic shifts + synthesis + resolved questions
+- **`intervention_utility`** — mean circularity reduction in the post-Fixy window
+- **`compute_all_metrics()`** — runs all three metrics in one call
+
+#### 🔬 Ablation Study
+- 4 reproducible conditions: `BASELINE`, `DIALOGUE_ENGINE`, `FIXY`, `DREAM`
+- `run_ablation(turns, seed)` guarantees identical results across runs; `print_results_table()` formats output
+
+#### 🛡️ Safety & Quality
+- **HMAC-SHA256 cryptographic integrity** — all long-term memory entries are signed
+- **Memory poisoning protection** and **PII redaction**
+- **Output artifact cleanup** — strips echoed headers, gender tags, scoring markers
+- **Forbidden meta-commentary** — removes phrases like `"In our dialogue"` or `"We learn"`
+- **Resilient error handling** with exponential backoff
+- **Structured logging**
+
+### 📦 Package Structure
 
 ```
 entelgia/
@@ -499,19 +559,11 @@ entelgia/
 └── ablation_study.py        # 4-condition reproducible ablation study (v2.6.0)
 ```
 
-**Key improvements:**
-- 📊 **6 seed strategies** vs 1 simple template
-- 🎯 **Dynamic speaker selection** vs ping-pong alternation
-- 🧠 **Context-aware** with 8 turns + 6 thoughts + 5 memories
-- 🔍 **Intelligent Fixy** detects circular reasoning, not just scheduled checks
-- ⚡ **Energy regulation** with dream-cycle recovery and hallucination-risk detection
-- 🧠 **Defense mechanisms** classifying memories as repressed or suppressed on every write
-
 The system runs via two executable entry points:
 
 ```
-Entelgia_production_meta.py   # Standard 30-minute session (time-bounded)
-Entelgia_production_meta_200t.py  # 200-turn session, no time-based stopping
+Entelgia_production_meta.py      # Standard 30-minute session (time-bounded)
+Entelgia_production_meta_200t.py # 200-turn session, no time-based stopping
 ```
 
 ---
