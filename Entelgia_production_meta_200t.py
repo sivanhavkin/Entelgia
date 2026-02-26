@@ -21,7 +21,7 @@ Advanced Multi-Agent Dialogue System with:
 - NO AUTO-TIMEOUT (turn-based stop only)
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 2.5.0.
+Version Note: Latest release: 2.6.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -2880,18 +2880,26 @@ class MainScript:
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
 
-        timeout_seconds = self.cfg.timeout_minutes * 60 if self.cfg.timeout_minutes > 0 else float("inf")
+        timeout_seconds = (
+            self.cfg.timeout_minutes * 60
+            if self.cfg.timeout_minutes > 0
+            else float("inf")
+        )
 
-        _timeout_label = f"{self.cfg.timeout_minutes}-minute" if self.cfg.timeout_minutes > 0 else "no-timeout"
+        _timeout_label = (
+            f"{self.cfg.timeout_minutes}-minute"
+            if self.cfg.timeout_minutes > 0
+            else "no-timeout"
+        )
         print(
             Fore.GREEN
             + f"\n[Session {self.session_id}] Starting {_timeout_label} dialogue..."
             + Style.RESET_ALL
         )
-        _log_timeout = f"{timeout_seconds}s" if self.cfg.timeout_minutes > 0 else "unlimited"
-        logger.info(
-            f"Starting session {self.session_id} with {_log_timeout} timeout"
+        _log_timeout = (
+            f"{timeout_seconds}s" if self.cfg.timeout_minutes > 0 else "unlimited"
         )
+        logger.info(f"Starting session {self.session_id} with {_log_timeout} timeout")
 
         while time.time() - self.start_time < timeout_seconds:
             self.turn_index += 1
@@ -3200,7 +3208,9 @@ def main():
             run_api()
         elif mode in ["help", "-h", "--help"]:
             print(
-                Fore.GREEN + "Entelgia Unified – 200-Turn No-Timeout Edition" + Style.RESET_ALL
+                Fore.GREEN
+                + "Entelgia Unified – 200-Turn No-Timeout Edition"
+                + Style.RESET_ALL
             )
             print()
             print("Usage:")

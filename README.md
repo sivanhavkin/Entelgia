@@ -241,6 +241,20 @@ pip install --upgrade git+https://github.com/sivanhavkin/Entelgia.git@main
   * **Forbidden meta-commentary phrases** — `validate_output()` removes any sentence containing `"In our dialogue"`, `"We learn"`, or `"Our conversations reveal"`; the same instruction is injected into LLM prompts to prevent generation up-front
   * **Dissent marker capped to exactly one sentence** — Athena's behavioral rule now requires *exactly* one dissent opener (e.g. `"However,"`, `"Yet,"`) rather than *at least* one
   * **Hard word truncation removed** — the post-processing 150-word cut is removed; response length is governed solely by the LLM prompt instruction, preventing mid-sentence clips
+* **📊 Dialogue Quality Metrics** (v2.6.0, PR #111)
+  * **`circularity_rate`** — fraction of turn-pairs with high topic-signature similarity; measures dialogue looping
+  * **`progress_rate`** — forward steps per turn: topic shifts + synthesis markers + open-question resolutions
+  * **`intervention_utility`** — mean circularity reduction in the post-Fixy window vs. pre-Fixy window
+  * **`compute_all_metrics()`** — runs all three metrics in one call
+* **🔬 Ablation Study** (v2.6.0, PR #111)
+  * **4-condition reproducible study**: `BASELINE`, `DIALOGUE_ENGINE`, `FIXY`, `DREAM`
+  * `run_ablation(turns, seed)` — fully reproducible across conditions; `print_results_table()` — formatted output
+* **🔥 Drive Pressure** (v2.6.0, PR #107)
+  * Per-agent urgency/tension scalar `0.0–10.0` injecting conciseness directives at pressure ≥ 6.5 and decisive prompts at ≥ 8.0
+  * Fluid drive dynamics: mean reversion and oscillation prevent monotonic drift (PR #102)
+* **🚫 Forbidden Opener Phrases** (v2.6.0, PR #104)
+  * Agents no longer open with `"Recent thought"`, `"A recent thought"`, or `"I ponder"`
+  * Cross-agent opener deduplication prevents repeated opening sentences
 * **Psychological drive modeling**
   * Id / Ego / Superego dynamics
 * **Emotion tracking & importance scoring**
@@ -449,7 +463,7 @@ The new `entelgia/` package provides modular components:
 
 ```
 entelgia/
-├── __init__.py              # Package exports (v2.5.0)
+├── __init__.py              # Package exports (v2.6.0)
 ├── dialogue_engine.py       # Dynamic speaker & seed generation
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
@@ -457,8 +471,8 @@ entelgia/
 ├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
 ├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
 ├── memory_security.py       # HMAC-SHA256 signature helpers
-├── dialogue_metrics.py      # Circularity, progress & intervention utility metrics (PR #111)
-└── ablation_study.py        # 4-condition reproducible ablation study (PR #111)
+├── dialogue_metrics.py      # Circularity, progress & intervention utility metrics (v2.6.0)
+└── ablation_study.py        # 4-condition reproducible ablation study (v2.6.0)
 ```
 
 **Key improvements:**
@@ -731,13 +745,14 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.5.0** | ✅ **Stable** | latest |
-| **v2.4.0** | ⚠️ Superseded | Use v2.5.0 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v2.5.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v2.5.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v2.5.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.5.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.5.0 instead |
+| **v2.6.0** | ✅ **Latest** | current |
+| **v2.5.0** | ✅ **Stable** | previous stable release |
+| **v2.4.0** | ⚠️ Superseded | Use v2.6.0 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v2.6.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v2.6.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.6.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.6.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.6.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -751,7 +766,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 We follow [Semantic Versioning](https://semver.org/):
 
 - **Major** (v3.0.0): Breaking changes
-- **Minor** (v2.5.0): New features, backward compatible  
+- **Minor** (v2.6.0): New features, backward compatible  
 - **Patch** (v2.1.2): Bug fixes only
 
 ### Release Schedule
@@ -858,7 +873,7 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.5.0 
+* **Version:** 2.6.0 
 * **Last Updated:** 18 February 2026
 ---
 
