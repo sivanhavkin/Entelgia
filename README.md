@@ -62,6 +62,34 @@ and the reproducibility methodology behind the project.
 
 ---
 
+## 📚 Citation
+
+If you use or reference this work, please cite:
+
+```bibtex
+@misc{havkin2026entelgia,
+  author = {Havkin, Sivan},
+  title = {Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study},
+  year = {2026},
+  publisher = {Zenodo},
+  doi = {10.5281/zenodo.18752028},
+  url = {https://doi.org/10.5281/zenodo.18752028}
+}
+```
+
+```bibtex
+@misc{havkin2026attractors,
+  author = {Havkin, Sivan},
+  title = {Personality Attractors and Dominance Lock in Dialogue-Based Cognitive Agents: An Exploratory Study within the Entelgia Architecture},
+  year = {2026},
+  publisher = {Zenodo},
+  doi = {10.5281/zenodo.18774720},
+  url = {https://doi.org/10.5281/zenodo.18774720}
+}
+```
+
+---
+
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
 > **⚡ Get started fast with our automated installer!**
@@ -640,31 +668,6 @@ Conceived and developed by **Sivan Havkin**.
 * **Last Updated:** 26 February 2026
 ---
 
-## 📚 Citation
-
-If you use or reference this work, please cite:
-
-```bibtex
-@misc{havkin2026entelgia,
-  author = {Havkin, Sivan},
-  title = {Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study},
-  year = {2026},
-  publisher = {Zenodo},
-  doi = {10.5281/zenodo.18752028},
-  url = {https://doi.org/10.5281/zenodo.18752028}
-}
-```
-
-```bibtex
-@misc{havkin2026attractors,
-  author = {Havkin, Sivan},
-  title = {Personality Attractors and Dominance Lock in Dialogue-Based Cognitive Agents: An Exploratory Study within the Entelgia Architecture},
-  year = {2026},
-  publisher = {Zenodo},
-  doi = {10.5281/zenodo.18774720},
-  url = {https://doi.org/10.5281/zenodo.18774720}
-}
-```
 ### What is "Research Hybrid"?
 
 The "Research Hybrid" status signals that Entelgia is both a forward-looking research project and a robust, production-grade system.  
