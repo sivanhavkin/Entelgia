@@ -446,19 +446,6 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 | 🦉 **Athena** | Principled reasoner | Models ethical grounding and structure |
 | 🔍 **Fixy** | Meta-cognitive supervisor | Monitors and regulates dialogue health |
 
-### ✨ Key Capabilities
-
-| Capability | Highlight |
-|---|---|
-| 🔁 **Enhanced Dialogue Engine** | Dynamic speaker selection, 6+ seed strategies, rich context enrichment |
-| ⚡ **Energy-Based Regulation** | FixyRegulator, dream cycle consolidation, hallucination-risk detection |
-| 🧠 **Personal Long-Term Memory** | DefenseMechanism, FreudianSlip, SelfReplication |
-| 🎛️ **Drive-Aware Cognition** | Dynamic LLM temperature, superego critique, ego-driven memory depth |
-| 🔥 **Drive Pressure** | Per-agent urgency scalar, conciseness + decisiveness thresholds |
-| 📊 **Dialogue Quality Metrics** | `circularity_rate`, `progress_rate`, `intervention_utility` |
-| 🔬 **Ablation Study** | 4 reproducible conditions, fully deterministic across runs |
-| 🛡️ **Safety & Quality** | HMAC-SHA256 integrity, PII redaction, output artifact cleanup |
-
 ### 📦 Package Structure
 
 ```
