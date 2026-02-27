@@ -26,7 +26,7 @@ It studies how persistent identity, internal conflict dynamics, and behavioral r
 
 **Use Entelgia if you want agents that evolve an internal identity — not just follow prompts.**  
   
-Unlike stateless chatbot systems, Entelgia maintains an evolving internal state, allowing identity, memory, and reflective behavior to develop continuously over time.
+Unlike stateless chatbot systems, Entelgia maintains an evolving internal state, allowing identity, memory, and reflective behavior to develop over time.
 
 Entelgia sits between agent engineering and cognitive architecture research, exploring how internal structure shapes agent behavior.  
 
@@ -35,6 +35,18 @@ Entelgia sits between agent engineering and cognitive architecture research, exp
 ### Mental Model (30 seconds)
 
 LLM + Persistent Memory + Psychological Drives + Observer Regulation = Dialogue-governed agents
+
+---
+
+### Why Entelgia Exists
+
+Most agent systems optimize outputs.
+Entelgia explores how internal structure regulates behavior over time.
+
+Instead of external guardrails, agents develop regulation through:
+- memory continuity
+- internal conflict
+- observer feedback loops
 
 ---
 
