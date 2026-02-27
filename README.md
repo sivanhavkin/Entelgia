@@ -29,20 +29,15 @@ It studies how persistent identity, internal conflict dynamics, and behavioral r
 Unlike stateless chatbot systems, Entelgia maintains an evolving internal state, allowing identity, memory, and reflective behavior to develop continuously over time.
 
 Entelgia sits between agent engineering and cognitive architecture research, exploring how internal structure shapes agent behavior.  
+
 ---
 
 ### What is "Research Hybrid"?
 
-The "Research Hybrid" status signals that Entelgia is both a forward-looking research project and a robust, production-grade system.  
-It sits at the intersection between academic experimentation and real-world application, blending innovative multi-agent algorithms and theoretical ideas with practical engineering, reliability and developer-friendly workflows. 
-
-**This means:**
-- Some modules (e.g. the dialogue engine, memory security, or agent persona modeling) feature experimental, cutting-edge methods that may evolve rapidly.
-- At the same time, the system is designed to be stable, usable out-of-the-box, and robust enough for integration in real settings.
-- Breaking changes and new features are introduced in a controlled way to balance innovation with stability.
-- The project actively solicits both contributors interested in AI/agent research and users who need a dependable foundation for projects that require persistent, moral, and reflective AI agents.
-
-This "hybrid" approach allows Entelgia to bridge the gap between the rapid pace of AI research and the needs of production-grade software.
+Entelgia is a **Research Hybrid** — combining experimental AI research with a stable engineering foundation.  
+It explores new multi-agent and cognitive ideas while remaining usable and reliable in real projects.  
+Some components evolve rapidly, but changes are introduced carefully to preserve stability.  
+The project welcomes both researchers and developers building persistent, reflective AI agents.
 
 ---
 
