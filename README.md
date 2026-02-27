@@ -47,20 +47,6 @@ The project welcomes both researchers and developers building persistent, reflec
 
 ---
 
-## 📚 Documentation
-
-* 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
-* 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
-* 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
-* 🗺️ **[Roadmap (ROADMAP.md)](ROADMAP.md)** - Project development roadmap and future plans
-* 📖  [Entelgia Demo(entelgia_demo.py)](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md) - See the system in action
-* ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
-* 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
-* 🧪 **[Test Suite (tests/README.md)](tests/README.md)** - Full test documentation and CI/CD details
-
----
-
-
 ## 📋 Requirements
 
 * Python **3.10+**
@@ -248,6 +234,19 @@ What would you like to delete?
 - **Storage management** - Free up disk space
 
 **Note:** Deleting memories will remove all dialogue history and context. The system will start fresh on the next run.
+
+---
+
+## 📚 Documentation
+
+* 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
+* 📄 **[System Specification (SPEC.md)](./SPEC.md)** - Detailed architecture specification
+* 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
+* 🗺️ **[Roadmap (ROADMAP.md)](ROADMAP.md)** - Project development roadmap and future plans
+* 📖  [Entelgia Demo(entelgia_demo.py)](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md) - See the system in action
+* ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
+* 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
+* 🧪 **[Test Suite (tests/README.md)](tests/README.md)** - Full test documentation and CI/CD details
 
 ---
 
