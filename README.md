@@ -513,51 +513,16 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 
 ### ✨ Key Capabilities
 
-#### 🔁 Enhanced Dialogue Engine
-- **Dynamic speaker selection** — intelligent turn-taking; no agent speaks 3+ times in a row
-- **6+ seed strategies** — analogy, disagree, reflect, challenge, and more
-- **Rich context enrichment** — full dialogue history + agent thoughts + memories
-- **Smart Fixy interventions** — need-based monitoring (not just scheduled checks)
-- **Enhanced personas** — deep character traits and consistent speech patterns
-
-#### ⚡ Energy-Based Regulation
-- **FixyRegulator** — meta-level energy supervisor with a configurable safety threshold
-- **Dream cycle consolidation** — automatic recharge when energy falls below threshold, with critical STM entries promoted to long-term memory
-- **Hallucination-risk detection** — stochastic check when energy drops below 60%
-
-#### 🧠 Personal Long-Term Memory System
-- **DefenseMechanism** — classifies memories as repressed or suppressed on every write
-- **FreudianSlip** — probabilistically surfaces defended memory fragments
-- **SelfReplication** — promotes recurring-pattern memories to consciousness
-
-#### 🎛️ Drive-Aware Cognition
-- **Dynamic LLM temperature** — computed automatically from id/ego/superego balance
-- **Superego second-pass critique** — rewrites responses when `superego_strength ≥ 7.5`
-- **Ego-driven memory depth** — retrieval limits scale with ego and self-awareness
-- **Coherent drive correlations** — conflict erodes ego capacity, raises temperature, scales energy drain
-
-#### 🔥 Drive Pressure
-- Per-agent urgency/tension scalar (`0.0–10.0`)
-- Conciseness directives kick in at pressure ≥ 6.5; decisive prompts at ≥ 8.0
-- Mean reversion and oscillation prevent monotonic drift
-
-#### 📊 Dialogue Quality Metrics
-- **`circularity_rate`** — fraction of turn-pairs with high topic-signature similarity
-- **`progress_rate`** — forward steps per turn: topic shifts + synthesis + resolved questions
-- **`intervention_utility`** — mean circularity reduction in the post-Fixy window
-- **`compute_all_metrics()`** — runs all three metrics in one call
-
-#### 🔬 Ablation Study
-- 4 reproducible conditions: `BASELINE`, `DIALOGUE_ENGINE`, `FIXY`, `DREAM`
-- `run_ablation(turns, seed)` guarantees identical results across runs; `print_results_table()` formats output
-
-#### 🛡️ Safety & Quality
-- **HMAC-SHA256 cryptographic integrity** — all long-term memory entries are signed
-- **Memory poisoning protection** and **PII redaction**
-- **Output artifact cleanup** — strips echoed headers, gender tags, scoring markers
-- **Forbidden meta-commentary** — removes phrases like `"In our dialogue"` or `"We learn"`
-- **Resilient error handling** with exponential backoff
-- **Structured logging**
+| Capability | Highlight |
+|---|---|
+| 🔁 **Enhanced Dialogue Engine** | Dynamic speaker selection, 6+ seed strategies, rich context enrichment |
+| ⚡ **Energy-Based Regulation** | FixyRegulator, dream cycle consolidation, hallucination-risk detection |
+| 🧠 **Personal Long-Term Memory** | DefenseMechanism, FreudianSlip, SelfReplication |
+| 🎛️ **Drive-Aware Cognition** | Dynamic LLM temperature, superego critique, ego-driven memory depth |
+| 🔥 **Drive Pressure** | Per-agent urgency scalar, conciseness + decisiveness thresholds |
+| 📊 **Dialogue Quality Metrics** | `circularity_rate`, `progress_rate`, `intervention_utility` |
+| 🔬 **Ablation Study** | 4 reproducible conditions, fully deterministic across runs |
+| 🛡️ **Safety & Quality** | HMAC-SHA256 integrity, PII redaction, output artifact cleanup |
 
 ### 📦 Package Structure
 
