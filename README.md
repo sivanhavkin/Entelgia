@@ -29,6 +29,21 @@
   
 ---
 
+### What is "Research Hybrid"?
+
+The "Research Hybrid" status signals that Entelgia is both a forward-looking research project and a robust, production-grade system.  
+It sits at the intersection between academic experimentation and real-world application, blending innovative multi-agent algorithms and theoretical ideas with practical engineering, reliability and developer-friendly workflows. 
+
+**This means:**
+- Some modules (e.g. the dialogue engine, memory security, or agent persona modeling) feature experimental, cutting-edge methods that may evolve rapidly.
+- At the same time, the system is designed to be stable, usable out-of-the-box, and robust enough for integration in real settings.
+- Breaking changes and new features are introduced in a controlled way to balance innovation with stability.
+- The project actively solicits both contributors interested in AI/agent research and users who need a dependable foundation for projects that require persistent, moral, and reflective AI agents.
+
+This "hybrid" approach allows Entelgia to bridge the gap between the rapid pace of AI research and the needs of production-grade software.
+
+---
+
 ## 📚 Documentation
 
 * 📘 **[Full Whitepaper](whitepaper.md)** - Complete architectural and theoretical foundation
@@ -720,16 +735,3 @@ Conceived and developed by **Sivan Havkin**.
 * **Version:** 2.6.0 
 * **Last Updated:** 26 February 2026
 ---
-
-### What is "Research Hybrid"?
-
-The "Research Hybrid" status signals that Entelgia is both a forward-looking research project and a robust, production-grade system.  
-It sits at the intersection between academic experimentation and real-world application, blending innovative multi-agent algorithms and theoretical ideas with practical engineering, reliability and developer-friendly workflows. 
-
-**This means:**
-- Some modules (e.g. the dialogue engine, memory security, or agent persona modeling) feature experimental, cutting-edge methods that may evolve rapidly.
-- At the same time, the system is designed to be stable, usable out-of-the-box, and robust enough for integration in real settings.
-- Breaking changes and new features are introduced in a controlled way to balance innovation with stability.
-- The project actively solicits both contributors interested in AI/agent research and users who need a dependable foundation for projects that require persistent, moral, and reflective AI agents.
-
-This "hybrid" approach allows Entelgia to bridge the gap between the rapid pace of AI research and the needs of production-grade software.
