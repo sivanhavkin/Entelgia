@@ -106,6 +106,17 @@ If you use or reference this work, please cite:
 
 ---
 
+## 📋 Requirements
+
+* Python **3.10+**
+* **Ollama** (local LLM runtime)
+* At least one supported model (`phi3`, `mistral`, etc.)
+* **8GB+ RAM** recommended (16GB+ for larger models)
+
+For the complete dependency list, see [`requirements.txt`](requirements.txt).
+
+---
+
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
 > **⚡ Get started fast with our automated installer!**
@@ -146,17 +157,6 @@ python Entelgia_production_meta_200t.py
 ```
 
 > 💡 **Having issues?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) for common problems and solutions.
-
----
-
-## 📋 Requirements
-
-* Python **3.10+**
-* **Ollama** (local LLM runtime)
-* At least one supported model (`phi3`, `mistral`, etc.)
-* **8GB+ RAM** recommended (16GB+ for larger models)
-
-For the complete dependency list, see [`requirements.txt`](requirements.txt).
 
 ---
 
