@@ -31,6 +31,7 @@ Unlike stateless chatbot systems, Entelgia maintains an evolving internal state,
 Entelgia sits between agent engineering and cognitive architecture research, exploring how internal structure shapes agent behavior.  
 
 ---
+
 ### Mental Model (30 seconds)
 
 LLM
