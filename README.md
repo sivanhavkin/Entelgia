@@ -25,7 +25,8 @@
 
   Unlike stateless chatbot systems, Entelgia maintains an evolving internal state across sessions, enabling continuity of identity, memory persistence, and more coherent reflective behavior over time.
 
-
+  Entelgia sits between agent engineering and cognitive architecture research — exploring how internal structure shapes agent behavior.
+  
 ---
 
 ## 📚 Documentation
