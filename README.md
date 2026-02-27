@@ -322,16 +322,13 @@ config.drive_oscillation_range = 0.15     # ±random noise added to drives per t
 #   stm_tail  = max(3, min(12, int(3 + ego/2)))
 ```
 
-For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
-
----
 
 **META block output** (when `show_meta=True`):
 ```
 Pressure: 6.42  Unresolved: 2  Stagnation: 0.75
 ```
 
-**Sample log showing pressure rising then output shortening:**
+**Sample log showing pressure rising, then output shortening:**
 ```
 [META: Socrates]
   Id: 5.8  Ego: 5.1  SuperEgo: 6.4  SA: 0.57
@@ -345,6 +342,8 @@ Pressure: 6.42  Unresolved: 2  Stagnation: 0.75
   Pressure: 8.03  Unresolved: 3  Stagnation: 1.00    ← turn 8, high pressure
   → output trimmed to 80 words, decisive question forced
 ```
+
+For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
 
 ---
 
