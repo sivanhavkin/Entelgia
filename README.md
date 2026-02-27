@@ -337,24 +337,7 @@ config.store_raw_subconscious_ltm = False   # Store un-redacted text in LTM (def
 > **Note:** Response length is controlled by the module-level constant `MAX_RESPONSE_WORDS = 150`
 > in `Entelgia_production_meta.py` (not a `Config` field). The LLM prompt instructs the model
 > to answer in maximum 150 words; responses are never truncated by the runtime.
-
-**Response Length Control:**
-- ✅ **No truncation/cutting** - All agent responses are displayed in full
-- 📝 **LLM guidance** - Explicit instruction added to LLM prompts: "Please answer in maximum 150 words"
-- 🎭 **Role-playing maintained** - Agents receive the 150-word request but responses are never truncated
-- 🔍 **Sanitization only** - `validate_output()` removes control characters and normalizes newlines, without any length limits
-- 🎯 **Natural responses** - LLM decides the response length naturally within the 150-word guidance
-
-This approach ensures:
-- Agent responses are complete and coherent (no mid-sentence cuts)
-- LLM maintains focus and conciseness through prompt instructions
-- Role-playing dynamic remains authentic with requested brevity
-- Users see full responses without artificial truncation
-
-**Timeout Settings:**
-- LLM request timeout is set to 300 s (`config.llm_timeout`) for faster failure detection
-- Better user experience with more predictable behavior
-- Most responses complete much faster than the timeout limit
+> `validate_output()` removes control characters and normalizes newlines, without any length limits.
 
 ### ⚡ Energy & Dream Cycle Settings
 
