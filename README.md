@@ -31,6 +31,15 @@ Unlike stateless chatbot systems, Entelgia maintains an evolving internal state,
 Entelgia sits between agent engineering and cognitive architecture research, exploring how internal structure shapes agent behavior.  
 
 ---
+### Mental Model (30 seconds)
+
+LLM
++ Persistent Memory
++ Psychological Drives
++ Observer Regulation
+= Dialogue-governed agents
+
+---
 
 ### What is "Research Hybrid"?
 
@@ -54,54 +63,6 @@ The project welcomes both researchers and developers building persistent, reflec
 
 ---
 
-## 📄 Research Papers
-
-**1. Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study**
-
-Sivan Havkin (2026)  
-Independent Researcher, Entelgia Labs
-
-DOI:
-https://doi.org/10.5281/zenodo.18754895
-
-This paper presents an ablation study examining how internal structural mechanisms influence dialogue stability and progression in multi-agent language systems.
-
-**2. The Entelgia architecture is documented in the following research preprint:**
-
-DOI: https://doi.org/10.5281/zenodo.18774720
-
-This publication describes the cognitive-agent framework, META behavioral metrics,
-and the reproducibility methodology behind the project.
-
----
-
-## 📚 Citation
-
-If you use or reference this work, please cite:
-
-```bibtex
-@misc{havkin2026entelgia,
-  author = {Havkin, Sivan},
-  title = {Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study},
-  year = {2026},
-  publisher = {Zenodo},
-  doi = {10.5281/zenodo.18752028},
-  url = {https://doi.org/10.5281/zenodo.18752028}
-}
-```
-
-```bibtex
-@misc{havkin2026attractors,
-  author = {Havkin, Sivan},
-  title = {Personality Attractors and Dominance Lock in Dialogue-Based Cognitive Agents: An Exploratory Study within the Entelgia Architecture},
-  year = {2026},
-  publisher = {Zenodo},
-  doi = {10.5281/zenodo.18774720},
-  url = {https://doi.org/10.5281/zenodo.18774720}
-}
-```
-
----
 
 ## 📋 Requirements
 
@@ -528,6 +489,54 @@ The article tracked six notable releases focused on plug-and-play enterprise int
 The scout explained that such capabilities make Entelgia a **promising foundation for long-term customer service and personal-assistant contexts**.
 
 📢 **Full Article:** [New agent SDKs and skills with secure execution](https://scouts.yutori.com)
+
+---
+## 📄 Research Papers
+
+**1. Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study**
+
+Sivan Havkin (2026)  
+Independent Researcher, Entelgia Labs
+
+DOI:
+https://doi.org/10.5281/zenodo.18754895
+
+This paper presents an ablation study examining how internal structural mechanisms influence dialogue stability and progression in multi-agent language systems.
+
+**2. The Entelgia architecture is documented in the following research preprint:**
+
+DOI: https://doi.org/10.5281/zenodo.18774720
+
+This publication describes the cognitive-agent framework, META behavioral metrics,
+and the reproducibility methodology behind the project.
+
+---
+
+## 📚 Citation
+
+If you use or reference this work, please cite:
+
+```bibtex
+@misc{havkin2026entelgia,
+  author = {Havkin, Sivan},
+  title = {Internal Structural Mechanisms and Dialogue Stability in Multi-Agent Language Systems: An Ablation Study},
+  year = {2026},
+  publisher = {Zenodo},
+  doi = {10.5281/zenodo.18752028},
+  url = {https://doi.org/10.5281/zenodo.18752028}
+}
+```
+
+```bibtex
+@misc{havkin2026attractors,
+  author = {Havkin, Sivan},
+  title = {Personality Attractors and Dominance Lock in Dialogue-Based Cognitive Agents: An Exploratory Study within the Entelgia Architecture},
+  year = {2026},
+  publisher = {Zenodo},
+  doi = {10.5281/zenodo.18774720},
+  url = {https://doi.org/10.5281/zenodo.18774720}
+}
+```
 
 ---
 
