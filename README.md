@@ -505,40 +505,13 @@ pytest tests/ -v
 
 ---
 
----
-
-## 📋 Release Policy
-
-We follow [Semantic Versioning](https://semver.org/):
-
-- **Major** (v3.0.0): Breaking changes
-- **Minor** (v2.6.0): New features, backward compatible  
-- **Patch** (v2.1.2): Bug fixes only
-
 ### Release Schedule
 
-- 🗓️ **Minor releases**: Every 2 weeks (feature batches)
+- 🗓️ **Minor releases**: Every week (feature batches)
 - 🐛 **Patch releases**: As needed for critical bugs
 - 🚨 **Hotfixes**: Within 24h for security issues
 
 📖 See [Changelog.md](Changelog.md) for detailed version history.
-
----
-
----
-
-## 🧪 Research Scope
-
-Entelgia is an architectural experiment exploring:
-
-* Persistent identity in LLM systems
-* Internal tension as computational driver
-* Memory-based regulation
-* Dialogue-driven ethical modeling
-
-It does **not** claim biological consciousness or sentience.
-
----
 
 ---
 
@@ -554,34 +527,7 @@ The article tracked six notable releases focused on plug-and-play enterprise int
 
 The scout explained that such capabilities make Entelgia a **promising foundation for long-term customer service and personal-assistant contexts**.
 
----
-
-### 🔬 Research Positioning
-
-Entelgia was positioned alongside:
-- **GitHub's Copilot SDK**
-- **openapi-to-skills**
-- **Bouvet**
-- **antigravity-skills**
-- **Deep Agents**
-
-Together, these projects advance three operational levers:
-
-| Lever | Description |
-|-------|-------------|
-| ⚡ **Faster Integration** | Seamless connection with existing applications |
-| 🛡️ **Safer Execution** | Autonomous operation with security guarantees |
-| 🎁 **Out-of-the-box Capabilities** | Pre-built functionality packs |
-
-**Entelgia specifically represents the research path for stable, ethically consistent agents.**
-
----
-
-### 📖 Read More
-
 📢 **Full Article:** [New agent SDKs and skills with secure execution](https://scouts.yutori.com)
-
----
 
 ---
 
@@ -592,21 +538,6 @@ Entelgia is released under the **MIT License**.
 This ensures the project remains open, permissive, and compatible with the broader open‑source ecosystem, encouraging research, experimentation, and collaboration.
 
 For the complete legal terms, see the `LICENSE` file included in this repository.
-
----
-
-### Ethical Position
-
-While the MIT License permits broad use, Entelgia was created as a **research‑oriented, human‑centered system** exploring reflective dialogue, moral self‑regulation, and internal cognitive structure.
-
-The original creator, **Sivan Havkin**, does not endorse and is not responsible for applications that:
-
-* Intentionally cause harm to human beings or other living creatures
-* Enable coercion, manipulation, or exploitation
-* Promote violence, hatred, or dehumanization
-* Contradict the philosophical intent of the project
-
-This statement expresses the ethical stance of the author but does not modify the legal permissions granted by the MIT License.
 
 ---
 
