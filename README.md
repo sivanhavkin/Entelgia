@@ -299,60 +299,15 @@ What would you like to delete?
 ## ✨ Core Features
 
 * **Multi-agent dialogue system** (Socrates · Athena · Fixy)
-* **Persistent memory**
-  * Short-term memory (JSON)
-  * Long-term memory (SQLite)
-  * 🔐 HMAC-SHA256 cryptographic integrity protection
-* **Enhanced Dialogue Engine**
-  * Dynamic speaker selection — intelligent turn-taking (no 3+ consecutive turns)
-  * Varied seed generation — 6+ strategy types (analogy, disagree, reflect, etc.)
-  * Rich context enrichment — full dialogue history + thoughts + memories
-  * Smart Fixy interventions — need-based meta-cognitive monitoring
-  * Enhanced personas — deep character traits and speech patterns
-  * 🐛 Dialogue bug fixes:
-    * **Third body calling to first body** — fixed by tracking the last non-Fixy speaker
-    * **Double turn** — duplicate Fixy response resolved by removing the legacy scheduled path
-    * **Pronoun issue** — LLM-echoed prompt headers now stripped automatically when `show_pronoun=False`
-* **⚡ Energy-Based Regulation**
-  * FixyRegulator — meta-level energy supervisor with configurable safety threshold
-  * Dream cycle consolidation — automatic recharge when energy falls below threshold; critical STM entries promoted to long-term memory
-  * Hallucination-risk detection — stochastic check when energy is below 60 %
-* **🧠 Personal Long-Term Memory System**
-  * DefenseMechanism — classifies memories as repressed or suppressed on write
-  * FreudianSlip — probabilistically surfaces defended memory fragments
-  * SelfReplication — promotes recurring-pattern memories to consciousness
-* **🎛️ Drive-Aware Cognition**
-  * Dynamic LLM temperature — derived from id/ego/superego drive balance
-  * Superego second-pass critique — response internally rewritten by a principled governor when `superego_strength ≥ 7.5`; the agent's original voice is always displayed in dialogue
-  * Ego-driven memory depth — retrieval limits scale with ego/self-awareness
-  * Output artifact cleanup — strips echoed name/pronoun headers, gender tags, scoring markers
-  * Coherent drive correlations — conflict directly erodes ego capacity, raises LLM temperature, and scales energy drain
-* **🗣️ Output Quality Rules**
-  * Forbidden meta-commentary phrases — `validate_output()` removes sentences containing `"In our dialogue"`, `"We learn"`, or `"Our conversations reveal"`
-  * Dissent marker capped to exactly one sentence — Athena's behavioral rule requires *exactly* one dissent opener (e.g. `"However,"`, `"Yet,"`)
-  * Hard word truncation removed — response length governed solely by the LLM prompt instruction
-* **📊 Dialogue Quality Metrics** (v2.6.0)
-  * `circularity_rate` — fraction of turn-pairs with high topic-signature similarity; measures dialogue looping
-  * `progress_rate` — forward steps per turn: topic shifts + synthesis markers + open-question resolutions
-  * `intervention_utility` — mean circularity reduction in the post-Fixy window vs. pre-Fixy window
-  * `compute_all_metrics()` — runs all three metrics in one call
-* **🔬 Ablation Study** (v2.6.0)
-  * 4-condition reproducible study: `BASELINE`, `DIALOGUE_ENGINE`, `FIXY`, `DREAM`
-  * `run_ablation(turns, seed)` — fully reproducible across conditions; `print_results_table()` — formatted output
-* **🔥 Drive Pressure** (v2.6.0)
-  * Per-agent urgency/tension scalar `0.0–10.0` injecting conciseness directives at pressure ≥ 6.5 and decisive prompts at ≥ 8.0
-  * Fluid drive dynamics: mean reversion and oscillation prevent monotonic drift
-* **🚫 Forbidden Opener Phrases** (v2.6.0)
-  * Agents no longer open with `"Recent thought"`, `"A recent thought"`, or `"I ponder"`
-  * Cross-agent opener deduplication prevents repeated opening sentences
-* **Psychological drive modeling** — id / ego / superego dynamics
-* **Emotion tracking & importance scoring**
-* **Dream cycles & memory promotion**
-* **Observer-based meta-cognition**
-* **Memory poisoning protection**
-* **PII redaction & privacy safeguards**
-* **Resilient error handling** (exponential backoff)
-* **Structured logging**
+* **Persistent memory** — short-term (JSON) + long-term (SQLite) with 🔐 HMAC-SHA256 integrity
+* **Enhanced Dialogue Engine** — dynamic speaker selection, 6+ seed strategies, rich context enrichment
+* **⚡ Energy-Based Regulation** — FixyRegulator, dream cycle consolidation, hallucination-risk detection
+* **🧠 Personal Long-Term Memory** — DefenseMechanism, FreudianSlip, SelfReplication
+* **🎛️ Drive-Aware Cognition** — dynamic LLM temperature, superego critique, ego-driven memory depth
+* **🔥 Drive Pressure** — per-agent urgency scalar with conciseness + decisiveness thresholds
+* **📊 Dialogue Quality Metrics** — `circularity_rate`, `progress_rate`, `intervention_utility`
+* **🔬 Ablation Study** — 4 reproducible conditions, fully deterministic
+* **🛡️ Safety & Quality** — PII redaction, output artifact cleanup, memory poisoning protection
 
 ---
 
