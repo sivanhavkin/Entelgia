@@ -53,10 +53,9 @@ Instead of external guardrails, agents develop regulation through:
 ## 🎭 See Entelgia in Action
 
 📄 Professional demo:
-[Entelgia Runtime Demo](docs/Entelgia_Demo_Session.pdf)
 
 🎬 Animated preview:
-![Entelgia Demo](docs/Entelgia_Demo.gif)
+![Entelgia Demo] (docs/Entelgia_Demo.gif)
 
 
 ### What is "Research Hybrid"?
