@@ -52,7 +52,8 @@ Instead of external guardrails, agents develop regulation through:
 
 ## 🎭 See Entelgia in Action
 
-📄 Professional demo:
+📄 Full Professional Demo: 
+[Entelgia Full Demo](docs/Entelgia_Full_Demo.pdf)
 
 🎬 Animated preview:
 ![Entelgia Demo](docs/Entelgia_Demo.gif)
