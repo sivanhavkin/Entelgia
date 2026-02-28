@@ -108,10 +108,7 @@ python scripts/install.py
 # Start Ollama service
 ollama serve
 
-# Run the demo (10 turns, ~2 minutes)
-python examples/demo_enhanced_dialogue.py
-
-# Or run the full system (30 minutes, stops when time limit is reached)
+# run the full system (30 minutes, stops when time limit is reached)
 python Entelgia_production_meta.py
 
 # Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
