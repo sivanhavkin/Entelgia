@@ -177,13 +177,14 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ```bash
 # Start Ollama (if not already running)
+
 ollama serve
 
-# Run the enhanced dialogue demo (10 turns, ~2 minutes)
-python examples/demo_enhanced_dialogue.py
-
-# Or run the full system (30 minutes)
+# run the full system (30 minutes, stops when time limit is reached)
 python Entelgia_production_meta.py
+
+# Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
+python Entelgia_production_meta_200t.py
 ```
 
 ---
