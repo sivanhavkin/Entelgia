@@ -1,8 +1,8 @@
 # tests/test_behavioral_rules.py
 """
 Tests for behavioral rules:
-  Rule A (Socrates): Conflict >= 5.0 → end response with binary-choice question (A or B).
-  Rule B (Athena):  Dissent >= 3.0  → directly challenge/counter Socrates's position
+  Rule A (Socrates): Conflict > 6 AND random < 0.5 → end response with binary-choice question (A or B).
+  Rule B (Athena):  Conflict > 6 AND random < 0.5  → directly challenge/counter Socrates's position
                     using varied language (no fixed sentence opener).
 """
 
@@ -10,6 +10,9 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import random
+from unittest.mock import patch
 
 import pytest
 
@@ -53,12 +56,12 @@ class _StubAgent:
 
     # The method under test – identical to the production implementation
     def _behavioral_rule_instruction(self) -> str:
-        if self.name == "Socrates" and self.conflict_index() >= 5.0:
+        if self.name == "Socrates" and self.conflict_index() > 6 and random.random() < 0.5:
             return (
                 "BEHAVIORAL RULE: You MUST end your response with one sharp question "
                 "that forces Athena to choose between exactly 2 options (A or B)."
             )
-        if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
+        if self.name == "Athena" and self.conflict_index() > 6 and random.random() < 0.5:
             return (
                 "BEHAVIORAL RULE: You MUST directly challenge or counter Socrates's position "
                 "in your response, expressing clear disagreement. Use varied language and do "
@@ -88,14 +91,19 @@ def _socrates_with_conflict(conflict: float) -> _StubAgent:
     )
 
 
-def _athena_with_dissent(dissent: float) -> _StubAgent:
-    """Return an Athena stub whose dissent_level ≈ *dissent*.
-    dissent = (id*0.45 + superego*0.45) - ego*0.25
-    We keep id=superego=x and solve for x: 2*0.45*x - 5*0.25 = dissent
-    → x = (dissent + 1.25) / 0.9
+def _athena_with_conflict(conflict: float) -> _StubAgent:
+    """Return an Athena stub whose conflict_index() equals *conflict*.
+    conflict_index = |id - ego| + |superego - ego|
+    We fix ego=5 and split the deviation symmetrically.
     """
-    x = (dissent + 5.0 * 0.25) / 0.9
-    return _StubAgent("Athena", id_strength=x, ego_strength=5.0, superego_strength=x)
+    ego = 5.0
+    half = conflict / 2.0
+    return _StubAgent(
+        "Athena",
+        id_strength=ego + half,
+        ego_strength=ego,
+        superego_strength=ego + half,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -146,12 +154,13 @@ def _print_bar_chart(data_pairs, title=None, max_width=36):
 
 
 class TestRuleASocrates:
-    """Rule A: Socrates emits binary-choice question when Conflict >= 5.0."""
+    """Rule A: Socrates emits binary-choice question when Conflict > 6 and random fires."""
 
-    def test_returns_nonempty_rule_at_exactly_5(self):
-        agent = _socrates_with_conflict(5.0)
-        assert abs(agent.conflict_index() - 5.0) < 0.01
-        rule = agent._behavioral_rule_instruction()
+    def test_returns_nonempty_rule_above_6_when_random_fires(self):
+        agent = _socrates_with_conflict(7.0)
+        assert agent.conflict_index() > 6
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "Rule triggered?", "Rule (truncated)"],
             [
@@ -162,46 +171,55 @@ class TestRuleASocrates:
                     rule[:50] + "..." if len(rule) > 50 else rule,
                 ]
             ],
-            title="test_returns_nonempty_rule_at_exactly_5",
+            title="test_returns_nonempty_rule_above_6_when_random_fires",
         )
         assert rule != ""
 
-    def test_returns_nonempty_rule_above_5(self):
+    def test_returns_empty_above_6_when_random_does_not_fire(self):
         agent = _socrates_with_conflict(7.0)
-        rule = agent._behavioral_rule_instruction()
+        assert agent.conflict_index() > 6
+        with patch("random.random", return_value=0.8):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "conflict_index", "Rule triggered?", "Rule (truncated)"],
+            ["Agent", "conflict_index", "Rule triggered?", "Expected"],
             [
                 [
                     "Socrates",
                     f"{agent.conflict_index():.2f}",
                     str(rule != ""),
-                    rule[:50] + "..." if len(rule) > 50 else rule,
+                    "False (random suppressed)",
                 ]
             ],
-            title="test_returns_nonempty_rule_above_5",
+            title="test_returns_empty_above_6_when_random_does_not_fire",
         )
-        sweep = [
-            (
-                f"c={c:.0f}",
+        assert rule == ""
+
+    def test_returns_nonempty_rule_above_6(self):
+        agent = _socrates_with_conflict(7.0)
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
+            sweep = [
                 (
-                    1.0
-                    if _socrates_with_conflict(float(c))._behavioral_rule_instruction()
-                    != ""
-                    else 0.0
-                ),
-            )
-            for c in range(0, 11)
-        ]
+                    f"c={c:.0f}",
+                    (
+                        1.0
+                        if _socrates_with_conflict(float(c))._behavioral_rule_instruction()
+                        != ""
+                        else 0.0
+                    ),
+                )
+                for c in range(0, 11)
+            ]
         _print_bar_chart(
             sweep, title="Rule A (Socrates) triggered vs conflict_index (0→10)"
         )
         assert rule != ""
 
-    def test_returns_empty_below_5(self):
-        agent = _socrates_with_conflict(4.0)
-        assert agent.conflict_index() < 5.0
-        rule = agent._behavioral_rule_instruction()
+    def test_returns_empty_at_or_below_6(self):
+        agent = _socrates_with_conflict(6.0)
+        assert agent.conflict_index() <= 6
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "Rule triggered?", "Expected"],
             [
@@ -212,13 +230,14 @@ class TestRuleASocrates:
                     "False (empty)",
                 ]
             ],
-            title="test_returns_empty_below_5",
+            title="test_returns_empty_at_or_below_6",
         )
         assert rule == ""
 
     def test_rule_mentions_binary_choice(self):
-        agent = _socrates_with_conflict(6.0)
-        rule = agent._behavioral_rule_instruction()
+        agent = _socrates_with_conflict(8.0)
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "'A or B' in rule?", "Rule (truncated)"],
             [
@@ -234,8 +253,9 @@ class TestRuleASocrates:
         assert "A or B" in rule
 
     def test_rule_mentions_end_response(self):
-        agent = _socrates_with_conflict(6.0)
-        rule = agent._behavioral_rule_instruction()
+        agent = _socrates_with_conflict(8.0)
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "'end' in rule?", "Rule (truncated)"],
             [
@@ -255,8 +275,9 @@ class TestRuleASocrates:
         agent = _StubAgent(
             "Fixy", id_strength=10.0, ego_strength=5.0, superego_strength=10.0
         )
-        assert agent.conflict_index() >= 5.0
-        rule = agent._behavioral_rule_instruction()
+        assert agent.conflict_index() > 6
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
             ["Agent", "conflict_index", "Rule triggered?", "Expected"],
             [
@@ -273,90 +294,101 @@ class TestRuleASocrates:
 
 
 # ---------------------------------------------------------------------------
-# Rule B: Athena + Dissent
+# Rule B: Athena + Conflict
 # ---------------------------------------------------------------------------
 
 
 class TestRuleBAnthena:
-    """Rule B: Athena directly challenges Socrates when Dissent >= 3.0 (no fixed opener)."""
+    """Rule B: Athena directly challenges Socrates when Conflict > 6 and random fires (no fixed opener)."""
 
-    def test_returns_nonempty_rule_at_exactly_3(self):
-        agent = _athena_with_dissent(3.0)
-        assert agent.debate_profile()["dissent_level"] >= 3.0
-        rule = agent._behavioral_rule_instruction()
+    def test_returns_nonempty_rule_above_6_when_random_fires(self):
+        agent = _athena_with_conflict(7.0)
+        assert agent.conflict_index() > 6
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "Rule triggered?", "Rule (truncated)"],
+            ["Agent", "conflict_index", "Rule triggered?", "Rule (truncated)"],
             [
                 [
                     "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    f"{agent.conflict_index():.2f}",
                     str(rule != ""),
                     rule[:50] + "..." if len(rule) > 50 else rule,
                 ]
             ],
-            title="test_returns_nonempty_rule_at_exactly_3",
+            title="test_returns_nonempty_rule_above_6_when_random_fires",
         )
         assert rule != ""
 
-    def test_returns_nonempty_rule_above_3(self):
-        agent = _athena_with_dissent(5.0)
-        rule = agent._behavioral_rule_instruction()
+    def test_returns_empty_above_6_when_random_does_not_fire(self):
+        agent = _athena_with_conflict(7.0)
+        assert agent.conflict_index() > 6
+        with patch("random.random", return_value=0.8):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "Rule triggered?", "Rule (truncated)"],
+            ["Agent", "conflict_index", "Rule triggered?", "Expected"],
             [
                 [
                     "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    f"{agent.conflict_index():.2f}",
                     str(rule != ""),
-                    rule[:50] + "..." if len(rule) > 50 else rule,
+                    "False (random suppressed)",
                 ]
             ],
-            title="test_returns_nonempty_rule_above_3",
+            title="test_returns_empty_above_6_when_random_does_not_fire",
         )
-        sweep = [
-            (
-                f"d={d:.0f}",
+        assert rule == ""
+
+    def test_returns_nonempty_rule_above_6(self):
+        agent = _athena_with_conflict(8.0)
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
+            sweep = [
                 (
-                    1.0
-                    if _athena_with_dissent(float(d))._behavioral_rule_instruction()
-                    != ""
-                    else 0.0
-                ),
-            )
-            for d in range(0, 8)
-        ]
+                    f"c={c:.0f}",
+                    (
+                        1.0
+                        if _athena_with_conflict(float(c))._behavioral_rule_instruction()
+                        != ""
+                        else 0.0
+                    ),
+                )
+                for c in range(0, 11)
+            ]
         _print_bar_chart(
-            sweep, title="Rule B (Athena) triggered vs dissent_level (0→7)"
+            sweep, title="Rule B (Athena) triggered vs conflict_index (0→10)"
         )
         assert rule != ""
 
-    def test_returns_empty_below_3(self):
-        agent = _athena_with_dissent(2.0)
-        assert agent.debate_profile()["dissent_level"] < 3.0
-        rule = agent._behavioral_rule_instruction()
+    def test_returns_empty_at_or_below_6(self):
+        agent = _athena_with_conflict(6.0)
+        assert agent.conflict_index() <= 6
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "Rule triggered?", "Expected"],
+            ["Agent", "conflict_index", "Rule triggered?", "Expected"],
             [
                 [
                     "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    f"{agent.conflict_index():.2f}",
                     str(rule != ""),
                     "False (empty)",
                 ]
             ],
-            title="test_returns_empty_below_3",
+            title="test_returns_empty_at_or_below_6",
         )
         assert rule == ""
 
     def test_rule_mentions_challenge(self):
-        agent = _athena_with_dissent(4.0)
-        rule = agent._behavioral_rule_instruction()
+        agent = _athena_with_conflict(8.0)
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "'challenge' in rule?", "Rule (truncated)"],
+            ["Agent", "conflict_index", "'challenge' in rule?", "Rule (truncated)"],
             [
                 [
                     "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    f"{agent.conflict_index():.2f}",
                     str("challenge" in rule.lower()),
                     rule[:60] + "..." if len(rule) > 60 else rule,
                 ]
@@ -366,14 +398,15 @@ class TestRuleBAnthena:
         assert "challenge" in rule.lower()
 
     def test_rule_mentions_disagreement(self):
-        agent = _athena_with_dissent(4.0)
-        rule = agent._behavioral_rule_instruction()
+        agent = _athena_with_conflict(8.0)
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "'disagreement' in rule?", "Rule (truncated)"],
+            ["Agent", "conflict_index", "'disagreement' in rule?", "Rule (truncated)"],
             [
                 [
                     "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    f"{agent.conflict_index():.2f}",
                     str("disagreement" in rule.lower()),
                     rule[:60] + "..." if len(rule) > 60 else rule,
                 ]
@@ -384,14 +417,15 @@ class TestRuleBAnthena:
 
     def test_rule_does_not_mandate_however(self):
         """Rule B must not force Athena to use fixed sentence openers like 'However,' 'Yet,' or 'This assumes.'"""
-        agent = _athena_with_dissent(4.0)
-        rule = agent._behavioral_rule_instruction()
+        agent = _athena_with_conflict(8.0)
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "'However,' absent?", "Rule (truncated)"],
+            ["Agent", "conflict_index", "'However,' absent?", "Rule (truncated)"],
             [
                 [
                     "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    f"{agent.conflict_index():.2f}",
                     str("However," not in rule),
                     rule[:60] + "..." if len(rule) > 60 else rule,
                 ]
@@ -400,19 +434,20 @@ class TestRuleBAnthena:
         )
         assert "However," not in rule
 
-    def test_non_athena_not_triggered_even_with_high_dissent(self):
+    def test_non_athena_not_triggered_even_with_high_conflict(self):
         """Rule B must not fire for agents other than Athena."""
         agent = _StubAgent(
-            "Fixy", id_strength=8.0, ego_strength=5.0, superego_strength=8.0
+            "Fixy", id_strength=9.0, ego_strength=5.0, superego_strength=9.0
         )
-        assert agent.debate_profile()["dissent_level"] >= 3.0
-        rule = agent._behavioral_rule_instruction()
+        assert agent.conflict_index() > 6
+        with patch("random.random", return_value=0.3):
+            rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "Rule triggered?", "Expected"],
+            ["Agent", "conflict_index", "Rule triggered?", "Expected"],
             [
                 [
                     "Fixy",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    f"{agent.conflict_index():.2f}",
                     str(rule != ""),
                     "False (not Athena)",
                 ]
