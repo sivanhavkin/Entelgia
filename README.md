@@ -34,8 +34,9 @@ Entelgia sits between agent engineering and cognitive architecture research, exp
 
 ### Mental Model (30 seconds)
 
-LLM + Persistent Memory + Psychological Drives + Observer Regulation = Dialogue-governed agents
-
+```
+LLM + Persistent Memory + Psychological Drives + Observer Regulation = Dialogue-governed agents' 
+```
 ---
 
 ### Why Entelgia Exists
