@@ -1526,17 +1526,11 @@ class Agent:
         """Return a behavioral rule instruction to inject into the prompt, if applicable.
 
         Rule A (Socrates): If Conflict >= 5.0, end response with a sharp binary-choice question (A or B).
-        Rule B (Athena): If Dissent >= 3.0, include a sentence starting with 'However,' / 'Yet,' / 'This assumes…'
         """
         if self.name == "Socrates" and self.conflict_index() >= 5.0:
             return (
                 "BEHAVIORAL RULE: You MUST end your response with one sharp question "
                 "that forces Athena to choose between exactly 2 options (A or B)."
-            )
-        if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
-            return (
-                "BEHAVIORAL RULE: Your response MUST include exactly one sentence that "
-                'begins with "However," or "Yet," or "This assumes…"'
             )
         return ""
 
