@@ -16,6 +16,8 @@ It represents exploration goals rather than fixed delivery promises.
 - Observer-based regulation (Fixy)
 - Structured dialogue strategies
 - Local-first execution via Ollama
+- **Limbic hijack** — Id-dominant emotional override with temporary Superego suppression (v2.7.0)
+- **Meta output refinement** — context-sensitive meta logging replacing constant noise (v2.7.0)
 
 Focus: stability, clarity, and architectural refinement.
 

@@ -277,6 +277,7 @@ What would you like to delete?
 * **⚡ Energy-Based Regulation** — FixyRegulator, dream cycle consolidation, hallucination-risk detection
 * **🧠 Personal Long-Term Memory** — DefenseMechanism, FreudianSlip, SelfReplication
 * **🎛️ Drive-Aware Cognition** — dynamic LLM temperature, superego critique, ego-driven memory depth
+* **🧠 Limbic Hijack** — Id-dominant emotional override: reduces Superego influence, forces impulsive responses, auto-exits after 3 turns or when intensity drops
 * **🔥 Drive Pressure** — per-agent urgency scalar with conciseness + decisiveness thresholds
 * **📊 Dialogue Quality Metrics** — `circularity_rate`, `progress_rate`, `intervention_utility`
 * **🔬 Ablation Study** — 4 reproducible conditions, fully deterministic
@@ -333,9 +334,11 @@ config.drive_mean_reversion_rate = 0.04   # Rate drives revert toward 5.0 each t
 config.drive_oscillation_range = 0.15     # ±random noise added to drives per turn (default: 0.15)
 
 # LLM temperature is computed automatically from drive values:
-# temperature = max(0.25, min(0.95, 0.60 + 0.03*(id - ego) - 0.02*(superego - ego)))
+# temperature = max(0.25, min(0.95, 0.60 + 0.03*(id - ego) - 0.02*(effective_sup - ego)))
+# During limbic hijack, effective_sup = superego * LIMBIC_HIJACK_SUPEREGO_MULTIPLIER (0.3)
 
 # Superego critique (second-pass rewrite) fires when superego_strength >= 7.5
+# During limbic hijack, effective_sup is reduced to 30% — suppressing the critique.
 # Memory depth scales automatically:
 #   ltm_limit = max(2, min(10, int(2 + ego/2 + self_awareness*4)))
 #   stm_tail  = max(3, min(12, int(3 + ego/2)))

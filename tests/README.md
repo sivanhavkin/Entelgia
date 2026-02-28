@@ -197,6 +197,30 @@ Tests verify the `evaluate_superego_critique()` function and the `Agent.speak()`
 
 ---
 
+### 🧠 Limbic Hijack Tests (15 tests)
+
+```bash
+pytest tests/test_limbic_hijack.py -v
+```
+
+Tests verify the limbic hijack mechanism introduced in v2.7.0:
+- ✅ **Initial state** — `limbic_hijack=False` and `_limbic_hijack_turns=0` on agent creation
+- ✅ **Activation (all conditions met)** — `id > 7`, `emotion_intensity > 0.7`, `conflict > 0.6` → hijack fires
+- ✅ **No activation (id too low)** — `id ≤ 7` → hijack stays off
+- ✅ **No activation (intensity too low)** — `emotion_intensity ≤ 0.7` → hijack stays off
+- ✅ **No activation (conflict too low)** — `conflict_index() ≤ 0.6` → hijack stays off
+- ✅ **Intensity-drop exit** — `emotion_intensity < 0.4` → hijack deactivates
+- ✅ **Turn-cap exit** — reaches `LIMBIC_HIJACK_MAX_TURNS` → hijack deactivates
+- ✅ **Counter increments while active** — `_limbic_hijack_turns` increases each non-exit turn
+- ✅ **Impulsive response kind** — `_last_response_kind == "impulsive"` during hijack
+- ✅ **Meta: limbic hijack message** — shown when `limbic_hijack=True`
+- ✅ **Meta: superego message** — shown when `_last_superego_rewrite=True` and no hijack
+- ✅ **Meta: no message when neither active** — silent when both flags are off
+- ✅ **Meta: no "skipped" spam** — skipped message never appears
+- ✅ **Meta: hijack has priority over superego** — hijack message wins when both are True
+
+---
+
 ### 📋 New Tests — `dialogue_metrics.py` & `ablation_study.py` (PR #111)
 
 #### `dialogue_metrics.py` Demo Output
@@ -275,7 +299,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 235 total tests (6 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 16 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 18 superego critique) |
+| **Unit Tests** | `pytest` | Runs 250 total tests (6 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 16 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 18 superego critique + 15 limbic hijack) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |

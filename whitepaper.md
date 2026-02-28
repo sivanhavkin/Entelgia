@@ -571,29 +571,103 @@ Energy-bounded cognition enables:
 
 ---
 
-## 21. Drive-Aware Cognition (v2.5.0)
+## 21. Drive-Aware Cognition (v2.5.0+)
 
 ### 21.1 Dynamic LLM Temperature
 
 Rather than using a fixed `temperature` parameter, each `CoreMind` agent computes its LLM sampling temperature on every turn from its current Freudian drive values:
 
 ```
-temperature = max(0.25, min(0.95, 0.60 + 0.03 × (id − ego) − 0.02 × (superego − ego)))
+temperature = max(0.25, min(0.95, 0.60 + 0.03 × (id − ego) − 0.02 × (effective_sup − ego)))
 ```
 
 - Higher **`id_strength`** shifts the agent toward more exploratory, creative outputs.
 - Higher **`superego_strength`** constrains the agent toward more principled, conservative responses.
 - The range [0.25, 0.95] prevents degenerate extremes (near-deterministic or fully random).
+- During **limbic hijack** (see §21.2), `effective_sup = superego × 0.3`, significantly elevating temperature.
 
-### 21.2 Superego Second-Pass Critique
+### 21.2 Limbic Hijack (v2.7.0)
 
-When an agent's `superego_strength` reaches or exceeds **7.5** (on a 0–10 scale), the initial response is passed back through the LLM at `temperature=0.25` with the following prompt acting as an internal governor:
+**Limbic hijack** models the psychoanalytic concept of the limbic system overpowering cortical, regulatory control when Id-driven emotional arousal becomes dominant.
+
+#### State
+
+Each agent carries two new fields:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `limbic_hijack` | `bool` | `False` | Emotional override active flag |
+| `_limbic_hijack_turns` | `int` | `0` | Consecutive turns elapsed since activation |
+
+Two module-level constants govern intensity and duration:
+
+| Constant | Value | Description |
+|---|---|---|
+| `LIMBIC_HIJACK_SUPEREGO_MULTIPLIER` | `0.3` | Fraction of SuperEgo applied during hijack |
+| `LIMBIC_HIJACK_MAX_TURNS` | `3` | Turns before automatic deactivation |
+
+#### Activation
+
+At the start of every `speak()` call, the following gate is evaluated:
+
+```python
+if ide > 7 and self._last_emotion_intensity > 0.7 and self.conflict_index() > 0.6:
+    self.limbic_hijack = True
+    self._limbic_hijack_turns = 0
+```
+
+All three conditions must hold simultaneously:
+
+| Condition | Rationale |
+|---|---|
+| `id_strength > 7` | Id drive sufficiently dominant |
+| `emotion_intensity > 0.7` | High affective arousal present |
+| `conflict_index() > 0.6` | Significant internal tension detected |
+
+#### Behavioral Effects
+
+While `limbic_hijack is True`:
+
+- **`effective_sup = sup × LIMBIC_HIJACK_SUPEREGO_MULTIPLIER`** — SuperEgo regulatory influence reduced to 30%.
+- Temperature formula uses `effective_sup` instead of `sup` — raising volatility and creativity.
+- `evaluate_superego_critique()` receives `effective_sup` — critique rarely fires, effectively silencing the internal governor.
+- `response_kind` forced to `"impulsive"` — feeds into `update_drives_after_turn()`, nudging Id upward and SuperEgo downward in the subsequent drive state.
+
+#### Exit Conditions
+
+The hijack deactivates (in the same `speak()` call where the `elif` branch runs) when:
+
+```python
+elif self.limbic_hijack:
+    self._limbic_hijack_turns += 1
+    if self._last_emotion_intensity < 0.4 or self._limbic_hijack_turns >= LIMBIC_HIJACK_MAX_TURNS:
+        self.limbic_hijack = False
+```
+
+- **Intensity exit** — emotion intensity fell below `0.4`; regulation restored.
+- **Turn cap exit** — `LIMBIC_HIJACK_MAX_TURNS = 3` consecutive non-re-triggered turns elapsed.
+
+#### Meta Output
+
+When `show_meta=True`, `print_meta_state()` uses a priority-ordered tag system:
+
+| Priority | Condition | Output |
+|---|---|---|
+| 1 | `limbic_hijack` is `True` | `[META] Limbic hijack engaged — emotional override active` |
+| 2 | SuperEgo critique was applied | `[SuperEgo critique applied; original shown in dialogue]` |
+| 3 | Neither | *(silent — no spam)* |
+
+This eliminates the previous per-turn "SuperEgo critic skipped" logging that appeared on almost every turn.
+
+### 21.3 Superego Second-Pass Critique
+
+When an agent's `superego_strength` reaches or exceeds **7.5** (on a 0–10 scale) *and no limbic hijack is active*, the initial response is passed back through the LLM at `temperature=0.25` with the following prompt acting as an internal governor:
 
 > *"You are the agent's Superego. Rewrite the response to be: more principled, less impulsive, remove contradictions, keep the core idea."*
 
 This two-pass approach models the Freudian ego-superego tension: the id produces a raw response; the superego governs and revises it.
 
-### 21.3 Ego-Driven Memory Retrieval Depth
+### 21.4 Ego-Driven Memory Retrieval Depth
 
 Fixed memory retrieval limits have been replaced by ego- and self-awareness-scaled bounds:
 
@@ -604,7 +678,7 @@ Fixed memory retrieval limits have been replaced by ego- and self-awareness-scal
 
 Agents with a stronger ego and higher self-awareness retrieve deeper context, allowing them to stabilise faster after a dream-cycle reset and maintain conversational coherence over longer sessions.
 
-### 21.4 Output Artifact Cleanup
+### 21.5 Output Artifact Cleanup
 
 After all validate/critique passes, `speak()` performs a final cleanup sweep:
 
