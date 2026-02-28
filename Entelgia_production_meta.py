@@ -1796,12 +1796,17 @@ class Agent:
             self._limbic_hijack_turns = 0
         elif self.limbic_hijack:
             self._limbic_hijack_turns += 1
-            if self._last_emotion_intensity < 0.4 or self._limbic_hijack_turns >= LIMBIC_HIJACK_MAX_TURNS:
+            if (
+                self._last_emotion_intensity < 0.4
+                or self._limbic_hijack_turns >= LIMBIC_HIJACK_MAX_TURNS
+            ):
                 self.limbic_hijack = False
                 self._limbic_hijack_turns = 0
 
         # During limbic hijack, reduce superego regulatory influence
-        effective_sup = sup * LIMBIC_HIJACK_SUPEREGO_MULTIPLIER if self.limbic_hijack else sup
+        effective_sup = (
+            sup * LIMBIC_HIJACK_SUPEREGO_MULTIPLIER if self.limbic_hijack else sup
+        )
 
         temperature = max(
             0.25,
