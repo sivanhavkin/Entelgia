@@ -154,6 +154,8 @@ Drives are internal state vectors that influence agent behavior, modeling:
 
 These competing drives create internal tension that shapes agent responses and enables emergent regulation.
 
+When **Id dominates** (id > 7) alongside high emotional intensity and high conflict, the agent enters a **limbic hijack** state — Superego influence is temporarily reduced to 30%, the response style becomes impulsive, and the agent auto-exits the state when arousal subsides or after 3 turns.
+
 ### What is Fixy's role?
 
 Fixy is the meta-observer that:
@@ -204,11 +206,12 @@ python Entelgia_production_meta_200t.py
    - Current dialogue context
    - Relevant memories (STM + LTM)
    - Internal drives and persona (temperature computed from id/ego/superego balance)
-4. Response is optionally rewritten by superego critique if `superego_strength ≥ 7.5`
-5. Response is logged and memory is updated
-6. Fixy may intervene if needed
-7. Dream/reflection cycles occur periodically
-8. Process continues for configured number of turns
+4. If Id > 7, emotion intensity > 0.7, and conflict > 0.6, **limbic hijack** activates: Superego influence is reduced to 30%, response style becomes impulsive, and the agent exits the state when arousal drops or after 3 turns
+5. Response is optionally rewritten by superego critique if `superego_strength ≥ 7.5` (and no hijack is active)
+6. Response is logged and memory is updated
+7. Fixy may intervene if needed
+8. Dream/reflection cycles occur periodically
+9. Process continues for configured number of turns
 
 ### How long does a session take?
 

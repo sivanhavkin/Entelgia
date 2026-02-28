@@ -12,6 +12,39 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [2.7.0] - 2026-02-28
+
+### Added
+
+- **Limbic Hijack State** 🧠 — Id-dominant emotional override mechanism for agents
+  - `agent.limbic_hijack: bool` — new per-agent boolean state (default `False`)
+  - `agent._limbic_hijack_turns: int` — consecutive turns elapsed since hijack started (default `0`)
+  - Module-level constants: `LIMBIC_HIJACK_SUPEREGO_MULTIPLIER = 0.3`, `LIMBIC_HIJACK_MAX_TURNS = 3`
+  - **Activation condition** (pre-response hook in `speak()`): fires when `id_strength > 7`, `_last_emotion_intensity > 0.7`, and `conflict_index() > 0.6` simultaneously
+  - **Behavioral effects during hijack**: SuperEgo influence reduced to 30% (`effective_sup = sup × 0.3`); response kind forced to `"impulsive"`; LLM temperature elevated; SuperEgo critique effectively suppressed
+  - **Exit condition**: deactivates immediately when `emotion_intensity < 0.4`, or automatically after `LIMBIC_HIJACK_MAX_TURNS = 3` turns without re-trigger
+  - Applied identically to both `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`
+
+- **Meta Output Refinement** — eliminated per-turn "SuperEgo critic skipped" log spam
+  - `print_meta_state()` now uses a priority-ordered tag system:
+    1. Limbic hijack active → `[META] Limbic hijack engaged — emotional override active`
+    2. SuperEgo critique applied → `[SuperEgo critique applied; original shown in dialogue]`
+    3. Otherwise → silent (no message)
+
+- **`tests/test_limbic_hijack.py`** 🧪 — 15 unit tests covering all hijack scenarios
+  - `TestLimbicHijackInitialState` — initial attribute defaults
+  - `TestLimbicHijackActivation` — all-conditions-met vs. each threshold below boundary
+  - `TestLimbicHijackExit` — intensity-drop exit, turn-cap exit, counter increment
+  - `TestLimbicHijackResponseKind` — impulsive kind enforcement during hijack
+  - `TestMetaOutputLogic` — all three meta output branches + priority ordering + no skipped-message spam
+
+### Changed
+
+- `Agent.speak()` in both production files: drives → temperature block now computes `effective_sup` before passing to temperature formula and `evaluate_superego_critique`, enabling hijack suppression without changing the public API or `drives` dict
+- `print_meta_state()` in both production files: removed unconditional "skipped" branch; limbic hijack message takes priority over SuperEgo messages
+
+---
+
 ## [2.6.0] - 2026-02-26
 
 ### Added

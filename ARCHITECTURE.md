@@ -277,14 +277,46 @@ process_step(input)
 Each `CoreMind` agent computes its LLM temperature from its current Freudian drive values on every turn:
 
 ```
-temperature = max(0.25, min(0.95, 0.60 + 0.03*(id − ego) − 0.02*(superego − ego)))
+temperature = max(0.25, min(0.95, 0.60 + 0.03*(id − ego) − 0.02*(effective_sup − ego)))
 ```
 
 Higher `id_strength` → more creative; higher `superego_strength` → more constrained.
+During limbic hijack, `effective_sup = superego × 0.3`, elevating temperature and uninhibiting responses.
+
+### Limbic Hijack
+
+**Limbic hijack** is an Id-dominant emotional override state (`agent.limbic_hijack: bool`). It models the psychoanalytic concept of the limbic system overpowering rational, regulatory control.
+
+**Activation** (checked at the start of every `speak()` call):
+
+```python
+if ide > 7 and emotion_intensity > 0.7 and conflict_index() > 0.6:
+    agent.limbic_hijack = True
+```
+
+**Behavioral effects while active:**
+
+| Effect | Detail |
+|---|---|
+| Reduced SuperEgo influence | `effective_sup = sup × LIMBIC_HIJACK_SUPEREGO_MULTIPLIER` (0.3) |
+| Elevated temperature | Computed using `effective_sup` — less restraint |
+| SuperEgo critique suppressed | `effective_sup` passed to `evaluate_superego_critique`; rarely dominant |
+| Impulsive response kind | `response_kind = "impulsive"` fed into drive update loop |
+
+**Exit conditions:**
+
+- Immediate: `emotion_intensity < 0.4`
+- Automatic: after `LIMBIC_HIJACK_MAX_TURNS = 3` consecutive turns without re-trigger
+
+**Meta output** (when `show_meta=True`):
+
+```
+[META] Limbic hijack engaged — emotional override active
+```
 
 ### Superego Second-Pass Critique
 
-When `superego_strength ≥ 7.5`, the initial response is rewritten by the LLM at `temperature=0.25` with a principled internal-governor prompt. This models the ego-superego tension: id produces a raw response; superego revises it.
+When `superego_strength ≥ 7.5` (and no limbic hijack is active), the initial response is rewritten by the LLM at `temperature=0.25` with a principled internal-governor prompt. This models the ego-superego tension: id produces a raw response; superego revises it.
 
 ### Ego-Driven Memory Retrieval Depth
 

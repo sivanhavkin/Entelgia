@@ -284,6 +284,12 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
 # Initial energy for all agents (restored after each dream cycle)
 AGENT_INITIAL_ENERGY: float = 100.0
 
+# Fraction of SuperEgo strength applied during limbic hijack (reduces regulatory influence)
+LIMBIC_HIJACK_SUPEREGO_MULTIPLIER: float = 0.3
+
+# Number of consecutive turns (without re-trigger) before limbic hijack auto-exits
+LIMBIC_HIJACK_MAX_TURNS: int = 3
+
 
 @dataclass
 class Config:
@@ -1481,6 +1487,9 @@ class Agent:
         self._topic_history: List[str] = []  # last N topic signatures for stagnation
         self._same_topic_turns: int = 0  # consecutive turns with same signature
         self._last_stagnation: float = 0.0
+        # Limbic hijack state
+        self.limbic_hijack: bool = False
+        self._limbic_hijack_turns: int = 0  # turns elapsed since hijack started
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -1773,13 +1782,33 @@ class Agent:
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
         sup = float(self.drives.get("superego_strength", 5.0))
+
+        # Limbic hijack: activate when Id is dominant, emotional intensity is high,
+        # and conflict crosses threshold.  Exit when intensity drops or after
+        # LIMBIC_HIJACK_MAX_TURNS turns without re-trigger.
+        if (
+            ide > 7
+            and self._last_emotion_intensity > 0.7
+            and self.conflict_index() > 0.6
+        ):
+            self.limbic_hijack = True
+            self._limbic_hijack_turns = 0
+        elif self.limbic_hijack:
+            self._limbic_hijack_turns += 1
+            if self._last_emotion_intensity < 0.4 or self._limbic_hijack_turns >= LIMBIC_HIJACK_MAX_TURNS:
+                self.limbic_hijack = False
+                self._limbic_hijack_turns = 0
+
+        # During limbic hijack, reduce superego regulatory influence
+        effective_sup = sup * LIMBIC_HIJACK_SUPEREGO_MULTIPLIER if self.limbic_hijack else sup
+
         temperature = max(
             0.25,
             min(
                 0.95,
                 0.60
                 + 0.03 * (ide - ego)
-                - 0.02 * (sup - ego)
+                - 0.02 * (effective_sup - ego)
                 + 0.015 * self.conflict_index(),
             ),
         )
@@ -1801,7 +1830,7 @@ class Agent:
         _critique = evaluate_superego_critique(
             id_strength=ide,
             ego_strength=ego,
-            superego_strength=sup,
+            superego_strength=effective_sup,
             conflict=self.conflict_index(),
             enabled=getattr(_cfg, "superego_critique_enabled", True),
             dominance_margin=getattr(_cfg, "superego_dominance_margin", 0.5),
@@ -1824,7 +1853,9 @@ class Agent:
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
-        if emo in ("anger", "frustration") or self.conflict_index() >= 8.5:
+        if self.limbic_hijack:
+            kind = "impulsive"
+        elif emo in ("anger", "frustration") or self.conflict_index() >= 8.5:
             kind = "aggressive"
         elif emo in ("fear", "anxiety"):
             kind = "guilt"
@@ -2754,12 +2785,10 @@ class MainScript:
             + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
             + reset
         )
-        if agent._last_superego_rewrite:
+        if getattr(agent, "limbic_hijack", False):
+            rewrite_tag = "  [META] Limbic hijack engaged — emotional override active"
+        elif agent._last_superego_rewrite:
             rewrite_tag = "  [SuperEgo critique applied; original shown in dialogue]"
-        elif getattr(agent, "_last_critique_reason", ""):
-            rewrite_tag = (
-                f"  [SuperEgo critique skipped: reason={agent._last_critique_reason}]"
-            )
         else:
             rewrite_tag = ""
         print(

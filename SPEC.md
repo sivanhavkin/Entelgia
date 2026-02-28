@@ -153,13 +153,17 @@ A compact agent state vector (examples):
 * emotional_state / arousal / coherence
 * conflict index
 * self-awareness level
+* `limbic_hijack: bool` — Id-dominant emotional override active flag (default `False`)
+* `_limbic_hijack_turns: int` — consecutive turns elapsed since hijack start (default `0`)
 * other agent-specific parameters
 
 These are updated after each turn via:
 
-* response kind (e.g., disagreement / reflection / analogy)
+* response kind (e.g., `"disagreement"` / `"reflective"` / `"impulsive"`)
 * detected emotion + intensity (if enabled)
 * intervention events
+
+**Limbic hijack** activates when `id_strength > 7`, `emotion_intensity > 0.7`, and `conflict_index() > 0.6`. While active, SuperEgo influence is reduced to 30% (`effective_sup = sup × 0.3`) and `response_kind` is forced to `"impulsive"`. The state auto-exits when emotion intensity drops below 0.4 or after 3 turns without re-trigger.
 
 ### 4.4 Persona
 
@@ -396,13 +400,18 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 * `enable_auto_patch` — Enable automatic self-patching (default: `False`)
 * `allow_write_self_file` — Allow the agent to write to its own source file (default: `False`)
 
-### Energy & Drive (v2.5.0)
+### Energy & Drive (v2.5.0+)
 
 * `energy_safety_threshold` — Energy floor that triggers a dream cycle (default: `35.0`)
 * `energy_drain_min` / `energy_drain_max` — Per-step energy drain range (default: `8.0` / `15.0`)
 * `self_replicate_every_n_turns` — Turns between self-replication keyword scans (default: `10`)
 * `drive_mean_reversion_rate` — Rate at which drives revert toward 5.0 each turn (default: `0.04`)
 * `drive_oscillation_range` — ±random noise added to drive values per turn (default: `0.15`)
+
+**Limbic hijack constants** (module-level, not `Config` fields):
+
+* `LIMBIC_HIJACK_SUPEREGO_MULTIPLIER = 0.3` — fraction of SuperEgo strength applied during hijack
+* `LIMBIC_HIJACK_MAX_TURNS = 3` — auto-exit after this many consecutive non-re-triggered turns
 
 ---
 
