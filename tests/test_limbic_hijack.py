@@ -33,7 +33,6 @@ from Entelgia_production_meta import (
     LIMBIC_HIJACK_MAX_TURNS,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -239,7 +238,9 @@ class TestLimbicHijackResponseKind:
 class _MinimalMetaAgent:
     """Minimal stub for testing print_meta_state output logic."""
 
-    def __init__(self, limbic_hijack: bool, superego_rewrite: bool, critique_reason: str = ""):
+    def __init__(
+        self, limbic_hijack: bool, superego_rewrite: bool, critique_reason: str = ""
+    ):
         self.limbic_hijack = limbic_hijack
         self._limbic_hijack_turns = 0
         self._last_superego_rewrite = superego_rewrite
@@ -292,13 +293,17 @@ class TestMetaOutputLogic:
         assert "SuperEgo critique applied" in tag
 
     def test_no_message_when_neither_active(self):
-        agent = _MinimalMetaAgent(limbic_hijack=False, superego_rewrite=False, critique_reason="ego_dominant")
+        agent = _MinimalMetaAgent(
+            limbic_hijack=False, superego_rewrite=False, critique_reason="ego_dominant"
+        )
         tag = _capture_rewrite_tag(agent)
         assert tag == "", f"Expected empty tag but got: {tag!r}"
 
     def test_no_skipped_message_shown(self):
         """The 'skipped' message must never appear (it was removed)."""
-        agent = _MinimalMetaAgent(limbic_hijack=False, superego_rewrite=False, critique_reason="low_conflict")
+        agent = _MinimalMetaAgent(
+            limbic_hijack=False, superego_rewrite=False, critique_reason="low_conflict"
+        )
         tag = _capture_rewrite_tag(agent)
         assert "skipped" not in tag
 
