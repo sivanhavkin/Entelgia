@@ -2,6 +2,8 @@
 """
 Tests for behavioral rules:
   Rule A (Socrates): Conflict >= 5.0 → end response with binary-choice question (A or B).
+  Rule B (Athena):  Dissent >= 3.0  → directly challenge/counter Socrates's position
+                    using varied language (no fixed sentence opener).
 """
 
 import sys
@@ -55,6 +57,12 @@ class _StubAgent:
             return (
                 "BEHAVIORAL RULE: You MUST end your response with one sharp question "
                 "that forces Athena to choose between exactly 2 options (A or B)."
+            )
+        if self.name == "Athena" and self.debate_profile()["dissent_level"] >= 3.0:
+            return (
+                "BEHAVIORAL RULE: You MUST directly challenge or counter Socrates's position "
+                "in your response, expressing clear disagreement. Use varied language and do "
+                "not start every sentence the same way."
             )
         return ""
 
@@ -270,42 +278,57 @@ class TestRuleASocrates:
 
 
 class TestRuleBAnthena:
-    """Rule B removed: Athena no longer emits a dissent-marker instruction."""
+    """Rule B: Athena directly challenges Socrates when Dissent >= 3.0 (no fixed opener)."""
 
-    def test_returns_empty_rule_at_exactly_3(self):
+    def test_returns_nonempty_rule_at_exactly_3(self):
         agent = _athena_with_dissent(3.0)
         assert agent.debate_profile()["dissent_level"] >= 3.0
         rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "Rule triggered?", "Expected"],
+            ["Agent", "dissent_level", "Rule triggered?", "Rule (truncated)"],
             [
                 [
                     "Athena",
                     f"{agent.debate_profile()['dissent_level']:.2f}",
                     str(rule != ""),
-                    "False (Rule B removed)",
+                    rule[:50] + "..." if len(rule) > 50 else rule,
                 ]
             ],
-            title="test_returns_empty_rule_at_exactly_3",
+            title="test_returns_nonempty_rule_at_exactly_3",
         )
-        assert rule == ""
+        assert rule != ""
 
-    def test_returns_empty_rule_above_3(self):
+    def test_returns_nonempty_rule_above_3(self):
         agent = _athena_with_dissent(5.0)
         rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "Rule triggered?", "Expected"],
+            ["Agent", "dissent_level", "Rule triggered?", "Rule (truncated)"],
             [
                 [
                     "Athena",
                     f"{agent.debate_profile()['dissent_level']:.2f}",
                     str(rule != ""),
-                    "False (Rule B removed)",
+                    rule[:50] + "..." if len(rule) > 50 else rule,
                 ]
             ],
-            title="test_returns_empty_rule_above_3",
+            title="test_returns_nonempty_rule_above_3",
         )
-        assert rule == ""
+        sweep = [
+            (
+                f"d={d:.0f}",
+                (
+                    1.0
+                    if _athena_with_dissent(float(d))._behavioral_rule_instruction()
+                    != ""
+                    else 0.0
+                ),
+            )
+            for d in range(0, 8)
+        ]
+        _print_bar_chart(
+            sweep, title="Rule B (Athena) triggered vs dissent_level (0→7)"
+        )
+        assert rule != ""
 
     def test_returns_empty_below_3(self):
         agent = _athena_with_dissent(2.0)
@@ -325,56 +348,57 @@ class TestRuleBAnthena:
         )
         assert rule == ""
 
-    def test_rule_does_not_mention_however(self):
+    def test_rule_mentions_challenge(self):
         agent = _athena_with_dissent(4.0)
         rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "dissent_level", "'However,' in rule?", "Expected"],
+            ["Agent", "dissent_level", "'challenge' in rule?", "Rule (truncated)"],
             [
                 [
                     "Athena",
                     f"{agent.debate_profile()['dissent_level']:.2f}",
-                    str("However," in rule),
-                    "False (Rule B removed)",
+                    str("challenge" in rule.lower()),
+                    rule[:60] + "..." if len(rule) > 60 else rule,
                 ]
             ],
-            title="test_rule_does_not_mention_however",
+            title="test_rule_mentions_challenge",
+        )
+        assert "challenge" in rule.lower()
+
+    def test_rule_mentions_disagreement(self):
+        agent = _athena_with_dissent(4.0)
+        rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["Agent", "dissent_level", "'disagreement' in rule?", "Rule (truncated)"],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str("disagreement" in rule.lower()),
+                    rule[:60] + "..." if len(rule) > 60 else rule,
+                ]
+            ],
+            title="test_rule_mentions_disagreement",
+        )
+        assert "disagreement" in rule.lower()
+
+    def test_rule_does_not_mandate_however(self):
+        """Rule B must not force Athena to use fixed sentence openers like 'However,' 'Yet,' or 'This assumes.'"""
+        agent = _athena_with_dissent(4.0)
+        rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["Agent", "dissent_level", "'However,' absent?", "Rule (truncated)"],
+            [
+                [
+                    "Athena",
+                    f"{agent.debate_profile()['dissent_level']:.2f}",
+                    str("However," not in rule),
+                    rule[:60] + "..." if len(rule) > 60 else rule,
+                ]
+            ],
+            title="test_rule_does_not_mandate_however",
         )
         assert "However," not in rule
-
-    def test_rule_does_not_mention_yet(self):
-        agent = _athena_with_dissent(4.0)
-        rule = agent._behavioral_rule_instruction()
-        _print_table(
-            ["Agent", "dissent_level", "'Yet,' in rule?", "Expected"],
-            [
-                [
-                    "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
-                    str("Yet," in rule),
-                    "False (Rule B removed)",
-                ]
-            ],
-            title="test_rule_does_not_mention_yet",
-        )
-        assert "Yet," not in rule
-
-    def test_rule_does_not_mention_this_assumes(self):
-        agent = _athena_with_dissent(4.0)
-        rule = agent._behavioral_rule_instruction()
-        _print_table(
-            ["Agent", "dissent_level", "'This assumes' in rule?", "Expected"],
-            [
-                [
-                    "Athena",
-                    f"{agent.debate_profile()['dissent_level']:.2f}",
-                    str("This assumes" in rule),
-                    "False (Rule B removed)",
-                ]
-            ],
-            title="test_rule_does_not_mention_this_assumes",
-        )
-        assert "This assumes" not in rule
 
     def test_non_athena_not_triggered_even_with_high_dissent(self):
         """Rule B must not fire for agents other than Athena."""
