@@ -10,10 +10,6 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
----
-
-## [2.7.0] - 2026-02-28
-
 ### Added
 
 - **Limbic Hijack State** 🧠 — Id-dominant emotional override mechanism for agents
@@ -37,6 +33,8 @@ All notable changes to this project will be documented in this file. The format 
   - `TestLimbicHijackExit` — intensity-drop exit, turn-cap exit, counter increment
   - `TestLimbicHijackResponseKind` — impulsive kind enforcement during hijack
   - `TestMetaOutputLogic` — all three meta output branches + priority ordering + no skipped-message spam
+
+---
 
 ### Changed
 
