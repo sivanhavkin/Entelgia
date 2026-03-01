@@ -2399,6 +2399,40 @@ if FASTAPI_AVAILABLE:
         """Health check endpoint."""
         return {"status": "ok", "version": "1.0"}
 
+    class ChatRequest(BaseModel):
+        message: str
+        session_id: Optional[str] = None
+
+    _chat_state: Dict[str, Any] = {"llm": None, "metrics": None}
+
+    def _get_chat_llm() -> "LLM":
+        """Return a lazily-initialised LLM singleton for /api/v1/chat."""
+        if _chat_state["llm"] is None:
+            cfg = CFG if CFG is not None else Config()
+            _chat_state["metrics"] = MetricsTracker(cfg.metrics_path)
+            _chat_state["llm"] = LLM(cfg, _chat_state["metrics"])
+        return _chat_state["llm"]
+
+    @app.post("/api/v1/chat")
+    async def chat(request: ChatRequest):
+        """Single-turn Fixy inference endpoint.
+
+        Performs a lightweight single LLM call using the Fixy model.
+        Does not start the dialogue engine or any multi-agent loop.
+        """
+        if not request.message or not request.message.strip():
+            raise HTTPException(status_code=400, detail="message must not be empty")
+        try:
+            cfg = CFG if CFG is not None else Config()
+            llm = _get_chat_llm()
+            response_text = llm.generate(
+                cfg.model_fixy, request.message.strip(), temperature=0.7, use_cache=False
+            )
+            return {"response": response_text}
+        except Exception as e:
+            logger.error(f"Chat API Error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
 
 # ============================================
 # UNIT TESTS (pytest)
