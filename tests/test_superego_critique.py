@@ -674,5 +674,111 @@ class TestAgentSpeakCritiqueStateReset:
         assert agent._last_critique_reason != "superego_dominant"
 
 
+# ---------------------------------------------------------------------------
+# 8. Consecutive SuperEgo streak limit
+# ---------------------------------------------------------------------------
+
+
+class TestSuperEgoConsecutiveStreakLimit:
+    """
+    After 2 consecutive SuperEgo rewrites the counter reaches its limit.
+    Turn 3+ must show the ORIGINAL text (no rewrite call) and set
+    _superego_streak_suppressed=True.  When a non-critique turn occurs
+    the counter resets so the next critique turn rewrites again.
+    """
+
+    def _make_superego_agent(self):
+        """Agent with SuperEgo-dominant drives so critique fires every turn."""
+        return _make_agent(ego_dominant=False)
+
+    def test_first_two_turns_apply_rewrite(self):
+        """Turns 1 and 2: rewrite applied, _last_superego_rewrite=True."""
+        agent, cfg = self._make_superego_agent()
+        with patch.object(_meta, "CFG", cfg):
+            for turn in range(1, 3):
+                agent.speak("What is justice?", [])
+                assert agent._last_superego_rewrite is True, (
+                    f"Turn {turn}: expected rewrite applied"
+                )
+                assert agent._superego_streak_suppressed is False, (
+                    f"Turn {turn}: suppressed flag must be False when rewrite applies"
+                )
+
+    def test_third_turn_suppresses_rewrite(self):
+        """Turn 3: critique would fire but streak >= 2, so original shown."""
+        agent, cfg = self._make_superego_agent()
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])  # turn 1
+            agent.speak("What is justice?", [])  # turn 2
+            # Capture LLM call count before turn 3
+            calls_before = agent.llm.generate.call_count
+            agent.speak("What is justice?", [])  # turn 3 — suppressed
+
+        _print_table(
+            [
+                "_last_superego_rewrite",
+                "_superego_streak_suppressed",
+                "extra_llm_calls",
+                "expected_rewrite",
+                "expected_suppressed",
+            ],
+            [
+                [
+                    str(agent._last_superego_rewrite),
+                    str(agent._superego_streak_suppressed),
+                    str(agent.llm.generate.call_count - calls_before),
+                    "False",
+                    "True",
+                ]
+            ],
+            title="test_third_turn_suppresses_rewrite",
+        )
+        assert agent._last_superego_rewrite is False, (
+            "Turn 3: _last_superego_rewrite must be False when streak limit reached"
+        )
+        assert agent._superego_streak_suppressed is True, (
+            "Turn 3: _superego_streak_suppressed must be True"
+        )
+        # Only one LLM call (main response), no extra rewrite call
+        assert agent.llm.generate.call_count - calls_before == 1, (
+            "Turn 3: LLM must not be called a second time for the rewrite"
+        )
+
+    def test_counter_resets_after_non_critique_turn(self):
+        """
+        After two critique turns (streak=2), a non-critique (ego-dominant) turn
+        resets the counter.  The following critique turn applies the rewrite again.
+        """
+        # Two agents: one shares the LLM mock so we can count calls
+        agent_sup, cfg_sup = self._make_superego_agent()
+        agent_ego, cfg_ego = _make_agent(ego_dominant=True)
+        # Share llm mock so we can inspect counts on the superego agent
+        with patch.object(_meta, "CFG", cfg_sup):
+            agent_sup.speak("What is justice?", [])  # turn 1 — rewrite
+            agent_sup.speak("What is justice?", [])  # turn 2 — rewrite
+            assert agent_sup._consecutive_superego_rewrites == 2
+
+            # Manually simulate a non-critique turn by patching evaluate_superego_critique
+            with patch.object(
+                _meta,
+                "evaluate_superego_critique",
+                return_value=_meta.CritiqueDecision(
+                    should_apply=False, reason="ego_dominant"
+                ),
+            ):
+                agent_sup.speak("What is virtue?", [])  # non-critique turn
+
+            assert agent_sup._consecutive_superego_rewrites == 0, (
+                "Counter must reset to 0 after a non-critique turn"
+            )
+
+            # Next critique turn should apply the rewrite again
+            agent_sup.speak("What is justice?", [])  # turn after reset
+            assert agent_sup._last_superego_rewrite is True, (
+                "After counter reset, first critique turn must apply rewrite again"
+            )
+            assert agent_sup._superego_streak_suppressed is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
