@@ -258,6 +258,7 @@ logger.info(
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 MAX_RESPONSE_WORDS = 150
+MAX_CONSECUTIVE_SUPEREGO_REWRITES = 2
 
 # LLM First-Person Instruction - agents must speak as themselves using "I"
 LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
@@ -1485,6 +1486,8 @@ class Agent:
         self._last_temperature: float = 0.6
         self._last_superego_rewrite: bool = False
         self._last_critique_reason: str = ""
+        self._consecutive_superego_rewrites: int = 0
+        self._superego_streak_suppressed: bool = False
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
@@ -1729,6 +1732,7 @@ class Agent:
         # Reset per-turn critique state before any early returns or alternate paths
         self._last_superego_rewrite = False
         self._last_critique_reason = ""
+        self._superego_streak_suppressed = False
 
         prompt = self._build_compact_prompt(seed, dialog_tail)
 
@@ -1847,18 +1851,26 @@ class Agent:
         )
         self._last_superego_rewrite = _critique.should_apply
         self._last_critique_reason = _critique.reason
-        if self._last_superego_rewrite:
-            critique_prompt = (
-                "Rewrite the following response to be more principled, "
-                "less impulsive, remove contradictions, keep the core idea.\n\n"
-                f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
-            )
-            out = validate_output(
-                self.llm.generate(
-                    self.model, critique_prompt, temperature=0.25, use_cache=False
+        if _critique.should_apply:
+            if self._consecutive_superego_rewrites < MAX_CONSECUTIVE_SUPEREGO_REWRITES:
+                critique_prompt = (
+                    "Rewrite the following response to be more principled, "
+                    "less impulsive, remove contradictions, keep the core idea.\n\n"
+                    f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
                 )
-                or out
-            )
+                out = validate_output(
+                    self.llm.generate(
+                        self.model, critique_prompt, temperature=0.25, use_cache=False
+                    )
+                    or out
+                )
+                self._consecutive_superego_rewrites += 1
+            else:
+                # Streak limit reached — show original text, suppress rewrite
+                self._last_superego_rewrite = False
+                self._superego_streak_suppressed = True
+        else:
+            self._consecutive_superego_rewrites = 0
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
@@ -2791,6 +2803,8 @@ class MainScript:
         )
         if getattr(agent, "limbic_hijack", False):
             rewrite_tag = "  [META] Limbic hijack engaged — emotional override active"
+        elif getattr(agent, "_superego_streak_suppressed", False):
+            rewrite_tag = "  [SuperEgo critique suppressed — consecutive limit; original answer shown]"
         elif agent._last_superego_rewrite:
             rewrite_tag = "  [SuperEgo critique applied; changed answer shown in dialogue]"
         else:
