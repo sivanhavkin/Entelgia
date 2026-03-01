@@ -2351,6 +2351,18 @@ if FASTAPI_AVAILABLE:
         dialog: List[Dict[str, str]]
         metrics: Dict[str, Any]
 
+    class CreateSessionResponse(BaseModel):
+        session_id: str
+
+    class ChatRequest(BaseModel):
+        message: str
+        session_id: Optional[str] = None
+
+    class ChatResponse(BaseModel):
+        response: str
+        session_id: str
+        agent: str
+
     @app.post("/api/dialogue/start", response_model=DialogResponse)
     async def start_dialogue(request: DialogRequest):
         """Start a new dialogue session."""
@@ -2398,6 +2410,51 @@ if FASTAPI_AVAILABLE:
     async def health_check():
         """Health check endpoint."""
         return {"status": "ok", "version": "1.0"}
+
+    @app.post("/api/sessions", response_model=CreateSessionResponse)
+    async def create_session():
+        """Create a new dialogue session and return its ID."""
+        session_id = str(uuid.uuid4())
+        return CreateSessionResponse(session_id=session_id)
+
+    @app.post("/api/v1/chat", response_model=ChatResponse)
+    async def chat(request: ChatRequest):
+        """Send a message to Fixy and get a response."""
+        try:
+            session_id = request.session_id or str(uuid.uuid4())
+            cfg = CFG or Config()
+            fixy_persona = (
+                "I am a meta-cognitive observer who detects patterns, names "
+                "contradictions, and suggests interventions. I am brief, concrete, "
+                "and speak English directly."
+            )
+            prompt = (
+                f"Fixy:\nPERSONA: {fixy_persona}\n\n"
+                f"MESSAGE: {request.message}\n\n"
+                "Respond as Fixy in maximum 150 words:\n"
+            )
+            payload = {
+                "model": cfg.model_fixy,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.4},
+            }
+            r = requests.post(
+                cfg.ollama_url,
+                json=payload,
+                timeout=(10, cfg.llm_timeout),
+            )
+            r.raise_for_status()
+            data = r.json()
+            response_text = (data.get("response") or "").strip()
+            return ChatResponse(
+                response=response_text,
+                session_id=session_id,
+                agent="Fixy",
+            )
+        except Exception as e:
+            logger.error(f"Chat API Error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================
