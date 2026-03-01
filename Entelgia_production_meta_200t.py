@@ -1833,7 +1833,6 @@ class Agent:
 
         # Validate output (sanitization only, no truncation)
         out = validate_output(raw_response)
-        original_out = out  # preserve the agent's original response before any rewrite
 
         # Superego → second-pass critique (internal governor)
         _cfg = self.cfg
