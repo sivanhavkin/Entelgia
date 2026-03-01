@@ -1870,11 +1870,6 @@ class Agent:
         self._last_response_kind = kind
         self.update_drives_after_turn(kind, emo, float(inten))
 
-        # Restore original response for display; superego rewrite is used only
-        # for internal state (emotion/drive analysis), not shown in dialogue
-        if self._last_superego_rewrite:
-            out = original_out
-
         m = re.search(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]", out)
         if m:
             self.language.set(self.name, m.group(1))
@@ -2794,7 +2789,7 @@ class MainScript:
         if getattr(agent, "limbic_hijack", False):
             rewrite_tag = "  [META] Limbic hijack engaged — emotional override active"
         elif agent._last_superego_rewrite:
-            rewrite_tag = "  [SuperEgo critique applied; original shown in dialogue]"
+            rewrite_tag = "  [SuperEgo critique applied; changed answer shown in dialogue]"
         else:
             rewrite_tag = ""
         print(
