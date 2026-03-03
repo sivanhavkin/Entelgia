@@ -153,7 +153,8 @@ A compact agent state vector (examples):
 * emotional_state / arousal / coherence
 * conflict index
 * self-awareness level
-* `limbic_hijack: bool` — Id-dominant emotional override active flag (default `False`)
+* `drive_pressure: float` — urgency/tension scalar 0.0–10.0 (default `2.0`; see §15)
+* `limbic_hijack: bool` — Id-dominant emotional override active flag (default `False`; see §16)
 * `_limbic_hijack_turns: int` — consecutive turns elapsed since hijack start (default `0`)
 * other agent-specific parameters
 
@@ -163,7 +164,7 @@ These are updated after each turn via:
 * detected emotion + intensity (if enabled)
 * intervention events
 
-**Limbic hijack** activates when `id_strength > 7`, `emotion_intensity > 0.7`, and `conflict_index() > 0.6`. While active, SuperEgo influence is reduced to 30% (`effective_sup = sup × 0.3`) and `response_kind` is forced to `"impulsive"`. The state auto-exits when emotion intensity drops below 0.4 or after 3 turns without re-trigger.
+**Limbic hijack** is an Id-dominant emotional override that suppresses SuperEgo influence and forces `response_kind` to `"impulsive"` under high-arousal, high-conflict conditions. See §16 for activation conditions, behavioral effects, and exit logic.
 
 ### 4.4 Persona
 
@@ -480,6 +481,111 @@ Every `self_replicate_every_n_turns` turns (default 10), scans the 50 most-recen
 
 - Defense flags will influence retrieval priority in future releases.
 - Freudian slip probability will be modulated by agent stress level.
+
+---
+
+## 15) DrivePressure (v2.6.0)
+
+### Overview
+
+**DrivePressure** is a per-agent urgency/tension scalar (`0.0–10.0`) that represents the internal pressure to act, resolve, or shift topic. It is not a character trait — it is a real-time urgency modulator. High pressure causes the agent to speak more concisely and decisively, breaking stagnation loops before they degrade dialogue quality.
+
+### Agent Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `drive_pressure` | `float` | `2.0` | Current urgency scalar (0.0–10.0) |
+| `open_questions` | `list[str]` | `[]` | Tracked unresolved questions |
+| `_topic_history` | `list[str]` | `[]` | MD5 topic signatures for stagnation detection |
+| `_same_topic_turns` | `int` | `0` | Consecutive turns on the same topic signature |
+
+### Computation
+
+`compute_drive_pressure()` blends four inputs with exponential smoothing (α = 0.35):
+
+| Input | Weight | Description |
+|---|---|---|
+| Conflict | 45% | `conflict_index / 10.0`, clamped to 1.0 |
+| Unresolved questions | 25% | `unresolved_count / 3.0`, clamped to 1.0 |
+| Stagnation | 20% | Topic-repetition score (0.0–1.0) |
+| Energy depletion | 10% | `(100 − energy) / 100.0` |
+
+Stagnation is measured by `_topic_signature(text)` (MD5-based content fingerprint). When all inputs are calm (conflict < 4.0, stagnation < 0.3, no open questions) pressure decays an additional −0.4 per turn.
+
+### Behavioral Thresholds
+
+| Pressure | Effect |
+|---|---|
+| `< 6.5` | Normal behavior |
+| `≥ 6.5` | Concise directive injected; response capped at 120 words |
+| `≥ 8.0` | Decisive directive injected; response capped at 80 words |
+
+### Runtime Integration
+
+`drive_pressure` is recomputed at the start of each `speak()` call using the current energy, conflict, unresolved-question count, and stagnation score. `print_meta_state()` displays the current value as the `Pressure:` line (between Energy and Conflict). The helper functions `_topic_signature()` and `_is_question_resolved()` are exposed as module-level utilities.
+
+### Related Config Fields (v2.6.0)
+
+`Config.drive_mean_reversion_rate` (`0.04`) and `Config.drive_oscillation_range` (`0.15`) govern fluid drive dynamics introduced alongside DrivePressure. Each turn, `id_strength` and `superego_strength` are pulled back toward 5.0 at the reversion rate plus a bounded random oscillation — preventing monotonic drift to extremes.
+
+---
+
+## 16) Limbic Hijack State (v2.7.0)
+
+### Overview
+
+**Limbic hijack** models the psychoanalytic concept of the limbic system overpowering cortical, regulatory control when Id-driven emotional arousal becomes dominant. While active, the SuperEgo's moderating role is drastically curtailed and the agent's response kind is forced to `"impulsive"`, producing rawer, less-mediated output.
+
+### State Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `limbic_hijack` | `bool` | `False` | Emotional override active flag |
+| `_limbic_hijack_turns` | `int` | `0` | Consecutive turns elapsed since activation |
+
+### Module-Level Constants
+
+| Constant | Value | Description |
+|---|---|---|
+| `LIMBIC_HIJACK_SUPEREGO_MULTIPLIER` | `0.3` | Fraction of SuperEgo strength applied during hijack |
+| `LIMBIC_HIJACK_MAX_TURNS` | `3` | Auto-exit after this many consecutive non-re-triggered turns |
+
+### Activation Conditions
+
+Evaluated as a pre-response hook inside `speak()`. Fires when **all three** conditions hold simultaneously:
+
+```python
+if id_strength > 7 and emotion_intensity > 0.7 and conflict_index() > 0.6:
+    agent.limbic_hijack = True
+```
+
+### Behavioral Effects While Active
+
+| Effect | Detail |
+|---|---|
+| Reduced SuperEgo influence | `effective_sup = sup × LIMBIC_HIJACK_SUPEREGO_MULTIPLIER` (0.3) |
+| Elevated temperature | Computed using `effective_sup` — less restraint yields higher temperature |
+| SuperEgo critique suppressed | `effective_sup` passed to `evaluate_superego_critique`; rarely dominant |
+| Impulsive response kind | `response_kind = "impulsive"` fed into the drive update loop |
+
+### Exit Conditions
+
+The hijack state deactivates when **either** condition is met:
+
+* `emotion_intensity < 0.4` — arousal has dropped below the calm threshold (immediate exit).
+* `_limbic_hijack_turns ≥ LIMBIC_HIJACK_MAX_TURNS` — the state has persisted for 3 consecutive turns without being re-triggered (auto-exit).
+
+### Meta Output (Priority-Ordered Tags)
+
+When `show_meta=True`, `print_meta_state()` uses a priority-ordered single-line tag to avoid per-turn log spam:
+
+| Priority | Condition | Output |
+|---|---|---|
+| 1 | `limbic_hijack` is `True` | `[META] Limbic hijack engaged — emotional override active` |
+| 2 | SuperEgo critique was applied | `[SuperEgo critique applied; original shown in dialogue]` |
+| 3 | Neither | *(silent — no output)* |
+
+This replaces the prior unconditional "SuperEgo critic skipped" message that appeared on almost every turn.
 
 ---
 
