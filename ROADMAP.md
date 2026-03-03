@@ -11,14 +11,14 @@ It represents exploration goals rather than fixed delivery promises.
 
 ## Current Stage — v2.x (Experimental Dialogue Architecture)
 
-- Multi-agent dialogue system
-- Persistent memory integration
-- Observer-based regulation (Fixy)
-- Structured dialogue strategies
-- Local-first execution via Ollama
-- **DrivePressure** — per-agent urgency/tension scalar driving conciseness and topic resolution (v2.6.0)
-- **Limbic hijack** — Id-dominant emotional override with temporary Superego suppression (v2.7.0)
-- **Meta output refinement** — context-sensitive meta logging replacing constant noise (v2.7.0)
+- ✅ Multi-agent dialogue system
+- ✅ Persistent memory integration
+- ✅ Observer-based regulation (Fixy)
+- ✅ Structured dialogue strategies
+- ✅ Local-first execution via Ollama
+- ✅ **DrivePressure** — per-agent urgency/tension scalar driving conciseness and topic resolution (v2.6.0)
+- ✅ **Limbic hijack** — Id-dominant emotional override with temporary Superego suppression (v2.7.0)
+- ✅ **Meta output refinement** — context-sensitive meta logging replacing constant noise (v2.7.0)
 
 Focus: stability, clarity, and architectural refinement.
 
@@ -26,11 +26,11 @@ Focus: stability, clarity, and architectural refinement.
 
 ## Near-Term Goals
 
-- Improve dialogue coherence across long sessions
-- Memory relevance tuning
-- Observer intervention heuristics
-- Simplified installation experience
-- Expanded example dialogues
+- ✅ Improve dialogue coherence across long sessions
+- ✅ Memory relevance tuning
+- ✅ Observer intervention heuristics
+- ✅ Simplified installation experience
+- ✅ Expanded example dialogues
 
 ---
 
