@@ -56,12 +56,20 @@ class _StubAgent:
 
     # The method under test – identical to the production implementation
     def _behavioral_rule_instruction(self) -> str:
-        if self.name == "Socrates" and self.conflict_index() > 6 and random.random() < 0.5:
+        if (
+            self.name == "Socrates"
+            and self.conflict_index() > 6
+            and random.random() < 0.5
+        ):
             return (
                 "BEHAVIORAL RULE: You MUST end your response with one sharp question "
                 "that forces Athena to choose between exactly 2 options (A or B)."
             )
-        if self.name == "Athena" and self.conflict_index() > 6 and random.random() < 0.5:
+        if (
+            self.name == "Athena"
+            and self.conflict_index() > 6
+            and random.random() < 0.5
+        ):
             return (
                 "BEHAVIORAL RULE: You MUST directly challenge or counter Socrates's position "
                 "in your response, expressing clear disagreement. Use varied language and do "
@@ -203,7 +211,9 @@ class TestRuleASocrates:
                     f"c={c:.0f}",
                     (
                         1.0
-                        if _socrates_with_conflict(float(c))._behavioral_rule_instruction()
+                        if _socrates_with_conflict(
+                            float(c)
+                        )._behavioral_rule_instruction()
                         != ""
                         else 0.0
                     ),
@@ -348,7 +358,9 @@ class TestRuleBAnthena:
                     f"c={c:.0f}",
                     (
                         1.0
-                        if _athena_with_conflict(float(c))._behavioral_rule_instruction()
+                        if _athena_with_conflict(
+                            float(c)
+                        )._behavioral_rule_instruction()
                         != ""
                         else 0.0
                     ),
