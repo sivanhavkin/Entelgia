@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [Unreleased]
+## [2.7.0] - 2026-03-03
 
 ### Added
 
@@ -769,7 +769,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.6.0
+- ✅ **Latest stable:** v2.7.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -780,7 +780,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.6.0** | 2026-02-26 | Minor | ✅ **Current** | Dialogue metrics, ablation study, drive pressure & research tools |
+| **v2.7.0** | 2026-03-03 | Minor | ✅ **Current** | Limbic hijack state, meta output refinement |
+| **v2.6.0** | 2026-02-26 | Minor | ✅ **Stable** | Dialogue metrics, ablation study, drive pressure & research tools |
 | **v2.5.0** | 2026-02-21 | Minor | ✅ **Stable** | Energy regulation, long-term memory & coherent drive correlations |
 | **v2.4.0** | 2026-02-18 | Minor | ⚠️ Superseded | Documentation & structure improvements |
 | **v2.3.0** | 2026-02-16 | Minor | ⚠️ Superseded | Installation improvements |
