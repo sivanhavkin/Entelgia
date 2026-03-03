@@ -1535,12 +1535,20 @@ class Agent:
         Rule A (Socrates): If Conflict > 6, end response with a sharp binary-choice question (A or B).
         Rule B (Athena): If Conflict > 6, directly challenge or counter Socrates's position using varied language.
         """
-        if self.name == "Socrates" and self.conflict_index() > 6 and random.random() < 0.5:
+        if (
+            self.name == "Socrates"
+            and self.conflict_index() > 6
+            and random.random() < 0.5
+        ):
             return (
                 "BEHAVIORAL RULE: You MUST end your response with one sharp question "
                 "that forces Athena to choose between exactly 2 options (A or B)."
             )
-        if self.name == "Athena" and self.conflict_index() > 6 and random.random() < 0.5:
+        if (
+            self.name == "Athena"
+            and self.conflict_index() > 6
+            and random.random() < 0.5
+        ):
             return (
                 "BEHAVIORAL RULE: You MUST directly challenge or counter Socrates's position "
                 "in your response, expressing clear disagreement. Use varied language and do "
@@ -2806,7 +2814,9 @@ class MainScript:
         elif getattr(agent, "_superego_streak_suppressed", False):
             rewrite_tag = "  [SuperEgo critique suppressed — consecutive limit; original answer shown]"
         elif agent._last_superego_rewrite:
-            rewrite_tag = "  [SuperEgo critique applied; changed answer shown in dialogue]"
+            rewrite_tag = (
+                "  [SuperEgo critique applied; changed answer shown in dialogue]"
+            )
         else:
             rewrite_tag = ""
         print(

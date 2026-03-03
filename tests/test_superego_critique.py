@@ -697,12 +697,12 @@ class TestSuperEgoConsecutiveStreakLimit:
         with patch.object(_meta, "CFG", cfg):
             for turn in range(1, 3):
                 agent.speak("What is justice?", [])
-                assert agent._last_superego_rewrite is True, (
-                    f"Turn {turn}: expected rewrite applied"
-                )
-                assert agent._superego_streak_suppressed is False, (
-                    f"Turn {turn}: suppressed flag must be False when rewrite applies"
-                )
+                assert (
+                    agent._last_superego_rewrite is True
+                ), f"Turn {turn}: expected rewrite applied"
+                assert (
+                    agent._superego_streak_suppressed is False
+                ), f"Turn {turn}: suppressed flag must be False when rewrite applies"
 
     def test_third_turn_suppresses_rewrite(self):
         """Turn 3: critique would fire but streak >= 2, so original shown."""
@@ -733,16 +733,16 @@ class TestSuperEgoConsecutiveStreakLimit:
             ],
             title="test_third_turn_suppresses_rewrite",
         )
-        assert agent._last_superego_rewrite is False, (
-            "Turn 3: _last_superego_rewrite must be False when streak limit reached"
-        )
-        assert agent._superego_streak_suppressed is True, (
-            "Turn 3: _superego_streak_suppressed must be True"
-        )
+        assert (
+            agent._last_superego_rewrite is False
+        ), "Turn 3: _last_superego_rewrite must be False when streak limit reached"
+        assert (
+            agent._superego_streak_suppressed is True
+        ), "Turn 3: _superego_streak_suppressed must be True"
         # Only one LLM call (main response), no extra rewrite call
-        assert agent.llm.generate.call_count - calls_before == 1, (
-            "Turn 3: LLM must not be called a second time for the rewrite"
-        )
+        assert (
+            agent.llm.generate.call_count - calls_before == 1
+        ), "Turn 3: LLM must not be called a second time for the rewrite"
 
     def test_counter_resets_after_non_critique_turn(self):
         """
@@ -768,15 +768,15 @@ class TestSuperEgoConsecutiveStreakLimit:
             ):
                 agent_sup.speak("What is virtue?", [])  # non-critique turn
 
-            assert agent_sup._consecutive_superego_rewrites == 0, (
-                "Counter must reset to 0 after a non-critique turn"
-            )
+            assert (
+                agent_sup._consecutive_superego_rewrites == 0
+            ), "Counter must reset to 0 after a non-critique turn"
 
             # Next critique turn should apply the rewrite again
             agent_sup.speak("What is justice?", [])  # turn after reset
-            assert agent_sup._last_superego_rewrite is True, (
-                "After counter reset, first critique turn must apply rewrite again"
-            )
+            assert (
+                agent_sup._last_superego_rewrite is True
+            ), "After counter reset, first critique turn must apply rewrite again"
             assert agent_sup._superego_streak_suppressed is False
 
 
