@@ -26,11 +26,11 @@ Focus: stability, clarity, and architectural refinement.
 
 ## Near-Term Goals
 
-- Improve dialogue coherence across long sessions
-- Memory relevance tuning
-- Observer intervention heuristics
-- Simplified installation experience
-- Expanded example dialogues
+- ✅ Improve dialogue coherence across long sessions
+- ✅ Memory relevance tuning
+- ✅ Observer intervention heuristics
+- ✅ Simplified installation experience
+- ✅ Expanded example dialogues
 
 ---
 
