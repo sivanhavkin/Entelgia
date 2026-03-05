@@ -13,77 +13,139 @@
   <meta property="og:description" content="An experimental AI architecture exploring memory, identity, and self-regulation in multi-agent systems." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://www.entelgia.com/" />
-  <!-- Optional: add an image to your repo and update this path -->
   <!-- <meta property="og:image" content="https://www.entelgia.com/assets/og.png" /> -->
 
-  <!-- Optional favicon (add /favicon.ico to repo root) -->
   <link rel="icon" href="/favicon.ico" />
 
-  <!-- Minimal, clean styling (single-file landing page) -->
   <style>
     :root{
       --bg:#0b1220;
-      --panel:#0f1a2e;
-      --panel2:#0c1527;
+      --bg2:#070c16;
       --text:#e6edf6;
       --muted:#a9b4c4;
-      --line:rgba(255,255,255,.10);
-      --accent:#6ea8ff;
-      --accent2:#7cf7d4;
-      --shadow: 0 12px 40px rgba(0,0,0,.35);
+      --shadow: 0 18px 60px rgba(0,0,0,.45);
+      --shadowSoft: 0 10px 30px rgba(0,0,0,.22);
       --radius: 18px;
-      --max: 1080px;
+      --radiusSm: 14px;
+      --max: 1120px;
     }
+
     *{box-sizing:border-box}
     html,body{height:100%}
+    html{
+      -webkit-text-size-adjust: 100%;
+      text-rendering: optimizeLegibility;
+      scroll-behavior: smooth;
+    }
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background: radial-gradient(1200px 800px at 20% -10%, rgba(110,168,255,.18), transparent 55%),
-                  radial-gradient(900px 700px at 90% 10%, rgba(124,247,212,.12), transparent 50%),
-                  linear-gradient(180deg, #070c16, var(--bg));
+      background:
+        radial-gradient(1200px 800px at 18% -10%, rgba(110,168,255,.18), transparent 55%),
+        radial-gradient(900px 700px at 90% 10%, rgba(124,247,212,.10), transparent 50%),
+        linear-gradient(180deg, var(--bg2), var(--bg));
       color:var(--text);
       line-height:1.55;
     }
+
     a{color:inherit}
-    .wrap{max-width:var(--max); margin:0 auto; padding:24px}
-    .nav{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:10px 0;
-    }
-    .brand{
-      display:flex; align-items:center; gap:10px; text-decoration:none;
-      letter-spacing:.2px;
-    }
-    .logo{
-      width:34px;height:34px;border-radius:10px;
-      background: linear-gradient(135deg, rgba(110,168,255,.95), rgba(124,247,212,.9));
-      box-shadow: 0 10px 24px rgba(110,168,255,.15);
-      position:relative;
-    }
-    .logo:after{
-      content:""; position:absolute; inset:8px;
-      border-radius:8px; background: rgba(11,18,32,.55);
-      border:1px solid rgba(255,255,255,.18);
-    }
-    .brand span{font-weight:700}
-    .navlinks{display:flex; gap:14px; align-items:center}
-    .navlinks a{
-      text-decoration:none; color:var(--muted);
-      padding:8px 10px; border-radius:12px;
-      border:1px solid transparent;
-    }
-    .navlinks a:hover{
-      color:var(--text); border-color:rgba(255,255,255,.10);
-      background: rgba(255,255,255,.03);
+    a:focus-visible{
+      outline: 2px solid rgba(110,168,255,.65);
+      outline-offset: 3px;
+      border-radius: 10px;
     }
 
+    .wrap{max-width:var(--max); margin:0 auto; padding:20px 22px}
+
+    /* Skip link (accessibility) */
+    .skip{
+      position:absolute;
+      left:-999px;
+      top:10px;
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(11,18,32,.92);
+      color: var(--text);
+      text-decoration:none;
+      z-index: 9999;
+    }
+    .skip:focus{ left: 12px; }
+
+    /* ===== Header / Nav (sticky) ===== */
+    .nav{
+      position:sticky;
+      top:0;
+      z-index:10;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(180deg, rgba(7,12,22,.74), rgba(7,12,22,.42));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .nav-inner{
+      max-width:var(--max);
+      margin:0 auto;
+      padding: 12px 22px;
+      width: 100%;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:16px;
+    }
+
+    .brand{
+      display:flex; align-items:center; gap:12px; text-decoration:none;
+      letter-spacing:.2px;
+      min-width: 220px;
+    }
+    .brand-logo{
+      height:60px;
+      width:auto;
+      display:block;
+      border-radius: 14px;
+      filter: drop-shadow(0 14px 26px rgba(0,0,0,.45));
+      transition: transform .12s ease, filter .15s ease;
+    }
+    .brand:hover .brand-logo{
+      transform: translateY(-1px);
+      filter: drop-shadow(0 18px 30px rgba(110,168,255,.18)) drop-shadow(0 14px 26px rgba(0,0,0,.45));
+    }
+    .brand-text{
+      display:flex; flex-direction:column;
+      line-height: 1.05;
+    }
+    .brand-text strong{
+      font-weight: 760;
+      font-size: 18px;
+      letter-spacing: .2px;
+    }
+    .brand-text span{
+      font-size: 13px;
+      color: rgba(169,180,196,.92);
+    }
+
+    .navlinks{display:flex; gap:8px; align-items:center}
+    .navlinks a{
+      text-decoration:none;
+      color: rgba(169,180,196,.95);
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid transparent;
+      transition: background .15s ease, border-color .15s ease, color .15s ease;
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .navlinks a:hover{
+      color:var(--text);
+      border-color:rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+    }
+
+    /* ===== Hero ===== */
     .hero{
-      margin-top:18px;
-      padding:48px 22px;
-      border:1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      border-radius: var(--radius);
+      margin-top:22px;
+      padding:56px 26px 22px;
+      border:1px solid rgba(255,255,255,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+      border-radius: calc(var(--radius) + 6px);
       box-shadow: var(--shadow);
       position:relative;
       overflow:hidden;
@@ -91,40 +153,44 @@
     .hero:before{
       content:"";
       position:absolute; inset:-2px;
-      background: radial-gradient(800px 280px at 18% 10%, rgba(110,168,255,.22), transparent 60%),
-                  radial-gradient(700px 260px at 85% 30%, rgba(124,247,212,.16), transparent 55%);
+      background:
+        radial-gradient(900px 320px at 18% 10%, rgba(110,168,255,.22), transparent 60%),
+        radial-gradient(760px 280px at 85% 30%, rgba(124,247,212,.14), transparent 58%);
       pointer-events:none;
     }
     .hero > *{position:relative}
+
     .kicker{
       display:inline-flex; gap:10px; align-items:center;
-      padding:7px 12px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(11,18,32,.35);
+      padding:8px 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(11,18,32,.40);
       border-radius: 999px;
-      color: var(--muted);
+      color: rgba(169,180,196,.95);
       font-size: 13px;
+      box-shadow: 0 8px 22px rgba(0,0,0,.22);
     }
     .dot{
       width:8px;height:8px;border-radius:99px;
-      background: var(--accent2);
+      background: rgba(124,247,212,.95);
       box-shadow: 0 0 0 6px rgba(124,247,212,.12);
     }
+
     h1{
       margin:18px 0 10px;
-      font-size: clamp(34px, 5vw, 56px);
-      line-height:1.06;
-      letter-spacing:-.9px;
+      font-size: clamp(36px, 5vw, 60px);
+      line-height:1.03;
+      letter-spacing:-1.1px;
     }
     .sub{
       margin: 0;
-      max-width: 780px;
-      color: var(--muted);
-      font-size: clamp(16px, 2.2vw, 20px);
+      max-width: 820px;
+      color: rgba(169,180,196,.98);
+      font-size: clamp(16px, 2.1vw, 20px);
     }
+
     .cta{
-      justify-content: center;
-      margin-top:22px;
+      margin-top:26px;
       display:flex; flex-wrap:wrap; gap:12px;
       align-items:center;
     }
@@ -137,65 +203,104 @@
       border:1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.04);
       color: var(--text);
-      font-weight: 650;
+      font-weight: 700;
       transition: transform .08s ease, background .15s ease, border-color .15s ease;
       user-select:none;
+      box-shadow: 0 10px 26px rgba(0,0,0,.18);
     }
-    .btn:hover{transform: translateY(-1px); background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.20)}
+    .btn:hover{
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.22)
+    }
     .btn.primary{
-      border-color: rgba(110,168,255,.45);
-      background: linear-gradient(135deg, rgba(110,168,255,.28), rgba(110,168,255,.14));
+      border-color: rgba(110,168,255,.55);
+      background: linear-gradient(135deg, rgba(110,168,255,.30), rgba(110,168,255,.12));
     }
-    .btn.primary:hover{border-color: rgba(110,168,255,.70)}
+    .btn.primary:hover{border-color: rgba(110,168,255,.78)}
     .btn.ghost{
       background: transparent;
+      border-color: rgba(255,255,255,.12);
     }
-    .btn small{font-weight:600; color: var(--muted)}
+    .btn small{font-weight:650; color: rgba(169,180,196,.95)}
+
+    /* Demo GIF panel */
+    .demo{
+      margin-top: 22px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(11,18,32,.28);
+      border-radius: var(--radius);
+      overflow:hidden;
+      box-shadow: var(--shadowSoft);
+    }
+    .demo-head{
+      display:flex;
+      justify-content: space-between;
+      align-items:center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      color: rgba(169,180,196,.95);
+      font-size: 13px;
+    }
+    .demo-head strong{color: var(--text)}
+    .demo-media{
+      display:block;
+      width:100%;
+      height:auto;
+      background: rgba(255,255,255,.02);
+    }
+    .demo-caption{
+      padding: 12px 16px 14px;
+      color: rgba(169,180,196,.95);
+      font-size: 14px;
+    }
+
     .grid{
-      margin-top:22px;
+      margin-top:26px;
       display:grid;
       grid-template-columns: repeat(12, 1fr);
       gap:14px;
     }
     .card{
-      border:1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
       border-radius: var(--radius);
       padding:18px 18px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.18);
+      box-shadow: var(--shadowSoft);
     }
     .card h3{
       margin:0 0 6px;
-      font-size: 16px;
+      font-size: 15px;
       letter-spacing:-.2px;
     }
     .card p{
       margin:0;
-      color: var(--muted);
+      color: rgba(169,180,196,.95);
       font-size: 14px;
     }
 
     .span-6{grid-column: span 6}
     .span-4{grid-column: span 4}
-    .span-8{grid-column: span 8}
-    .span-12{grid-column: span 12}
 
     .section{
       margin-top:18px;
-      padding:22px;
-      border:1px solid var(--line);
+      padding:24px;
+      border:1px solid rgba(255,255,255,.10);
       background: rgba(255,255,255,.02);
       border-radius: var(--radius);
+      box-shadow: 0 10px 28px rgba(0,0,0,.14);
     }
     .section h2{
-      margin:0 0 8px;
+      margin:0 0 10px;
       font-size: 20px;
       letter-spacing:-.3px;
     }
     .section p{
       margin:0;
-      color: var(--muted);
+      color: rgba(169,180,196,.96);
     }
+
     .list{
       margin:14px 0 0;
       padding:0;
@@ -208,11 +313,20 @@
       padding:12px 12px;
       border:1px solid rgba(255,255,255,.10);
       background: rgba(11,18,32,.25);
-      border-radius: 14px;
-      color: var(--muted);
+      border-radius: var(--radiusSm);
+      color: rgba(169,180,196,.96);
       font-size: 14px;
     }
     .li b{color: var(--text)}
+
+    .section a{
+      text-decoration: none;
+      border-bottom: 1px solid rgba(110,168,255,.30);
+    }
+    .section a:hover{
+      border-bottom-color: rgba(110,168,255,.70);
+    }
+
     .footer{
       margin:18px 0 30px;
       display:flex;
@@ -220,47 +334,35 @@
       gap:12px;
       align-items:center;
       justify-content:space-between;
-      color: var(--muted);
+      color: rgba(169,180,196,.92);
       font-size: 13px;
       padding: 0 2px;
     }
-    .footer a{color: var(--muted); text-decoration:none}
+    .footer a{color: rgba(169,180,196,.92); text-decoration:none}
     .footer a:hover{color: var(--text); text-decoration:underline}
-    .muted{color:var(--muted)}
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:8px 10px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.02);
-    }
+
+    .muted{color: rgba(169,180,196,.92)}
 
     @media (max-width: 860px){
       .navlinks{display:none}
       .list{grid-template-columns: 1fr}
-      .span-6,.span-4,.span-8{grid-column: span 12}
-      .hero{padding:38px 18px}
+      .span-6,.span-4{grid-column: span 12}
+      .hero{padding:44px 18px 18px}
+      .wrap{padding: 14px 16px}
+      .brand-logo{height:54px}
+      h1{letter-spacing:-.9px}
     }
-  
-    /* Header logo image */
-    .brand-logo{
-      height:44px;
-      width:auto;
-      display:block;
-      border-radius: 12px;
-      filter: drop-shadow(0 14px 26px rgba(0,0,0,.45));
-      transition: transform .12s ease, filter .15s ease;
+    @media (max-width: 420px){
+      .brand-logo{height:46px}
+      .brand-text span{display:none}
     }
-    .brand:hover .brand-logo{
-      transform: translateY(-1px);
-      filter: drop-shadow(0 18px 30px rgba(110,168,255,.18)) drop-shadow(0 14px 26px rgba(0,0,0,.45));
-    }
-    /* Hide the old CSS gradient square logo if it still exists in markup */
-    .brand .logo{ display:none; }
 
-</style>
+    @media (prefers-reduced-motion: reduce){
+      html{scroll-behavior:auto}
+      *{transition:none !important}
+    }
+  </style>
 
-  <!-- Optional: Structured data -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -274,134 +376,161 @@
 </head>
 
 <body>
+  <a class="skip" href="#main">Skip to content</a>
+
   <div class="wrap">
     <header class="nav">
-      <a class="brand" href="#top" aria-label="Entelgia home">
-        <img class="brand-logo" src="/Assets/entelgia-logo.png" alt="Entelgia Logo" loading="eager" decoding="async" />
-        <span>Entelgia</span>
-      </a>
+      <div class="nav-inner">
+        <a class="brand" href="#top" aria-label="Entelgia home">
+          <img class="brand-logo" src="/Assets/entelgia-logo.png" alt="Entelgia Logo" loading="eager" decoding="async" />
+          <div class="brand-text">
+            <strong>Entelgia</strong>
+            <span>Dialogue-governed cognitive architecture</span>
+          </div>
+        </a>
 
-      <nav class="navlinks" aria-label="Primary">
-        <a href="#about">About</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#links">Links</a>
-        <a href="#contact">Contact</a>
-      </nav>
+        <nav class="navlinks" aria-label="Primary">
+          <a href="#about">About</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#links">Links</a>
+          <a href="#contact">Contact</a>
+        </nav>
+      </div>
     </header>
 
-    <main id="top" class="hero">
-      <div class="kicker">
-        <span class="dot" aria-hidden="true"></span>
-        <span>Experimental research architecture • Multi-agent • Internal state</span>
-      </div>
-
-      <h1>Dialogue-governed agents with memory, reflection, and self-regulation.</h1>
-
-      <p class="sub">
-        Entelgia explores how <b>internal structure</b>—long-term memory, emotional signals, and observer loops—shapes
-        agent behavior over time. It’s a build-to-understand project focused on <b>identity drift</b>, stability, and interpretability.
-      </p>
-
-      <div class="cta">
-        <a class="btn primary" href="https://github.com/sivanhavkin/entelgia" target="_blank" rel="noopener">
-          View on GitHub
-          <small>↗</small>
-        </a>
-
-        <a class="btn" href="/docs/Entelgia_v8_as_Cognitive_Architecture_2.0.pdf" target="_blank" rel="noopener">
-          Read the Paper
-          <small>↗</small>
-        </a>
-
-        <a class="btn ghost" href="/docs/Entelgia_Full_Demo.pdf" target="_blank" rel="noopener">
-          View Full Demo
-          <small>↗</small>
-        </a>
-      </div>
-
-      <div class="grid" style="margin-top:26px">
-        <div class="card span-6">
-          <h3>What it is</h3>
-          <p>
-            A modular dialogue architecture where agents maintain internal state and evolve via structured reflection.
-            The goal is to study behavior emergence—not just produce outputs.
-          </p>
+    <main id="main">
+      <section id="top" class="hero">
+        <div class="kicker">
+          <span class="dot" aria-hidden="true"></span>
+          <span>Experimental research architecture • Multi-agent • Internal state</span>
         </div>
 
-        <div class="card span-6">
-          <h3>What it’s not</h3>
-          <p>
-            Not a production framework. Not a tool wrapper. Entelgia is an evolving research codebase meant to be read,
-            adapted, simplified, and challenged.
-          </p>
+        <h1>Dialogue-governed agents with memory, reflection, and self-regulation.</h1>
+
+        <p class="sub">
+          Entelgia explores how <b>internal structure</b>—long-term memory, emotional signals, and observer loops—shapes
+          agent behavior over time. It’s a build-to-understand project focused on <b>identity drift</b>, stability, and interpretability.
+        </p>
+
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/sivanhavkin/entelgia" target="_blank" rel="noopener">
+            View on GitHub
+            <small>↗</small>
+          </a>
+
+          <a class="btn" href="/docs/Entelgia_v8_as_Cognitive_Architecture_2.0.pdf" target="_blank" rel="noopener">
+            Read the Paper
+            <small>↗</small>
+          </a>
+
+          <a class="btn ghost" href="/docs/Entelgia_Full_Demo.pdf" target="_blank" rel="noopener">
+            View Full Demo
+            <small>↗</small>
+          </a>
         </div>
 
-        <div class="card span-4">
-          <h3>Memory</h3>
-          <p>Short-term context + long-term persistence with promotion rules and traceability.</p>
+        <!-- GIF only -->
+        <div class="demo" aria-label="Entelgia demo preview">
+          <div class="demo-head">
+            <div><strong>Demo preview</strong> <span class="muted">• animated</span></div>
+            <div class="muted">Assets</div>
+          </div>
+          <img
+            class="demo-media"
+            src="/Assets/entelgia-demo.gif"
+            alt="Entelgia demo GIF showing dialogue examples and internal state changes."
+            loading="lazy"
+            decoding="async"
+          />
+          <div class="demo-caption">
+            A quick visual glimpse of the Entelgia dialogue flow and internal-state driven behavior.
+          </div>
         </div>
 
-        <div class="card span-4">
-          <h3>Emotion signal</h3>
-          <p>Emotional intensity as a routing/importance signal for behavior and storage decisions.</p>
-        </div>
+        <div class="grid">
+          <div class="card span-6">
+            <h3>What it is</h3>
+            <p>
+              A modular dialogue architecture where agents maintain internal state and evolve via structured reflection.
+              The goal is to study behavior emergence—not just produce outputs.
+            </p>
+          </div>
 
-        <div class="card span-4">
-          <h3>Observer loop</h3>
-          <p>Fixy-style oversight to detect patterns, correct failures, and improve stability over time.</p>
+          <div class="card span-6">
+            <h3>What it’s not</h3>
+            <p>
+              Not a production framework. Not a tool wrapper. Entelgia is an evolving research codebase meant to be read,
+              adapted, simplified, and challenged.
+            </p>
+          </div>
+
+          <div class="card span-4">
+            <h3>Memory</h3>
+            <p>Short-term context + long-term persistence with promotion rules and traceability.</p>
+          </div>
+
+          <div class="card span-4">
+            <h3>Emotion signal</h3>
+            <p>Emotional intensity as a routing/importance signal for behavior and storage decisions.</p>
+          </div>
+
+          <div class="card span-4">
+            <h3>Observer loop</h3>
+            <p>Fixy-style oversight to detect patterns, correct failures, and improve stability over time.</p>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section id="about" class="section">
+        <h2>About</h2>
+        <p>
+          Entelgia sits between agent engineering and cognitive-architecture research. It asks a simple question:
+          <b>what changes when the agent has structure?</b> If memory, emotion, and reflection are first-class components,
+          can we get behavior that is more stable, explainable, and meaningfully self-regulated?
+        </p>
+      </section>
+
+      <section id="architecture" class="section">
+        <h2>Core components</h2>
+        <p class="muted">A minimal overview of the moving parts.</p>
+
+        <ul class="list">
+          <li class="li"><b>Dialogue Engine</b> — turn selection, context shaping, and structured prompting</li>
+          <li class="li"><b>Long-Term Memory</b> — persistence with promotion/importance thresholds</li>
+          <li class="li"><b>Emotion Core</b> — emotion tags and intensity signals influencing decisions</li>
+          <li class="li"><b>Observer / Fixy</b> — detects drift, errors, loops; proposes corrections</li>
+          <li class="li"><b>Behavior Rules</b> — constraints and self-regulation (ethics/consistency)</li>
+          <li class="li"><b>Trace & Logs</b> — CSV/GEXF/event trails for reproducibility and analysis</li>
+        </ul>
+      </section>
+
+      <section id="links" class="section">
+        <h2>Links</h2>
+        <div class="grid">
+          <div class="card span-6">
+            <h3>Repository</h3>
+            <p><a href="https://github.com/sivanhavkin/entelgia" target="_blank" rel="noopener">github.com/sivanhavkin/entelgia</a></p>
+          </div>
+          <div class="card span-6">
+            <h3>Docs / Demo</h3>
+            <p>
+              <a href="/docs/Entelgia_v8_as_Cognitive_Architecture_2.0.pdf" target="_blank" rel="noopener">Paper — Entelgia v8 as Cognitive Architecture 2.0 (PDF)</a>
+              <br>
+              <a href="/docs/Entelgia_Full_Demo.pdf" target="_blank" rel="noopener">Full Demo — Dialogue Examples (PDF)</a>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="contact" class="section">
+        <h2>Contact</h2>
+        <p>
+          Email: <a href="mailto:info@entelgia.com">info@entelgia.com</a>
+          <span class="muted">•</span>
+          GitHub: <a href="https://github.com/sivanhavkin" target="_blank" rel="noopener">@sivanhavkin</a>
+        </p>
+      </section>
     </main>
-
-    <section id="about" class="section">
-      <h2>About</h2>
-      <p>
-        Entelgia sits between agent engineering and cognitive-architecture research. It asks a simple question:
-        <b>what changes when the agent has structure?</b> If memory, emotion, and reflection are first-class components,
-        can we get behavior that is more stable, explainable, and meaningfully self-regulated?
-      </p>
-    </section>
-
-    <section id="architecture" class="section">
-      <h2>Core components</h2>
-      <p class="muted">A minimal overview of the moving parts.</p>
-
-      <ul class="list">
-        <li class="li"><b>Dialogue Engine</b> — turn selection, context shaping, and structured prompting</li>
-        <li class="li"><b>Long-Term Memory</b> — persistence with promotion/importance thresholds</li>
-        <li class="li"><b>Emotion Core</b> — emotion tags and intensity signals influencing decisions</li>
-        <li class="li"><b>Observer / Fixy</b> — detects drift, errors, loops; proposes corrections</li>
-        <li class="li"><b>Behavior Rules</b> — constraints and self-regulation (ethics/consistency)</li>
-        <li class="li"><b>Trace & Logs</b> — CSV/GEXF/event trails for reproducibility and analysis</li>
-      </ul>
-    </section>
-
-    <section id="links" class="section">
-      <h2>Links</h2>
-      <div class="grid">
-        <div class="card span-6">
-          <h3>Repository</h3>
-          <p><a href="https://github.com/sivanhavkin/entelgia" target="_blank" rel="noopener">github.com/sivanhavkin/entelgia</a></p>
-        </div>
-        <div class="card span-6">
-          <h3>Docs / Demo</h3>
-          <p>
-            <a href="/docs/Entelgia_v8_as_Cognitive_Architecture_2.0.pdf" target="_blank" rel="noopener">Paper — Entelgia v8 as Cognitive Architecture 2.0 (PDF)</a>
-            <br>
-            <a href="/docs/Entelgia_Full_Demo.pdf" target="_blank" rel="noopener">Full Demo — Dialogue Examples (PDF)</a>
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <section id="contact" class="section">
-      <h2>Contact</h2>
-      <p>
-        Email: <a href="mailto:info@entelgia.com">info@entelgia.com</a>
-        <span class="muted">•</span>
-        GitHub: <a href="https://github.com/sivanhavkin" target="_blank" rel="noopener">@sivanhavkin</a>
-      </p>
-    </section>
 
     <div class="footer">
       <div>© <span id="year"></span> Entelgia • Research project by Sivan Havkin</div>
