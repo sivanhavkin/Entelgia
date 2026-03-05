@@ -13,7 +13,6 @@
   <meta property="og:description" content="An experimental AI architecture exploring memory, identity, and self-regulation in multi-agent systems." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://www.entelgia.com/" />
-  <!-- <meta property="og:image" content="https://www.entelgia.com/assets/og.png" /> -->
 
   <link rel="icon" href="/favicon.ico" />
 
@@ -57,7 +56,6 @@
 
     .wrap{max-width:var(--max); margin:0 auto; padding:20px 22px}
 
-    /* Skip link (accessibility) */
     .skip{
       position:absolute;
       left:-999px;
@@ -72,7 +70,6 @@
     }
     .skip:focus{ left: 12px; }
 
-    /* ===== Header / Nav (sticky) ===== */
     .nav{
       position:sticky;
       top:0;
@@ -139,13 +136,12 @@
       background: rgba(255,255,255,.04);
     }
 
-    /* ===== Hero ===== */
     .hero{
       margin-top:22px;
       padding:56px 26px 22px;
       border:1px solid rgba(255,255,255,.10);
       background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
-      border-radius: calc(var(--radius) + 6px);
+      border-radius: 24px;
       box-shadow: var(--shadow);
       position:relative;
       overflow:hidden;
@@ -224,7 +220,6 @@
     }
     .btn small{font-weight:650; color: rgba(169,180,196,.95)}
 
-    /* Demo GIF panel */
     .demo{
       margin-top: 22px;
       border:1px solid rgba(255,255,255,.10);
@@ -279,7 +274,6 @@
       color: rgba(169,180,196,.95);
       font-size: 14px;
     }
-
     .span-6{grid-column: span 6}
     .span-4{grid-column: span 4}
 
@@ -340,7 +334,6 @@
     }
     .footer a{color: rgba(169,180,196,.92); text-decoration:none}
     .footer a:hover{color: var(--text); text-decoration:underline}
-
     .muted{color: rgba(169,180,196,.92)}
 
     @media (max-width: 860px){
@@ -429,15 +422,15 @@
           </a>
         </div>
 
-        <!-- GIF only -->
+        <!-- FIX: Correct exact GIF path + casing -->
         <div class="demo" aria-label="Entelgia demo preview">
           <div class="demo-head">
             <div><strong>Demo preview</strong> <span class="muted">• animated</span></div>
-            <div class="muted">Assets</div>
+            <div class="muted">Assets/Entelgia_Demo.gif</div>
           </div>
           <img
             class="demo-media"
-            src="/Assets/entelgia-demo.gif"
+            src="/Assets/Entelgia_Demo.gif"
             alt="Entelgia demo GIF showing dialogue examples and internal state changes."
             loading="lazy"
             decoding="async"
