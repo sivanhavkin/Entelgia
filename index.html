@@ -1,222 +1,419 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Entelgia — Dialogue-Governed AI Architecture</title>
+  <meta name="description" content="Entelgia is an experimental AI architecture exploring how internal structure—memory, emotion, and reflection—shapes agent behavior over time." />
+  <meta name="theme-color" content="#0b1220" />
 
-<title>Entelgia — Dialogue-Governed AI Architecture</title>
+  <!-- Open Graph / Social -->
+  <meta property="og:title" content="Entelgia — Dialogue-Governed AI Architecture" />
+  <meta property="og:description" content="An experimental AI architecture exploring memory, identity, and self-regulation in multi-agent systems." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.entelgia.com/" />
+  <!-- Optional: add an image to your repo and update this path -->
+  <!-- <meta property="og:image" content="https://www.entelgia.com/assets/og.png" /> -->
 
-<meta name="description"
-content="Entelgia is an experimental AI architecture exploring memory, emotion and reflection in multi-agent systems">
+  <!-- Optional favicon (add /favicon.ico to repo root) -->
+  <link rel="icon" href="/favicon.ico" />
 
-<style>
+  <!-- Minimal, clean styling (single-file landing page) -->
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1a2e;
+      --panel2:#0c1527;
+      --text:#e6edf6;
+      --muted:#a9b4c4;
+      --line:rgba(255,255,255,.10);
+      --accent:#6ea8ff;
+      --accent2:#7cf7d4;
+      --shadow: 0 12px 40px rgba(0,0,0,.35);
+      --radius: 18px;
+      --max: 1080px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -10%, rgba(110,168,255,.18), transparent 55%),
+                  radial-gradient(900px 700px at 90% 10%, rgba(124,247,212,.12), transparent 50%),
+                  linear-gradient(180deg, #070c16, var(--bg));
+      color:var(--text);
+      line-height:1.55;
+    }
+    a{color:inherit}
+    .wrap{max-width:var(--max); margin:0 auto; padding:24px}
+    .nav{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 0;
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px; text-decoration:none;
+      letter-spacing:.2px;
+    }
+    .logo{
+      width:34px;height:34px;border-radius:10px;
+      background: linear-gradient(135deg, rgba(110,168,255,.95), rgba(124,247,212,.9));
+      box-shadow: 0 10px 24px rgba(110,168,255,.15);
+      position:relative;
+    }
+    .logo:after{
+      content:""; position:absolute; inset:8px;
+      border-radius:8px; background: rgba(11,18,32,.55);
+      border:1px solid rgba(255,255,255,.18);
+    }
+    .brand span{font-weight:700}
+    .navlinks{display:flex; gap:14px; align-items:center}
+    .navlinks a{
+      text-decoration:none; color:var(--muted);
+      padding:8px 10px; border-radius:12px;
+      border:1px solid transparent;
+    }
+    .navlinks a:hover{
+      color:var(--text); border-color:rgba(255,255,255,.10);
+      background: rgba(255,255,255,.03);
+    }
 
-body{
-margin:0;
-font-family:system-ui,Arial;
-background:#0b1220;
-color:white;
-}
+    .hero{
+      margin-top:18px;
+      padding:48px 22px;
+      border:1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      position:relative;
+      overflow:hidden;
+    }
+    .hero:before{
+      content:"";
+      position:absolute; inset:-2px;
+      background: radial-gradient(800px 280px at 18% 10%, rgba(110,168,255,.22), transparent 60%),
+                  radial-gradient(700px 260px at 85% 30%, rgba(124,247,212,.16), transparent 55%);
+      pointer-events:none;
+    }
+    .hero > *{position:relative}
+    .kicker{
+      display:inline-flex; gap:10px; align-items:center;
+      padding:7px 12px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(11,18,32,.35);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .dot{
+      width:8px;height:8px;border-radius:99px;
+      background: var(--accent2);
+      box-shadow: 0 0 0 6px rgba(124,247,212,.12);
+    }
+    h1{
+      margin:18px 0 10px;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height:1.06;
+      letter-spacing:-.9px;
+    }
+    .sub{
+      margin: 0;
+      max-width: 780px;
+      color: var(--muted);
+      font-size: clamp(16px, 2.2vw, 20px);
+    }
+    .cta{
+      justify-content: center;
+      margin-top:22px;
+      display:flex; flex-wrap:wrap; gap:12px;
+      align-items:center;
+    }
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      gap:10px;
+      padding:12px 16px;
+      border-radius: 14px;
+      text-decoration:none;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      font-weight: 650;
+      transition: transform .08s ease, background .15s ease, border-color .15s ease;
+      user-select:none;
+    }
+    .btn:hover{transform: translateY(-1px); background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.20)}
+    .btn.primary{
+      border-color: rgba(110,168,255,.45);
+      background: linear-gradient(135deg, rgba(110,168,255,.28), rgba(110,168,255,.14));
+    }
+    .btn.primary:hover{border-color: rgba(110,168,255,.70)}
+    .btn.ghost{
+      background: transparent;
+    }
+    .btn small{font-weight:600; color: var(--muted)}
+    .grid{
+      margin-top:22px;
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:14px;
+    }
+    .card{
+      border:1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border-radius: var(--radius);
+      padding:18px 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    }
+    .card h3{
+      margin:0 0 6px;
+      font-size: 16px;
+      letter-spacing:-.2px;
+    }
+    .card p{
+      margin:0;
+      color: var(--muted);
+      font-size: 14px;
+    }
 
-.wrap{
-max-width:1100px;
-margin:auto;
-padding:30px;
-}
+    .span-6{grid-column: span 6}
+    .span-4{grid-column: span 4}
+    .span-8{grid-column: span 8}
+    .span-12{grid-column: span 12}
 
-header{
-display:flex;
-align-items:center;
-gap:15px;
-margin-bottom:40px;
-}
+    .section{
+      margin-top:18px;
+      padding:22px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.02);
+      border-radius: var(--radius);
+    }
+    .section h2{
+      margin:0 0 8px;
+      font-size: 20px;
+      letter-spacing:-.3px;
+    }
+    .section p{
+      margin:0;
+      color: var(--muted);
+    }
+    .list{
+      margin:14px 0 0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:10px;
+    }
+    .li{
+      padding:12px 12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(11,18,32,.25);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .li b{color: var(--text)}
+    .footer{
+      margin:18px 0 30px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 0 2px;
+    }
+    .footer a{color: var(--muted); text-decoration:none}
+    .footer a:hover{color: var(--text); text-decoration:underline}
+    .muted{color:var(--muted)}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.02);
+    }
 
-.logo{
-height:60px;
-}
-
-.navlinks{
-margin-left:auto;
-}
-
-.navlinks a{
-margin-left:20px;
-text-decoration:none;
-color:#9ca3af;
-}
-
-.hero{
-text-align:center;
-padding:60px 20px;
-}
-
-.hero h1{
-font-size:56px;
-margin-bottom:10px;
-}
-
-.hero p{
-color:#9ca3af;
-max-width:700px;
-margin:auto;
-}
-
-.cta{
-margin-top:40px;
-}
-
-.btn{
-display:inline-block;
-padding:14px 24px;
-margin:10px;
-border-radius:8px;
-text-decoration:none;
-color:white;
-background:#2563eb;
-}
-
-.btn.secondary{
-background:#1f2937;
-}
-
-.section{
-margin-top:80px;
-padding:40px;
-background:#111827;
-border-radius:10px;
-}
-
-.footer{
-margin-top:60px;
-color:#6b7280;
-text-align:center;
-font-size:14px;
-}
+    @media (max-width: 860px){
+      .navlinks{display:none}
+      .list{grid-template-columns: 1fr}
+      .span-6,.span-4,.span-8{grid-column: span 12}
+      .hero{padding:38px 18px}
+    }
+  
+    /* Header logo image */
+    .brand-logo{
+      height:44px;
+      width:auto;
+      display:block;
+      border-radius: 12px;
+      filter: drop-shadow(0 14px 26px rgba(0,0,0,.45));
+      transition: transform .12s ease, filter .15s ease;
+    }
+    .brand:hover .brand-logo{
+      transform: translateY(-1px);
+      filter: drop-shadow(0 18px 30px rgba(110,168,255,.18)) drop-shadow(0 14px 26px rgba(0,0,0,.45));
+    }
+    /* Hide the old CSS gradient square logo if it still exists in markup */
+    .brand .logo{ display:none; }
 
 </style>
+
+  <!-- Optional: Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "Entelgia",
+    "codeRepository": "https://github.com/sivanhavkin/entelgia",
+    "description": "An experimental AI architecture exploring how internal structure—memory, emotion, and reflection—shapes agent behavior over time.",
+    "license": "https://github.com/sivanhavkin/entelgia/blob/main/LICENSE"
+  }
+  </script>
 </head>
 
 <body>
+  <div class="wrap">
+    <header class="nav">
+      <a class="brand" href="#top" aria-label="Entelgia home">
+        <img class="brand-logo" src="/assets/entelgia-logo.png" alt="Entelgia Logo" loading="eager" decoding="async" />
+        <span>Entelgia</span></a>
 
-<div class="wrap">
+      <nav class="navlinks" aria-label="Primary">
+        <a href="#about">About</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#links">Links</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </header>
 
-<header>
+    <main id="top" class="hero">
+      <div class="kicker">
+        <span class="dot" aria-hidden="true"></span>
+        <span>Experimental research architecture • Multi-agent • Internal state</span>
+      </div>
 
-<img class="logo" src="/assets/entelgia-logo.png" alt="Entelgia Logo">
+      <h1>Dialogue-governed agents with memory, reflection, and self-regulation.</h1>
 
-<h2>Entelgia</h2>
+      <p class="sub">
+        Entelgia explores how <b>internal structure</b>—long-term memory, emotional signals, and observer loops—shapes
+        agent behavior over time. It’s a build-to-understand project focused on <b>identity drift</b>, stability, and interpretability.
+      </p>
 
-<div class="navlinks">
-<a href="#about">About</a>
-<a href="#architecture">Architecture</a>
-<a href="#links">Links</a>
-</div>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/sivanhavkin/entelgia" target="_blank" rel="noopener">
+          View on GitHub
+          <small>↗</small>
+        </a>
 
-</header>
+        <a class="btn" href="/docs/Entelgia%20v8%20as%20Cognitive%20Architecture%202.0.pdf" target="_blank" rel="noopener">
+          Read the Paper
+          <small>↗</small>
+        </a>
 
+        <a class="btn ghost" href="/docs/Entelgia_Full_Demo.pdf" target="_blank" rel="noopener">
+          View Full Demo
+          <small>↗</small>
+        </a>
+      </div>
 
-<div class="hero">
+      <div class="grid style="margin-top:26px">
+        <div class="card span-6">
+          <h3>What it is</h3>
+          <p>
+            A modular dialogue architecture where agents maintain internal state and evolve via structured reflection.
+            The goal is to study behavior emergence—not just produce outputs.
+          </p>
+        </div>
 
-<h1>Dialogue-governed agents with memory and reflection</h1>
+        <div class="card span-6">
+          <h3>What it’s not</h3>
+          <p>
+            Not a production framework. Not a tool wrapper. Entelgia is an evolving research codebase meant to be read,
+            adapted, simplified, and challenged.
+          </p>
+        </div>
 
-<p>
-Entelgia explores how internal structures such as memory,
-emotional signals and observer loops influence the long-term
-behavior of AI agents.
-</p>
+        <div class="card span-4">
+          <h3>Memory</h3>
+          <p>Short-term context + long-term persistence with promotion rules and traceability.</p>
+        </div>
 
-<div class="cta">
+        <div class="card span-4">
+          <h3>Emotion signal</h3>
+          <p>Emotional intensity as a routing/importance signal for behavior and storage decisions.</p>
+        </div>
 
-<a class="btn"
-href="https://github.com/sivanhavkin/entelgia"
-target="_blank">
-View on GitHub
-</a>
+        <div class="card span-4">
+          <h3>Observer loop</h3>
+          <p>Fixy-style oversight to detect patterns, correct failures, and improve stability over time.</p>
+        </div>
+      </div>
+    </main>
 
-<a class="btn secondary"
-href="/docs/Entelgia%20v8%20as%20Cognitive%20Architecture%202.0.pdf"
-target="_blank">
-Read the Paper
-</a>
+    <section id="about" class="section">
+      <h2>About</h2>
+      <p>
+        Entelgia sits between agent engineering and cognitive-architecture research. It asks a simple question:
+        <b>what changes when the agent has structure?</b> If memory, emotion, and reflection are first-class components,
+        can we get behavior that is more stable, explainable, and meaningfully self-regulated?
+      </p>
+    </section>
 
-<a class="btn secondary"
-href="/docs/Entelgia_Full_Demo.pdf"
-target="_blank">
-View Full Demo
-</a>
+    <section id="architecture" class="section">
+      <h2>Core components</h2>
+      <p class="muted">A minimal overview of the moving parts.</p>
 
-</div>
+      <ul class="list">
+        <li class="li"><b>Dialogue Engine</b> — turn selection, context shaping, and structured prompting</li>
+        <li class="li"><b>Long-Term Memory</b> — persistence with promotion/importance thresholds</li>
+        <li class="li"><b>Emotion Core</b> — emotion tags and intensity signals influencing decisions</li>
+        <li class="li"><b>Observer / Fixy</b> — detects drift, errors, loops; proposes corrections</li>
+        <li class="li"><b>Behavior Rules</b> — constraints and self-regulation (ethics/consistency)</li>
+        <li class="li"><b>Trace & Logs</b> — CSV/GEXF/event trails for reproducibility and analysis</li>
+      </ul>
+    </section>
 
-</div>
+    <section id="links" class="section">
+      <h2>Links</h2>
+      <div class="grid">
+        <div class="card span-6">
+          <h3>Repository</h3>
+          <p><a href="https://github.com/sivanhavkin/entelgia" target="_blank" rel="noopener">github.com/sivanhavkin/entelgia</a></p>
+        </div>
+        <div class="card span-6">
+          <h3>Docs / Demo</h3>
+          <p>
+            <a href="/docs/Entelgia%20v8%20as%20Cognitive%20Architecture%202.0.pdf" target="_blank" rel="noopener">Paper — Entelgia v8 (PDF)</a>
+            <br>
+            <a href="/docs/Entelgia_Full_Demo.pdf" target="_blank" rel="noopener">Full Demo — Dialogue Examples (PDF)</a>
+          </p>
+        </div>
+      </div>
+    </section>
 
+    <section id="contact" class="section">
+      <h2>Contact</h2>
+      <p>
+        Email: <a href="mailto:info@entelgia.com">info@entelgia.com</a>
+        <span class="muted">•</span>
+        GitHub: <a href="https://github.com/sivanhavkin" target="_blank" rel="noopener">@sivanhavkin</a>
+      </p>
+    </section>
 
-<div id="about" class="section">
+    <div class="footer">
+      <div>© <span id="year"></span> Entelgia • Research project by Sivan Havkin</div>
+      <div>
+        <a href="#top">Back to top</a>
+        <span class="muted"> • </span>
+        <a href="https://github.com/sivanhavkin/entelgia/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+      </div>
+    </div>
+  </div>
 
-<h2>About Entelgia</h2>
-
-<p>
-Entelgia is a research architecture investigating how structured
-internal processes shape agent behavior over time.
-</p>
-
-<p>
-Instead of stateless prompting, Entelgia models agents with memory,
-emotion signals and reflective observer loops.
-</p>
-
-</div>
-
-
-<div id="architecture" class="section">
-
-<h2>Core Components</h2>
-
-<p>
-
-Dialogue Engine • Long-Term Memory • Emotion Core • Observer (Fixy)
-• Behavioral Rules • Traceable Internal State
-
-</p>
-
-</div>
-
-
-<div id="links" class="section">
-
-<h2>Project Links</h2>
-
-<p>
-
-<a href="https://github.com/sivanhavkin/entelgia" target="_blank">
-GitHub Repository
-</a>
-
-<br><br>
-
-<a href="/docs/Entelgia%20v8%20as%20Cognitive%20Architecture%202.0.pdf" target="_blank">
-Research Paper
-</a>
-
-<br><br>
-
-<a href="/docs/Entelgia_Full_Demo.pdf" target="_blank">
-Full Dialogue Demo
-</a>
-
-</p>
-
-</div>
-
-
-<div class="footer">
-
-Entelgia Research Project  
-Created by Sivan Havkin
-
-</div>
-
-</div>
-
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
