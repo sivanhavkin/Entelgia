@@ -94,6 +94,92 @@ _INSTRUCTION_WORDS: FrozenSet[str] = frozenset(
     }
 )
 
+# Filler, functional, and light-semantic words removed during query rewriting.
+# These extend _STOPWORDS with pronouns, common verbs, modals, conjunctions,
+# prepositions, and discourse markers that carry no concept value for search.
+_REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
+    {
+        # Personal pronouns
+        "i", "we", "you", "he", "she", "they", "it",
+        "me", "us", "him", "her", "them",
+        # Demonstratives / locatives
+        "this", "that", "these", "those", "here", "there",
+        # Auxiliary / modal verbs
+        "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did",
+        "can", "could", "will", "would", "shall", "should",
+        "may", "might", "must",
+        # Light / copula verbs
+        "hold", "holds", "held",
+        "seem", "seems", "seemed",
+        "appear", "appears", "appeared",
+        "become", "becomes", "became",
+        "feel", "feels", "felt",
+        "keep", "keeps", "kept",
+        "get", "gets", "got",
+        "make", "makes", "made",
+        "go", "goes", "went",
+        "come", "comes", "came",
+        "take", "takes", "took",
+        "give", "gives", "gave",
+        "see", "sees", "saw",
+        "look", "looks", "looked",
+        "say", "says", "said",
+        "tell", "tells", "told",
+        "mean", "means", "meant",
+        "find", "finds", "found",
+        "know", "knows", "knew",
+        "think", "thinks", "thought",
+        "believe", "believes", "believed",
+        "suggest", "suggests", "suggested",
+        "understand", "understands", "understood",
+        # Conjunctions / subordinators
+        "and", "but", "or", "nor", "so", "yet", "for",
+        "if", "because", "since", "as", "when", "while",
+        "although", "though", "whether",
+        # Prepositions not already in _STOPWORDS
+        "with", "at", "from", "by", "to", "into", "onto",
+        "upon", "about", "before", "after", "during",
+        "through", "between", "among", "under", "over",
+        "above", "near", "around", "against", "on", "off",
+        # Adverbs / discourse markers
+        "not", "no", "just", "only", "also", "very", "quite",
+        "rather", "often", "always", "never", "sometimes",
+        "still", "even", "now", "then", "today", "already",
+        "well", "perhaps", "maybe", "certainly", "indeed",
+        "however", "therefore", "thus", "hence",
+        "moreover", "furthermore", "nevertheless",
+        # Interrogatives
+        "where", "when", "why", "who", "whom",
+        # Already in _STOPWORDS — included here so the set is self-contained
+        "the", "a", "an", "of", "in", "within", "across",
+        "how", "what", "which", "our", "your", "their", "its",
+        # Generic nouns / adjectives that add no search value
+        "place", "central", "way", "thing", "things", "part",
+        "fact", "matter", "kind", "sort", "type",
+        # Discourse / sentence-opening gerunds (prose style markers)
+        "reflecting", "considering", "exploring", "examining",
+        "thinking", "noting", "observing", "recognizing",
+        "acknowledging", "believing", "knowing",
+        "wondering", "questioning", "suggesting", "arguing",
+        "discussing", "analyzing", "reviewing",
+        "looking", "seeing", "finding", "getting",
+        "making", "taking", "giving", "coming", "going",
+        "saying", "telling", "meaning", "holding",
+        # Common filler adjectives / participles
+        "given", "certain", "clear", "true", "false",
+        "various", "different", "similar", "important",
+        "possible", "likely", "general", "specific",
+        # Verb forms that carry no concept value in search
+        "shows", "show", "shown", "demonstrate", "demonstrates",
+        "demonstrated", "indicates", "indicate", "indicated",
+        "implies", "imply", "implied", "follows", "follow",
+        "need", "needs", "needed", "want", "wants", "wanted",
+        "use", "uses", "used", "allow", "allows", "allowed",
+        "work", "works", "worked", "put", "puts",
+    }
+)
+
 # Maximum number of words in a compressed search query
 _MAX_QUERY_WORDS: int = 6
 
@@ -339,6 +425,67 @@ def _extract_trigger_fragment(text: str, trigger: str) -> str:
     return _compress_to_keywords(_sanitize_text(fragment))
 
 
+def rewrite_search_query(text: str, trigger: str) -> str:
+    """Rewrite a trigger-containing sentence into a concept-based search query.
+
+    Finds the sentence in *text* that contains *trigger*, then aggressively
+    strips pronouns, auxiliary verbs, conjunctions, prepositions, and other
+    non-concept words so only 3–6 meaningful noun/concept terms remain.
+
+    This produces search-oriented output instead of the raw prose fragment
+    that results from simple keyword compression.  For example::
+
+        "Truth holds a central place in our understanding of knowledge"
+        → "truth understanding knowledge"
+
+        "I question whether memory can distort our perception of reality"
+        → "memory distort perception reality"
+
+    Parameters
+    ----------
+    text:
+        The full dialogue turn or seed text containing the trigger.
+    trigger:
+        The trigger keyword or phrase already identified in *text*.
+
+    Returns
+    -------
+    A compact, concept-based query string of at most ``_MAX_QUERY_WORDS``
+    meaningful terms.  Falls back to :func:`_extract_trigger_fragment` when
+    the trigger cannot be located in *text*.
+    """
+    # 1. Find the sentence that contains the trigger.
+    trigger_lower = trigger.lower()
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    target_sentence = None
+    for sentence in sentences:
+        if trigger_lower in sentence.lower():
+            target_sentence = sentence
+            break
+    if target_sentence is None:
+        # Trigger not found in any sentence — fall back to the whole text.
+        logger.warning(
+            "rewrite_search_query: trigger %r not found in any sentence; "
+            "falling back to _extract_trigger_fragment",
+            trigger,
+        )
+        return _extract_trigger_fragment(text, trigger)
+
+    # 2. Sanitize the sentence (strips agent names, HTML entities, mode labels,
+    #    instruction words, possessives, and punctuation).
+    clean = _sanitize_text(target_sentence)
+
+    # 3. Remove filler/functional words (much more aggressive than _compress_to_keywords).
+    words = clean.split()
+    concepts = [
+        w for w in words
+        if w.lower() not in _REWRITE_FILLER_WORDS and len(w) > 2
+    ]
+
+    # 4. Return at most _MAX_QUERY_WORDS concept terms.
+    return " ".join(concepts[:_MAX_QUERY_WORDS])
+
+
 def _extract_topic_line(text: str) -> str:
     """Return the content after the first ``TOPIC:`` label, or the full text.
 
@@ -416,8 +563,8 @@ def build_research_query(
                 trigger = find_trigger(text)
                 logger.debug("[branch=dialogue_question] detected_trigger=%r", trigger)
                 if trigger:
-                    # _extract_trigger_fragment already sanitizes and compresses
-                    query = _extract_trigger_fragment(text, trigger)
+                    # rewrite_search_query extracts concepts from the full sentence
+                    query = rewrite_search_query(text, trigger)
                     logger.debug("[branch=dialogue_question] query=%r", query)
                     break
 
@@ -437,8 +584,8 @@ def build_research_query(
                 trigger = find_trigger(text)
                 logger.debug("[branch=dialogue_longest] detected_trigger=%r", trigger)
                 if trigger:
-                    # _extract_trigger_fragment already sanitizes and compresses
-                    query = _extract_trigger_fragment(text, trigger)
+                    # rewrite_search_query extracts concepts from the full sentence
+                    query = rewrite_search_query(text, trigger)
                     logger.debug("[branch=dialogue_longest] query=%r", query)
 
     # Priority 3: fall back to seed_text, still applying trigger-based extraction
@@ -453,8 +600,8 @@ def build_research_query(
         trigger = find_trigger(topic_seed)
         logger.debug("[branch=seed_fallback] detected_trigger=%r", trigger)
         if trigger:
-            # _extract_trigger_fragment already sanitizes and compresses
-            query = _extract_trigger_fragment(topic_seed, trigger)
+            # rewrite_search_query extracts concepts from the full sentence
+            query = rewrite_search_query(topic_seed, trigger)
         else:
             query = _compress_to_keywords(_sanitize_text(topic_seed))
         logger.debug("[branch=seed_fallback] query=%r", query)
