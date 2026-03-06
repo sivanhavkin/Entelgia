@@ -605,6 +605,53 @@ class TestBuildResearchQuery:
         assert isinstance(result, str)
         assert len(result) > 0
 
+    def test_fragment_begins_at_trigger_when_trigger_appears_later(self):
+        # When the trigger word appears mid-sentence, the fragment must start
+        # at the trigger position — not at the beginning of the sentence.
+        from entelgia.web_research import _extract_trigger_fragment
+
+        text = "Reflecting on the nature of truth and our understanding today is key."
+        result = _extract_trigger_fragment(text, "today")
+        # The result must begin with the trigger word (after sanitization)
+        assert result.lower().startswith("today")
+
+    def test_query_does_not_start_from_sentence_beginning(self):
+        # Conversational filler before the trigger must be excluded from the query.
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {
+                "role": "Athena",
+                "text": (
+                    "Reflecting on the nature of truth and our understanding "
+                    "today is what research shows?"
+                ),
+            }
+        ]
+        result = build_research_query("seed", dialog, None)
+        # The conversational preamble before "today" must not appear in the query
+        assert "Reflecting" not in result
+        assert "nature" not in result
+        # The trigger and content after it must drive the query
+        assert "today" in result
+
+    def test_sanitize_and_compress_run_after_fragment_extraction(self):
+        # _extract_trigger_fragment must apply _sanitize_text then
+        # _compress_to_keywords so that agent names and stopwords are removed
+        # from the extracted fragment.
+        from entelgia.web_research import _extract_trigger_fragment
+
+        # "Athena" is an agent name that should be stripped by _sanitize_text;
+        # "the" is a stopword that should be removed by _compress_to_keywords.
+        text = "today Athena explains the philosophy of mind"
+        result = _extract_trigger_fragment(text, "today")
+        assert "Athena" not in result
+        # Use split() to check for the standalone stopword token, not a substring
+        assert "the" not in result.split()
+        # Core content keywords must be retained
+        assert "today" in result
+        assert "philosophy" in result
+
 
 class TestStoreExternalKnowledge:
     """Tests for _store_external_knowledge using a temporary SQLite database."""
