@@ -55,7 +55,6 @@ _TRIGGER_PHRASES: frozenset = frozenset(
         "latest results",
         "current evidence",
         "recent developments",
-
         # academic sources
         "peer reviewed",
         "peer reviewed paper",
@@ -65,7 +64,6 @@ _TRIGGER_PHRASES: frozenset = frozenset(
         "systematic review",
         "meta analysis",
         "scientific report",
-
         # verification / sourcing
         "primary source",
         "reliable source",
@@ -87,7 +85,8 @@ _TRIGGER_KEYWORDS: frozenset = frozenset(
         "updated",
         "trend",
         "trends",
-
+        # user intent / action
+        "web",
         # academic / research signals
         "research",
         "study",
@@ -95,7 +94,6 @@ _TRIGGER_KEYWORDS: frozenset = frozenset(
         "paper",
         "journal",
         "arxiv",
-
         # sourcing / verification
         "evidence",
         "source",
@@ -112,14 +110,17 @@ _TRIGGER_KEYWORDS: frozenset = frozenset(
     }
 )
 
-# Phrases that signal a need for external research (simple substring matching)
-_TRIGGER_PHRASES: tuple[str, ...] = (
-    "latest research",
-    "recent paper",
-    "find sources",
-    "external evidence",
-    "current research",
-    "peer reviewed",
+# ---------------------------------------------------------------------------
+# Scoring constants
+# ---------------------------------------------------------------------------
+
+# Multi-word phrases score higher than single keywords
+_PHRASE_SCORE: int = 3
+_KEYWORD_SCORE: int = 1
+
+# Academic keywords that carry extra weight (+1) when found
+_HIGH_VALUE_KEYWORDS: frozenset = frozenset(
+    {"research", "study", "paper", "arxiv", "journal"}
 )
 
 # Fixy meta-reason values that indicate a research need
@@ -146,40 +147,37 @@ def find_trigger(text: str) -> Optional[str]:
     Return the strongest trigger phrase or keyword found in text.
 
     Selection rules:
-    1. Prefer multi-word phrases over single keywords.
-    2. Prefer high-value academic keywords.
+    1. Prefer multi-word phrases over single keywords (higher score).
+    2. When scores are equal, prefer the trigger that appears earliest in text.
     3. Case-insensitive matching.
-    4. Return the highest-scoring trigger.
     """
 
     if not text:
         return None
 
     text_lower = text.lower()
+    # Each candidate: (score, position, trigger)
     candidates = []
 
     # --- phrase detection ---
     for phrase in _TRIGGER_PHRASES:
-        if phrase in text_lower:
-            score = _PHRASE_SCORE
-            candidates.append((score, phrase))
+        idx = text_lower.find(phrase)
+        if idx != -1:
+            candidates.append((_PHRASE_SCORE, idx, phrase))
 
-    # --- keyword detection ---
-    words = set(re.findall(r"\b[a-zA-Z\-]+\b", text_lower))
-
-    for keyword in _TRIGGER_KEYWORDS:
-        if keyword in words:
-            score = _KEYWORD_SCORE
-            if keyword in _HIGH_VALUE_KEYWORDS:
-                score += 1
-            candidates.append((score, keyword))
+    # --- keyword detection (whole-word, case-insensitive) ---
+    for m in re.finditer(r"\b[a-zA-Z\-]+\b", text_lower):
+        word = m.group()
+        if word in _TRIGGER_KEYWORDS:
+            candidates.append((_KEYWORD_SCORE, m.start(), word))
 
     if not candidates:
         return None
 
-    # return highest scoring trigger
-    candidates.sort(reverse=True)
-    return candidates[0][1]
+    # Sort: higher score first; for equal scores, earlier position first.
+    candidates.sort(key=lambda c: (-c[0], c[1]))
+    return candidates[0][2]
+
 
 def _text_has_trigger(text: str) -> bool:
     """Return True if *text* contains a trigger keyword (whole-word) or phrase."""
