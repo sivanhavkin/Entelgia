@@ -43,7 +43,6 @@ from entelgia.research_context_builder import build_research_context
 from entelgia.source_evaluator import evaluate_sources
 from entelgia.web_research import maybe_add_web_context
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -157,15 +156,17 @@ def run_demo(user_query: str) -> None:
         dialog.append({"role": agent_name, "text": response})
 
         colour_codes = {
-            "Fixy":     "\033[33m",   # yellow
-            "Ego":      "\033[36m",   # cyan
-            "Superego": "\033[35m",   # magenta
-            "Id":       "\033[31m",   # red
+            "Fixy": "\033[33m",  # yellow
+            "Ego": "\033[36m",  # cyan
+            "Superego": "\033[35m",  # magenta
+            "Id": "\033[31m",  # red
         }
         reset = "\033[0m"
         colour = colour_codes.get(agent_name, "")
         print(f"  {colour}{agent_name}:{reset}")
-        wrapped = textwrap.fill(response, width=65, initial_indent="    ", subsequent_indent="    ")
+        wrapped = textwrap.fill(
+            response, width=65, initial_indent="    ", subsequent_indent="    "
+        )
         print(wrapped)
         print()
 
@@ -192,5 +193,9 @@ def run_demo(user_query: str) -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    query = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "latest research on artificial intelligence"
+    query = (
+        " ".join(sys.argv[1:])
+        if len(sys.argv) > 1
+        else "latest research on artificial intelligence"
+    )
     run_demo(query)

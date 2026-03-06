@@ -91,18 +91,36 @@ _DIALOG_TAIL_WINDOW: int = 4
 # ---------------------------------------------------------------------------
 
 
-def _text_has_trigger(text: str) -> bool:
-    """Return True if *text* contains a trigger keyword (whole-word) or phrase."""
+def find_trigger(text: str) -> Optional[str]:
+    """Return the first trigger phrase or keyword found in *text*, or ``None``.
+
+    Multi-word phrases are checked before single keywords so that the more
+    specific match is always preferred.
+
+    Parameters
+    ----------
+    text:
+        Arbitrary text to scan for trigger signals.
+
+    Returns
+    -------
+    The matched phrase or keyword string, or ``None`` when no trigger is found.
+    """
     if not text or not text.strip():
-        return False
+        return None
     text_lower = text.lower()
-    # Phrase check (substring)
+    # Phrase check first (multi-word match takes priority over single words)
     for phrase in _TRIGGER_PHRASES:
         if phrase in text_lower:
-            return True
+            return phrase
     # Whole-word keyword check
-    words = frozenset(re.findall(r"[a-z]+", text_lower))
-    return bool(words & _TRIGGER_KEYWORDS)
+    words = re.findall(r"[a-z]+", text_lower)
+    return next((word for word in words if word in _TRIGGER_KEYWORDS), None)
+
+
+def _text_has_trigger(text: str) -> bool:
+    """Return True if *text* contains a trigger keyword (whole-word) or phrase."""
+    return find_trigger(text) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +158,9 @@ def fixy_should_search(
     ``True`` if a web search should be performed, ``False`` otherwise.
     """
     # 1. Check seed text
-    if _text_has_trigger(seed_text):
-        logger.debug("fixy_should_search: trigger found in seed_text")
+    trigger = find_trigger(seed_text)
+    if trigger:
+        logger.info("web search triggered by keyword: %r", trigger)
         return True
 
     # 2. Check recent dialogue turns (skip index 0 – the seed topic)
@@ -152,13 +171,14 @@ def fixy_should_search(
         recent_turns = turns_to_scan[-_DIALOG_TAIL_WINDOW:]
         for turn in recent_turns:
             turn_text = turn.get("text", "") if isinstance(turn, dict) else ""
-            if _text_has_trigger(turn_text):
-                logger.debug("fixy_should_search: trigger found in dialogue turn")
+            trigger = find_trigger(turn_text)
+            if trigger:
+                logger.info("web search triggered by keyword: %r", trigger)
                 return True
 
     # 3. Check Fixy meta-reason signal
     if fixy_reason and fixy_reason in _FIXY_RESEARCH_REASONS:
-        logger.debug("fixy_should_search: trigger from fixy_reason=%r", fixy_reason)
+        logger.info("web search triggered by fixy_reason: %r", fixy_reason)
         return True
 
     return False

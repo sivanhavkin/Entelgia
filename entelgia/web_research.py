@@ -31,7 +31,7 @@ import sqlite3
 import uuid
 from typing import Any, Dict, List, Optional
 
-from entelgia.fixy_research_trigger import fixy_should_search
+from entelgia.fixy_research_trigger import find_trigger, fixy_should_search
 from entelgia.research_context_builder import build_research_context
 from entelgia.source_evaluator import evaluate_sources
 from entelgia.web_tool import search_and_fetch
@@ -110,6 +110,41 @@ def _store_external_knowledge(
 # ---------------------------------------------------------------------------
 
 _MAX_QUERY_LENGTH: int = 200
+_TRIGGER_FRAGMENT_MAX_WORDS: int = 15
+
+
+def _extract_trigger_fragment(text: str, trigger: str) -> str:
+    """Return a focused query fragment starting from the trigger word/phrase.
+
+    Trims all text before the first occurrence of *trigger* so that
+    dialogue preamble (e.g. agent names, conversational filler) is not
+    included in the resulting search query.  The output is limited to
+    ``_TRIGGER_FRAGMENT_MAX_WORDS`` words.
+
+    Parameters
+    ----------
+    text:
+        The full dialogue turn or seed text.
+    trigger:
+        The trigger keyword or phrase already identified in *text*.
+
+    Returns
+    -------
+    A short, focused string suitable for use as a web search query.
+    """
+    idx = text.lower().find(trigger.lower())
+    if idx == -1:
+        # Trigger not found literally — unexpected since find_trigger() should
+        # have confirmed its presence; log a warning and return a safe truncation.
+        logger.warning(
+            "_extract_trigger_fragment: trigger %r not found in text; "
+            "returning truncated text",
+            trigger,
+        )
+        return " ".join(text.split()[:_TRIGGER_FRAGMENT_MAX_WORDS])
+    fragment = text[idx:]
+    words = fragment.split()
+    return " ".join(words[:_TRIGGER_FRAGMENT_MAX_WORDS])
 
 
 def build_research_query(
@@ -122,7 +157,12 @@ def build_research_query(
     Priority order:
 
     1. An explicit question detected in the last few dialogue turns.
-    2. The most informative (longest) recent agent dialogue turn.
+       When a trigger keyword is identified in the question, only the
+       fragment starting at the trigger is used to avoid including
+       agent names or conversational filler in the query.
+    2. The most informative (longest) recent agent dialogue turn,
+       similarly trimmed to start at the trigger keyword when one is
+       present.
     3. Fallback to *seed_text*.
 
     The returned query is limited to ``_MAX_QUERY_LENGTH`` characters and has
@@ -151,7 +191,11 @@ def build_research_query(
         for turn in reversed(recent):
             text = (turn.get("text", "") if isinstance(turn, dict) else "").strip()
             if "?" in text:
-                candidate = text
+                trigger = find_trigger(text)
+                if trigger:
+                    candidate = _extract_trigger_fragment(text, trigger)
+                else:
+                    candidate = text
                 break
 
         # Priority 2: most informative (longest) turn
@@ -162,9 +206,12 @@ def build_research_query(
                 default=None,
             )
             if best:
-                candidate = (
-                    best.get("text", "") if isinstance(best, dict) else ""
-                ).strip()
+                text = (best.get("text", "") if isinstance(best, dict) else "").strip()
+                trigger = find_trigger(text)
+                if trigger:
+                    candidate = _extract_trigger_fragment(text, trigger)
+                else:
+                    candidate = text
 
     # Priority 3: fall back to seed_text
     if not candidate:
