@@ -28,3 +28,11 @@ If you create a derivative project based on Entelgia:
 ## Questions?
 
 For questions about branding, trademark usage, or attribution requirements, please contact the project maintainer.
+
+---
+
+## Web Research Module
+
+The Web Research Module retrieves and displays content from third-party websites.
+Such content is the property of the respective copyright holders and is used
+solely as informational context within the agent dialogue pipeline.

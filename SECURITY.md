@@ -48,6 +48,28 @@ Users are responsible for reviewing and managing their local data.
 
 ---
 
+## Web Research Module — Safety Considerations
+
+The optional Web Research Module (`entelgia/web_research.py`) makes outbound HTTP
+requests to DuckDuckGo and to third-party web pages.  Be aware of the following:
+
+- **Network exposure**: enabling the module causes the system to make HTTP GET/POST
+  requests to external servers, which may log IP addresses and query terms.
+- **Untrusted content**: page text extracted from arbitrary URLs is passed directly
+  into LLM prompts.  Adversarial pages could attempt prompt-injection via crafted text.
+  The module caps extracted text at 6 000 characters and strips scripts/styles/nav/footer
+  elements, but does not perform deep sanitisation.
+- **Timeout & failure safety**: all requests use a 10-second timeout.  Any exception
+  is caught and logged; the main dialogue pipeline always continues with an empty
+  context block.
+- **Memory persistence**: sources with `credibility_score > 0.8` are stored in the
+  `external_knowledge` table.  Review and rotate this table as needed.
+
+To disable the module entirely, ensure `fixy_should_search` always returns `False`
+or do not call `maybe_add_web_context` in your pipeline.
+
+---
+
 ## Experimental Nature
 
 This project is under active research and development.

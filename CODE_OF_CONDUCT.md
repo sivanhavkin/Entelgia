@@ -130,3 +130,13 @@ enforcement ladder](https://github.com/mozilla/diversity).
 For answers to common questions about this code of conduct, see the FAQ at
 https://www.contributor-covenant.org/faq. Translations are available at
 https://www.contributor-covenant.org/translations.
+
+---
+
+## Note on Web Research
+
+The Web Research Module (v2.8.0) retrieves content from external websites.
+Contributors and users are expected to use this capability responsibly and in
+accordance with the terms of service of any websites accessed.  The same
+community standards described above apply to any data retrieved, stored, or
+shared through the web research pipeline.

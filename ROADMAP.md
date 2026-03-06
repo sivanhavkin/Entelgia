@@ -19,6 +19,7 @@ It represents exploration goals rather than fixed delivery promises.
 - ✅ **DrivePressure** — per-agent urgency/tension scalar driving conciseness and topic resolution (v2.6.0)
 - ✅ **Limbic hijack** — Id-dominant emotional override with temporary Superego suppression (v2.7.0)
 - ✅ **Meta output refinement** — context-sensitive meta logging replacing constant noise (v2.7.0)
+- ✅ **Web Research Module** — Fixy-triggered DuckDuckGo search, credibility evaluation, and external knowledge injection (v2.8.0)
 
 Focus: stability, clarity, and architectural refinement.
 

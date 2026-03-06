@@ -11,6 +11,7 @@ Thank you to everyone who has contributed to Entelgia!
 - **Sivan Havkin** ([@sivanhavkin](https://github.com/sivanhavkin))
   - Creator & Lead Developer
   - Architecture & Core Implementation
+  - Web Research Module (v2.8.0)
 
 ## 🤝 Contributors
 

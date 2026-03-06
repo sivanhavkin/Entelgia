@@ -46,6 +46,7 @@ class ContextManager:
         debate_profile: Dict[str, Any],
         show_pronoun: bool = False,
         agent_pronoun: Optional[str] = None,
+        web_context: str = "",
     ) -> str:
         """
         Build rich context with smart truncation and memory integration.
@@ -62,6 +63,7 @@ class ContextManager:
             debate_profile: Debate style profile
             show_pronoun: Whether to display pronoun after agent name
             agent_pronoun: Pronoun to display (e.g., "he", "she") if show_pronoun is True
+            web_context: Optional external knowledge context from web research
 
         Returns:
             Formatted prompt string
@@ -95,6 +97,7 @@ class ContextManager:
             important_memories=important_memories,
             show_pronoun=show_pronoun,
             agent_pronoun=agent_pronoun,
+            web_context=web_context,
         )
 
         return prompt
@@ -153,6 +156,7 @@ class ContextManager:
         important_memories: List[Dict[str, Any]],
         show_pronoun: bool = False,
         agent_pronoun: Optional[str] = None,
+        web_context: str = "",
     ) -> str:
         """
         Format enriched prompt with all context.
@@ -168,6 +172,7 @@ class ContextManager:
             important_memories: Important LTM entries
             show_pronoun: Whether to display pronoun after agent name
             agent_pronoun: Pronoun to display (e.g., "he", "she")
+            web_context: Optional external knowledge block from web research
 
         Returns:
             Formatted prompt
@@ -219,6 +224,18 @@ class ContextManager:
                 # Add star marker for very important memories
                 marker = "* " if float(importance) > 0.7 else ""
                 prompt += f"{marker}- {content}\n"
+
+        # Add external knowledge context if provided
+        if web_context:
+            prompt += "\nExternal Knowledge Context:\n"
+            prompt += web_context + "\n"
+            prompt += (
+                "Instructions for agents:\n"
+                "- Superego must verify credibility of external sources.\n"
+                "- Ego must integrate sources into the reasoning.\n"
+                "- Id may resist heavy research if energy is low.\n"
+                "- Fixy monitors reasoning loops and source reliability.\n"
+            )
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         # Identity lock: drives are internal psychology metrics, not persona labels.

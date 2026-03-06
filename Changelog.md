@@ -8,6 +8,46 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [2.8.0] - 2026-03-06
+
+### Added
+
+- **Web Research Module** 🌐 — Fixy-triggered external knowledge pipeline (5 new modules)
+
+  - **`entelgia/web_tool.py`** — Three public functions:
+    - `web_search(query, max_results=5)` — DuckDuckGo HTML search; returns `[{title, url, snippet}]`
+    - `fetch_page_text(url)` — downloads page, strips `<script>`/`<style>`/`<nav>`/`<footer>`, returns `{url, title, text}` (capped at 6 000 chars)
+    - `search_and_fetch(query)` — combines search + fetch into `{query, sources: [{title, url, snippet, text}]}`
+
+  - **`entelgia/source_evaluator.py`** — Heuristic credibility scoring
+    - `evaluate_source(source)` → `{url, credibility_score}` in [0, 1]
+    - `evaluate_sources(sources)` → list sorted descending by score
+    - Scoring rules: `.edu`/`.gov` (+0.30), known research sites (+0.20), long text (+0.20/+0.10), very short text (−0.20)
+
+  - **`entelgia/research_context_builder.py`** — Formats ranked sources as LLM-ready context
+    - `build_research_context(bundle, scored_sources, max_sources=3)` → formatted `"External Research:\n..."` block
+
+  - **`entelgia/fixy_research_trigger.py`** — Keyword-based trigger detection
+    - `fixy_should_search(user_message)` → `True` when message contains: `latest`, `recent`, `research`, `news`, `current`, `today`, `web`, `find`, `search`, `paper`, `study`, `article`, `published`, `updated`, `new`, `trend`, `report`, `source`
+
+  - **`entelgia/web_research.py`** — Full pipeline orchestration
+    - `maybe_add_web_context(user_message, db_path=None, max_results=5)` → context string or `""`
+    - Stores sources with `credibility_score > 0.8` in `external_knowledge` SQLite table (`id`, `timestamp`, `query`, `url`, `summary`, `credibility_score`)
+    - Fails gracefully — never crashes the main dialogue system
+
+- **`entelgia/context_manager.py`** — Extended `build_enriched_context` and `_format_prompt` to accept an optional `web_context: str = ""` parameter; when provided, injects an `"External Knowledge Context:"` section with agent-specific instructions (Superego verifies credibility, Ego integrates sources, Id may resist if energy is low, Fixy monitors reasoning loops)
+
+- **`entelgia_research_demo.py`** — Standalone demo script
+  - Simulates the full pipeline: user query → Fixy trigger → search → credibility ranking → agent dialogue → final answer
+  - Runs without a live Ollama instance (mock agent responses for demo purposes)
+  - Usage: `python entelgia_research_demo.py "latest research on quantum computing"`
+
+### Changed
+
+- `requirements.txt` — added `beautifulsoup4>=4.12.0` (required by `web_tool.fetch_page_text`)
+
+---
+
 ## [2.7.0] - 2026-03-03
 
 ### Added

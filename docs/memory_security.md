@@ -269,3 +269,33 @@ ALTER TABLE memories ADD COLUMN signature_hex TEXT DEFAULT NULL;
 - [HMAC-SHA256 Specification (RFC 2104)](https://tools.ietf.org/html/rfc2104)
 - [Python hmac module](https://docs.python.org/3/library/hmac.html)
 - [Constant-Time Comparison](https://codahale.com/a-lesson-in-timing-attacks/)
+
+---
+
+## External Knowledge Table (v2.8.0)
+
+The Web Research Module persists high-credibility web sources in a separate SQLite
+table called `external_knowledge`.  This table is **not** protected by HMAC-SHA256
+signatures (unlike the `memories` table) because it stores externally-sourced
+public data rather than private agent memories.
+
+### Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS external_knowledge (
+    id                TEXT PRIMARY KEY,    -- UUID v4
+    timestamp         TEXT NOT NULL,       -- ISO-8601 UTC
+    query             TEXT,                -- original search query
+    url               TEXT,                -- source URL
+    summary           TEXT,                -- extracted page text (≤ 1 000 chars)
+    credibility_score REAL                 -- heuristic score in [0.0, 1.0]
+);
+```
+
+### Notes
+
+- Only sources with `credibility_score > 0.8` are persisted.
+- The table is created on first use; no migration is needed.
+- It is stored in the same database file as the agent `memories` table when
+  `db_path` is shared, but the tables are logically independent.
+- To clear external knowledge: `DELETE FROM external_knowledge;`

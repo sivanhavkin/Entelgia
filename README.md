@@ -263,6 +263,7 @@ What would you like to delete?
 * 🏗 **[Architecture Overview (ARCHITECTURE.md)](ARCHITECTURE.md)** - High-level and component design
 * 🗺️ **[Roadmap (ROADMAP.md)](ROADMAP.md)** - Project development roadmap and future plans
 * 📖  [Entelgia Demo(entelgia_demo.py)](https://github.com/sivanhavkin/Entelgia/blob/main/entelgia_demo.md) - See the system in action
+* 🌐 **[Web Research Demo (entelgia_research_demo.py)](entelgia_research_demo.py)** - Fixy-triggered web search demo
 * ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
 * 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 * 🧪 **[Test Suite (tests/README.md)](tests/README.md)** - Full test documentation and CI/CD details
@@ -282,6 +283,7 @@ What would you like to delete?
 * **📊 Dialogue Quality Metrics** — `circularity_rate`, `progress_rate`, `intervention_utility`
 * **🔬 Ablation Study** — 4 reproducible conditions, fully deterministic
 * **🛡️ Safety & Quality** — PII redaction, output artifact cleanup, memory poisoning protection
+* **🌐 Web Research Module** — Fixy-triggered DuckDuckGo search, credibility scoring, and external knowledge injection into agent dialogue
 
 ---
 
@@ -384,6 +386,7 @@ Entelgia is built around a modular **CoreMind** system — a layered stack of co
 | `Behavior` | Goal-oriented response shaping |
 | `Observer` | Meta-level monitoring & correction |
 | `EnergyRegulator` | Cognitive energy supervision & dream cycles |
+| `WebResearch` | External knowledge retrieval & credibility evaluation |
 
 ### 🤝 The Three Agents
 
@@ -408,7 +411,12 @@ entelgia/
 ├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
 ├── memory_security.py       # HMAC-SHA256 signature helpers
 ├── dialogue_metrics.py      # Circularity, progress & intervention utility metrics (v2.6.0)
-└── ablation_study.py        # 4-condition reproducible ablation study (v2.6.0)
+├── ablation_study.py        # 4-condition reproducible ablation study (v2.6.0)
+├── web_tool.py              # DuckDuckGo search + BeautifulSoup page extraction (v2.8.0)
+├── source_evaluator.py      # Heuristic credibility scoring for web sources (v2.8.0)
+├── research_context_builder.py  # Format research bundle as LLM context (v2.8.0)
+├── fixy_research_trigger.py # Keyword-based search trigger detection (v2.8.0)
+└── web_research.py          # maybe_add_web_context integration + memory storage (v2.8.0)
 ```
 
 The system runs via two executable entry points:
@@ -417,6 +425,62 @@ The system runs via two executable entry points:
 Entelgia_production_meta.py      # Standard 30-minute session (time-bounded)
 Entelgia_production_meta_200t.py # 200-turn session, no time-based stopping
 ```
+
+---
+
+## 🌐 Web Research Module (v2.8.0)
+
+Entelgia can retrieve up-to-date information from the web and inject it directly into the internal agent dialogue.
+
+### How It Works
+
+```
+User Input
+↓
+Fixy detects research keywords (fixy_research_trigger)
+↓
+Web Research Module (DuckDuckGo search + BeautifulSoup extraction)
+↓
+Source credibility evaluation & ranking
+↓
+Context injected into agent prompts
+↓
+Agents discuss with External Knowledge Context
+↓
+High-credibility sources stored in long-term memory
+```
+
+### Modules
+
+| Module | Description |
+|--------|-------------|
+| `entelgia/web_tool.py` | `web_search`, `fetch_page_text`, `search_and_fetch` |
+| `entelgia/source_evaluator.py` | Heuristic credibility scoring (`.edu`, `.gov`, trusted domains) |
+| `entelgia/research_context_builder.py` | Formats ranked sources as LLM-ready context block |
+| `entelgia/fixy_research_trigger.py` | Keyword-based trigger: `latest`, `research`, `news`, `current`, … |
+| `entelgia/web_research.py` | `maybe_add_web_context` — full pipeline + memory persistence |
+
+### Quick Start
+
+```python
+from entelgia.web_research import maybe_add_web_context
+
+context = maybe_add_web_context("latest research on quantum computing")
+# Returns formatted "External Research:" block or "" if no search needed
+```
+
+### Demo
+
+```bash
+python entelgia_research_demo.py "latest research on artificial intelligence"
+```
+
+### Safety
+
+- All network requests use a 10-second timeout
+- Network errors never crash the main dialogue system
+- Results are capped at 5 sources by default
+- High-credibility threshold: score > 0.8 for memory storage
 
 ---
 

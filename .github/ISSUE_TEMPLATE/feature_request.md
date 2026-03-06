@@ -31,3 +31,9 @@ Are there other ways to achieve this?
 ## 📋 Additional Context
 
 Add any other context or screenshots.
+
+## 🌐 Web Research Module
+
+_If this feature request involves the Web Research Module (search, credibility,
+context injection), please describe the specific component affected:_
+`web_tool` / `source_evaluator` / `research_context_builder` / `fixy_research_trigger` / `web_research`

@@ -354,11 +354,38 @@ Yes! Entelgia can run on modern laptops with:
 
 ### Does Entelgia require internet?
 
-No! Entelgia runs entirely locally:
+The core system runs entirely locally:
 - Ollama provides local LLM inference
-- No external API calls
+- No external API calls required
 - Complete privacy and offline operation
 - (Internet needed only for initial installation)
+
+The optional **Web Research Module** (`entelgia/web_research.py`) does make outbound
+HTTP requests when Fixy decides a search is needed.  It can be completely ignored if
+you prefer fully offline operation — the module fails gracefully and returns an empty
+string when the network is unavailable.
+
+### What is the Web Research Module?
+
+The Web Research Module (v2.8.0) is an optional external knowledge pipeline:
+
+1. **Fixy detects** research-intent keywords in the user message (`latest`, `news`, `research`, `current`, `search`, `paper`, …)
+2. **DuckDuckGo HTML search** retrieves results (no API key required)
+3. **BeautifulSoup** extracts readable text from each page
+4. **Credibility scoring** ranks sources by domain (`.edu`, `.gov`, trusted sites) and text quality
+5. **Top 3 sources** are formatted as an `External Research:` block injected into agent prompts
+6. **High-credibility sources** (score > 0.8) are stored in an `external_knowledge` SQLite table
+
+All requests use a 10-second timeout and errors never crash the main system.
+
+### How do I run the Web Research demo?
+
+```bash
+python entelgia_research_demo.py "latest research on artificial intelligence"
+```
+
+This runs the complete pipeline without requiring a live Ollama instance (agent
+responses are mocked).  Pass any query as an argument.
 
 ### How much disk space does Entelgia need?
 

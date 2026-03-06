@@ -35,6 +35,7 @@ You are welcome to contribute by:
 - Improving documentation and clarity
 - Proposing experiments or research directions
 - Enhancing safety, transparency, or reproducibility
+- Extending the **Web Research Module** (new credibility heuristics, alternative search backends, richer context formatting)
 
 _Small, focused contributions are especially appreciated._
 

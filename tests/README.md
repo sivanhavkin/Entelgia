@@ -307,3 +307,24 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 | **Documentation** | Doc integrity checks | Validates documentation consistency |
 
 > 🛡️ Together these jobs ensure that **every commit** adheres to style guidelines, passes vulnerability scans and produces a valid package and documentation.
+
+---
+
+### 🌐 Web Research Module Tests
+
+The web research modules include unit tests for all components:
+
+```bash
+pytest tests/test_web_research.py -v
+```
+
+Tests cover:
+
+- ✅ **`fixy_should_search`** — trigger keyword detection, edge cases (empty string, no keywords)
+- ✅ **`evaluate_source` / `evaluate_sources`** — credibility scoring rules, clamping, ranking
+- ✅ **`build_research_context`** — formatting with and without sources, max_sources limit
+- ✅ **`maybe_add_web_context`** — graceful failure on network error, no-trigger path
+- ✅ **`_store_external_knowledge`** — SQLite table creation and row insertion
+- ✅ **`ContextManager.build_enriched_context`** — `web_context` parameter injection into prompt
+
+All network calls in tests are mocked — no real HTTP requests are made.
