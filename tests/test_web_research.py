@@ -1350,3 +1350,287 @@ class TestStructuredLogging:
                 )
 
         assert any("AI & machine learning" in m for m in caplog.messages)
+
+
+# ---------------------------------------------------------------------------
+# Branch-level debug logging
+# ---------------------------------------------------------------------------
+
+
+class TestBranchLevelDebugLogging:
+    """Tests that branch-level DEBUG logs are emitted for each trigger-selection branch.
+
+    Requirement: before find_trigger() each branch must log its name, source
+    type, and a 160-character text preview; after find_trigger() it must log
+    the detected trigger.  build_research_query must log the per-branch query.
+    """
+
+    # ------------------------------------------------------------------
+    # fixy_should_search – seed branch
+    # ------------------------------------------------------------------
+
+    def test_seed_branch_logs_source_type_and_preview(self, caplog):
+        import logging
+
+        seed = "Tell me about the latest AI research please"
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search(seed)
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any("[branch=seed]" in m and "source_type=seed_text" in m for m in debug_msgs)
+        assert any("[branch=seed]" in m and "text_preview=" in m for m in debug_msgs)
+
+    def test_seed_branch_logs_detected_trigger(self, caplog):
+        import logging
+
+        seed = "What is the latest research on climate?"
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search(seed)
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any(
+            "[branch=seed]" in m and "detected_trigger=" in m for m in debug_msgs
+        )
+
+    def test_seed_branch_preview_truncated_to_160_chars(self, caplog):
+        import logging
+
+        long_seed = "latest " + ("word " * 100)
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search(long_seed)
+
+        # The repr of the preview in the log message must not exceed 160 chars
+        # (plus quote characters).  We check the raw preview value length.
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        preview_msgs = [
+            m for m in debug_msgs if "[branch=seed]" in m and "text_preview=" in m
+        ]
+        assert preview_msgs, "Expected at least one [branch=seed] text_preview log"
+        # The preview is the repr of seed[:160], so its unquoted content is ≤160 chars
+        for msg in preview_msgs:
+            # Extract the repr value after 'text_preview='
+            idx = msg.find("text_preview=")
+            assert idx != -1
+            preview_repr = msg[idx + len("text_preview="):]
+            # repr includes surrounding quotes; strip them to measure content length
+            preview_value = preview_repr.strip("'\"")
+            assert len(preview_value) <= 160
+
+    # ------------------------------------------------------------------
+    # fixy_should_search – dialogue branch
+    # ------------------------------------------------------------------
+
+    def test_dialogue_branch_logs_source_type_and_role(self, caplog):
+        import logging
+
+        dialog = [
+            {"role": "system", "text": "Welcome."},
+            {"role": "Athena", "text": "We need current evidence on this topic."},
+        ]
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search("Neutral seed.", dialog_tail=dialog)
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any(
+            "[branch=dialogue]" in m and "source_type=dialogue_text" in m
+            for m in debug_msgs
+        )
+        assert any(
+            "[branch=dialogue]" in m and "turn_role=" in m for m in debug_msgs
+        )
+
+    def test_dialogue_branch_logs_detected_trigger(self, caplog):
+        import logging
+
+        dialog = [
+            {"role": "system", "text": "Welcome."},
+            {"role": "Athena", "text": "We need current evidence on this topic."},
+        ]
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search("Neutral seed.", dialog_tail=dialog)
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any(
+            "[branch=dialogue]" in m and "detected_trigger=" in m for m in debug_msgs
+        )
+
+    # ------------------------------------------------------------------
+    # fixy_should_search – fixy_reason branch
+    # ------------------------------------------------------------------
+
+    def test_fixy_reason_branch_logs_source_type_and_preview(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search(
+                "Hello.",
+                fixy_reason="external_verification_needed",
+            )
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any(
+            "[branch=fixy_reason]" in m and "source_type=fixy_reason" in m
+            for m in debug_msgs
+        )
+
+    # ------------------------------------------------------------------
+    # build_research_query – per-branch logging
+    # ------------------------------------------------------------------
+
+    def test_query_build_dialogue_question_branch_logs(self, caplog):
+        import logging
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {"role": "Socrates", "text": "What is the latest research on climate change?"},
+        ]
+        with caplog.at_level(logging.DEBUG, logger="entelgia.web_research"):
+            build_research_query("Some seed.", dialog, None)
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any(
+            "[branch=dialogue_question]" in m and "source_type=dialogue_text" in m
+            for m in debug_msgs
+        )
+        assert any(
+            "[branch=dialogue_question]" in m and "detected_trigger=" in m
+            for m in debug_msgs
+        )
+        assert any(
+            "[branch=dialogue_question]" in m and "query=" in m for m in debug_msgs
+        )
+
+    def test_query_build_dialogue_longest_branch_logs(self, caplog):
+        import logging
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {"role": "Socrates", "text": "We need the latest research on climate change and energy."},
+        ]
+        with caplog.at_level(logging.DEBUG, logger="entelgia.web_research"):
+            build_research_query("Some seed.", dialog, None)
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any(
+            "[branch=dialogue_longest]" in m and "source_type=dialogue_text" in m
+            for m in debug_msgs
+        )
+        assert any(
+            "[branch=dialogue_longest]" in m and "detected_trigger=" in m
+            for m in debug_msgs
+        )
+        assert any(
+            "[branch=dialogue_longest]" in m and "query=" in m for m in debug_msgs
+        )
+
+    def test_query_build_seed_fallback_branch_logs(self, caplog):
+        import logging
+        from entelgia.web_research import build_research_query
+
+        with caplog.at_level(logging.DEBUG, logger="entelgia.web_research"):
+            build_research_query("Find the latest research on AI safety.", None, None)
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+        assert any(
+            "[branch=seed_fallback]" in m and "source_type=seed_text" in m
+            for m in debug_msgs
+        )
+        assert any(
+            "[branch=seed_fallback]" in m and "detected_trigger=" in m
+            for m in debug_msgs
+        )
+        assert any(
+            "[branch=seed_fallback]" in m and "query=" in m for m in debug_msgs
+        )
+
+    # ------------------------------------------------------------------
+    # Session-start: trigger not in visible dialogue – proves which branch
+    # ------------------------------------------------------------------
+
+    def test_session_start_trigger_from_seed_not_dialogue(self, caplog):
+        """At session start, visible dialogue is neutral; trigger comes from seed.
+
+        This test proves that find_trigger() fires on the seed branch (not the
+        dialogue branch) when no visible dialogue turn contains the trigger word.
+        """
+        import logging
+
+        # Seed contains the trigger keyword; dialogue turns are neutral.
+        seed = "Tell me about the latest developments in quantum computing."
+        dialog = [
+            {"role": "system", "text": "Welcome to our debate."},
+            {"role": "Socrates", "text": "I am curious about your perspective."},
+            {"role": "Athena", "text": "Let us think carefully about this together."},
+        ]
+
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            result = fixy_should_search(seed, dialog_tail=dialog)
+
+        assert result is True, "Trigger should fire because seed contains 'latest'"
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+
+        # The seed branch must have detected the trigger.
+        seed_trigger_msgs = [
+            m for m in debug_msgs
+            if "[branch=seed]" in m and "detected_trigger=" in m
+        ]
+        assert seed_trigger_msgs, "Seed branch must log its detected trigger"
+        # The logged trigger for the seed branch must not be None (%r formats
+        # None as the four-character string 'None').
+        assert not any("detected_trigger=None" in m for m in seed_trigger_msgs), (
+            "Seed branch detected_trigger must be a real trigger, not None"
+        )
+
+        # The dialogue branch must have logged 'detected_trigger=None' for every
+        # neutral turn (no trigger keyword present in any visible dialogue turn).
+        dialogue_trigger_msgs = [
+            m for m in debug_msgs
+            if "[branch=dialogue]" in m and "detected_trigger=" in m
+        ]
+        # There are no dialogue turns with triggers, so every dialogue
+        # detected_trigger log should show None.
+        for m in dialogue_trigger_msgs:
+            assert "detected_trigger=None" in m, (
+                f"Expected no trigger in dialogue turns, but got: {m}"
+            )
+
+    def test_session_start_trigger_from_dialogue_not_seed(self, caplog):
+        """At session start, seed is neutral; trigger comes from a dialogue turn.
+
+        Proves that the dialogue branch (not seed) supplied the trigger.
+        """
+        import logging
+
+        seed = "Let us reflect on an important philosophical question."
+        dialog = [
+            {"role": "system", "text": "Welcome."},
+            {"role": "Athena", "text": "We should consult the latest research on this."},
+        ]
+
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
+            result = fixy_should_search(seed, dialog_tail=dialog)
+
+        assert result is True, "Trigger should fire from dialogue turn"
+
+        debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
+
+        # The seed branch must have logged detected_trigger=None (seed is neutral)
+        seed_trigger_msgs = [
+            m for m in debug_msgs
+            if "[branch=seed]" in m and "detected_trigger=" in m
+        ]
+        assert seed_trigger_msgs, "Seed branch must log its detected trigger"
+        assert any(
+            "detected_trigger=None" in m for m in seed_trigger_msgs
+        ), "Seed branch should find no trigger in the neutral seed"
+
+        # The dialogue branch must have detected a real trigger keyword.
+        dialogue_trigger_msgs = [
+            m for m in debug_msgs
+            if "[branch=dialogue]" in m and "detected_trigger=" in m
+        ]
+        assert any(
+            "detected_trigger=" in m and "detected_trigger=None" not in m
+            for m in dialogue_trigger_msgs
+        ), "Dialogue branch should find a trigger in at least one turn"

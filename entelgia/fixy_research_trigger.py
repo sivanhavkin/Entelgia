@@ -261,7 +261,12 @@ def fixy_should_search(
     current_turn = _trigger_turn_counter
 
     # 1. Check seed text
+    logger.debug(
+        "[branch=seed] source_type=seed_text text_preview=%r",
+        seed_text[:160],
+    )
     trigger = find_trigger(seed_text)
+    logger.debug("[branch=seed] detected_trigger=%r", trigger)
     if trigger:
         if _is_trigger_cooled_down(trigger, current_turn):
             logger.debug(
@@ -283,7 +288,14 @@ def fixy_should_search(
         recent_turns = turns_to_scan[-_DIALOG_TAIL_WINDOW:]
         for turn in recent_turns:
             turn_text = turn.get("text", "") if isinstance(turn, dict) else ""
+            turn_role = turn.get("role", "") if isinstance(turn, dict) else ""
+            logger.debug(
+                "[branch=dialogue] source_type=dialogue_text turn_role=%r text_preview=%r",
+                turn_role,
+                turn_text[:160],
+            )
             trigger = find_trigger(turn_text)
+            logger.debug("[branch=dialogue] detected_trigger=%r", trigger)
             if trigger:
                 if _is_trigger_cooled_down(trigger, current_turn):
                     logger.debug(
@@ -298,6 +310,10 @@ def fixy_should_search(
                 return True
 
     # 3. Check Fixy meta-reason signal
+    logger.debug(
+        "[branch=fixy_reason] source_type=fixy_reason text_preview=%r",
+        (fixy_reason or "")[:160],
+    )
     if fixy_reason and fixy_reason in _FIXY_RESEARCH_REASONS:
         logger.info("web search triggered by fixy_reason: %r", fixy_reason)
         return True
