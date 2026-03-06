@@ -257,12 +257,12 @@ def clear_research_caches() -> None:
 
 
 def _extract_trigger_fragment(text: str, trigger: str) -> str:
-    """Return a focused query fragment starting from the trigger word/phrase.
+    """Return a sanitized, keyword-compressed query fragment starting from the trigger.
 
-    Trims all text before the first occurrence of *trigger* so that
-    dialogue preamble (e.g. agent names, conversational filler) is not
-    included in the resulting search query.  The output is limited to
-    ``_TRIGGER_FRAGMENT_MAX_WORDS`` words.
+    Finds the first occurrence of *trigger* in *text*, discards everything
+    before it, then passes the resulting fragment through :func:`_sanitize_text`
+    and :func:`_compress_to_keywords` so the return value is ready to use
+    directly as a web search query.
 
     Parameters
     ----------
@@ -273,10 +273,13 @@ def _extract_trigger_fragment(text: str, trigger: str) -> str:
 
     Returns
     -------
-    A short, focused string suitable for use as a web search query.
+    A sanitized, keyword-compressed string derived from the portion of *text*
+    that starts at *trigger*.  Falls back to a sanitized truncation of the
+    full text when the trigger is not found literally.
     """
-    idx = text.lower().find(trigger.lower())
-    if idx == -1:
+    text_lower = text.lower()
+    trigger_pos = text_lower.find(trigger.lower())
+    if trigger_pos == -1:
         # Trigger not found literally — unexpected since find_trigger() should
         # have confirmed its presence; log a warning and return a safe truncation.
         logger.warning(
@@ -284,10 +287,10 @@ def _extract_trigger_fragment(text: str, trigger: str) -> str:
             "returning truncated text",
             trigger,
         )
-        return " ".join(text.split()[:_TRIGGER_FRAGMENT_MAX_WORDS])
-    fragment = text[idx:]
-    words = fragment.split()
-    return " ".join(words[:_TRIGGER_FRAGMENT_MAX_WORDS])
+        fragment = " ".join(text.split()[:_TRIGGER_FRAGMENT_MAX_WORDS])
+    else:
+        fragment = text[trigger_pos:]
+    return _compress_to_keywords(_sanitize_text(fragment))
 
 
 def build_research_query(
@@ -325,7 +328,7 @@ def build_research_query(
     -------
     A compact query string suitable for a web search.
     """
-    candidate: str = ""
+    query: str = ""
 
     if dialog_tail:
         recent = dialog_tail[-4:]
@@ -336,13 +339,14 @@ def build_research_query(
             if "?" in text:
                 trigger = find_trigger(text)
                 if trigger:
-                    candidate = _extract_trigger_fragment(text, trigger)
+                    # _extract_trigger_fragment already sanitizes and compresses
+                    query = _extract_trigger_fragment(text, trigger)
                 else:
-                    candidate = text
+                    query = _compress_to_keywords(_sanitize_text(text))
                 break
 
         # Priority 2: most informative (longest) turn
-        if not candidate:
+        if not query:
             best = max(
                 recent,
                 key=lambda t: len(t.get("text", "") if isinstance(t, dict) else ""),
@@ -352,21 +356,21 @@ def build_research_query(
                 text = (best.get("text", "") if isinstance(best, dict) else "").strip()
                 trigger = find_trigger(text)
                 if trigger:
-                    candidate = _extract_trigger_fragment(text, trigger)
+                    # _extract_trigger_fragment already sanitizes and compresses
+                    query = _extract_trigger_fragment(text, trigger)
                 else:
-                    candidate = text
+                    query = _compress_to_keywords(_sanitize_text(text))
 
-    # Priority 3: fall back to seed_text
-    if not candidate:
-        candidate = (seed_text or "").strip()
-
-    # Sanitize and compress to a keyword-style query
-    query = _compress_to_keywords(_sanitize_text(candidate))
+    # Priority 3: fall back to seed_text, still applying trigger-based extraction
     if not query:
-        # The candidate (from dialog) sanitized to nothing; fall back to seed_text
-        # to give a meaningful query.  When candidate IS the seed_text this produces
-        # the same empty result, but that's an acceptable no-op edge case.
-        query = _compress_to_keywords(_sanitize_text((seed_text or "").strip()))
+        seed = (seed_text or "").strip()
+        trigger = find_trigger(seed)
+        if trigger:
+            # _extract_trigger_fragment already sanitizes and compresses
+            query = _extract_trigger_fragment(seed, trigger)
+        else:
+            query = _compress_to_keywords(_sanitize_text(seed))
+
     logger.debug("build_research_query: query=%r", query)
     return query
 
