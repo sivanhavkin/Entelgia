@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Number of turns a trigger must be absent before it can fire again
-_COOLDOWN_TURNS: int = 8
+_COOLDOWN_TURNS: int = 5
 
 # Monotonically increasing call counter – incremented on every
 # fixy_should_search() invocation.
@@ -39,40 +39,76 @@ _recent_triggers: Dict[str, int] = {}
 # Constants
 # ---------------------------------------------------------------------------
 
+# High-signal triggers for external web research
+# Phrases are checked before single keywords
+
+_TRIGGER_PHRASES: frozenset = frozenset(
+    {
+        # recency / updates
+        "latest research",
+        "recent study",
+        "recent studies",
+        "recent paper",
+        "new research",
+        "new paper",
+        "latest findings",
+        "latest results",
+        "current evidence",
+        "recent developments",
+
+        # academic sources
+        "peer reviewed",
+        "peer reviewed paper",
+        "research paper",
+        "academic paper",
+        "journal article",
+        "systematic review",
+        "meta analysis",
+        "scientific report",
+
+        # verification / sourcing
+        "primary source",
+        "reliable source",
+        "academic source",
+        "supporting evidence",
+        "published research",
+        "empirical study",
+    }
+)
+
 _TRIGGER_KEYWORDS: frozenset = frozenset(
     {
+        # recency / freshness
         "latest",
         "recent",
         "current",
         "today",
-        "news",
+        "update",
+        "updated",
+        "trend",
+        "trends",
+
+        # academic / research signals
         "research",
-        "paper",
         "study",
-        "article",
+        "studies",
+        "paper",
+        "journal",
+        "arxiv",
+
+        # sourcing / verification
+        "evidence",
         "source",
         "sources",
-        "evidence",
-        "published",
-        "updated",
-        "report",
-        "find",
-        "search",
-        "web",
+        "reference",
+        "references",
+        "citation",
+        "citations",
         "verify",
         "verification",
         "fact",
-        "citation",
-        "citations",
-        "external",
-        "reference",
-        "references",
-        "peer",
-        "reviewed",
-        "journal",
-        "arxiv",
-        "trend",
-        "new",
+        "report",
+        "published",
     }
 )
 
@@ -106,31 +142,44 @@ _DIALOG_TAIL_WINDOW: int = 4
 
 
 def find_trigger(text: str) -> Optional[str]:
-    """Return the first trigger phrase or keyword found in *text*, or ``None``.
-
-    Multi-word phrases are checked before single keywords so that the more
-    specific match is always preferred.
-
-    Parameters
-    ----------
-    text:
-        Arbitrary text to scan for trigger signals.
-
-    Returns
-    -------
-    The matched phrase or keyword string, or ``None`` when no trigger is found.
     """
-    if not text or not text.strip():
+    Return the strongest trigger phrase or keyword found in text.
+
+    Selection rules:
+    1. Prefer multi-word phrases over single keywords.
+    2. Prefer high-value academic keywords.
+    3. Case-insensitive matching.
+    4. Return the highest-scoring trigger.
+    """
+
+    if not text:
         return None
+
     text_lower = text.lower()
-    # Phrase check first (multi-word match takes priority over single words)
+    candidates = []
+
+    # --- phrase detection ---
     for phrase in _TRIGGER_PHRASES:
         if phrase in text_lower:
-            return phrase
-    # Whole-word keyword check
-    words = re.findall(r"[a-z]+", text_lower)
-    return next((word for word in words if word in _TRIGGER_KEYWORDS), None)
+            score = _PHRASE_SCORE
+            candidates.append((score, phrase))
 
+    # --- keyword detection ---
+    words = set(re.findall(r"\b[a-zA-Z\-]+\b", text_lower))
+
+    for keyword in _TRIGGER_KEYWORDS:
+        if keyword in words:
+            score = _KEYWORD_SCORE
+            if keyword in _HIGH_VALUE_KEYWORDS:
+                score += 1
+            candidates.append((score, keyword))
+
+    if not candidates:
+        return None
+
+    # return highest scoring trigger
+    candidates.sort(reverse=True)
+    return candidates[0][1]
 
 def _text_has_trigger(text: str) -> bool:
     """Return True if *text* contains a trigger keyword (whole-word) or phrase."""
