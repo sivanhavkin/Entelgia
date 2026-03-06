@@ -342,7 +342,7 @@ class Config:
     superego_dominance_margin: float = 0.5
     superego_critique_conflict_min: float = 2.0
     # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
-    web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "1")))
+    web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "0")))
     web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "5"))
 
     def __post_init__(self):
