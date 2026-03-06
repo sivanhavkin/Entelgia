@@ -22,6 +22,20 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Cooldown state
+# ---------------------------------------------------------------------------
+
+# Number of turns a trigger must be absent before it can fire again
+_COOLDOWN_TURNS: int = 8
+
+# Monotonically increasing call counter – incremented on every
+# fixy_should_search() invocation.
+_trigger_turn_counter: int = 0
+
+# Maps trigger word/phrase → turn number on which it last triggered a search
+_recent_triggers: Dict[str, int] = {}
+
+# ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
@@ -123,6 +137,29 @@ def _text_has_trigger(text: str) -> bool:
     return find_trigger(text) is not None
 
 
+def clear_trigger_cooldown() -> None:
+    """Reset the trigger cooldown state.
+
+    Intended for use in tests to avoid cross-test cooldown interference.
+    """
+    global _trigger_turn_counter
+    _trigger_turn_counter = 0
+    _recent_triggers.clear()
+
+
+def _is_trigger_cooled_down(trigger: str, current_turn: int) -> bool:
+    """Return ``True`` if *trigger* has not yet cooled down and must not fire again.
+
+    The trigger is considered hot (still cooling) when the gap between
+    *current_turn* and the turn on which it last fired is within the
+    ``_COOLDOWN_TURNS`` window.
+    """
+    last_turn = _recent_triggers.get(trigger)
+    if last_turn is None:
+        return False
+    return (current_turn - last_turn) <= _COOLDOWN_TURNS
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -137,10 +174,15 @@ def fixy_should_search(
 
     Returns ``True`` when any of the following conditions hold:
 
-    1. A trigger keyword or phrase is present in *seed_text*.
+    1. A trigger keyword or phrase is present in *seed_text* and has not
+       fired within the last ``_COOLDOWN_TURNS`` turns.
     2. A trigger keyword or phrase appears in the last
-       ``_DIALOG_TAIL_WINDOW`` turns of *dialog_tail*.
+       ``_DIALOG_TAIL_WINDOW`` turns of *dialog_tail* and has not fired
+       within the cooldown window.
     3. *fixy_reason* matches one of the known research-signal values.
+
+    A per-trigger cooldown (``_COOLDOWN_TURNS = 8``) prevents repeated
+    searches for the same keyword in rapid succession.
 
     Parameters
     ----------
@@ -157,11 +199,24 @@ def fixy_should_search(
     -------
     ``True`` if a web search should be performed, ``False`` otherwise.
     """
+    global _trigger_turn_counter
+    _trigger_turn_counter += 1
+    current_turn = _trigger_turn_counter
+
     # 1. Check seed text
     trigger = find_trigger(seed_text)
     if trigger:
-        logger.info("web search triggered by keyword: %r", trigger)
-        return True
+        if _is_trigger_cooled_down(trigger, current_turn):
+            logger.debug(
+                "trigger %r is in cooldown (last fired on turn %d, current %d), skipping",
+                trigger,
+                _recent_triggers[trigger],
+                current_turn,
+            )
+        else:
+            _recent_triggers[trigger] = current_turn
+            logger.info("web search triggered by keyword: %r", trigger)
+            return True
 
     # 2. Check recent dialogue turns (skip index 0 – the seed topic)
     # Scanning starts from index 1 to prevent the seed topic from
@@ -173,6 +228,15 @@ def fixy_should_search(
             turn_text = turn.get("text", "") if isinstance(turn, dict) else ""
             trigger = find_trigger(turn_text)
             if trigger:
+                if _is_trigger_cooled_down(trigger, current_turn):
+                    logger.debug(
+                        "trigger %r is in cooldown (last fired on turn %d, current %d), skipping",
+                        trigger,
+                        _recent_triggers[trigger],
+                        current_turn,
+                    )
+                    continue
+                _recent_triggers[trigger] = current_turn
                 logger.info("web search triggered by keyword: %r", trigger)
                 return True
 
