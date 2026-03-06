@@ -457,7 +457,7 @@ High-credibility sources stored in long-term memory
 | `entelgia/web_tool.py` | `web_search`, `fetch_page_text`, `search_and_fetch` |
 | `entelgia/source_evaluator.py` | Heuristic credibility scoring (`.edu`, `.gov`, trusted domains) |
 | `entelgia/research_context_builder.py` | Formats ranked sources as LLM-ready context block |
-| `entelgia/fixy_research_trigger.py` | Keyword-based trigger: `latest`, `research`, `news`, `current`, … |
+| `entelgia/fixy_research_trigger.py` | Keyword-based trigger with semantic scoring — concept terms (`credibility`, `bias`, `epistemology`, `truth`, `reasoning`) rank above generic labels like `source` |
 | `entelgia/web_research.py` | `maybe_add_web_context` — full pipeline + memory persistence |
 
 ### Quick Start
@@ -486,7 +486,7 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **380 tests** in 13 suites.
+Entelgia ships with comprehensive test coverage across **388 tests** in 13 suites.
 
 For full test documentation, per-suite details, CI/CD pipeline information, and sample output, see the **[Test Suite README (tests/README.md)](tests/README.md)**.
 
