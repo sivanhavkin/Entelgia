@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **235 tests** in 11 suites:
+Entelgia ships with comprehensive test coverage across **388 tests** in 11 suites:
 
 ### Enhanced Dialogue Tests (6 tests)
 
@@ -299,7 +299,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 250 total tests (6 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 16 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 18 superego critique + 15 limbic hijack) |
+| **Unit Tests** | `pytest` | Runs 388 total tests (133 web research + 6 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 16 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 18 superego critique + 15 limbic hijack + 5 memory signing) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -310,7 +310,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 ---
 
-### 🌐 Web Research Module Tests
+### 🌐 Web Research Module Tests (133 tests)
 
 The web research modules include unit tests for all components:
 
@@ -321,6 +321,9 @@ pytest tests/test_web_research.py -v
 Tests cover:
 
 - ✅ **`fixy_should_search`** — trigger keyword detection, edge cases (empty string, no keywords)
+- ✅ **`find_trigger`** — phrase-over-keyword priority, position tie-breaking, concept-term scoring
+- ✅ **Concept terms beat generic triggers** — `credibility`, `bias`, `epistemology` each outscore `source`
+- ✅ **Filler-word removal** — `that`, `this`, `how`, `what` stripped from compressed queries
 - ✅ **`evaluate_source` / `evaluate_sources`** — credibility scoring rules, clamping, ranking
 - ✅ **`build_research_context`** — formatting with and without sources, max_sources limit
 - ✅ **`maybe_add_web_context`** — graceful failure on network error, no-trigger path

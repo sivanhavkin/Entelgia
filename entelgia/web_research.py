@@ -58,7 +58,11 @@ _MODE_LABELS: Tuple[str, ...] = (
 
 # Stopwords for keyword compression (per spec §6)
 _STOPWORDS: FrozenSet[str] = frozenset(
-    {"the", "a", "an", "of", "and", "in", "within", "across"}
+    {
+        "the", "a", "an", "of", "and", "in", "within", "across",
+        "that", "this", "these", "those", "how", "what", "which",
+        "our", "your", "their", "its",
+    }
 )
 
 # Maximum number of words in a compressed search query

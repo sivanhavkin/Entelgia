@@ -107,6 +107,12 @@ _TRIGGER_KEYWORDS: frozenset = frozenset(
         "fact",
         "report",
         "published",
+        # concept-bearing epistemic terms
+        "credibility",
+        "bias",
+        "epistemology",
+        "truth",
+        "reasoning",
     }
 )
 
@@ -118,9 +124,12 @@ _TRIGGER_KEYWORDS: frozenset = frozenset(
 _PHRASE_SCORE: int = 3
 _KEYWORD_SCORE: int = 1
 
-# Academic keywords that carry extra weight (+1) when found
+# Academic and concept-bearing keywords that carry extra weight (+1) when found
 _HIGH_VALUE_KEYWORDS: frozenset = frozenset(
-    {"research", "study", "paper", "arxiv", "journal"}
+    {
+        "research", "study", "paper", "arxiv", "journal",
+        "credibility", "bias", "epistemology", "truth", "reasoning",
+    }
 )
 
 # Fixy meta-reason values that indicate a research need
@@ -169,7 +178,8 @@ def find_trigger(text: str) -> Optional[str]:
     for m in re.finditer(r"\b[a-zA-Z\-]+\b", text_lower):
         word = m.group()
         if word in _TRIGGER_KEYWORDS:
-            candidates.append((_KEYWORD_SCORE, m.start(), word))
+            score = _KEYWORD_SCORE + (1 if word in _HIGH_VALUE_KEYWORDS else 0)
+            candidates.append((score, m.start(), word))
 
     if not candidates:
         return None

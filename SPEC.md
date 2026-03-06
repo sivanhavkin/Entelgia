@@ -618,8 +618,15 @@ contains any word from the trigger set:
 
 ```
 latest, recent, research, news, current, today, web, find, search,
-paper, study, article, published, updated, new, trend, report, source
+paper, study, article, published, updated, new, trend, report, source,
+credibility, bias, epistemology, truth, reasoning
 ```
+
+Triggers are ranked by semantic weight: multi-word phrases score 3, concept-bearing
+terms (`credibility`, `bias`, `epistemology`, `truth`, `reasoning`, `research`,
+`study`, `paper`, `arxiv`, `journal`) score 2, and all other single keywords score 1.
+When multiple triggers appear in the same fragment the highest-scoring one is chosen;
+ties are broken by earliest position.
 
 ### Pipeline Steps
 
@@ -629,6 +636,22 @@ paper, study, article, published, updated, new, trend, report, source
 4. Sort by `credibility_score` descending
 5. `research_context_builder.build_research_context(bundle, scored)` — format top-3
 6. Return context string for injection into `build_enriched_context(web_context=...)`
+
+### Query Compression
+
+Before a query is sent to the search engine it passes through two filters in
+`web_research.py`:
+
+1. **`_sanitize_text`** — strips agent names and mode-label phrases.
+2. **`_compress_to_keywords`** — removes stopwords and trims to 6 words.
+
+Stopwords removed during compression:
+
+```
+the, a, an, of, and, in, within, across,
+that, this, these, those, how, what, which,
+our, your, their, its
+```
 
 ### Credibility Scoring Rules
 

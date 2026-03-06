@@ -209,8 +209,10 @@ class TestFindTrigger:
         assert find_trigger("cats and dogs love play time") is None
 
     def test_returns_matched_keyword(self):
+        # "research" is a high-value keyword (score 2) and beats "latest"
+        # (score 1) even though "latest" appears earlier in the text.
         result = find_trigger("latest AI research")
-        assert result == "latest"
+        assert result == "research"
 
     def test_returns_first_keyword_in_sentence(self):
         # "recent" appears at position 0, before "sources" at position 7;
@@ -240,6 +242,23 @@ class TestFindTrigger:
 
     def test_returns_none_for_socrates_alone(self):
         assert find_trigger("Socrates poses the question.") is None
+
+    def test_credibility_beats_source_when_both_present(self):
+        # "credibility" is a high-value keyword (score 2) and must beat the
+        # generic "source" (score 1) even when "source" appears first.
+        result = find_trigger("Is the source credibility reliable?")
+        assert result == "credibility"
+
+    def test_bias_beats_source_when_both_present(self):
+        # "bias" is a high-value keyword (score 2) and must beat the generic
+        # "source" (score 1) regardless of position.
+        result = find_trigger("What source would confirm this bias?")
+        assert result == "bias"
+
+    def test_epistemology_beats_source_when_both_present(self):
+        # "epistemology" is a high-value keyword (score 2); "source" is score 1.
+        result = find_trigger("source of knowledge in epistemology")
+        assert result == "epistemology"
 
 
 # ---------------------------------------------------------------------------
@@ -651,6 +670,31 @@ class TestBuildResearchQuery:
         # Core content keywords must be retained
         assert "today" in result
         assert "philosophy" in result
+
+    def test_filler_word_that_removed_from_query(self):
+        # "that" is a stopword and must be removed from the compressed query.
+        from entelgia.web_research import _compress_to_keywords
+
+        result = _compress_to_keywords("research evidence that supports memory")
+        tokens = result.split()
+        assert "that" not in tokens
+        # Meaningful content must be retained
+        assert "research" in tokens
+        assert "evidence" in tokens
+        assert "memory" in tokens
+
+    def test_filler_words_removed_from_fragment(self):
+        # Filler words like "that", "this", "how", "what" must be stripped
+        # from the final trigger fragment by _compress_to_keywords.
+        from entelgia.web_research import _extract_trigger_fragment
+
+        text = "research shows that this is how memory works"
+        result = _extract_trigger_fragment(text, "research")
+        tokens = result.split()
+        assert "that" not in tokens
+        assert "this" not in tokens
+        assert "how" not in tokens
+        assert "memory" in tokens
 
 
 class TestStoreExternalKnowledge:
