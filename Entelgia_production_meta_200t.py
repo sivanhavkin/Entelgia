@@ -1742,7 +1742,7 @@ class Agent:
                     user_seed,
                     db_path=CFG.db_path,
                     max_results=CFG.web_research_max_results,
-                
+                )  
                 if web_context:
                     logger.info(
                         "Web research context added for agent %s (seed=%r)",
