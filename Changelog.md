@@ -46,6 +46,14 @@ All notable changes to this project will be documented in this file. The format 
 
 - `requirements.txt` — added `beautifulsoup4>=4.12.0` (required by `web_tool.fetch_page_text`)
 
+### Fixed
+
+- **Query-branch consistency** — `dialogue_question` and `dialogue_longest` branches in `web_research.py` no longer emit a search query when `find_trigger()` returns `None`; turns with no trigger fall through silently to `seed_fallback` (PR #192)
+- **Duplicate log handlers** — replaced re-entrant `setup_logging()` in both production scripts with a single `logging.basicConfig(force=True)` call, eliminating duplicate output on every run (PR #192)
+- **Debug mode toggle** — added `debug: bool = True` field to `Config`; `__post_init__` now sets the root logger level dynamically (`DEBUG` or `INFO`), making debug noise opt-out (PR #193)
+- **Topic/seed mismatch** — `run()` now rotates `TOPIC_CYCLE` so `topicman.current()` on turn 1 matches `cfg.seed_topic`; `SeedGenerator.generate_seed()` logs the topic received and seed produced (PR #194)
+- **Concept-based query rewriting** — replaced `_extract_trigger_fragment` in `build_research_query` with the new `rewrite_search_query(text, trigger)` public function in `web_research.py`; strips pronouns, auxiliaries, conjunctions, prepositions, and discourse gerunds via `_REWRITE_FILLER_WORDS`, returning at most 6 concept terms (PR #195)
+
 ---
 
 ## [2.7.0] - 2026-03-03
