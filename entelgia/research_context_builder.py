@@ -13,6 +13,7 @@ credibility score already attached to each source.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 # ---------------------------------------------------------------------------
@@ -20,7 +21,51 @@ from typing import Any, Dict, List
 # ---------------------------------------------------------------------------
 
 MAX_SOURCES: int = 3
-_SUMMARY_TEXT_LIMIT: int = 500  # characters per source in the prompt section
+# Character limit per source summary (≈ 200 tokens for typical English text).
+# This is an approximate guideline; actual token count varies by content type.
+_SUMMARY_TEXT_LIMIT: int = 800  # characters per source in the prompt section
+_MAX_SENTENCES: int = 3
+# Minimum ratio of the char limit at which a word boundary is accepted when
+# truncating: only break at a word boundary if it falls in the last 20 % of
+# the allowed length (avoids very short summaries when the first space is near
+# the beginning).
+_WORD_BOUNDARY_THRESHOLD: float = 0.8
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _summarize_text(text: str) -> str:
+    """Return a concise summary limited to ``_MAX_SENTENCES`` sentences or
+    ``_SUMMARY_TEXT_LIMIT`` characters (≈ 200 tokens), whichever is shorter.
+
+    The result is appended with ``"..."`` when the original text was truncated.
+    """
+    if not text or not text.strip():
+        return ""
+
+    # Split into sentences on any sentence-ending punctuation followed by whitespace
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+
+    # Keep at most _MAX_SENTENCES sentences
+    selected = " ".join(sentences[:_MAX_SENTENCES])
+
+    # Also enforce the character limit
+    if len(selected) > _SUMMARY_TEXT_LIMIT:
+        selected = selected[:_SUMMARY_TEXT_LIMIT].rstrip()
+        # Break at the last word boundary to avoid a mid-word cut
+        last_space = selected.rfind(" ")
+        if last_space > _SUMMARY_TEXT_LIMIT * _WORD_BOUNDARY_THRESHOLD:
+            selected = selected[:last_space]
+        return selected + "..."
+
+    # Append ellipsis if the original text was longer than what we kept
+    if len(text.strip()) > len(selected):
+        selected += "..."
+
+    return selected
 
 
 # ---------------------------------------------------------------------------
@@ -70,9 +115,7 @@ def build_research_context(
         title = src.get("title", "") or src.get("snippet", "")[:80]
         credibility = score_map.get(url, 0.0)
         text = src.get("text", "") or src.get("snippet", "")
-        summary = text[:_SUMMARY_TEXT_LIMIT].strip()
-        if len(text) > _SUMMARY_TEXT_LIMIT:
-            summary += "..."
+        summary = _summarize_text(text)
 
         lines.append(f"Source {idx}:")
         lines.append(f"  Title: {title}")

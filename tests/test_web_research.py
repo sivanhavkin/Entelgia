@@ -92,10 +92,19 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("Let us discuss", dialog_tail=dialog) is True
 
     def test_trigger_from_dialogue_keyword_external(self):
+        # Seed topic (index 0) is neutral; trigger keyword is at index 1
         dialog = [
+            {"role": "system", "text": "Let us begin the discussion."},
             {"role": "Socrates", "text": "Find recent external sources on this topic."},
         ]
         assert fixy_should_search("Discuss.", dialog_tail=dialog) is True
+
+    def test_seed_topic_at_index_0_does_not_trigger(self):
+        # Keyword only in the seed topic at index 0 – must NOT trigger
+        dialog = [
+            {"role": "system", "text": "Find recent external sources on this topic."},
+        ]
+        assert fixy_should_search("Discuss.", dialog_tail=dialog) is False
 
     def test_no_trigger_from_empty_dialogue(self):
         assert fixy_should_search("Hello.", dialog_tail=[]) is False
@@ -119,7 +128,11 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("Hello.", dialog_tail=dialog) is False
 
     def test_trigger_phrase_in_dialogue(self):
-        dialog = [{"role": "Athena", "text": "We should find sources to verify this."}]
+        # Seed topic (index 0) is neutral; trigger phrase is at index 1
+        dialog = [
+            {"role": "system", "text": "Welcome to the debate."},
+            {"role": "Athena", "text": "We should find sources to verify this."},
+        ]
         assert fixy_should_search("Interesting.", dialog_tail=dialog) is True
 
     # ------------------------------------------------------------------
@@ -356,7 +369,11 @@ class TestMaybeAddWebContext:
     def test_triggered_by_dialogue_turn(self):
         from entelgia.web_research import maybe_add_web_context
 
-        dialog = [{"role": "Athena", "text": "We need to find recent papers on this."}]
+        # Seed topic at index 0 is neutral; trigger is at index 1
+        dialog = [
+            {"role": "system", "text": "Let us begin."},
+            {"role": "Athena", "text": "We need to find recent papers on this."},
+        ]
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
@@ -387,7 +404,11 @@ class TestMaybeAddWebContext:
     def test_graceful_failure_on_network_error_with_dialogue(self):
         from entelgia.web_research import maybe_add_web_context
 
-        dialog = [{"role": "Athena", "text": "We need current evidence."}]
+        # Seed topic at index 0 is neutral; trigger is at index 1
+        dialog = [
+            {"role": "system", "text": "Welcome."},
+            {"role": "Athena", "text": "We need current evidence."},
+        ]
         with patch(
             "entelgia.web_research.search_and_fetch",
             side_effect=Exception("timeout"),
