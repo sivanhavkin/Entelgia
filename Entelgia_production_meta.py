@@ -327,7 +327,7 @@ class Config:
     store_raw_stm: bool = False
     store_raw_subconscious_ltm: bool = False
     max_turns: int = 200
-    seed_topic: str = "what would you like to talk about?"
+    seed_topic: str = "Freedom"
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
@@ -352,7 +352,7 @@ class Config:
     superego_critique_conflict_min: float = 2.0
     # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
     web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "1")))
-    web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "5"))
+    web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "3"))
 
     def __post_init__(self):
         """Validate configuration."""
