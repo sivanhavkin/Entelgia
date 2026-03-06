@@ -114,3 +114,45 @@ This PR is ready for:
 3. ✅ Testing (completed, 6/6 tests passing)
 4. 🔄 Merge to main branch
 5. 📦 Release as v2.2.0
+
+---
+
+## PR: Web Research Module (v2.8.0)
+
+### Overview
+This PR implements the Web Research capability for Entelgia — 5 new modules plus
+demo script and full documentation.
+
+### Key Features
+
+#### 1. Fixy Research Trigger 🔍
+- `fixy_should_search(user_message)` — keyword detection
+- Trigger words: `latest`, `research`, `news`, `current`, `today`, `web`, `find`, `search`, `paper`, and more
+
+#### 2. Web Tool 🌐
+- `web_search(query, max_results=5)` — DuckDuckGo HTML search (no API key)
+- `fetch_page_text(url)` — BeautifulSoup extraction, 6 000-char cap
+- `search_and_fetch(query)` — combined pipeline
+
+#### 3. Source Evaluator 📊
+- Heuristic credibility scoring: `.edu`/`.gov` domains, trusted research sites, text length
+- Score in [0.0, 1.0], sorted descending
+
+#### 4. Research Context Builder 📝
+- Formats top-3 sources as `External Research:` block for LLM prompts
+
+#### 5. Integration 🔗
+- `maybe_add_web_context(user_message)` — full pipeline
+- `ContextManager.build_enriched_context(web_context=...)` — prompt injection
+- High-credibility sources (> 0.8) stored in `external_knowledge` SQLite table
+
+### Files Changed
+- `entelgia/web_tool.py` (new)
+- `entelgia/source_evaluator.py` (new)
+- `entelgia/research_context_builder.py` (new)
+- `entelgia/fixy_research_trigger.py` (new)
+- `entelgia/web_research.py` (new)
+- `entelgia/context_manager.py` (modified — `web_context` parameter added)
+- `entelgia_research_demo.py` (new)
+- `requirements.txt` (modified — added `beautifulsoup4>=4.12.0`)
+- All documentation markdown files updated

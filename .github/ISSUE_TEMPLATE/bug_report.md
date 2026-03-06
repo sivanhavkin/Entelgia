@@ -40,3 +40,13 @@ What actually happens?
 ## 📋 Additional Context
 
 Add any other context, screenshots, or logs.
+
+## 🌐 Web Research Module
+
+_If the bug involves the Web Research Module, please confirm:_
+- [ ] Web search returns no results
+- [ ] Page text extraction fails
+- [ ] Credibility scoring is incorrect
+- [ ] Context not injected into prompt
+- [ ] Memory storage not working
+- [ ] Network timeout / error handling

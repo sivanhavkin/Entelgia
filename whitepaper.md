@@ -708,6 +708,99 @@ Key characteristics:
 
 ---
 
+## 22. Web Research Module — External Knowledge Integration (v2.8.0)
+
+### 22.1 Motivation
+
+Dialogue-governed agents accumulate knowledge through internal memory across sessions.
+However, they have no access to events or research published after their training data
+or beyond what has been explicitly stored in long-term memory.  The Web Research Module
+extends the architecture with a controlled, safe pathway to retrieve current external
+knowledge and inject it into the internal dialogue.
+
+### 22.2 Design Principles
+
+The module is designed as a **separable external layer** — it does not alter internal
+memory dynamics, drive models, or agent personas.  It provides a structured text block
+that agents receive as additional context, exactly like any other prompt section.
+
+Crucially:
+- The pipeline fails gracefully on any network error
+- It never blocks or crashes the main dialogue loop
+- All HTTP requests are time-bounded (10 s)
+- Memory persistence is opt-in (requires `db_path`)
+
+### 22.3 Pipeline
+
+```
+User message
+↓
+fixy_research_trigger.fixy_should_search()
+↓ (True only when message contains research-intent keywords)
+web_tool.search_and_fetch(query)
+  ├─ web_search()        ← DuckDuckGo HTML POST
+  └─ fetch_page_text()   ← requests + BeautifulSoup
+↓
+source_evaluator.evaluate_sources()
+↓
+research_context_builder.build_research_context()
+↓
+Injected as web_context into ContextManager.build_enriched_context()
+↓
+Agent prompts include:
+  "External Knowledge Context:
+   External Research:
+   Source 1: Title / URL / Credibility / Summary Text
+   Source 2: ...
+   Instructions for agents: ..."
+↓
+Sources with credibility_score > 0.8 → external_knowledge SQLite table
+```
+
+### 22.4 Credibility Model
+
+Sources are scored on a simple additive heuristic:
+
+| Signal | Δ Score |
+|--------|---------|
+| `.edu` or `.gov` domain | +0.30 |
+| Known research/reference site | +0.20 |
+| Extracted text ≥ 500 chars | +0.20 |
+| Extracted text ≥ 200 chars | +0.10 |
+| Extracted text < 50 chars | −0.20 |
+
+Score is clamped to [0.0, 1.0].  Trusted domains include Wikipedia, arXiv, PubMed,
+Nature, BBC, Reuters, WHO, CDC, NIH, and others.
+
+### 22.5 Agent Roles with External Knowledge
+
+When external context is injected, each agent receives role-specific instructions:
+
+- **Superego** must verify credibility of external sources before accepting claims
+- **Ego** integrates sources into balanced reasoning
+- **Id** may resist heavy evidence-based constraint if internal energy is low
+- **Fixy** monitors for reasoning loops and source-attribution drift
+
+### 22.6 Memory Schema
+
+High-credibility external knowledge is persisted in a dedicated table:
+
+```sql
+CREATE TABLE external_knowledge (
+    id                TEXT PRIMARY KEY,
+    timestamp         TEXT NOT NULL,
+    query             TEXT,
+    url               TEXT,
+    summary           TEXT,
+    credibility_score REAL
+);
+```
+
+This table is separate from the agent `memories` table to preserve the integrity
+of the signed LTM system.
+
+---
+
 # Appendix: CoreMind Model
 
 Entelgia is structured around six interacting cores:

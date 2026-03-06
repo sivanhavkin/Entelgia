@@ -241,3 +241,20 @@ These findings suggest a shift in agent design perspective: instead of treating 
 - Entelgia Whitepaper — [whitepaper.md](whitepaper.md)
 - Entelgia Architecture Overview — [ARCHITECTURE.md](ARCHITECTURE.md)
 - Entelgia System Specification — [SPEC.md](SPEC.md)
+- Entelgia Web Research Module — [entelgia/web_research.py](../entelgia/web_research.py)
+
+---
+
+### Web Research Module Note
+
+The Web Research Module (v2.8.0) adds a controlled external knowledge pathway to
+Entelgia's internal dialogue architecture.  Rather than replacing Retrieval-Augmented
+Generation (RAG) [9], it provides a lightweight, session-scoped alternative that:
+
+- is triggered selectively by Fixy based on message intent
+- evaluates source credibility using domain and text-quality heuristics
+- injects ranked external context into agent prompts with role-specific instructions
+- persists high-credibility knowledge for future retrieval
+
+This design preserves the core property of internal state governance while allowing
+the system to reason about current, external information when needed.

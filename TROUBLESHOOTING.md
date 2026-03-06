@@ -17,6 +17,7 @@ This guide helps you diagnose and resolve common issues when working with Entelg
 - [Runtime Failures](#runtime-failures)
 - [Memory and Performance Issues](#memory-and-performance-issues)
 - [Testing Issues](#testing-issues)
+- [Web Research Issues](#web-research-issues)
 - [Getting Help](#getting-help)
 
 ---
@@ -502,6 +503,78 @@ Run tests from project root:
 cd /path/to/Entelgia
 python -m pytest tests/
 ```
+
+---
+
+## Web Research Issues
+
+### Problem: `ImportError: No module named 'bs4'`
+
+**Symptoms:**
+```
+ImportError: No module named 'bs4'
+```
+
+**Solution:** Install `beautifulsoup4`:
+```bash
+pip install beautifulsoup4>=4.12.0
+```
+
+Or reinstall all dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+### Problem: Web search returns no results
+
+**Symptoms:**
+`maybe_add_web_context` returns an empty string even for research-intent queries.
+
+**Possible causes & solutions:**
+- **No internet connection** — the module fails gracefully when offline; this is expected behaviour.
+- **DuckDuckGo blocked or rate-limited** — try again later or check connectivity.
+- **Query does not contain trigger keywords** — ensure the message contains one of:
+  `latest`, `recent`, `research`, `news`, `current`, `today`, `web`, `find`, `search`, `paper`, `study`, `article`, `published`, `updated`, `new`, `trend`, `report`, `source`.
+
+---
+
+### Problem: Web research is slow or times out
+
+**Symptoms:**
+Noticeably slower response when web research is triggered.
+
+**Solution:**
+Each HTTP request has a 10-second timeout.  In slow network conditions fetching
+several pages can take up to ~60 seconds.  This is by design — the timeout prevents
+indefinite blocking.  You can reduce `max_results` in the `maybe_add_web_context`
+call to speed things up:
+
+```python
+context = maybe_add_web_context(user_message, max_results=2)
+```
+
+---
+
+### Problem: External knowledge not stored in database
+
+**Symptoms:**
+High-credibility sources (score > 0.8) are not appearing in the `external_knowledge` table.
+
+**Solution:**
+Memory persistence is opt-in.  Pass a `db_path` argument:
+
+```python
+from entelgia.web_research import maybe_add_web_context
+
+context = maybe_add_web_context(
+    user_message="latest AI research",
+    db_path="entelgia_memory.db",
+)
+```
+
+When `db_path=None` (the default) memory storage is silently skipped.
 
 ---
 

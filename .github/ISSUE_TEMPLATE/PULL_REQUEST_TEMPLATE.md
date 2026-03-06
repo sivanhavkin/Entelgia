@@ -36,3 +36,9 @@ Closes #(issue number)
 ## 📸 Screenshots (if applicable)
 
 Add screenshots here.
+
+## 🌐 Web Research (if applicable)
+
+- [ ] Web Research Module changes maintain graceful failure behaviour
+- [ ] Network requests include a timeout
+- [ ] New credibility scoring rules are documented

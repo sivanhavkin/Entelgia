@@ -67,6 +67,14 @@ Need-based intervention:
 - decides *if* and *why* to intervene
 - generates a short actionable intervention message
 
+### Web Research Module (v2.8.0)
+External knowledge pipeline triggered by Fixy:
+- `fixy_research_trigger` — detects research-intent keywords in user messages
+- `web_tool` — DuckDuckGo HTML search + BeautifulSoup page extraction
+- `source_evaluator` — heuristic credibility scoring (domain, text length)
+- `research_context_builder` — formats top-3 sources as LLM-ready context
+- `web_research.maybe_add_web_context` — full pipeline orchestration + LTM persistence
+
 
 
 ## 2) Runtime Loop (“Physics Loop”)
@@ -243,6 +251,7 @@ Target composition (example):
 * STM (selected summary)
 * LTM (relevant memories, bounded)
 * Seed / instruction
+* External Knowledge Context (optional, injected by Web Research Module when Fixy triggers a search)
 
 Token control:
 
@@ -592,3 +601,59 @@ This replaces the prior unconditional "SuperEgo critic skipped" message that app
 **Status:** Experimental / research-oriented.
 PRs should preserve: internal-state governance, meta-observer policy, and reproducible evaluation signals.
 
+
+---
+
+## 16) Web Research Module (v2.8.0)
+
+### Overview
+
+Optional external knowledge pipeline activated by Fixy when the user message
+contains research-intent keywords.
+
+### Trigger Condition
+
+`fixy_should_search(user_message)` returns `True` when the lowercased message
+contains any word from the trigger set:
+
+```
+latest, recent, research, news, current, today, web, find, search,
+paper, study, article, published, updated, new, trend, report, source
+```
+
+### Pipeline Steps
+
+1. `web_tool.web_search(query, max_results=5)` — DuckDuckGo HTML search
+2. `web_tool.fetch_page_text(url)` — download + extract text (limit 6 000 chars)
+3. `source_evaluator.evaluate_sources(sources)` — score each source
+4. Sort by `credibility_score` descending
+5. `research_context_builder.build_research_context(bundle, scored)` — format top-3
+6. Return context string for injection into `build_enriched_context(web_context=...)`
+
+### Credibility Scoring Rules
+
+| Signal | Score |
+|--------|-------|
+| `.edu` or `.gov` domain | +0.30 |
+| Known research/reference site | +0.20 |
+| Text length ≥ 500 chars | +0.20 |
+| Text length ≥ 200 chars | +0.10 |
+| Text length < 50 chars | −0.20 |
+
+Score clamped to [0.0, 1.0].
+
+### Memory Persistence
+
+When `credibility_score > 0.8`, the source summary is stored in the
+`external_knowledge` table (SQLite):
+
+```
+id, timestamp, query, url, summary, credibility_score
+```
+
+### Safety Constraints
+
+- Timeout: 10 s per HTTP request
+- Max results: 5 (configurable)
+- Text cap: 6 000 chars per page
+- All exceptions caught; returns `""` on any failure

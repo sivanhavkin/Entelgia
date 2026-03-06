@@ -355,3 +355,59 @@ class MainScriptLong(MainScript):
 ---
 
 
+
+## Web Research Pipeline (v2.8.0)
+
+Entelgia can retrieve current information from the web and inject it into the
+internal agent dialogue.  The pipeline is entirely optional and modular — it
+runs only when Fixy detects that the user message requires external knowledge.
+
+### Pipeline Overview
+
+```
+User Input
+↓
+fixy_research_trigger.fixy_should_search()   ← keyword detection
+↓ (if True)
+web_tool.search_and_fetch()                  ← DuckDuckGo + BeautifulSoup
+↓
+source_evaluator.evaluate_sources()          ← heuristic credibility scoring
+↓
+research_context_builder.build_research_context()  ← LLM-ready context block
+↓
+Injected into ContextManager.build_enriched_context() as web_context
+↓
+Agents discuss with "External Knowledge Context" section in their prompts
+↓
+High-credibility sources (score > 0.8) stored in external_knowledge SQLite table
+```
+
+### Modules
+
+| Module | Purpose |
+|--------|---------|
+| `entelgia/web_tool.py` | `web_search` (DuckDuckGo HTML), `fetch_page_text` (BeautifulSoup), `search_and_fetch` |
+| `entelgia/source_evaluator.py` | Domain-based + text-length credibility scoring |
+| `entelgia/research_context_builder.py` | Formats top-3 sources as structured LLM prompt section |
+| `entelgia/fixy_research_trigger.py` | Keyword set trigger: `latest`, `research`, `news`, `current`, `today`, `web`, `find`, `search`, `paper`, … |
+| `entelgia/web_research.py` | `maybe_add_web_context` — full orchestration + optional LTM persistence |
+
+### Agent Instructions Injected with Web Context
+
+```
+Instructions for agents:
+- Superego must verify credibility of external sources.
+- Ego must integrate sources into the reasoning.
+- Id may resist heavy research if energy is low.
+- Fixy monitors reasoning loops and source reliability.
+```
+
+### Safety Constraints
+
+- Request timeout: 10 seconds per network call
+- Results limited to 5 sources by default
+- Text extracted from pages capped at 6 000 characters
+- All errors are caught and logged; the main pipeline always continues
+- Memory storage only for sources with `credibility_score > 0.8`
+
+---

@@ -277,6 +277,7 @@ Unlike typical chatbots, these agents don't just respond—they **think, reflect
 - 📄 [System Specification](SPEC.md) — Detailed design documentation  
 - 🏗 [Architecture Overview](ARCHITECTURE.md) — Component design and flow
 - ❓ [FAQ](FAQ.md) — Common questions answered
+- 🌐 [Web Research Demo](../entelgia_research_demo.py) — Fixy-triggered search demo (`python entelgia_research_demo.py "latest AI research"`)
 
 ---
 

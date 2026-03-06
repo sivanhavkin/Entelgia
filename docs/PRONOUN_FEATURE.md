@@ -156,3 +156,12 @@ Expected output includes:
 - [ ] Per-agent pronoun override
 - [ ] Localized pronoun display based on language
 - [ ] Dynamic pronoun selection in runtime
+
+---
+
+## Interaction with Web Research Module
+
+When the Web Research Module is active (v2.8.0+), the `External Knowledge Context:`
+block is injected into agent prompts after the memories section but before the
+final instructions.  Pronoun settings have no effect on the external knowledge
+block — it is displayed identically regardless of the `show_pronoun` flag.

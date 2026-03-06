@@ -160,6 +160,50 @@ All errors return JSON:
 
 ---
 
+## 🌐 Web Research (v2.8.0)
+
+The Web Research Module can be used directly from Python without the REST API.
+
+### Python Usage
+
+```python
+from entelgia.web_research import maybe_add_web_context
+from entelgia.fixy_research_trigger import fixy_should_search
+
+# Check if a search is needed
+needs_search = fixy_should_search("latest research on quantum computing")
+# → True
+
+# Run the full pipeline
+context = maybe_add_web_context(
+    user_message="latest research on quantum computing",
+    db_path="entelgia_memory.db",   # optional: persist high-credibility sources
+    max_results=5,
+)
+# → "External Research:\n\nSource 1:\n  Title: ...\n  URL: ...\n..."
+```
+
+### Individual Components
+
+```python
+from entelgia.web_tool import web_search, fetch_page_text, search_and_fetch
+from entelgia.source_evaluator import evaluate_sources
+from entelgia.research_context_builder import build_research_context
+
+# Search only
+results = web_search("quantum computing 2026", max_results=3)
+
+# Fetch single page
+page = fetch_page_text("https://arxiv.org/abs/2401.12345")
+
+# Full bundle
+bundle = search_and_fetch("AI regulation news")
+scored = evaluate_sources(bundle["sources"])
+context_block = build_research_context(bundle, scored)
+```
+
+---
+
 ## 📖 Additional Resources
 
 - [Whitepaper](../../whitepaper.md)
@@ -176,4 +220,4 @@ All errors return JSON:
 
 ---
 
-**Last Updated:** February 2026
+**Last Updated:** March 2026
