@@ -81,6 +81,19 @@ _STOPWORDS: FrozenSet[str] = frozenset(
     }
 )
 
+# Directive/instruction words to strip from seed text during sanitization
+_INSTRUCTION_WORDS: FrozenSet[str] = frozenset(
+    {
+        "question",
+        "reflect",
+        "build",
+        "explore",
+        "disagree",
+        "consider",
+        "examine",
+    }
+)
+
 # Maximum number of words in a compressed search query
 _MAX_QUERY_WORDS: int = 6
 
@@ -170,14 +183,16 @@ _TRIGGER_FRAGMENT_MAX_WORDS: int = 15
 
 
 def _sanitize_text(text: str) -> str:
-    """Remove agent names, mode labels, and punctuation from *text*.
+    """Remove agent names, mode labels, HTML entities, instruction words, and punctuation.
 
     Processing order:
 
     1. Strip multi-word mode labels (case-insensitive).
     2. Remove agent names as whole words (case-insensitive).
-    3. Remove possessive ``'s`` and common punctuation characters.
-    4. Collapse multiple spaces into one.
+    3. Replace common HTML entities (``&amp;``, ``&lt;``, ``&gt;``, etc.) with a space.
+    4. Remove instruction/directive words as whole words (case-insensitive).
+    5. Remove possessive ``'s`` and common punctuation characters.
+    6. Collapse multiple spaces into one.
 
     The original capitalisation of retained words is preserved so that
     the output can be used directly as a search query without further
@@ -190,7 +205,8 @@ def _sanitize_text(text: str) -> str:
 
     Returns
     -------
-    Cleaned string with agent names, mode labels, and punctuation removed.
+    Cleaned string with agent names, mode labels, HTML entities, instruction
+    words, and punctuation removed.
     """
     # 1. Remove mode labels (case-insensitive, multi-word)
     for label in _MODE_LABELS:
@@ -198,10 +214,20 @@ def _sanitize_text(text: str) -> str:
     # 2. Remove agent names (whole-word, case-insensitive)
     for name in _AGENT_NAMES:
         text = re.sub(r"\b" + re.escape(name) + r"\b", " ", text, flags=re.IGNORECASE)
-    # 3. Remove possessive 's and punctuation: . , ? ! : ; " '
+    # 3. Replace common HTML entities with a space
+    text = re.sub(r"&amp;", " ", text)
+    text = re.sub(r"&lt;", " ", text)
+    text = re.sub(r"&gt;", " ", text)
+    text = re.sub(r"&quot;", " ", text)
+    text = re.sub(r"&apos;", " ", text)
+    text = re.sub(r"&#[0-9]+;", " ", text)
+    # 4. Remove instruction words (whole-word, case-insensitive)
+    for word in _INSTRUCTION_WORDS:
+        text = re.sub(r"\b" + re.escape(word) + r"\b", " ", text, flags=re.IGNORECASE)
+    # 5. Remove possessive 's and punctuation: . , ? ! : ; " '
     text = re.sub(r"'s\b", " ", text)
     text = re.sub(r"[.,?!:;\"']", " ", text)
-    # 4. Normalize whitespace
+    # 6. Normalize whitespace
     return " ".join(text.split())
 
 
@@ -313,6 +339,32 @@ def _extract_trigger_fragment(text: str, trigger: str) -> str:
     return _compress_to_keywords(_sanitize_text(fragment))
 
 
+def _extract_topic_line(text: str) -> str:
+    """Return the content after the first ``TOPIC:`` label, or the full text.
+
+    When *text* contains a line that begins with ``TOPIC:`` (case-insensitive),
+    only the content on that line after the colon is returned.  This lets the
+    seed-fallback branch focus on the topical noun phrase rather than on the
+    full seed template with its instruction words and questions.
+
+    Parameters
+    ----------
+    text:
+        Raw seed text, potentially containing a ``TOPIC:`` header line.
+
+    Returns
+    -------
+    The topic content string, or *text* unchanged when no ``TOPIC:`` line is
+    found.
+    """
+    for line in text.splitlines():
+        stripped = line.strip()
+        m = re.match(r"TOPIC:\s*(.*)", stripped, re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+    return text
+
+
 def build_research_query(
     seed_text: str,
     dialog_tail: Optional[List[Dict[str, Any]]],
@@ -396,13 +448,15 @@ def build_research_query(
             "[branch=seed_fallback] source_type=seed_text text_preview=%r",
             seed[:160],
         )
-        trigger = find_trigger(seed)
+        # Prefer the TOPIC line when the seed follows the structured seed template
+        topic_seed = _extract_topic_line(seed)
+        trigger = find_trigger(topic_seed)
         logger.debug("[branch=seed_fallback] detected_trigger=%r", trigger)
         if trigger:
             # _extract_trigger_fragment already sanitizes and compresses
-            query = _extract_trigger_fragment(seed, trigger)
+            query = _extract_trigger_fragment(topic_seed, trigger)
         else:
-            query = _compress_to_keywords(_sanitize_text(seed))
+            query = _compress_to_keywords(_sanitize_text(topic_seed))
         logger.debug("[branch=seed_fallback] query=%r", query)
 
     logger.debug("build_research_query: query=%r", query)

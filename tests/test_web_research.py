@@ -711,6 +711,66 @@ class TestBuildResearchQuery:
         assert "how" not in tokens
         assert "memory" in tokens
 
+    def test_topic_line_extracted_from_structured_seed(self):
+        # When seed_text has a TOPIC: header, the fallback query must be
+        # derived from the topic line only, not the full seed.
+        from entelgia.web_research import build_research_query
+
+        seed = "TOPIC: truth & epistemology\nQUESTION a hidden assumption. What are we taking for granted?"
+        result = build_research_query(seed, None, None)
+        assert "truth" in result
+        assert "epistemology" in result
+        # Instruction word "question" must not appear in the query
+        assert "question" not in result.lower()
+
+    def test_html_entity_amp_removed_from_seed_query(self):
+        # "&amp;" must be stripped from the query during sanitization.
+        from entelgia.web_research import build_research_query
+
+        seed = "truth &amp; epistemology"
+        result = build_research_query(seed, None, None)
+        assert "&amp;" not in result
+        assert "&" not in result
+        assert "truth" in result
+        assert "epistemology" in result
+
+    def test_instruction_words_removed_from_seed_query(self):
+        # Instruction words like "question", "reflect", "explore" must be
+        # stripped during sanitization.
+        from entelgia.web_research import _sanitize_text
+
+        text = "question reflect build explore disagree consider examine consciousness"
+        result = _sanitize_text(text)
+        tokens = result.split()
+        for word in ("question", "reflect", "build", "explore", "disagree", "consider", "examine"):
+            assert word not in tokens
+        assert "consciousness" in tokens
+
+    def test_seed_fallback_topic_line_no_trailing_instruction_noise(self):
+        # Multi-line seed: only TOPIC line content used; instruction lines dropped.
+        from entelgia.web_research import build_research_query
+
+        seed = "TOPIC: philosophy of mind\nReflect on what it means to think."
+        result = build_research_query(seed, None, None)
+        assert "philosophy" in result
+        assert "mind" in result
+        # "reflect" and "think" come from the non-topic line and must be absent
+        assert "reflect" not in result.lower()
+
+    def test_extract_topic_line_returns_full_text_when_no_topic_header(self):
+        # When there is no TOPIC: line, the full text is returned unchanged.
+        from entelgia.web_research import _extract_topic_line
+
+        text = "We must seek truth above all."
+        assert _extract_topic_line(text) == text
+
+    def test_extract_topic_line_case_insensitive(self):
+        # The TOPIC: prefix match must be case-insensitive.
+        from entelgia.web_research import _extract_topic_line
+
+        assert _extract_topic_line("topic: free will") == "free will"
+        assert _extract_topic_line("Topic: consciousness") == "consciousness"
+
 
 class TestStoreExternalKnowledge:
     """Tests for _store_external_knowledge using a temporary SQLite database."""

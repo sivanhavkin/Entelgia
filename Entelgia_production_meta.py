@@ -318,9 +318,17 @@ class Config:
     # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
     web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "1")))
     web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "3"))
+    debug: bool = True   # Enable DEBUG-level logging (True = verbose, False = INFO only)
 
     def __post_init__(self):
-        """Validate configuration."""
+        """Validate configuration and apply the debug logging level.
+
+        Instantiate ``Config`` early in the application lifecycle so the
+        ``debug`` flag takes effect before any significant log output is
+        produced.  Setting the root-logger level here is effective for all
+        child loggers that have not been given an explicit level, because they
+        propagate records up to the root.
+        """
         if self.cache_size < 100:
             raise ValueError("cache_size must be >= 100")
         if self.max_turns < 1:
@@ -331,6 +339,7 @@ class Config:
             raise ValueError("ollama_url must be a valid URL")
         if self.timeout_minutes < 1:
             raise ValueError("timeout_minutes must be >= 1")
+        logging.getLogger().setLevel(logging.DEBUG if self.debug else logging.INFO)
         logger.info(
             f"Config validated: max_turns={self.max_turns}, timeout={self.timeout_minutes}min"
         )
