@@ -1739,7 +1739,6 @@ class Agent:
                     seed_text=user_seed,
                     dialog_tail=dialog_tail,
                     fixy_reason=None,
-                    user_seed,
                     db_path=CFG.db_path,
                     max_results=CFG.web_research_max_results,
                 )  
