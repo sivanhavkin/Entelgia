@@ -72,8 +72,7 @@ def _store_external_knowledge(
     """
     try:
         with sqlite3.connect(db_path) as conn:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS external_knowledge (
                     id               TEXT PRIMARY KEY,
                     timestamp        TEXT NOT NULL,
@@ -82,8 +81,7 @@ def _store_external_knowledge(
                     summary          TEXT,
                     credibility_score REAL
                 )
-                """
-            )
+                """)
             conn.execute(
                 """
                 INSERT INTO external_knowledge
@@ -100,7 +98,9 @@ def _store_external_knowledge(
                 ),
             )
             conn.commit()
-        logger.debug("Stored external knowledge from %r (score=%.2f)", url, credibility_score)
+        logger.debug(
+            "Stored external knowledge from %r (score=%.2f)", url, credibility_score
+        )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to store external knowledge: %s", exc)
 
@@ -219,9 +219,7 @@ def maybe_add_web_context(
 
         bundle: Dict[str, Any] = search_and_fetch(query, max_results=max_results)
         sources: List[Dict[str, Any]] = bundle.get("sources", [])
-        logger.debug(
-            "maybe_add_web_context: %d source(s) retrieved", len(sources)
-        )
+        logger.debug("maybe_add_web_context: %d source(s) retrieved", len(sources))
 
         if not sources:
             logger.debug("maybe_add_web_context: no sources returned.")

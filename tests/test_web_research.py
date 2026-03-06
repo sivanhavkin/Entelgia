@@ -28,7 +28,6 @@ from entelgia.fixy_research_trigger import fixy_should_search
 from entelgia.research_context_builder import build_research_context
 from entelgia.source_evaluator import evaluate_source, evaluate_sources
 
-
 # ---------------------------------------------------------------------------
 # fixy_research_trigger
 # ---------------------------------------------------------------------------
@@ -106,7 +105,10 @@ class TestFixyResearchTrigger:
 
     def test_dialogue_only_last_4_turns_inspected(self):
         # Keyword only in old turns beyond the window – must NOT trigger
-        old_turn = {"role": "Socrates", "text": "latest research was mentioned long ago"}
+        old_turn = {
+            "role": "Socrates",
+            "text": "latest research was mentioned long ago",
+        }
         neutral_turns = [
             {"role": "Athena", "text": "I agree."},
             {"role": "Socrates", "text": "Indeed."},
@@ -178,7 +180,9 @@ class TestEvaluateSource:
         assert result["credibility_score"] >= 0.3
 
     def test_trusted_domain_wikipedia(self):
-        result = evaluate_source(self._source("https://en.wikipedia.org/wiki/AI", "x" * 600))
+        result = evaluate_source(
+            self._source("https://en.wikipedia.org/wiki/AI", "x" * 600)
+        )
         assert result["credibility_score"] >= 0.2
 
     def test_long_text_boosts_score(self):
@@ -191,9 +195,7 @@ class TestEvaluateSource:
         assert result["credibility_score"] == 0.0
 
     def test_score_clamped_to_one(self):
-        result = evaluate_source(
-            self._source("https://nih.gov/research", "x" * 800)
-        )
+        result = evaluate_source(self._source("https://nih.gov/research", "x" * 800))
         assert result["credibility_score"] <= 1.0
 
     def test_score_clamped_to_zero(self):
@@ -326,7 +328,9 @@ class TestMaybeAddWebContext:
     def test_returns_context_string_when_triggered(self):
         from entelgia.web_research import maybe_add_web_context
 
-        with patch("entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()):
+        with patch(
+            "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
+        ):
             result = maybe_add_web_context("latest AI research")
         assert isinstance(result, str)
         assert "External Research:" in result
@@ -334,7 +338,10 @@ class TestMaybeAddWebContext:
     def test_returns_empty_on_network_error(self):
         from entelgia.web_research import maybe_add_web_context
 
-        with patch("entelgia.web_research.search_and_fetch", side_effect=Exception("network error")):
+        with patch(
+            "entelgia.web_research.search_and_fetch",
+            side_effect=Exception("network error"),
+        ):
             result = maybe_add_web_context("latest AI research")
         assert result == ""
 
@@ -353,9 +360,7 @@ class TestMaybeAddWebContext:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
-            result = maybe_add_web_context(
-                "Discuss the matter.", dialog_tail=dialog
-            )
+            result = maybe_add_web_context("Discuss the matter.", dialog_tail=dialog)
         assert isinstance(result, str)
         assert "External Research:" in result
 
@@ -450,8 +455,6 @@ class TestBuildResearchQuery:
 
         result = build_research_query("  hello   world  ", None, None)
         assert result == "hello world"
-
-
 
 
 class TestStoreExternalKnowledge:
@@ -556,7 +559,9 @@ class TestContextManagerWebContext:
     def test_prompt_with_web_context_contains_section(self):
         cm = self._make_context_manager()
         args = self._base_args()
-        args["web_context"] = "External Research:\n\nSource 1:\n  Title: Test\n  URL: https://example.com\n  Credibility: 0.85\n  Summary Text: Sample content."
+        args["web_context"] = (
+            "External Research:\n\nSource 1:\n  Title: Test\n  URL: https://example.com\n  Credibility: 0.85\n  Summary Text: Sample content."
+        )
         prompt = cm.build_enriched_context(**args)
         assert "External Knowledge Context:" in prompt
         assert "External Research:" in prompt
@@ -564,7 +569,9 @@ class TestContextManagerWebContext:
     def test_prompt_with_web_context_includes_agent_instructions(self):
         cm = self._make_context_manager()
         args = self._base_args()
-        args["web_context"] = "External Research:\n\nSource 1:\n  Title: T\n  URL: u\n  Credibility: 0.9\n  Summary Text: text."
+        args["web_context"] = (
+            "External Research:\n\nSource 1:\n  Title: T\n  URL: u\n  Credibility: 0.9\n  Summary Text: text."
+        )
         prompt = cm.build_enriched_context(**args)
         assert "Superego must verify credibility" in prompt
         assert "Ego must integrate sources" in prompt
@@ -579,6 +586,8 @@ class TestContextManagerWebContext:
     def test_prompt_ends_with_respond_now(self):
         cm = self._make_context_manager()
         args = self._base_args()
-        args["web_context"] = "External Research:\n\nSource 1:\n  Title: T\n  URL: u\n  Credibility: 0.9\n  Summary Text: text."
+        args["web_context"] = (
+            "External Research:\n\nSource 1:\n  Title: T\n  URL: u\n  Credibility: 0.9\n  Summary Text: text."
+        )
         prompt = cm.build_enriched_context(**args)
         assert "Respond now:" in prompt
