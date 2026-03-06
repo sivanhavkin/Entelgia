@@ -106,7 +106,9 @@ def build_research_context(
     }
 
     # Sort sources by descending credibility score
-    ranked = sorted(sources, key=lambda s: score_map.get(s.get("url", ""), 0.0), reverse=True)
+    ranked = sorted(
+        sources, key=lambda s: score_map.get(s.get("url", ""), 0.0), reverse=True
+    )
 
     lines: List[str] = ["External Research:\n"]
 

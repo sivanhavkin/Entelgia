@@ -206,9 +206,7 @@ def build_research_query(
                 default=None,
             )
             if best:
-                text = (
-                    best.get("text", "") if isinstance(best, dict) else ""
-                ).strip()
+                text = (best.get("text", "") if isinstance(best, dict) else "").strip()
                 trigger = find_trigger(text)
                 if trigger:
                     candidate = _extract_trigger_fragment(text, trigger)

@@ -47,7 +47,9 @@ def _get_soup(html: str) -> Any:
 
         return BeautifulSoup(html, "html.parser")
     except ImportError:  # pragma: no cover
-        logger.warning("beautifulsoup4 is not installed; page text extraction disabled.")
+        logger.warning(
+            "beautifulsoup4 is not installed; page text extraction disabled."
+        )
         return None
 
 
@@ -62,7 +64,9 @@ def _clean_text(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def web_search(query: str, max_results: int = _DEFAULT_MAX_RESULTS) -> List[Dict[str, str]]:
+def web_search(
+    query: str, max_results: int = _DEFAULT_MAX_RESULTS
+) -> List[Dict[str, str]]:
     """Search DuckDuckGo HTML interface and return structured results.
 
     Parameters
@@ -176,7 +180,9 @@ def fetch_page_text(url: str, text_limit: int = _DEFAULT_TEXT_LIMIT) -> Dict[str
     cleaned = _clean_text(raw_text)
     result["text"] = cleaned[:text_limit]
 
-    logger.debug("fetch_page_text: extracted %d chars from %r", len(result["text"]), url)
+    logger.debug(
+        "fetch_page_text: extracted %d chars from %r", len(result["text"]), url
+    )
     return result
 
 
