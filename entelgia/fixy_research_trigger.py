@@ -144,9 +144,12 @@ def fixy_should_search(
         logger.debug("fixy_should_search: trigger found in seed_text")
         return True
 
-    # 2. Check recent dialogue turns
+    # 2. Check recent dialogue turns (skip index 0 – the seed topic)
+    # Scanning starts from index 1 to prevent the seed topic from
+    # activating web search on every turn.
     if dialog_tail:
-        recent_turns = dialog_tail[-_DIALOG_TAIL_WINDOW:]
+        turns_to_scan = dialog_tail[1:]
+        recent_turns = turns_to_scan[-_DIALOG_TAIL_WINDOW:]
         for turn in recent_turns:
             turn_text = turn.get("text", "") if isinstance(turn, dict) else ""
             if _text_has_trigger(turn_text):
