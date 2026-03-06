@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-235%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-380%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -486,7 +486,7 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **235 tests** in 11 suites.
+Entelgia ships with comprehensive test coverage across **380 tests** in 13 suites.
 
 For full test documentation, per-suite details, CI/CD pipeline information, and sample output, see the **[Test Suite README (tests/README.md)](tests/README.md)**.
 
@@ -504,15 +504,16 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.7.0** | ✅ **Latest** | current |
+| **v2.8.0** | ✅ **Latest** | current |
+| **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
 | **v2.5.0** | ✅ **Stable** | previous stable release |
-| **v2.4.0** | ⚠️ Superseded | Use v2.7.0 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v2.7.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v2.7.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v2.7.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.7.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.7.0 instead |
+| **v2.4.0** | ⚠️ Superseded | Use v2.8.0 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v2.8.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v2.8.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.8.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.8.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.8.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -597,6 +598,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.7.0 
-* **Last Updated:** 26 February 2026
+* **Version:** 2.8.0 
+* **Last Updated:** 06 March 2026
 ---

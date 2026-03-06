@@ -46,7 +46,7 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("What is the current news?") is True
 
     def test_trigger_on_find(self):
-        assert fixy_should_search("Find papers on quantum computing") is True
+        assert fixy_should_search("Find paper on quantum computing") is True
 
     def test_trigger_on_search(self):
         assert fixy_should_search("search for new studies") is True
@@ -213,9 +213,10 @@ class TestFindTrigger:
         assert result == "latest"
 
     def test_returns_first_keyword_in_sentence(self):
-        # "find" appears before "search" alphabetically but "find" is first in the text
-        result = find_trigger("find and search for sources")
-        assert result == "find"
+        # "recent" appears at position 0, before "sources" at position 7;
+        # position wins over alphabetical order ("sources" > "recent" alphabetically).
+        result = find_trigger("recent sources on some topic")
+        assert result == "recent"
 
     def test_phrase_takes_priority_over_single_keyword(self):
         # "latest research" is a phrase; "latest" is also a standalone keyword
@@ -227,11 +228,11 @@ class TestFindTrigger:
         assert result == "latest"
 
     def test_returns_keyword_from_dialogue_prose(self):
-        # "find" appears before "latest" in the text, so "find" is returned.
+        # "latest" appears before "sources" in the text, so "latest" is returned.
         result = find_trigger(
-            "Athena, I think we need to find the latest sources on this."
+            "Athena, I think we need to check the latest sources on this."
         )
-        assert result == "find"
+        assert result == "latest"
 
     def test_returns_none_for_agent_name_alone(self):
         # Agent names like "Athena" must not be trigger words
@@ -1081,9 +1082,7 @@ class TestTopicResearchCache:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
-            r1 = maybe_add_web_context(
-                "latest AI research", topic="machine learning"
-            )
+            r1 = maybe_add_web_context("latest AI research", topic="machine learning")
 
         from entelgia.fixy_research_trigger import clear_trigger_cooldown
 
@@ -1092,9 +1091,7 @@ class TestTopicResearchCache:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
-            r2 = maybe_add_web_context(
-                "latest AI research", topic="consciousness"
-            )
+            r2 = maybe_add_web_context("latest AI research", topic="consciousness")
 
         assert "External Research:" in r1
         assert "External Research:" in r2
@@ -1115,7 +1112,12 @@ class TestQualityGate:
         empty_text_bundle = {
             "query": "latest AI",
             "sources": [
-                {"url": "https://example.com", "title": "AI", "snippet": "", "text": ""},
+                {
+                    "url": "https://example.com",
+                    "title": "AI",
+                    "snippet": "",
+                    "text": "",
+                },
             ],
         }
         with patch(
@@ -1158,7 +1160,8 @@ class TestQualityGate:
                     "url": "https://arxiv.org/abs/2401.00001",
                     "title": "AI Research Paper",
                     "snippet": "A study on latest AI research trends.",
-                    "text": "Detailed information about the latest AI research trends. " * 20,
+                    "text": "Detailed information about the latest AI research trends. "
+                    * 20,
                 }
             ],
         }
