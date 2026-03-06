@@ -415,7 +415,8 @@ class TestMaybeAddWebContext:
                     "url": "https://arxiv.org/abs/2401.00001",
                     "title": "AI Paper 2026",
                     "snippet": "A great study on recent AI papers.",
-                    "text": "Detailed text about AI research and recent papers on latest findings " * 40,
+                    "text": "Detailed text about AI research and recent papers on latest findings "
+                    * 40,
                 }
             ],
         }
@@ -743,7 +744,15 @@ class TestBuildResearchQuery:
         text = "question reflect build explore disagree consider examine consciousness"
         result = _sanitize_text(text)
         tokens = result.split()
-        for word in ("question", "reflect", "build", "explore", "disagree", "consider", "examine"):
+        for word in (
+            "question",
+            "reflect",
+            "build",
+            "explore",
+            "disagree",
+            "consider",
+            "examine",
+        ):
             assert word not in tokens
         assert "consciousness" in tokens
 
@@ -830,15 +839,21 @@ class TestRewriteSearchQuery:
 
         sentences = [
             ("Truth holds a central place in our understanding of knowledge.", "truth"),
-            ("I question whether memory can distort our perception of reality.", "memory"),
-            ("We must examine the credibility of the source and its biases.", "credibility"),
+            (
+                "I question whether memory can distort our perception of reality.",
+                "memory",
+            ),
+            (
+                "We must examine the credibility of the source and its biases.",
+                "credibility",
+            ),
         ]
         for text, trigger in sentences:
             result = rewrite_search_query(text, trigger)
             word_count = len(result.split())
-            assert 1 <= word_count <= 6, (
-                f"Expected 1–6 words for {text!r}, got {word_count}: {result!r}"
-            )
+            assert (
+                1 <= word_count <= 6
+            ), f"Expected 1–6 words for {text!r}, got {word_count}: {result!r}"
 
     def test_discourse_gerund_removed(self):
         # A sentence-opening gerund like "Reflecting" must be filtered out.

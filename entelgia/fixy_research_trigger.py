@@ -127,8 +127,16 @@ _KEYWORD_SCORE: int = 1
 # Academic and concept-bearing keywords that carry extra weight (+1) when found
 _HIGH_VALUE_KEYWORDS: frozenset = frozenset(
     {
-        "research", "study", "paper", "arxiv", "journal",
-        "credibility", "bias", "epistemology", "truth", "reasoning",
+        "research",
+        "study",
+        "paper",
+        "arxiv",
+        "journal",
+        "credibility",
+        "bias",
+        "epistemology",
+        "truth",
+        "reasoning",
     }
 )
 

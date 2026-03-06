@@ -461,9 +461,7 @@ def test_seed_topic_consistency():
         mismatches or [["–", "none", "all correct"]],
         title="test_seed_topic_consistency",
     )
-    assert not mismatches, (
-        f"seed_text topic mismatches detected: {mismatches}"
-    )
+    assert not mismatches, f"seed_text topic mismatches detected: {mismatches}"
 
 
 if __name__ == "__main__":
