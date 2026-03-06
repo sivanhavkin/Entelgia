@@ -293,3 +293,52 @@ Generate your intervention (2-4 sentences, direct and concrete).
 
         # If no synthesis markers in recent turns and we have enough content, might be opportunity
         return not has_synthesis and len(turns) >= 5
+
+    def should_request_research(
+        self,
+        dialog: List[Dict[str, str]],
+        turn_count: int,
+    ) -> Tuple[bool, Optional[str]]:
+        """Determine whether Fixy should signal a need for external research.
+
+        This method only *signals* a research need; it does **not** trigger a
+        web search directly.  The web research system consumes the returned
+        reason string and decides whether to run a search.
+
+        Parameters
+        ----------
+        dialog:
+            Full dialogue history (list of dicts with ``"role"`` and
+            ``"text"`` keys).
+        turn_count:
+            Current turn number (1-based).
+
+        Returns
+        -------
+        A ``(bool, Optional[str])`` tuple where the first element is ``True``
+        when external research is recommended and the second element is the
+        reason string (e.g. ``"external_verification_needed"``) or ``None``
+        when no research is needed.
+        """
+        if turn_count < 3:
+            return (False, None)
+
+        last_10 = dialog[-10:] if len(dialog) >= 10 else dialog
+
+        # Condition 1: high conflict without resolution
+        if turn_count >= 6 and self._detect_high_conflict(last_10):
+            return (True, "high_conflict_no_resolution")
+
+        # Condition 2: shallow factual discussion (surface level for a long time)
+        if turn_count >= 10 and self._detect_shallow_discussion(last_10):
+            return (True, "external_verification_needed")
+
+        # Condition 3: repeated factual uncertainty (heavy repetition)
+        if self._detect_repetition(last_10):
+            return (True, "factual_uncertainty_detected")
+
+        # Condition 4: missed synthesis opportunity requiring external evidence
+        if turn_count >= 5 and self._detect_synthesis_opportunity(last_10):
+            return (True, "research_needed_for_synthesis")
+
+        return (False, None)

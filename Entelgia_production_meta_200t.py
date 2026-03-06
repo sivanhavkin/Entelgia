@@ -121,6 +121,7 @@ try:
         FreudianSlip,
         SelfReplication,
     )
+    from entelgia.web_research import maybe_add_web_context
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -145,6 +146,15 @@ except ImportError:
 
         def format_replication(self, memory):
             return ""
+
+    def maybe_add_web_context(  # type: ignore[no-redef]
+        seed_text,
+        dialog_tail=None,
+        fixy_reason=None,
+        db_path=None,
+        max_results=5,
+    ):
+        return ""
 
 
 # Optional: FastAPI for REST API
@@ -344,6 +354,7 @@ class Config:
     superego_critique_enabled: bool = True
     superego_dominance_margin: float = 0.5
     superego_critique_conflict_min: float = 2.0
+    web_research_max_results: int = 5
 
     def __post_init__(self):
         """Validate configuration."""
@@ -1718,6 +1729,15 @@ class Agent:
         if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
             agent_pronoun = self.persona_dict["pronoun"]
 
+        # Gather web research context from seed and recent dialogue
+        web_context = maybe_add_web_context(
+            seed_text=user_seed,
+            dialog_tail=dialog_tail,
+            fixy_reason=None,
+            db_path=CFG.db_path,
+            max_results=CFG.web_research_max_results,
+        )
+
         # Use ContextManager to build enriched prompt
         prompt = self.context_mgr.build_enriched_context(
             agent_name=self.name,
@@ -1731,6 +1751,7 @@ class Agent:
             debate_profile=self.debate_profile(),
             show_pronoun=CFG.show_pronoun,
             agent_pronoun=agent_pronoun,
+            web_context=web_context,
         )
 
         return prompt

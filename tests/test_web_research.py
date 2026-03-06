@@ -81,6 +81,82 @@ class TestFixyResearchTrigger:
     def test_trigger_on_trend(self):
         assert fixy_should_search("What is the current trend?") is True
 
+    # ------------------------------------------------------------------
+    # New tests: dialogue-tail trigger
+    # ------------------------------------------------------------------
+
+    def test_trigger_from_dialogue_turn(self):
+        dialog = [
+            {"role": "Socrates", "text": "Tell me your thoughts."},
+            {"role": "Athena", "text": "We need current evidence to settle this."},
+        ]
+        assert fixy_should_search("Let us discuss", dialog_tail=dialog) is True
+
+    def test_trigger_from_dialogue_keyword_external(self):
+        dialog = [
+            {"role": "Socrates", "text": "Find recent external sources on this topic."},
+        ]
+        assert fixy_should_search("Discuss.", dialog_tail=dialog) is True
+
+    def test_no_trigger_from_empty_dialogue(self):
+        assert fixy_should_search("Hello.", dialog_tail=[]) is False
+
+    def test_no_trigger_dialog_tail_none(self):
+        assert fixy_should_search("Hello.", dialog_tail=None) is False
+
+    def test_dialogue_only_last_4_turns_inspected(self):
+        # Keyword only in old turns beyond the window – must NOT trigger
+        old_turn = {"role": "Socrates", "text": "latest research was mentioned long ago"}
+        neutral_turns = [
+            {"role": "Athena", "text": "I agree."},
+            {"role": "Socrates", "text": "Indeed."},
+            {"role": "Athena", "text": "Certainly."},
+            {"role": "Socrates", "text": "Quite so."},
+        ]
+        dialog = [old_turn] + neutral_turns
+        assert fixy_should_search("Hello.", dialog_tail=dialog) is False
+
+    def test_trigger_phrase_in_dialogue(self):
+        dialog = [{"role": "Athena", "text": "We should find sources to verify this."}]
+        assert fixy_should_search("Interesting.", dialog_tail=dialog) is True
+
+    # ------------------------------------------------------------------
+    # New tests: fixy_reason trigger
+    # ------------------------------------------------------------------
+
+    def test_trigger_from_fixy_reason_external_verification(self):
+        assert (
+            fixy_should_search(
+                "Hello.",
+                fixy_reason="external_verification_needed",
+            )
+            is True
+        )
+
+    def test_trigger_from_fixy_reason_research_needed(self):
+        assert (
+            fixy_should_search(
+                "Hello.",
+                fixy_reason="research_needed_for_synthesis",
+            )
+            is True
+        )
+
+    def test_trigger_from_fixy_reason_factual_uncertainty(self):
+        assert (
+            fixy_should_search(
+                "Hello.",
+                fixy_reason="factual_uncertainty_detected",
+            )
+            is True
+        )
+
+    def test_no_trigger_unknown_fixy_reason(self):
+        assert fixy_should_search("Hello.", fixy_reason="some_other_signal") is False
+
+    def test_no_trigger_fixy_reason_none(self):
+        assert fixy_should_search("Hello.", fixy_reason=None) is False
+
 
 # ---------------------------------------------------------------------------
 # source_evaluator
@@ -270,10 +346,112 @@ class TestMaybeAddWebContext:
             result = maybe_add_web_context("latest AI research")
         assert result == ""
 
+    def test_triggered_by_dialogue_turn(self):
+        from entelgia.web_research import maybe_add_web_context
+
+        dialog = [{"role": "Athena", "text": "We need to find recent papers on this."}]
+        with patch(
+            "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
+        ):
+            result = maybe_add_web_context(
+                "Discuss the matter.", dialog_tail=dialog
+            )
+        assert isinstance(result, str)
+        assert "External Research:" in result
+
+    def test_triggered_by_fixy_reason(self):
+        from entelgia.web_research import maybe_add_web_context
+
+        with patch(
+            "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
+        ):
+            result = maybe_add_web_context(
+                "Hello.",
+                fixy_reason="external_verification_needed",
+            )
+        assert isinstance(result, str)
+        assert "External Research:" in result
+
+    def test_skipped_when_no_trigger_with_dialog(self):
+        from entelgia.web_research import maybe_add_web_context
+
+        dialog = [{"role": "Athena", "text": "I agree completely."}]
+        result = maybe_add_web_context("Let us talk.", dialog_tail=dialog)
+        assert result == ""
+
+    def test_graceful_failure_on_network_error_with_dialogue(self):
+        from entelgia.web_research import maybe_add_web_context
+
+        dialog = [{"role": "Athena", "text": "We need current evidence."}]
+        with patch(
+            "entelgia.web_research.search_and_fetch",
+            side_effect=Exception("timeout"),
+        ):
+            result = maybe_add_web_context("Hello.", dialog_tail=dialog)
+        assert result == ""
+
 
 # ---------------------------------------------------------------------------
-# web_research._store_external_knowledge
+# web_research.build_research_query
 # ---------------------------------------------------------------------------
+
+
+class TestBuildResearchQuery:
+    """Tests for build_research_query."""
+
+    def test_fallback_to_seed_when_no_dialog(self):
+        from entelgia.web_research import build_research_query
+
+        result = build_research_query("tell me about AI", None, None)
+        assert result == "tell me about AI"
+
+    def test_uses_question_from_dialogue(self):
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {"role": "Socrates", "text": "This is interesting."},
+            {
+                "role": "Athena",
+                "text": "What recent research exists on consciousness?",
+            },
+        ]
+        result = build_research_query("Seed text.", dialog, None)
+        assert "consciousness" in result
+
+    def test_falls_back_to_longest_turn_without_question(self):
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {"role": "Socrates", "text": "Short."},
+            {
+                "role": "Athena",
+                "text": "A much longer statement about cognitive architecture.",
+            },
+        ]
+        result = build_research_query("Seed.", dialog, None)
+        assert "cognitive architecture" in result
+
+    def test_query_within_max_length(self):
+        from entelgia.web_research import build_research_query
+
+        long_text = "word " * 300
+        dialog = [{"role": "Athena", "text": long_text}]
+        result = build_research_query("seed", dialog, None)
+        assert len(result) <= 200
+
+    def test_empty_dialog_falls_back_to_seed(self):
+        from entelgia.web_research import build_research_query
+
+        result = build_research_query("my seed query", [], None)
+        assert result == "my seed query"
+
+    def test_whitespace_normalised(self):
+        from entelgia.web_research import build_research_query
+
+        result = build_research_query("  hello   world  ", None, None)
+        assert result == "hello world"
+
+
 
 
 class TestStoreExternalKnowledge:
