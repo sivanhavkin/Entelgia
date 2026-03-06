@@ -637,21 +637,27 @@ ties are broken by earliest position.
 5. `research_context_builder.build_research_context(bundle, scored)` — format top-3
 6. Return context string for injection into `build_enriched_context(web_context=...)`
 
-### Query Compression
+### Query Rewriting
 
-Before a query is sent to the search engine it passes through two filters in
+Before a query is sent to the search engine it passes through processing in
 `web_research.py`:
 
 1. **`_sanitize_text`** — strips agent names and mode-label phrases.
-2. **`_compress_to_keywords`** — removes stopwords and trims to 6 words.
+2. **`rewrite_search_query(text, trigger)`** — finds the sentence containing the trigger, sanitizes it, then filters `_REWRITE_FILLER_WORDS`, returning at most 6 concept terms. Falls back to `_extract_trigger_fragment` when the trigger is not found within any sentence boundary.
 
-Stopwords removed during compression:
+`_REWRITE_FILLER_WORDS` is a comprehensive frozenset covering:
 
-```
-the, a, an, of, and, in, within, across,
-that, this, these, those, how, what, which,
-our, your, their, its
-```
+| Category | Examples |
+|----------|---------|
+| Personal pronouns | `i`, `we`, `you`, `he`, `she`, `they`, `me`, `us` |
+| Auxiliary / modal verbs | `is`, `are`, `was`, `were`, `can`, `could`, `should`, `may` |
+| Light / copula verbs | `hold`, `seem`, `become`, `feel`, `think`, `believe`, `find` |
+| Conjunctions / subordinators | `and`, `but`, `or`, `if`, `because`, `since`, `when`, `while` |
+| Prepositions | `with`, `at`, `from`, `by`, `to`, `into`, `about`, `before` |
+| Adverbs / discourse markers | `not`, `just`, `only`, `very`, `however`, `therefore`, `thus` |
+| Interrogatives | `where`, `when`, `why`, `who`, `whom` |
+| Generic nouns / adjectives | `place`, `thing`, `way`, `part`, `fact`, `kind`, `sort`, `type` |
+| Discourse gerunds | `reflecting`, `considering`, `exploring`, `examining`, `discussing` |
 
 ### Credibility Scoring Rules
 
