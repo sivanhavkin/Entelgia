@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-HIGH_CREDIBILITY_THRESHOLD: float = 0.8
+HIGH_CREDIBILITY_THRESHOLD: float = 0.6
 
 # ---------------------------------------------------------------------------
 # Memory persistence (optional)
