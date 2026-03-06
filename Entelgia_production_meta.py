@@ -2942,7 +2942,16 @@ class MainScript:
 
     def run(self):
         """Main execution loop (timeout configurable in minutes)."""
-        topicman = TopicManager(TOPIC_CYCLE, rotate_every_rounds=1, shuffle=False)
+        # Build topic cycle starting from the configured seed_topic so the
+        # active topic always matches the opening seed text.
+        first_topic = self.cfg.seed_topic
+        logger.debug("MainScript.run: configured first topic=%r", first_topic)
+        if first_topic in TOPIC_CYCLE:
+            idx = TOPIC_CYCLE.index(first_topic)
+            topic_list = TOPIC_CYCLE[idx:] + TOPIC_CYCLE[:idx]
+        else:
+            topic_list = [first_topic] + TOPIC_CYCLE[:]
+        topicman = TopicManager(topic_list, rotate_every_rounds=1, shuffle=False)
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
 
@@ -2997,6 +3006,11 @@ class MainScript:
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
             topic_label = topicman.current()
+            logger.debug(
+                "MainScript.run: turn=%d selected active topic=%r",
+                self.turn_index,
+                topic_label,
+            )
 
             # Dynamic seed generation (if enhanced mode available)
             if self.dialogue_engine and speaker.name != "Fixy":
@@ -3012,7 +3026,12 @@ class MainScript:
                     f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
                 )
 
-            logger.debug(f"Turn {self.turn_index}: {speaker.name}")
+            logger.debug(
+                "MainScript.run: turn=%d speaker=%s final seed_text=%r",
+                self.turn_index,
+                speaker.name,
+                seed,
+            )
             out = speaker.speak(seed, self.dialog)
             self.dialog.append({"role": speaker.name, "text": out})
 
