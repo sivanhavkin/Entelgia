@@ -127,9 +127,11 @@ def run_demo(user_query: str) -> None:
             db_path = tmp.name
 
         web_context = maybe_add_web_context(
-            user_message=user_query,
+            seed_text=query,
+            dialog_tail=None,
+            fixy_reason=None,
             db_path=db_path,
-            max_results=3,
+            max_results=5,
         )
 
         if web_context:
