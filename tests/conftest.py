@@ -11,6 +11,24 @@ import pytest
 import tempfile
 
 
+@pytest.fixture(autouse=True)
+def reset_trigger_cooldown():
+    """Reset the fixy_research_trigger cooldown state before every test.
+
+    This prevents cooldown state set in one test from bleeding into another,
+    ensuring deterministic test results regardless of execution order.
+    Also resets the web_research module-level caches for the same reason.
+    """
+    from entelgia.fixy_research_trigger import clear_trigger_cooldown
+    from entelgia.web_research import clear_research_caches
+
+    clear_trigger_cooldown()
+    clear_research_caches()
+    yield
+    clear_trigger_cooldown()
+    clear_research_caches()
+
+
 @pytest.fixture
 def test_secret_key():
     """Provide a test secret key for HMAC operations."""
