@@ -6,8 +6,11 @@ Dialogue Engine for Entelgia
 Manages dynamic speaker selection and flexible seed generation for natural dialogue flow.
 """
 
+import logging
 import random
 from typing import Dict, List, Any, Tuple, TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from typing import Protocol
@@ -82,7 +85,14 @@ class SeedGenerator:
         template = self.SEED_TEMPLATES.get(
             strategy, self.SEED_TEMPLATES["constructive_disagree"]
         )
-        return template.format(topic=topic)
+        seed_text = template.format(topic=topic)
+        logger.debug(
+            "SeedGenerator.generate_seed: topic=%r strategy=%r seed_text=%r",
+            topic,
+            strategy,
+            seed_text,
+        )
+        return seed_text
 
     def _select_strategy(
         self, turn_count: int, conflict_level: float, last_emotion: str

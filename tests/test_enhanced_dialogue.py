@@ -428,6 +428,44 @@ def test_persona_pronouns():
     assert not failed_checks, f"Failed pronoun checks: {failed_checks}"
 
 
+def test_seed_topic_consistency():
+    """Test that seed_text always uses the active topic, never a different one."""
+
+    engine = DialogueEngine()
+
+    class MockAgent:
+        def __init__(self, name):
+            self.name = name
+
+        def conflict_index(self):
+            return 5.0
+
+    socrates = MockAgent("Socrates")
+    dialog = [{"role": "Socrates", "text": "test", "emotion": "neutral"}]
+
+    mismatches = []
+    for turn in range(1, 21):
+        seed = engine.generate_seed(
+            topic="Freedom",
+            dialog_history=dialog,
+            speaker=socrates,
+            turn_count=turn,
+        )
+        if "Freedom" not in seed:
+            mismatches.append((turn, "missing 'Freedom'", seed))
+        if "truth & epistemology" in seed:
+            mismatches.append((turn, "contains 'truth & epistemology'", seed))
+
+    _print_table(
+        ["turn", "issue", "seed"],
+        mismatches or [["–", "none", "all correct"]],
+        title="test_seed_topic_consistency",
+    )
+    assert not mismatches, (
+        f"seed_text topic mismatches detected: {mismatches}"
+    )
+
+
 if __name__ == "__main__":
     import pytest
 
