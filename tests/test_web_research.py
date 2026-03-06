@@ -414,8 +414,8 @@ class TestMaybeAddWebContext:
                 {
                     "url": "https://arxiv.org/abs/2401.00001",
                     "title": "AI Paper 2026",
-                    "snippet": "A great study on AI.",
-                    "text": "Detailed text about AI research " * 40,
+                    "snippet": "A great study on recent AI papers.",
+                    "text": "Detailed text about AI research and recent papers on latest findings " * 40,
                 }
             ],
         }
@@ -650,7 +650,9 @@ class TestBuildResearchQuery:
         assert result.lower().startswith("today")
 
     def test_query_does_not_start_from_sentence_beginning(self):
-        # Conversational filler before the trigger must be excluded from the query.
+        # rewrite_search_query uses the full sentence but filters discourse
+        # markers, filler verbs, and non-concept words so only meaningful
+        # concept terms remain.
         from entelgia.web_research import build_research_query
 
         dialog = [
@@ -663,11 +665,10 @@ class TestBuildResearchQuery:
             }
         ]
         result = build_research_query("seed", dialog, None)
-        # The conversational preamble before "today" must not appear in the query
+        # Discourse opening gerund must be filtered out
         assert "Reflecting" not in result
-        assert "nature" not in result
-        # The trigger and content after it must drive the query
-        assert "today" in result
+        # Core concept terms from the sentence must appear in the result
+        assert "truth" in result or "research" in result
 
     def test_sanitize_and_compress_run_after_fragment_extraction(self):
         # _extract_trigger_fragment must apply _sanitize_text then
@@ -770,6 +771,149 @@ class TestBuildResearchQuery:
 
         assert _extract_topic_line("topic: free will") == "free will"
         assert _extract_topic_line("Topic: consciousness") == "consciousness"
+
+
+class TestRewriteSearchQuery:
+    """Tests for rewrite_search_query.
+
+    Validates that the function produces compact, concept-based queries
+    rather than raw prose fragments.
+    """
+
+    def test_raw_prose_not_used_as_query(self):
+        # The result must not be the full prose sentence — it must be
+        # a compact, concept-based query.
+        from entelgia.web_research import rewrite_search_query
+
+        text = "Truth holds a central place in our understanding of knowledge."
+        result = rewrite_search_query(text, "truth")
+        # Raw prose words that carry no concept value must be removed
+        assert "holds" not in result.split()
+        assert "central" not in result.split()
+        # The output must be compact (at most 6 words)
+        assert len(result.split()) <= 6
+
+    def test_rewritten_query_is_concept_based(self):
+        # The result must keep meaningful concept nouns and discard
+        # prose verbs and filler words.
+        from entelgia.web_research import rewrite_search_query
+
+        text = "I question whether memory can distort our perception of reality."
+        result = rewrite_search_query(text, "memory")
+        # Pronouns and filler words must be removed
+        assert "I" not in result.split()
+        assert "whether" not in result.split()
+        assert "can" not in result.split()
+        assert "our" not in result.split()
+        # Core concept terms must be present
+        assert "memory" in result
+        assert "perception" in result
+        assert "reality" in result
+
+    def test_rewritten_query_credibility_source(self):
+        # Verifies concept extraction for an epistemological sentence.
+        from entelgia.web_research import rewrite_search_query
+
+        text = "We must examine the credibility of the source and its biases."
+        result = rewrite_search_query(text, "credibility")
+        # Prose verbs and function words must be absent
+        assert "We" not in result.split()
+        assert "must" not in result.split()
+        assert "the" not in result.split()
+        # Key concept terms must be retained
+        assert "credibility" in result
+        assert "source" in result or "biases" in result
+
+    def test_output_word_count_within_range(self):
+        # The returned query must contain between 1 and 6 words.
+        from entelgia.web_research import rewrite_search_query
+
+        sentences = [
+            ("Truth holds a central place in our understanding of knowledge.", "truth"),
+            ("I question whether memory can distort our perception of reality.", "memory"),
+            ("We must examine the credibility of the source and its biases.", "credibility"),
+        ]
+        for text, trigger in sentences:
+            result = rewrite_search_query(text, trigger)
+            word_count = len(result.split())
+            assert 1 <= word_count <= 6, (
+                f"Expected 1–6 words for {text!r}, got {word_count}: {result!r}"
+            )
+
+    def test_discourse_gerund_removed(self):
+        # A sentence-opening gerund like "Reflecting" must be filtered out.
+        from entelgia.web_research import rewrite_search_query
+
+        text = "Reflecting on truth and research in epistemology today."
+        result = rewrite_search_query(text, "research")
+        assert "Reflecting" not in result.split()
+        # Core concepts must be retained
+        assert "truth" in result or "research" in result or "epistemology" in result
+
+    def test_agent_name_stripped(self):
+        # Agent names must be removed by _sanitize_text before concept extraction.
+        from entelgia.web_research import rewrite_search_query
+
+        text = "Athena claims that research on consciousness is crucial today."
+        result = rewrite_search_query(text, "research")
+        assert "Athena" not in result
+        assert "research" in result or "consciousness" in result
+
+    def test_fallback_on_trigger_not_in_text(self):
+        # When the trigger is not found in any sentence, the function must
+        # return a non-empty string rather than raising an error.
+        from entelgia.web_research import rewrite_search_query
+
+        result = rewrite_search_query("Some text about knowledge.", "missing")
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_build_research_query_uses_rewrite(self):
+        # build_research_query must produce concept-based output, not raw prose,
+        # when a trigger is detected in the dialogue.
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {
+                "role": "Athena",
+                "text": (
+                    "I believe that research into memory and its distortions "
+                    "is essential."
+                ),
+            }
+        ]
+        result = build_research_query("seed", dialog, None)
+        # Prose filler must not survive into the final query
+        assert "I" not in result.split()
+        assert "believe" not in result.split()
+        assert "that" not in result.split()
+        # Core research concept must be present
+        assert "research" in result or "memory" in result
+
+    def test_build_research_query_raw_prose_excluded(self):
+        # Verifies end-to-end that raw prose sentence fragments are NOT used
+        # as the final search query.
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {
+                "role": "Socrates",
+                "text": (
+                    "We should verify the credibility of sources and their biases "
+                    "in this evidence."
+                ),
+            }
+        ]
+        result = build_research_query("seed", dialog, None)
+        # The full prose sentence must not appear verbatim
+        assert result != (
+            "We should verify the credibility of sources and their biases "
+            "in this evidence."
+        )
+        # Output must be compact
+        assert len(result.split()) <= 6
+        # Concept terms must be present
+        assert "credibility" in result or "sources" in result or "evidence" in result
 
 
 class TestStoreExternalKnowledge:
