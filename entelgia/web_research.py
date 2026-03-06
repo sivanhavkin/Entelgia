@@ -430,7 +430,8 @@ def rewrite_search_query(text: str, trigger: str) -> str:
 
     Finds the sentence in *text* that contains *trigger*, then aggressively
     strips pronouns, auxiliary verbs, conjunctions, prepositions, and other
-    non-concept words so only 3–6 meaningful noun/concept terms remain.
+    non-concept words so only meaningful noun/concept terms remain (at most
+    ``_MAX_QUERY_WORDS`` words).
 
     This produces search-oriented output instead of the raw prose fragment
     that results from simple keyword compression.  For example::

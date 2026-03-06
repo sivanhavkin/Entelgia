@@ -916,6 +916,7 @@ class TestRewriteSearchQuery:
         assert "credibility" in result or "sources" in result or "evidence" in result
 
 
+class TestStoreExternalKnowledge:
     """Tests for _store_external_knowledge using a temporary SQLite database."""
 
     def test_creates_table_and_stores_row(self):
