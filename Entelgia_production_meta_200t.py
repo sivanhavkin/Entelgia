@@ -121,6 +121,7 @@ try:
         FreudianSlip,
         SelfReplication,
     )
+    from entelgia.web_research import maybe_add_web_context
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -344,6 +345,9 @@ class Config:
     superego_critique_enabled: bool = True
     superego_dominance_margin: float = 0.5
     superego_critique_conflict_min: float = 2.0
+    # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
+    web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "0")))
+    web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "5"))
 
     def __post_init__(self):
         """Validate configuration."""
@@ -1718,6 +1722,33 @@ class Agent:
         if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
             agent_pronoun = self.persona_dict["pronoun"]
 
+        # Compute web research context (gracefully returns "" when disabled or on error)
+        web_context = ""
+        if CFG.web_research_enabled and ENTELGIA_ENHANCED:
+            try:
+                web_context = maybe_add_web_context(
+                    user_seed,
+                    db_path=CFG.db_path,
+                    max_results=CFG.web_research_max_results,
+                )
+                if web_context:
+                    logger.info(
+                        "Web research context added for agent %s (seed=%r)",
+                        self.name,
+                        user_seed[:80],
+                    )
+                else:
+                    logger.debug(
+                        "Web research skipped/no results for agent %s", self.name
+                    )
+            except Exception as _web_err:  # noqa: BLE001
+                logger.warning("Web research error (ignored): %s", _web_err)
+        else:
+            logger.debug(
+                "Web research disabled (ENTELGIA_WEB_RESEARCH=0) for agent %s",
+                self.name,
+            )
+
         # Use ContextManager to build enriched prompt
         prompt = self.context_mgr.build_enriched_context(
             agent_name=self.name,
@@ -1731,6 +1762,7 @@ class Agent:
             debate_profile=self.debate_profile(),
             show_pronoun=CFG.show_pronoun,
             agent_pronoun=agent_pronoun,
+            web_context=web_context,
         )
 
         return prompt
