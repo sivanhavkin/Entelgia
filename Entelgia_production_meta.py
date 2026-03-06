@@ -199,48 +199,13 @@ def validate_signature(message: bytes, key: bytes, signature: bytes) -> bool:
 # LOGGING SETUP
 # ============================================
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s - %(name)s - %(message)s",
+    force=True,
+)
 
-def setup_logging(log_level: int = logging.INFO) -> logging.Logger:
-    """Setup structured logging."""
-    logger = logging.getLogger("entelgia")
-    logger.setLevel(log_level)
-
-    # Console handler – use a UTF-8 stream so emoji/non-ASCII chars never
-    # raise UnicodeEncodeError on Windows consoles with narrow code pages
-    # (e.g. cp1255).  errors="replace" silently substitutes any character
-    # that the underlying codec cannot encode.
-    try:
-        if sys.platform == "win32" and hasattr(sys.stderr, "buffer"):
-            _console_stream = io.TextIOWrapper(
-                sys.stderr.buffer, encoding="utf-8", errors="replace"
-            )
-        else:
-            _console_stream = sys.stderr
-    except Exception:
-        _console_stream = sys.stderr
-    console_handler = logging.StreamHandler(_console_stream)
-    console_handler.setLevel(log_level)
-
-    # File handler
-    os.makedirs("entelgia_data", exist_ok=True)
-    file_handler = logging.FileHandler("entelgia_data/entelgia.log")
-    file_handler.setLevel(log_level)
-
-    # Formatter
-    formatter = logging.Formatter(
-        "[%(asctime)s] %(levelname)s - %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    console_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
-
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
-
-    return logger
-
-
-logger = setup_logging()
+logger = logging.getLogger("entelgia")
 
 
 # ============================================

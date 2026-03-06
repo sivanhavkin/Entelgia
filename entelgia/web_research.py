@@ -59,9 +59,25 @@ _MODE_LABELS: Tuple[str, ...] = (
 # Stopwords for keyword compression (per spec §6)
 _STOPWORDS: FrozenSet[str] = frozenset(
     {
-        "the", "a", "an", "of", "and", "in", "within", "across",
-        "that", "this", "these", "those", "how", "what", "which",
-        "our", "your", "their", "its",
+        "the",
+        "a",
+        "an",
+        "of",
+        "and",
+        "in",
+        "within",
+        "across",
+        "that",
+        "this",
+        "these",
+        "those",
+        "how",
+        "what",
+        "which",
+        "our",
+        "your",
+        "their",
+        "its",
     }
 )
 
@@ -350,10 +366,8 @@ def build_research_query(
                 if trigger:
                     # _extract_trigger_fragment already sanitizes and compresses
                     query = _extract_trigger_fragment(text, trigger)
-                else:
-                    query = _compress_to_keywords(_sanitize_text(text))
-                logger.debug("[branch=dialogue_question] query=%r", query)
-                break
+                    logger.debug("[branch=dialogue_question] query=%r", query)
+                    break
 
         # Priority 2: most informative (longest) turn
         if not query:
@@ -373,9 +387,7 @@ def build_research_query(
                 if trigger:
                     # _extract_trigger_fragment already sanitizes and compresses
                     query = _extract_trigger_fragment(text, trigger)
-                else:
-                    query = _compress_to_keywords(_sanitize_text(text))
-                logger.debug("[branch=dialogue_longest] query=%r", query)
+                    logger.debug("[branch=dialogue_longest] query=%r", query)
 
     # Priority 3: fall back to seed_text, still applying trigger-based extraction
     if not query:
