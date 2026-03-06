@@ -341,12 +341,18 @@ def build_research_query(
         for turn in reversed(recent):
             text = (turn.get("text", "") if isinstance(turn, dict) else "").strip()
             if "?" in text:
+                logger.debug(
+                    "[branch=dialogue_question] source_type=dialogue_text text_preview=%r",
+                    text[:160],
+                )
                 trigger = find_trigger(text)
+                logger.debug("[branch=dialogue_question] detected_trigger=%r", trigger)
                 if trigger:
                     # _extract_trigger_fragment already sanitizes and compresses
                     query = _extract_trigger_fragment(text, trigger)
                 else:
                     query = _compress_to_keywords(_sanitize_text(text))
+                logger.debug("[branch=dialogue_question] query=%r", query)
                 break
 
         # Priority 2: most informative (longest) turn
@@ -358,22 +364,34 @@ def build_research_query(
             )
             if best:
                 text = (best.get("text", "") if isinstance(best, dict) else "").strip()
+                logger.debug(
+                    "[branch=dialogue_longest] source_type=dialogue_text text_preview=%r",
+                    text[:160],
+                )
                 trigger = find_trigger(text)
+                logger.debug("[branch=dialogue_longest] detected_trigger=%r", trigger)
                 if trigger:
                     # _extract_trigger_fragment already sanitizes and compresses
                     query = _extract_trigger_fragment(text, trigger)
                 else:
                     query = _compress_to_keywords(_sanitize_text(text))
+                logger.debug("[branch=dialogue_longest] query=%r", query)
 
     # Priority 3: fall back to seed_text, still applying trigger-based extraction
     if not query:
         seed = (seed_text or "").strip()
+        logger.debug(
+            "[branch=seed_fallback] source_type=seed_text text_preview=%r",
+            seed[:160],
+        )
         trigger = find_trigger(seed)
+        logger.debug("[branch=seed_fallback] detected_trigger=%r", trigger)
         if trigger:
             # _extract_trigger_fragment already sanitizes and compresses
             query = _extract_trigger_fragment(seed, trigger)
         else:
             query = _compress_to_keywords(_sanitize_text(seed))
+        logger.debug("[branch=seed_fallback] query=%r", query)
 
     logger.debug("build_research_query: query=%r", query)
     return query
