@@ -24,7 +24,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from entelgia.fixy_research_trigger import fixy_should_search
+from entelgia.fixy_research_trigger import find_trigger, fixy_should_search
 from entelgia.research_context_builder import build_research_context
 from entelgia.source_evaluator import evaluate_source, evaluate_sources
 
@@ -171,6 +171,74 @@ class TestFixyResearchTrigger:
 
     def test_no_trigger_fixy_reason_none(self):
         assert fixy_should_search("Hello.", fixy_reason=None) is False
+
+    def test_logs_trigger_keyword_on_seed_match(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search("Find the latest AI news")
+        assert any("web search triggered by keyword:" in m for m in caplog.messages)
+
+    def test_logs_trigger_keyword_on_dialogue_match(self, caplog):
+        import logging
+
+        dialog = [
+            {"role": "system", "text": "Let us begin."},
+            {"role": "Athena", "text": "We need current evidence for this claim."},
+        ]
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_research_trigger"):
+            fixy_should_search("Neutral seed.", dialog_tail=dialog)
+        assert any("web search triggered by keyword:" in m for m in caplog.messages)
+
+
+# ---------------------------------------------------------------------------
+# fixy_research_trigger.find_trigger
+# ---------------------------------------------------------------------------
+
+
+class TestFindTrigger:
+    """Tests for the find_trigger helper."""
+
+    def test_returns_none_on_empty_string(self):
+        assert find_trigger("") is None
+
+    def test_returns_none_on_whitespace_only(self):
+        assert find_trigger("   ") is None
+
+    def test_returns_none_when_no_trigger(self):
+        assert find_trigger("cats and dogs love play time") is None
+
+    def test_returns_matched_keyword(self):
+        result = find_trigger("latest AI research")
+        assert result == "latest"
+
+    def test_returns_first_keyword_in_sentence(self):
+        # "find" appears before "search" alphabetically but "find" is first in the text
+        result = find_trigger("find and search for sources")
+        assert result == "find"
+
+    def test_phrase_takes_priority_over_single_keyword(self):
+        # "latest research" is a phrase; "latest" is also a standalone keyword
+        result = find_trigger("latest research on climate")
+        assert result == "latest research"
+
+    def test_case_insensitive_keyword(self):
+        result = find_trigger("LATEST developments in robotics")
+        assert result == "latest"
+
+    def test_returns_keyword_from_dialogue_prose(self):
+        # "find" appears before "latest" in the text, so "find" is returned.
+        result = find_trigger(
+            "Athena, I think we need to find the latest sources on this."
+        )
+        assert result == "find"
+
+    def test_returns_none_for_agent_name_alone(self):
+        # Agent names like "Athena" must not be trigger words
+        assert find_trigger("Athena says hello.") is None
+
+    def test_returns_none_for_socrates_alone(self):
+        assert find_trigger("Socrates poses the question.") is None
 
 
 # ---------------------------------------------------------------------------
@@ -476,6 +544,62 @@ class TestBuildResearchQuery:
 
         result = build_research_query("  hello   world  ", None, None)
         assert result == "hello world"
+
+    def test_agent_name_excluded_when_trigger_found_in_question(self):
+        # Agent name "Athena" in prose must not appear in the query when a
+        # trigger keyword anchors the fragment extraction.
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {"role": "Socrates", "text": "Let us think carefully."},
+            {
+                "role": "Socrates",
+                "text": (
+                    "Athena, I think we need to find the latest research "
+                    "on consciousness?"
+                ),
+            },
+        ]
+        result = build_research_query("Seed.", dialog, None)
+        assert "Athena" not in result
+        assert "consciousness" in result
+
+    def test_query_starts_at_trigger_keyword(self):
+        # When dialogue contains an agent name before the trigger, the returned
+        # query must NOT include the agent name; the fragment starts at the
+        # trigger keyword or phrase instead.
+        from entelgia.web_research import build_research_query
+
+        dialog = [
+            {"role": "system", "text": "Welcome."},
+            {
+                "role": "Fixy",
+                "text": "Socrates, please search for recent papers on ethics.",
+            },
+        ]
+        result = build_research_query("Intro.", dialog, None)
+        # The query must exclude the agent name preamble
+        assert "Socrates" not in result
+        # The query should contain the substantive topic
+        assert "ethics" in result
+
+    def test_trigger_fragment_respects_max_words(self):
+        # The fragment must not exceed _TRIGGER_FRAGMENT_MAX_WORDS words even
+        # when the source text is very long.
+        from entelgia.web_research import _extract_trigger_fragment
+
+        long_text = "find " + " ".join(["word"] * 50)
+        result = _extract_trigger_fragment(long_text, "find")
+        assert len(result.split()) <= 15
+
+    def test_extract_trigger_fragment_fallback_on_missing_trigger(self):
+        # When the trigger is not found literally in the text, a safe
+        # truncation is returned instead of raising an error.
+        from entelgia.web_research import _extract_trigger_fragment
+
+        result = _extract_trigger_fragment("Some text without the keyword.", "missing")
+        assert isinstance(result, str)
+        assert len(result) > 0
 
 
 class TestStoreExternalKnowledge:
