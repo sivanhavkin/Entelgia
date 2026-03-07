@@ -143,7 +143,9 @@ except ImportError:
             return (0, 0)
 
     class FreudianSlip:  # type: ignore[no-redef]
-        def __init__(self, slip_probability=0.05, slip_cooldown_turns=10, dedup_window=10):
+        def __init__(
+            self, slip_probability=0.05, slip_cooldown_turns=10, dedup_window=10
+        ):
             self.slip_probability = slip_probability
             self.slip_cooldown_turns = slip_cooldown_turns
             self.dedup_window = dedup_window
