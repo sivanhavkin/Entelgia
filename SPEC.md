@@ -673,7 +673,7 @@ Score clamped to [0.0, 1.0].
 
 ### Memory Persistence
 
-When `credibility_score > 0.8`, the source summary is stored in the
+When `credibility_score > 0.6`, the source summary is stored in the
 `external_knowledge` table (SQLite):
 
 ```

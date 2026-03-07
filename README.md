@@ -481,7 +481,7 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 - All network requests use a 10-second timeout
 - Network errors never crash the main dialogue system
 - Results are capped at 5 sources by default
-- High-credibility threshold: score > 0.8 for memory storage
+- High-credibility threshold: score > 0.6 for memory storage
 
 ---
 

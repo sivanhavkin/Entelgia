@@ -144,7 +144,7 @@ demo script and full documentation.
 #### 5. Integration 🔗
 - `maybe_add_web_context(user_message)` — full pipeline
 - `ContextManager.build_enriched_context(web_context=...)` — prompt injection
-- High-credibility sources (> 0.8) stored in `external_knowledge` SQLite table
+- High-credibility sources (> 0.6) stored in `external_knowledge` SQLite table
 
 ### Files Changed
 - `entelgia/web_tool.py` (new)

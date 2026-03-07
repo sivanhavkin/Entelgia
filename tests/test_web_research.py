@@ -931,8 +931,121 @@ class TestRewriteSearchQuery:
         assert "credibility" in result or "sources" in result or "evidence" in result
 
 
+class TestRewriteQueryQuality:
+    """Tests for improved rewrite_search_query concept extraction quality.
+
+    Verifies that the function avoids prose verb fragments, extracts core
+    concept terms, and handles specific multi-word trigger phrases correctly.
+    """
+
+    def test_rewrite_avoids_broken_fragment(self):
+        # The fallback path must not return prose verb fragments when the
+        # trigger is absent from the text.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "We err in dismissing subjective experiences as unreliable"
+            " when they form our reality."
+        )
+        trigger = "truth"
+        result = rewrite_search_query(text, trigger)
+        assert result != "err dismissing subjective experiences unreliable form"
+        assert "err" not in result.split()
+        assert "dismissing" not in result.split()
+
+    def test_rewrite_extracts_concepts(self):
+        # Even when the trigger is absent, concept-level terms from the
+        # surrounding sentence must appear in the result.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "We err in dismissing subjective experiences as unreliable"
+            " when they form our reality."
+        )
+        trigger = "truth"
+        result = rewrite_search_query(text, trigger)
+        # At least one concept-level term from the source sentence must be present.
+        assert any(
+            term in result.lower()
+            for term in ["subjective", "experience", "unreliable", "reality", "epistemic"]
+        )
+
+    def test_specific_trigger_can_remain(self):
+        # A specific multi-word trigger is itself a ready-made concept query
+        # and must be returned unchanged (or nearly so).
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "Global Workspace Theory suggests that conscious contents"
+            " become globally available."
+        )
+        trigger = "global workspace theory"
+        result = rewrite_search_query(text, trigger)
+        # All trigger words must be preserved in the result.
+        assert "global" in result.lower()
+        assert "workspace" in result.lower()
+        assert "theory" in result.lower()
+        # The result should equal the trigger (no extraneous words added).
+        assert result.lower() == "global workspace theory"
+
+    def test_query_prefers_concept_terms(self):
+        # After the heuristic ranking, weak nouns and verb-derived forms must
+        # be excluded in favour of stronger concept terms.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "We err in dismissing subjective experiences as unreliable"
+            " when they form our reality."
+        )
+        trigger = "truth"
+        result = rewrite_search_query(text, trigger)
+        # Banned verbs and discourse words must not appear.
+        assert "err" not in result.split()
+        assert "dismissing" not in result.split()
+        # Weak generic nouns must not appear.
+        assert "form" not in result.split()
+        # Core concept terms from the sentence must be present.
+        assert "subjective" in result.lower() or "experience" in result.lower()
+        # The trigger should be included to add specificity.
+        assert "truth" in result.lower()
+
+    def test_verb_like_forms_excluded_when_concepts_available(self):
+        # When enough noun-quality terms are available, verb-derived (-ed, -ing)
+        # tokens must be excluded from the query.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "If our recollections are subjective, can memory be trusted"
+            " as a basis for knowledge?"
+        )
+        trigger = "memory"
+        result = rewrite_search_query(text, trigger)
+        # "trusted" is verb-derived (-ed) and must not appear when better
+        # concept terms (memory, knowledge, recollections, subjective) exist.
+        assert "trusted" not in result.split()
+        # Core concept terms must still be present.
+        assert "memory" in result.lower()
+        assert "knowledge" in result.lower()
+
+    def test_weak_nouns_removed_in_favour_of_concepts(self):
+        # Generic nouns like "form", "aspect", "part" must be stripped so that
+        # only meaningful concept terms survive in the final query.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "The key aspect of freedom is the form of autonomy that allows"
+            " fallibility to coexist with knowledge."
+        )
+        trigger = "freedom"
+        result = rewrite_search_query(text, trigger)
+        # Weak generic nouns must be absent.
+        assert "aspect" not in result.split()
+        assert "form" not in result.split()
+        # Concept terms must be retained.
+        assert "freedom" in result.lower()
+        assert "autonomy" in result.lower() or "knowledge" in result.lower()
+
 class TestStoreExternalKnowledge:
-    """Tests for _store_external_knowledge using a temporary SQLite database."""
 
     def test_creates_table_and_stores_row(self):
         from entelgia.web_research import _store_external_knowledge
