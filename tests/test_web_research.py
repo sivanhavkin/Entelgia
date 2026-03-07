@@ -931,8 +931,65 @@ class TestRewriteSearchQuery:
         assert "credibility" in result or "sources" in result or "evidence" in result
 
 
+class TestRewriteQueryQuality:
+    """Tests for improved rewrite_search_query concept extraction quality.
+
+    Verifies that the function avoids prose verb fragments, extracts core
+    concept terms, and handles specific multi-word trigger phrases correctly.
+    """
+
+    def test_rewrite_avoids_broken_fragment(self):
+        # The fallback path must not return prose verb fragments when the
+        # trigger is absent from the text.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "We err in dismissing subjective experiences as unreliable"
+            " when they form our reality."
+        )
+        trigger = "truth"
+        result = rewrite_search_query(text, trigger)
+        assert result != "err dismissing subjective experiences unreliable form"
+        assert "err" not in result.split()
+        assert "dismissing" not in result.split()
+
+    def test_rewrite_extracts_concepts(self):
+        # Even when the trigger is absent, concept-level terms from the
+        # surrounding sentence must appear in the result.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "We err in dismissing subjective experiences as unreliable"
+            " when they form our reality."
+        )
+        trigger = "truth"
+        result = rewrite_search_query(text, trigger)
+        # At least one concept-level term from the source sentence must be present.
+        assert any(
+            term in result.lower()
+            for term in ["subjective", "experience", "unreliable", "reality", "epistemic"]
+        )
+
+    def test_specific_trigger_can_remain(self):
+        # A specific multi-word trigger is itself a ready-made concept query
+        # and must be returned unchanged (or nearly so).
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "Global Workspace Theory suggests that conscious contents"
+            " become globally available."
+        )
+        trigger = "global workspace theory"
+        result = rewrite_search_query(text, trigger)
+        # All trigger words must be preserved in the result.
+        assert "global" in result.lower()
+        assert "workspace" in result.lower()
+        assert "theory" in result.lower()
+        # The result should equal the trigger (no extraneous words added).
+        assert result.lower() == "global workspace theory"
+
+
 class TestStoreExternalKnowledge:
-    """Tests for _store_external_knowledge using a temporary SQLite database."""
 
     def test_creates_table_and_stores_row(self):
         from entelgia.web_research import _store_external_knowledge

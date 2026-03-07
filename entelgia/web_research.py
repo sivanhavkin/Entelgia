@@ -395,6 +395,33 @@ _REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
         "worked",
         "put",
         "puts",
+        # Action / discourse verbs explicitly banned from search queries
+        "err",
+        "errs",
+        "erring",
+        "erred",
+        "dismiss",
+        "dismisses",
+        "dismissed",
+        "dismissing",
+        "overlook",
+        "overlooks",
+        "overlooked",
+        "overlooking",
+        "try",
+        "tries",
+        "tried",
+        "trying",
+        "seek",
+        "seeks",
+        "sought",
+        "seeking",
+        "limit",
+        "limits",
+        "limited",
+        "limiting",
+        # Adverbial connectives with no concept value
+        "thereby",
     }
 )
 
@@ -670,9 +697,22 @@ def rewrite_search_query(text: str, trigger: str) -> str:
     Returns
     -------
     A compact, concept-based query string of at most ``_MAX_QUERY_WORDS``
-    meaningful terms.  Falls back to :func:`_extract_trigger_fragment` when
-    the trigger cannot be located in *text*.
+    meaningful terms.  When the trigger is not located in *text*, concept words
+    are extracted from the full text using the same aggressive filler-word filter.
     """
+    # 0. Short-circuit: if the trigger is already a specific multi-word concept
+    #    phrase (≥ 3 non-filler words), return it directly as a ready-made query.
+    #    Two-word phrases are kept for contextualization with nearby concepts.
+    trigger_words = trigger.lower().split()
+    if len(trigger_words) >= 3 and all(
+        w not in _REWRITE_FILLER_WORDS and len(w) > 2 for w in trigger_words
+    ):
+        logger.debug(
+            "rewrite_search_query: specific multi-word trigger %r returned as-is",
+            trigger,
+        )
+        return trigger.lower()
+
     # 1. Find the sentence that contains the trigger.
     trigger_lower = trigger.lower()
     sentences = re.split(r"(?<=[.!?])\s+", text)
@@ -682,13 +722,20 @@ def rewrite_search_query(text: str, trigger: str) -> str:
             target_sentence = sentence
             break
     if target_sentence is None:
-        # Trigger not found in any sentence — fall back to the whole text.
+        # Trigger not found in any sentence — extract concept words from the
+        # full text using the same aggressive filler-word filter so the result
+        # is concept-based rather than a raw prose fragment.
         logger.warning(
             "rewrite_search_query: trigger %r not found in any sentence; "
-            "falling back to _extract_trigger_fragment",
+            "extracting concepts from full text",
             trigger,
         )
-        return _extract_trigger_fragment(text, trigger)
+        clean = _sanitize_text(text)
+        words = clean.split()
+        concepts = [
+            w for w in words if w.lower() not in _REWRITE_FILLER_WORDS and len(w) > 2
+        ]
+        return " ".join(concepts[:_MAX_QUERY_WORDS])
 
     # 2. Sanitize the sentence (strips agent names, HTML entities, mode labels,
     #    instruction words, possessives, and punctuation).
