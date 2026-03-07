@@ -684,9 +684,7 @@ class TestFreudianSlipRateLimiting:
 
     def test_dedup_blocks_repeated_identical_content(self):
         """A slip with the same content as a recent slip should be suppressed."""
-        fs = FreudianSlip(
-            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=10
-        )
+        fs = FreudianSlip(slip_probability=1.0, slip_cooldown_turns=0, dedup_window=10)
         memories = [_make_memory("identical secret", intrusive=1)]
         first = fs.attempt_slip(memories)
         assert first is not None, "First slip should succeed"
@@ -701,9 +699,7 @@ class TestFreudianSlipRateLimiting:
 
     def test_dedup_allows_different_content(self):
         """Different content should not be blocked by dedup."""
-        fs = FreudianSlip(
-            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=10
-        )
+        fs = FreudianSlip(slip_probability=1.0, slip_cooldown_turns=0, dedup_window=10)
         mem_a = _make_memory("content alpha", intrusive=1)
         mem_b = _make_memory("content beta", intrusive=1)
         first = fs.attempt_slip([mem_a])
@@ -718,9 +714,7 @@ class TestFreudianSlipRateLimiting:
 
     def test_dedup_disabled_when_window_is_zero(self):
         """When dedup_window=0, identical content should not be deduplicated."""
-        fs = FreudianSlip(
-            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0
-        )
+        fs = FreudianSlip(slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0)
         memories = [_make_memory("repeat repeat", intrusive=1)]
         first = fs.attempt_slip(memories)
         second = fs.attempt_slip(memories)
@@ -734,9 +728,7 @@ class TestFreudianSlipRateLimiting:
 
     def test_zero_cooldown_allows_every_turn(self):
         """With slip_cooldown_turns=0, a slip can occur every eligible turn."""
-        fs = FreudianSlip(
-            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0
-        )
+        fs = FreudianSlip(slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0)
         memories = [_make_memory("unconstrained", intrusive=1)]
         results = [fs.attempt_slip(memories) for _ in range(5)]
         _print_table(
