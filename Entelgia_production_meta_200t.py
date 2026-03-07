@@ -143,6 +143,13 @@ except ImportError:
             return (0, 0)
 
     class FreudianSlip:  # type: ignore[no-redef]
+        def __init__(self, slip_probability=0.05, slip_cooldown_turns=10, dedup_window=10):
+            self.slip_probability = slip_probability
+            self.slip_cooldown_turns = slip_cooldown_turns
+            self.dedup_window = dedup_window
+            self.attempts: int = 0
+            self.successes: int = 0
+
         def attempt_slip(self, recent_memories):
             return None
 
@@ -322,6 +329,10 @@ class Config:
     # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
     web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "1")))
     web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "3"))
+    # Freudian Slip controls
+    slip_probability: float = float(os.environ.get("ENTELGIA_SLIP_PROBABILITY", "0.05"))
+    slip_cooldown_turns: int = int(os.environ.get("ENTELGIA_SLIP_COOLDOWN", "10"))
+    slip_dedup_window: int = int(os.environ.get("ENTELGIA_SLIP_DEDUP_WINDOW", "10"))
     debug: bool = (
         False  # Enable DEBUG-level logging (True = verbose, False = INFO only)
     )
@@ -1486,6 +1497,12 @@ class Agent:
         # Limbic hijack state
         self.limbic_hijack: bool = False
         self._limbic_hijack_turns: int = 0  # turns elapsed since hijack started
+        # Persistent Freudian slip engine (preserves cooldown/dedup state across turns)
+        self._slip_engine = FreudianSlip(
+            slip_probability=cfg.slip_probability if cfg is not None else 0.05,
+            slip_cooldown_turns=cfg.slip_cooldown_turns if cfg is not None else 10,
+            dedup_window=cfg.slip_dedup_window if cfg is not None else 10,
+        )
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -2070,13 +2087,12 @@ class Agent:
         Returns the leaked fragment text if a slip occurs, otherwise None.
         """
         recent = self.memory.ltm_recent(self.name, limit=30, layer="subconscious")
-        slip_engine = FreudianSlip()
-        slipped = slip_engine.attempt_slip(recent)
+        slipped = self._slip_engine.attempt_slip(recent)
         if slipped is None:
             return None
 
         fragment = str(slipped.get("content", "")).strip()
-        msg = slip_engine.format_slip(slipped)
+        msg = self._slip_engine.format_slip(slipped)
         print(Fore.MAGENTA + msg + Style.RESET_ALL)
 
         # Promote to conscious layer
@@ -3184,6 +3200,15 @@ class MainScript:
         logger.info(
             f"Session {self.session_id} completed: {self.turn_index} turns, {elapsed:.1f}s"
         )
+        # Log Freudian slip instrumentation for each agent
+        for _agent in (self.socrates, self.athena):
+            _eng = _agent._slip_engine
+            logger.info(
+                "FreudianSlip stats [%s]: attempts=%d, successes=%d",
+                _agent.name,
+                getattr(_eng, "attempts", 0),
+                getattr(_eng, "successes", 0),
+            )
 
         # ============================================
 

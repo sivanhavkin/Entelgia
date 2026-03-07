@@ -584,5 +584,168 @@ class TestLongTermMemoryPackageImports:
         assert SR is SelfReplication
 
 
+# ============================================================================
+# FreudianSlip rate-limiting and instrumentation tests
+# ============================================================================
+
+
+class TestFreudianSlipRateLimiting:
+    """Tests for FreudianSlip cooldown, dedup, and instrumentation features."""
+
+    def test_default_probability_is_five_percent(self):
+        """Default slip_probability should be 0.05."""
+        fs = FreudianSlip()
+        _print_table(
+            ["attribute", "value", "expected"],
+            [["slip_probability", str(fs.slip_probability), "0.05"]],
+            title="test_default_probability_is_five_percent",
+        )
+        assert fs.slip_probability == 0.05
+
+    def test_attempts_counter_increments(self):
+        """attempts counter should increase with each attempt_slip call."""
+        fs = FreudianSlip(slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0)
+        memories = [_make_memory("pain", intrusive=1)]
+        for _ in range(5):
+            fs.attempt_slip(memories)
+        _print_table(
+            ["calls", "attempts_counter"],
+            [["5", str(fs.attempts)]],
+            title="test_attempts_counter_increments",
+        )
+        assert fs.attempts == 5
+
+    def test_successes_counter_increments(self):
+        """successes counter should track successful slips."""
+        fs = FreudianSlip(slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0)
+        memories = [_make_memory("pain", intrusive=1)]
+        # Each call succeeds because dedup is disabled and cooldown is 0
+        fs.attempt_slip(memories)
+        _print_table(
+            ["successes_counter", "expected"],
+            [[str(fs.successes), "1"]],
+            title="test_successes_counter_increments",
+        )
+        assert fs.successes == 1
+
+    def test_successes_never_exceed_attempts(self):
+        """successes should always be <= attempts."""
+        fs = FreudianSlip(slip_probability=0.5, slip_cooldown_turns=0, dedup_window=0)
+        memories = [_make_memory("recurring", intrusive=1)]
+        for _ in range(30):
+            fs.attempt_slip(memories)
+        _print_table(
+            ["attempts", "successes", "valid?"],
+            [[str(fs.attempts), str(fs.successes), str(fs.successes <= fs.attempts)]],
+            title="test_successes_never_exceed_attempts",
+        )
+        assert fs.successes <= fs.attempts
+
+    def test_cooldown_blocks_consecutive_slips(self):
+        """No slip should occur during the cooldown window after a success."""
+        cooldown = 5
+        fs = FreudianSlip(
+            slip_probability=1.0, slip_cooldown_turns=cooldown, dedup_window=0
+        )
+        memories = [_make_memory("trauma", intrusive=1)]
+        # First call should succeed (engine initialised at cooldown threshold)
+        first = fs.attempt_slip(memories)
+        assert first is not None, "Expected first slip to succeed"
+        # The next `cooldown` calls must all be blocked
+        blocked_results = [fs.attempt_slip(memories) for _ in range(cooldown)]
+        any_slipped = any(r is not None for r in blocked_results)
+        _print_table(
+            ["cooldown", "blocked_attempts", "any_slipped_during_cooldown?"],
+            [[str(cooldown), str(cooldown), str(any_slipped)]],
+            title="test_cooldown_blocks_consecutive_slips",
+        )
+        assert not any_slipped
+
+    def test_slip_resumes_after_cooldown(self):
+        """A slip should be allowed once the cooldown window has elapsed."""
+        cooldown = 3
+        fs = FreudianSlip(
+            slip_probability=1.0, slip_cooldown_turns=cooldown, dedup_window=0
+        )
+        memories = [_make_memory("repressed", intrusive=1)]
+        # Trigger first slip
+        assert fs.attempt_slip(memories) is not None
+        # Exhaust cooldown
+        for _ in range(cooldown):
+            fs.attempt_slip(memories)
+        # Next call should succeed again
+        second = fs.attempt_slip(memories)
+        _print_table(
+            ["cooldown", "second_slip_is_none?"],
+            [[str(cooldown), str(second is None)]],
+            title="test_slip_resumes_after_cooldown",
+        )
+        assert second is not None
+
+    def test_dedup_blocks_repeated_identical_content(self):
+        """A slip with the same content as a recent slip should be suppressed."""
+        fs = FreudianSlip(
+            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=10
+        )
+        memories = [_make_memory("identical secret", intrusive=1)]
+        first = fs.attempt_slip(memories)
+        assert first is not None, "First slip should succeed"
+        # Same content: should be blocked by dedup
+        second = fs.attempt_slip(memories)
+        _print_table(
+            ["first_slip", "second_slip (same content)", "expected_second"],
+            [["not None", str(second), "None"]],
+            title="test_dedup_blocks_repeated_identical_content",
+        )
+        assert second is None
+
+    def test_dedup_allows_different_content(self):
+        """Different content should not be blocked by dedup."""
+        fs = FreudianSlip(
+            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=10
+        )
+        mem_a = _make_memory("content alpha", intrusive=1)
+        mem_b = _make_memory("content beta", intrusive=1)
+        first = fs.attempt_slip([mem_a])
+        assert first is not None
+        second = fs.attempt_slip([mem_b])
+        _print_table(
+            ["first_content", "second_content", "second_slip_is_none?"],
+            [["content alpha", "content beta", str(second is None)]],
+            title="test_dedup_allows_different_content",
+        )
+        assert second is not None
+
+    def test_dedup_disabled_when_window_is_zero(self):
+        """When dedup_window=0, identical content should not be deduplicated."""
+        fs = FreudianSlip(
+            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0
+        )
+        memories = [_make_memory("repeat repeat", intrusive=1)]
+        first = fs.attempt_slip(memories)
+        second = fs.attempt_slip(memories)
+        _print_table(
+            ["dedup_window", "first_slip", "second_slip"],
+            [["0", str(first is not None), str(second is not None)]],
+            title="test_dedup_disabled_when_window_is_zero",
+        )
+        assert first is not None
+        assert second is not None
+
+    def test_zero_cooldown_allows_every_turn(self):
+        """With slip_cooldown_turns=0, a slip can occur every eligible turn."""
+        fs = FreudianSlip(
+            slip_probability=1.0, slip_cooldown_turns=0, dedup_window=0
+        )
+        memories = [_make_memory("unconstrained", intrusive=1)]
+        results = [fs.attempt_slip(memories) for _ in range(5)]
+        _print_table(
+            ["cooldown", "all_non_none?"],
+            [["0", str(all(r is not None for r in results))]],
+            title="test_zero_cooldown_allows_every_turn",
+        )
+        assert all(r is not None for r in results)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
