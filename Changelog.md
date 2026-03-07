@@ -10,15 +10,63 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+
+
+## [2.8.1] - 2026-03-07
+### Added
+
+- Added support for disabling dialogue timeout by allowing the timeout configuration to be set to `None`.
+- Added clearer internal guidance for **constructive disagreement** in Athena’s dialogue prompt to improve dialectical responses.
+
+### Changed
+
+- Restored the default runtime timeout to **300 minutes**, while preserving support for `None` as an unlimited-time option for debugging and long experimental runs.
+- Updated search-query rewriting to better filter out:
+  - weak semantic filler words
+  - weak structural words
+  - prompt scaffolding / template leakage words
+- Improved Athena’s disagreement prompt from a generic instruction to a structured dialectical scaffold:
+  - identify the previous claim
+  - question an assumption, definition, or implication
+  - offer an alternative interpretation or counter-argument
+  - maintain a respectful philosophical tone
+- Clarified practical model requirements in documentation: **Phi-3 class models or stronger are recommended**, since smaller models do not reliably sustain the system’s complexity.
+
 ### Fixed
 
-- **Query-branch consistency** — `dialogue_question` and `dialogue_longest` branches in `web_research.py` no longer emit a search query when `find_trigger()` returns `None`; turns with no trigger fall through silently to `seed_fallback` (PR #192)
-- **Duplicate log handlers** — replaced re-entrant `setup_logging()` in both production scripts with a single `logging.basicConfig(force=True)` call, eliminating duplicate output on every run (PR #192)
-- **Debug mode toggle** — added `debug: bool = True` field to `Config`; `__post_init__` now sets the root logger level dynamically (`DEBUG` or `INFO`), making debug noise opt-out (PR #193)
-- **Topic/seed mismatch** — `run()` now rotates `TOPIC_CYCLE` so `topicman.current()` on turn 1 matches `cfg.seed_topic`; `SeedGenerator.generate_seed()` logs the topic received and seed produced (PR #194)
-- **Concept-based query rewriting** — replaced `_extract_trigger_fragment` in `build_research_query` with the new `rewrite_search_query(text, trigger)` public function in `web_research.py`; strips pronouns, auxiliaries, conjunctions, prepositions, and discourse gerunds via `_REWRITE_FILLER_WORDS`, returning at most 6 concept terms (PR #195)
+- **Query-branch consistency** — `dialogue_question` and `dialogue_longest` branches in `web_research.py` no longer emit a search query when `find_trigger()` returns `None`; turns with no trigger now fall through silently to `seed_fallback`. (PR #192)
+- **Duplicate log handlers** — replaced re-entrant `setup_logging()` in both production scripts with a single `logging.basicConfig(force=True)` call, eliminating duplicate log output on every run. (PR #192)
+- **Debug mode toggle** — added `debug: bool = True` field to `Config`; `__post_init__` now sets the root logger level dynamically (`DEBUG` or `INFO`), making debug verbosity configurable. (PR #193)
+- **Topic/seed mismatch** — `run()` now rotates `TOPIC_CYCLE` so `topicman.current()` on turn 1 matches `cfg.seed_topic`; `SeedGenerator.generate_seed()` logs both the received topic and the generated seed. (PR #194)
+- **Concept-based query rewriting** — replaced `_extract_trigger_fragment` in `build_research_query` with the new `rewrite_search_query(text, trigger)` function in `web_research.py`; removes pronouns, auxiliaries, conjunctions, prepositions, and discourse gerunds via `_REWRITE_FILLER_WORDS`, returning up to **6 concept terms**. (PR #195)
+- Fixed low-quality web research queries caused by filler or structural tokens appearing in sanitized search strings.
+- Prevented prompt-template leakage into search queries, filtering terms such as:
+  - `style`
+  - `drives`
+  - `seed`
+  - `recent`
+  - `thoughts`
+  - `answer`
+  - `analysis`
+  - `synthesis`
+  - `deconstruction`
+- Reduced malformed queries such as  
+  `essence virtue truth increasingly integral one`  
+  and replaced them with compact **concept-based search queries**.
+- Improved Athena’s tendency to **agree and expand** when instructed to disagree constructively.
 
----
+### Verified
+
+- Main script architecture remained unchanged aside from timeout configurability.
+- Existing test suite passed after the changes.
+- No new security issues were introduced in the modified areas.
+- Core pipeline behavior preserved:
+  - trigger detection
+  - search execution
+  - page fetching
+  - context injection
+  - dialogue loop
+  - meta metrics
 
 ## [2.8.0] - 2026-03-06
 
