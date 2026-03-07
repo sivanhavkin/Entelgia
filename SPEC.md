@@ -478,9 +478,19 @@ Classifies every subconscious write into two binary flags stored in the `memorie
 
 ### FreudianSlip
 
-After each non-Fixy agent turn, rolls `slip_probability` (default 0.15) against the 30 most-recent unconscious memories that carry at least one defense flag. A selected fragment is simultaneously:
+After each non-Fixy agent turn, rolls `slip_probability` (default 0.05) against the 30 most-recent unconscious memories that carry at least one defense flag. A selected fragment is simultaneously:
 - Printed to console as `[SLIP] <content>` (magenta).
 - Promoted to the `conscious` LTM layer with `source="freudian_slip"`.
+
+**Rate-limiting controls** (configurable via `Config` or environment variables):
+
+| Parameter | Default | Env var | Description |
+|---|---|---|---|
+| `slip_probability` | `0.05` | `ENTELGIA_SLIP_PROBABILITY` | Per-turn probability a slip fires |
+| `slip_cooldown_turns` | `10` | `ENTELGIA_SLIP_COOLDOWN` | Minimum turns between two successful slips |
+| `slip_dedup_window` | `10` | `ENTELGIA_SLIP_DEDUP_WINDOW` | Number of recent slip hashes remembered to block repeats |
+
+**Instrumentation**: The `FreudianSlip` engine exposes `attempts` and `successes` counters. These are logged per-agent at the end of each session (`FreudianSlip stats [<agent>]: attempts=N, successes=M`).
 
 ### SelfReplication
 

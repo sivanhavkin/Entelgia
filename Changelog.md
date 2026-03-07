@@ -10,7 +10,17 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
 
+- **FreudianSlip rate-limiting**: Added `slip_cooldown_turns` (default 10) — a minimum number of turns that must elapse between two successful slips. Prevents burst sequences of `[SLIP]` output.
+- **FreudianSlip deduplication**: Added `slip_dedup_window` (default 10) — remembers the last N slipped content hashes and suppresses identical (normalised) repeats within the window.
+- **FreudianSlip instrumentation**: `FreudianSlip` now exposes `attempts` and `successes` integer counters. Both values are logged per-agent at session end: `FreudianSlip stats [<name>]: attempts=N, successes=M`.
+- **Configurable slip controls**: `slip_probability`, `slip_cooldown_turns`, and `slip_dedup_window` are all available as `Config` fields and as environment variables (`ENTELGIA_SLIP_PROBABILITY`, `ENTELGIA_SLIP_COOLDOWN`, `ENTELGIA_SLIP_DEDUP_WINDOW`).
+
+### Changed
+
+- **FreudianSlip default probability** lowered from `0.15` to `0.05` to reduce `[SLIP]` output frequency during normal runs.
+- `Agent.apply_freudian_slip` now reuses a single persistent `FreudianSlip` engine instance (`self._slip_engine`) instead of constructing a new one per turn. This is required for cooldown and dedup state to be maintained across turns.
 
 ## [2.8.1] - 2026-03-07
 ### Added

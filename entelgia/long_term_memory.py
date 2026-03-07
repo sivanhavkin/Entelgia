@@ -15,9 +15,11 @@ of the SQLite backend and are fully testable without a live database.
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from collections import deque
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -97,10 +99,48 @@ class FreudianSlip:
     ``_SLIP_CANDIDATE_LIMIT`` most-recent unconscious memories that carry at
     least one defense flag.  When triggered, the chosen fragment is returned
     (to be promoted to the conscious layer by the caller).
+
+    Rate-limiting controls
+    ----------------------
+    slip_probability:
+        Probability (0–1) that a slip fires on any eligible turn.
+        Default lowered to 0.05 (5 %) to reduce burst frequency.
+    slip_cooldown_turns:
+        Minimum number of ``attempt_slip`` calls that must occur between two
+        successful slips.  Default 10.  Set to 0 to disable.
+    dedup_window:
+        How many of the most-recent slipped content hashes to remember.
+        If the chosen fragment's normalised hash already appears in the
+        window the slip is suppressed.  Default 10.  Set to 0 to disable.
+
+    Instrumentation
+    ---------------
+    attempts:  total calls to ``attempt_slip``
+    successes: number of times a slip was actually returned
     """
 
-    def __init__(self, slip_probability: float = 0.15) -> None:
+    def __init__(
+        self,
+        slip_probability: float = 0.05,
+        slip_cooldown_turns: int = 10,
+        dedup_window: int = 10,
+    ) -> None:
         self.slip_probability = slip_probability
+        self.slip_cooldown_turns = slip_cooldown_turns
+        self.dedup_window = dedup_window
+
+        # Instrumentation counters
+        self.attempts: int = 0
+        self.successes: int = 0
+
+        # Internal state – persisted across calls so callers must reuse the
+        # same FreudianSlip instance (do NOT create a new one every turn).
+        # Initialised to slip_cooldown_turns so the very first eligible call
+        # is not blocked.
+        self._turns_since_last_slip: int = slip_cooldown_turns
+        self._recent_slip_hashes: Deque[str] = deque(
+            maxlen=dedup_window if dedup_window > 0 else None
+        )
 
     def attempt_slip(
         self, recent_memories: List[Dict[str, Any]]
@@ -120,12 +160,20 @@ class FreudianSlip:
         The slipped memory dict (with ``source`` set to ``"freudian_slip"``)
         or ``None`` if no slip occurs.
         """
+        self.attempts += 1
+
+        # Cooldown gate: block if not enough turns have elapsed since last slip
+        if self._turns_since_last_slip < self.slip_cooldown_turns:
+            self._turns_since_last_slip += 1
+            return None
+
         candidates = [
             m
             for m in recent_memories[:_SLIP_CANDIDATE_LIMIT]
             if m.get("intrusive", 0) or m.get("suppressed", 0)
         ]
         if not candidates:
+            self._turns_since_last_slip += 1
             return None
 
         # Weight by defense flags
@@ -134,12 +182,28 @@ class FreudianSlip:
         ]
         total = sum(weights)
         if total == 0:
+            self._turns_since_last_slip += 1
             return None
 
         if random.random() >= self.slip_probability:
+            self._turns_since_last_slip += 1
             return None
 
         chosen = random.choices(candidates, weights=weights, k=1)[0]
+
+        # Deduplication: skip if the same content slipped recently
+        if self.dedup_window > 0:
+            content_norm = str(chosen.get("content", "")).strip().lower()
+            content_hash = hashlib.md5(content_norm.encode()).hexdigest()
+            if content_hash in self._recent_slip_hashes:
+                self._turns_since_last_slip += 1
+                return None
+            self._recent_slip_hashes.append(content_hash)
+
+        # Successful slip – reset cooldown counter and update instrumentation
+        self._turns_since_last_slip = 0
+        self.successes += 1
+
         result = dict(chosen)
         result["source"] = "freudian_slip"
         return result
