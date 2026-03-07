@@ -483,8 +483,10 @@ Automated pipeline runs on every commit:
 
 ## 17.2 Supported Models
 
+> ⚠️ **Practical minimum:** Entelgia should be run with **Phi-3 or stronger**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
+
 Via Ollama:
-* **phi3** (3.8B) - Fast & lightweight [default, recommended]
+* **phi3** (3.8B) - Practical minimum [default, recommended]
 * **mistral** (7B) - Balanced reasoning
 * **neural-chat** (7B) - Conversational coherence
 * **llama2** (7B+) - General purpose

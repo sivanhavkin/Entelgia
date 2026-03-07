@@ -150,7 +150,10 @@ ollama pull phi3
 ```
 
 Recommended models (8GB+ RAM recommended):
-* **phi3 (3.8B)** – Fast & lightweight [recommended for 8GB systems]
+
+> ⚠️ **Practical minimum:** Entelgia should be run with **Phi-3 or stronger**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
+
+* **phi3 (3.8B)** – Practical minimum [default, recommended]
 * **mistral (7B)** – Balanced reasoning
 * **neural-chat (7B)** – Strong conversational coherence
 
