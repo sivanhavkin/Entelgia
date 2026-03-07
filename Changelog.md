@@ -44,7 +44,7 @@ All notable changes to this project will be documented in this file. The format 
 
   - **`entelgia/web_research.py`** — Full pipeline orchestration
     - `maybe_add_web_context(user_message, db_path=None, max_results=5)` → context string or `""`
-    - Stores sources with `credibility_score > 0.8` in `external_knowledge` SQLite table (`id`, `timestamp`, `query`, `url`, `summary`, `credibility_score`)
+    - Stores sources with `credibility_score > 0.6` in `external_knowledge` SQLite table (`id`, `timestamp`, `query`, `url`, `summary`, `credibility_score`)
     - Fails gracefully — never crashes the main dialogue system
 
 - **`entelgia/context_manager.py`** — Extended `build_enriched_context` and `_format_prompt` to accept an optional `web_context: str = ""` parameter; when provided, injects an `"External Knowledge Context:"` section with agent-specific instructions (Superego verifies credibility, Ego integrates sources, Id may resist if energy is low, Fixy monitors reasoning loops)

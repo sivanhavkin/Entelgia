@@ -294,7 +294,7 @@ CREATE TABLE IF NOT EXISTS external_knowledge (
 
 ### Notes
 
-- Only sources with `credibility_score > 0.8` are persisted.
+- Only sources with `credibility_score > 0.6` are persisted.
 - The table is created on first use; no migration is needed.
 - It is stored in the same database file as the agent `memories` table when
   `db_path` is shared, but the tables are logically independent.

@@ -363,6 +363,9 @@ _REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
         "likely",
         "general",
         "specific",
+        "genuine",
+        "authentic",
+        "real",
         # Verb forms that carry no concept value in search
         "shows",
         "show",
@@ -422,8 +425,95 @@ _REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
         "limiting",
         # Adverbial connectives with no concept value
         "thereby",
+        # Comparatives, quantifiers, and determiners with no search value
+        "more",
+        "less",
+        "most",
+        "least",
+        "many",
+        "much",
+        "few",
+        "some",
+        "any",
+        "all",
+        "both",
+        "each",
+        "every",
+        "other",
+        "another",
+        "such",
+        # Light verbs: lead / leave / bring not already covered
+        "lead",
+        "leads",
+        "leading",
+        "led",
+        "leave",
+        "leaves",
+        "leaving",
+        "left",
+        "bring",
+        "brings",
+        "bringing",
+        "brought",
     }
 )
+
+# Weak nouns that look substantive but carry little search value.
+# These are removed after filler-word filtering as a final cleanup pass.
+_WEAK_CONCEPT_WORDS: FrozenSet[str] = frozenset(
+    {
+        "form",
+        "forms",
+        "thing",
+        "things",
+        "way",
+        "ways",
+        "aspect",
+        "aspects",
+        "element",
+        "elements",
+        "part",
+        "parts",
+        "case",
+        "cases",
+        "instance",
+        "instances",
+        "area",
+        "areas",
+        "nature",
+        "point",
+        "points",
+        "basis",
+        "level",
+        "levels",
+        "sense",
+        "senses",
+        "role",
+        "roles",
+        "result",
+        "results",
+        "effect",
+        "effects",
+    }
+)
+
+# Suffixes associated with strong concept nouns (high-priority in ranking).
+_CONCEPT_NOUN_SUFFIXES: Tuple[str, ...] = (
+    "ity",
+    "ism",
+    "ness",
+    "tion",
+    "sion",
+    "ment",
+    "hood",
+    "ology",
+    "ence",
+    "ance",
+)
+
+# Suffixes associated with verb-derived forms (low-priority in ranking).
+# These are kept only when no better concept terms are available.
+_VERB_LIKE_SUFFIXES: Tuple[str, ...] = ("ing", "ed")
 
 # Maximum number of words in a compressed search query
 _MAX_QUERY_WORDS: int = 6
@@ -670,6 +760,119 @@ def _extract_trigger_fragment(text: str, trigger: str) -> str:
     return _compress_to_keywords(_sanitize_text(fragment))
 
 
+def _score_concept_token(word: str) -> int:
+    """Return a concept-quality score for a single token.
+
+    Higher scores indicate stronger concept nouns suitable for search queries.
+
+    Scoring tiers
+    -------------
+    2 — word ends with a strong concept-noun suffix (-ity, -ism, -ness, etc.)
+    1 — neutral / regular nouns and adjectives
+    0 — verb-derived forms ending in -ing or -ed (de-prioritised)
+
+    Parameters
+    ----------
+    word:
+        A single token (may be mixed-case).
+
+    Returns
+    -------
+    Integer score: 2, 1, or 0.
+    """
+    lower = word.lower()
+    for suffix in _CONCEPT_NOUN_SUFFIXES:
+        # Require the word to be meaningfully longer than just the suffix
+        # (e.g., reject trivial matches like "ed" → "-ed").
+        if lower.endswith(suffix) and len(lower) > len(suffix) + 2:
+            return 2
+    for suffix in _VERB_LIKE_SUFFIXES:
+        if lower.endswith(suffix) and len(lower) > len(suffix) + 2:
+            return 0
+    return 1
+
+
+def _select_concept_terms(
+    concepts: List[str],
+    trigger: str,
+    max_terms: int = _MAX_QUERY_WORDS,
+) -> str:
+    """Rank *concepts* by quality and return the best terms as a query string.
+
+    The pipeline is:
+
+    1. Remove ``_WEAK_CONCEPT_WORDS`` (generic nouns like *form*, *aspect*, etc.).
+    2. Score each remaining token with :func:`_score_concept_token`.
+    3. Select the top *max_terms* tokens by score (stable sort keeps insertion
+       order for equal-scoring tokens, which preserves sentence adjacency).
+    4. Restore the original sentence order of selected tokens (so adjacent
+       concept pairs like "subjective experience" stay together).
+    5. Append the *trigger* at the end if it adds specificity — i.e., when it
+       is not already represented in the selected tokens.
+
+    Parameters
+    ----------
+    concepts:
+        Pre-filtered list of tokens (filler words already removed), in their
+        original sentence order.
+    trigger:
+        The trigger keyword or phrase.
+    max_terms:
+        Maximum number of terms to include (default: ``_MAX_QUERY_WORDS``).
+
+    Returns
+    -------
+    A compact, concept-based query string of at most *max_terms* words.
+    """
+    # Step 1 — remove weak concept words.
+    strong = [w for w in concepts if w.lower() not in _WEAK_CONCEPT_WORDS]
+
+    # Fall back to the full concept list if all tokens were removed.
+    if not strong:
+        strong = concepts
+
+    # Step 2 — score.
+    scored = [(w, _score_concept_token(w)) for w in strong]
+
+    # Step 3 — prefer high-quality (score ≥ 1) terms; only fall back to
+    # verb-derived (score = 0) tokens when there aren't enough better options.
+    _MIN_CONCEPT_TERMS = 3
+    high_quality = [(w, s) for w, s in scored if s >= 1]
+    candidates = high_quality if len(high_quality) >= _MIN_CONCEPT_TERMS else scored
+
+    # Take top candidates (stable sort preserves sentence order for equal scores).
+    candidates_sorted = sorted(candidates, key=lambda x: x[1], reverse=True)
+    top_words_set = {w for w, _ in candidates_sorted[:max_terms]}
+
+    # Step 4 — restore original sentence order (preserves adjacency of concept pairs).
+    ordered = [w for w in strong if w in top_words_set]
+
+    # Step 5 — optionally append trigger for specificity.
+    # Include trigger if none of its words are already represented in the result
+    # and the trigger itself is not a pure filler term.
+    trigger_lower = trigger.lower()
+    trigger_tokens = trigger_lower.split()
+    already_covered = any(
+        t in " ".join(ordered).lower() for t in trigger_tokens
+    )
+    trigger_is_filler = all(
+        t in _REWRITE_FILLER_WORDS or len(t) <= 2 for t in trigger_tokens
+    )
+    if not already_covered and not trigger_is_filler:
+        # Reserve a slot for the trigger by taking one fewer concept term,
+        # then append each trigger word that isn't already in the result.
+        trigger_extra = [
+            t for t in trigger_tokens
+            if t not in " ".join(ordered).lower() and t not in _REWRITE_FILLER_WORDS
+        ]
+        if trigger_extra:
+            slots_for_concepts = max(max_terms - len(trigger_extra), 1)
+            ordered = ordered[:slots_for_concepts]
+            ordered.extend(trigger_extra)
+
+    return " ".join(ordered[:max_terms])
+
+
 def rewrite_search_query(text: str, trigger: str) -> str:
     """Rewrite a trigger-containing sentence into a concept-based search query.
 
@@ -685,7 +888,7 @@ def rewrite_search_query(text: str, trigger: str) -> str:
         → "truth understanding knowledge"
 
         "I question whether memory can distort our perception of reality"
-        → "memory distort perception reality"
+        → "memory perception reality distort"
 
     Parameters
     ----------
@@ -735,7 +938,7 @@ def rewrite_search_query(text: str, trigger: str) -> str:
         concepts = [
             w for w in words if w.lower() not in _REWRITE_FILLER_WORDS and len(w) > 2
         ]
-        return " ".join(concepts[:_MAX_QUERY_WORDS])
+        return _select_concept_terms(concepts, trigger)
 
     # 2. Sanitize the sentence (strips agent names, HTML entities, mode labels,
     #    instruction words, possessives, and punctuation).
@@ -747,8 +950,8 @@ def rewrite_search_query(text: str, trigger: str) -> str:
         w for w in words if w.lower() not in _REWRITE_FILLER_WORDS and len(w) > 2
     ]
 
-    # 4. Return at most _MAX_QUERY_WORDS concept terms.
-    return " ".join(concepts[:_MAX_QUERY_WORDS])
+    # 4. Rank by concept quality, restore sentence order, and return.
+    return _select_concept_terms(concepts, trigger)
 
 
 def _extract_topic_line(text: str) -> str:

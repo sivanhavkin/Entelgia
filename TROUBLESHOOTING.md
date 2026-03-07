@@ -560,7 +560,7 @@ context = maybe_add_web_context(user_message, max_results=2)
 ### Problem: External knowledge not stored in database
 
 **Symptoms:**
-High-credibility sources (score > 0.8) are not appearing in the `external_knowledge` table.
+High-credibility sources (score > 0.6) are not appearing in the `external_knowledge` table.
 
 **Solution:**
 Memory persistence is opt-in.  Pass a `db_path` argument:

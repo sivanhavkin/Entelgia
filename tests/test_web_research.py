@@ -988,6 +988,62 @@ class TestRewriteQueryQuality:
         # The result should equal the trigger (no extraneous words added).
         assert result.lower() == "global workspace theory"
 
+    def test_query_prefers_concept_terms(self):
+        # After the heuristic ranking, weak nouns and verb-derived forms must
+        # be excluded in favour of stronger concept terms.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "We err in dismissing subjective experiences as unreliable"
+            " when they form our reality."
+        )
+        trigger = "truth"
+        result = rewrite_search_query(text, trigger)
+        # Banned verbs and discourse words must not appear.
+        assert "err" not in result.split()
+        assert "dismissing" not in result.split()
+        # Weak generic nouns must not appear.
+        assert "form" not in result.split()
+        # Core concept terms from the sentence must be present.
+        assert "subjective" in result.lower() or "experience" in result.lower()
+        # The trigger should be included to add specificity.
+        assert "truth" in result.lower()
+
+    def test_verb_like_forms_excluded_when_concepts_available(self):
+        # When enough noun-quality terms are available, verb-derived (-ed, -ing)
+        # tokens must be excluded from the query.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "If our recollections are subjective, can memory be trusted"
+            " as a basis for knowledge?"
+        )
+        trigger = "memory"
+        result = rewrite_search_query(text, trigger)
+        # "trusted" is verb-derived (-ed) and must not appear when better
+        # concept terms (memory, knowledge, recollections, subjective) exist.
+        assert "trusted" not in result.split()
+        # Core concept terms must still be present.
+        assert "memory" in result.lower()
+        assert "knowledge" in result.lower()
+
+    def test_weak_nouns_removed_in_favour_of_concepts(self):
+        # Generic nouns like "form", "aspect", "part" must be stripped so that
+        # only meaningful concept terms survive in the final query.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "The key aspect of freedom is the form of autonomy that allows"
+            " fallibility to coexist with knowledge."
+        )
+        trigger = "freedom"
+        result = rewrite_search_query(text, trigger)
+        # Weak generic nouns must be absent.
+        assert "aspect" not in result.split()
+        assert "form" not in result.split()
+        # Concept terms must be retained.
+        assert "freedom" in result.lower()
+        assert "autonomy" in result.lower() or "knowledge" in result.lower()
 
 class TestStoreExternalKnowledge:
 

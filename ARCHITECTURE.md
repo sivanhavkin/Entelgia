@@ -379,7 +379,7 @@ Injected into ContextManager.build_enriched_context() as web_context
 ↓
 Agents discuss with "External Knowledge Context" section in their prompts
 ↓
-High-credibility sources (score > 0.8) stored in external_knowledge SQLite table
+High-credibility sources (score > 0.6) stored in external_knowledge SQLite table
 ```
 
 ### Modules
@@ -408,6 +408,6 @@ Instructions for agents:
 - Results limited to 5 sources by default
 - Text extracted from pages capped at 6 000 characters
 - All errors are caught and logged; the main pipeline always continues
-- Memory storage only for sources with `credibility_score > 0.8`
+- Memory storage only for sources with `credibility_score > 0.6`
 
 ---

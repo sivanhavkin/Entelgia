@@ -374,7 +374,7 @@ The Web Research Module (v2.8.0) is an optional external knowledge pipeline:
 3. **BeautifulSoup** extracts readable text from each page
 4. **Credibility scoring** ranks sources by domain (`.edu`, `.gov`, trusted sites) and text quality
 5. **Top 3 sources** are formatted as an `External Research:` block injected into agent prompts
-6. **High-credibility sources** (score > 0.8) are stored in an `external_knowledge` SQLite table
+6. **High-credibility sources** (score > 0.6) are stored in an `external_knowledge` SQLite table
 
 All requests use a 10-second timeout and errors never crash the main system.
 

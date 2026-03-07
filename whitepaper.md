@@ -754,7 +754,7 @@ Agent prompts include:
    Source 2: ...
    Instructions for agents: ..."
 ↓
-Sources with credibility_score > 0.8 → external_knowledge SQLite table
+Sources with credibility_score > 0.6 → external_knowledge SQLite table
 ```
 
 ### 22.4 Credibility Model
