@@ -508,16 +508,17 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.8.0** | ✅ **Latest** | current |
+| **v2.8.1** | ✅ **Latest** | current |
+| **v2.8.0** | ⚠️ Superseded | Use v2.8.1 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
 | **v2.5.0** | ✅ **Stable** | previous stable release |
-| **v2.4.0** | ⚠️ Superseded | Use v2.8.0 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v2.8.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v2.8.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v2.8.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.8.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.8.0 instead |
+| **v2.4.0** | ⚠️ Superseded | Use v2.8.1 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v2.8.1 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v2.8.1 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.8.1 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.8.1 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.8.1 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -602,6 +603,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.8.0 
-* **Last Updated:** 06 March 2026
+* **Version:** 2.8.1 
+* **Last Updated:** 07 March 2026
 ---
