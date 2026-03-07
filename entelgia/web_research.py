@@ -425,6 +425,27 @@ _REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
         "limiting",
         # Adverbial connectives with no concept value
         "thereby",
+        # Weak semantic adverbs that reduce search quality
+        "increasingly",
+        "really",
+        "merely",
+        "mere",
+        # Weak structural words with minimal concept value
+        "integral",
+        "state",
+        "states",
+        "one",
+        # Prompt scaffolding words that leak from seed templates into queries
+        "style",
+        "drives",
+        "seed",
+        "recent",
+        "thoughts",
+        "answer",
+        "answers",
+        "analysis",
+        "synthesis",
+        "deconstruction",
         # Comparatives, quantifiers, and determiners with no search value
         "more",
         "less",
