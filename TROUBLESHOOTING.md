@@ -187,12 +187,11 @@ ollama pull phi3
 
 3. Try an alternative model if phi3 continues to fail:
 ```bash
-# Smaller, faster model
-ollama pull phi3:mini
-
-# Or use mistral
+# Use mistral as an alternative
 ollama pull mistral
 ```
+
+> ⚠️ **Note:** Do not substitute with models smaller than Phi-3. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 4. Update your `.env` file to use the alternative model:
 ```
@@ -211,8 +210,7 @@ Error: not enough disk space
 **Solution:**
 - phi3 requires ~2.3GB of disk space
 - Check available space: `df -h` (Linux/macOS) or `dir` (Windows)
-- Free up space or use a smaller model like `phi3:mini`
-- Remove unused models: `ollama rm <model-name>`
+- Free up space if needed, or remove unused models: `ollama rm <model-name>`
 
 ---
 
@@ -306,10 +304,12 @@ ollama ps
 ollama serve
 ```
 
-4. Try a faster model if timeouts persist:
+4. Try a faster model if timeouts persist (use phi3 or stronger):
 ```bash
-ollama pull phi3:mini
+ollama pull phi3
 ```
+
+> ⚠️ **Note:** Do not substitute with models smaller than Phi-3. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 ---
 
@@ -386,8 +386,7 @@ config.dream_every_n_turns = 5  # More frequent reflection
 
 **Solution:**
 1. Check model size - larger models need more RAM:
-   - `phi3:mini` - ~2GB RAM
-   - `phi3` - ~4GB RAM
+   - `phi3` - ~4GB RAM (practical minimum)
    - `mistral` - ~4GB RAM
 
 2. Reduce context size:
@@ -396,7 +395,7 @@ config.max_turns = 100  # Reduce from default 200
 ```
 
 3. Close other applications
-4. Use a smaller model if your system has limited RAM
+4. Ensure you are using Phi-3 or stronger; smaller models are not recommended as they do not reliably handle Entelgia's multi-layer reasoning demands
 
 ---
 
@@ -622,7 +621,7 @@ These patterns help ensure Entelgia works reliably:
 
 ✅ **Start fresh** - When in doubt, restart Ollama and the application
 
-✅ **Use stable models** - `phi3` and `mistral` are well-tested
+✅ **Use stable models** - `phi3` and `mistral` are well-tested; Phi-3 is the practical minimum
 
 ✅ **Check logs** - Watch Ollama output for errors
 

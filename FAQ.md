@@ -312,10 +312,12 @@ This is an advanced customization not officially supported.
 ### Can I use different LLM models?
 
 Yes! Entelgia supports any Ollama-compatible model. Specify the model in configuration:
-- `phi3` (default, recommended)
+- `phi3` (default, recommended — practical minimum)
 - `mistral`
 - `llama2`
 - Other models available through Ollama
+
+> ⚠️ **Practical minimum:** Entelgia should be run with **Phi-3 or stronger**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 Different models will produce different dialogue qualities and require varying resources.
 
@@ -347,10 +349,12 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for optimization tips.
 ### Can I run Entelgia on a laptop?
 
 Yes! Entelgia can run on modern laptops with:
-- 8GB+ RAM for smaller models (`phi3`)
+- 8GB+ RAM (required for Phi-3, the practical minimum model)
 - 16GB+ RAM recommended for larger models
 - SSD storage for faster model loading
 - Recent CPU (GPU optional but helpful)
+
+> ⚠️ **Practical minimum:** Entelgia should be run with **Phi-3 or stronger**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 ### Does Entelgia require internet?
 
