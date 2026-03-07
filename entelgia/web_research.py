@@ -873,9 +873,7 @@ def _select_concept_terms(
     # and the trigger itself is not a pure filler term.
     trigger_lower = trigger.lower()
     trigger_tokens = trigger_lower.split()
-    already_covered = any(
-        t in " ".join(ordered).lower() for t in trigger_tokens
-    )
+    already_covered = any(t in " ".join(ordered).lower() for t in trigger_tokens)
     trigger_is_filler = all(
         t in _REWRITE_FILLER_WORDS or len(t) <= 2 for t in trigger_tokens
     )
@@ -883,7 +881,8 @@ def _select_concept_terms(
         # Reserve a slot for the trigger by taking one fewer concept term,
         # then append each trigger word that isn't already in the result.
         trigger_extra = [
-            t for t in trigger_tokens
+            t
+            for t in trigger_tokens
             if t not in " ".join(ordered).lower() and t not in _REWRITE_FILLER_WORDS
         ]
         if trigger_extra:
