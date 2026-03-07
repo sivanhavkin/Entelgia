@@ -967,7 +967,13 @@ class TestRewriteQueryQuality:
         # At least one concept-level term from the source sentence must be present.
         assert any(
             term in result.lower()
-            for term in ["subjective", "experience", "unreliable", "reality", "epistemic"]
+            for term in [
+                "subjective",
+                "experience",
+                "unreliable",
+                "reality",
+                "epistemic",
+            ]
         )
 
     def test_specific_trigger_can_remain(self):
@@ -1044,6 +1050,7 @@ class TestRewriteQueryQuality:
         # Concept terms must be retained.
         assert "freedom" in result.lower()
         assert "autonomy" in result.lower() or "knowledge" in result.lower()
+
 
 class TestStoreExternalKnowledge:
 
