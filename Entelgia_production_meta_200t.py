@@ -339,7 +339,7 @@ class Config:
             raise ValueError("cache_size must be >= 100")
         if self.max_turns < 1:
             raise ValueError("max_turns must be >= 1")
-        if self.llm_timeout < 5:
+        if self.llm_timeout is not None and self.llm_timeout < 5:
             raise ValueError("llm_timeout must be >= 5")
         if not self.ollama_url.startswith("http"):
             raise ValueError("ollama_url must be a valid URL")
