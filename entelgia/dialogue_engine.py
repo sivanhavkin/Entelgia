@@ -40,7 +40,14 @@ class SeedGenerator:
         "agree_and_expand": "TOPIC: {topic}\nBUILD on the previous insight. Add depth or a new dimension.",
         "question_assumption": "TOPIC: {topic}\nQUESTION a hidden assumption. What are we taking for granted?",
         "synthesize": "TOPIC: {topic}\nINTEGRATE the different views. Find the connecting thread.",
-        "constructive_disagree": "TOPIC: {topic}\nDISAGREE constructively. Offer an alternative perspective.",
+        "constructive_disagree": (
+            "TOPIC: {topic}\n"
+            "DISAGREE constructively:\n"
+            "1. Identify the main claim in the previous turn.\n"
+            "2. Question an assumption, definition, or implication of that claim.\n"
+            "3. Offer an alternative interpretation or counter-argument.\n"
+            "4. Maintain a respectful philosophical tone."
+        ),
         "explore_implication": "TOPIC: {topic}\nEXPLORE consequences. Where does this line of thinking lead?",
         "introduce_analogy": "TOPIC: {topic}\nCONNECT via analogy. How is this like something else?",
         "meta_reflect": "TOPIC: {topic}\nREFLECT on our dialogue. What are we learning? Where are we stuck?",
