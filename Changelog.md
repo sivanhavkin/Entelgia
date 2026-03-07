@@ -869,7 +869,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.7.0
+- ✅ **Latest stable:** v2.8.1
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -880,7 +880,9 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.7.0** | 2026-03-03 | Minor | ✅ **Current** | Limbic hijack state, meta output refinement |
+| **v2.8.1** | 2026-03-07 | Patch | ✅ **Current** | Version bump across all documentation |
+| **v2.8.0** | 2026-03-06 | Minor | ⚠️ Superseded | Web Research Module — Fixy-triggered external knowledge pipeline |
+| **v2.7.0** | 2026-03-03 | Minor | ✅ **Stable** | Limbic hijack state, meta output refinement |
 | **v2.6.0** | 2026-02-26 | Minor | ✅ **Stable** | Dialogue metrics, ablation study, drive pressure & research tools |
 | **v2.5.0** | 2026-02-21 | Minor | ✅ **Stable** | Energy regulation, long-term memory & coherent drive correlations |
 | **v2.4.0** | 2026-02-18 | Minor | ⚠️ Superseded | Documentation & structure improvements |
