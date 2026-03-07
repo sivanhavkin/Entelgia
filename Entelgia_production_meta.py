@@ -335,7 +335,7 @@ class Config:
             raise ValueError("cache_size must be >= 100")
         if self.max_turns < 1:
             raise ValueError("max_turns must be >= 1")
-        if self.llm_timeout < 5:
+        if self.llm_timeout is not None and self.llm_timeout < 5:
             raise ValueError("llm_timeout must be >= 5")
         if not self.ollama_url.startswith("http"):
             raise ValueError("ollama_url must be a valid URL")
@@ -3138,6 +3138,17 @@ class MainScript:
                 )
                 break
 
+            if self.turn_index >= self.cfg.max_turns:
+                logger.info(
+                    f"max_turns={self.cfg.max_turns} reached at turn {self.turn_index}"
+                )
+                print(
+                    Fore.YELLOW
+                    + f"\n[DONE] {self.cfg.max_turns} turns completed."
+                    + Style.RESET_ALL
+                )
+                break
+
             time.sleep(0.02)
 
         # Save session and metrics
@@ -3185,6 +3196,7 @@ def run_cli():
     print(json.dumps(config_display, ensure_ascii=False, indent=2))
     print()
 
+    app_script = None
     try:
         app_script = MainScript(CFG)
         app_script.run()
@@ -3194,6 +3206,27 @@ def run_cli():
             Fore.YELLOW + "\n[INTERRUPTED] Session cancelled by user" + Style.RESET_ALL
         )
         logger.info("Session interrupted by user")
+        if app_script is not None:
+            try:
+                app_script.metrics.save()
+            except Exception as metrics_err:
+                logger.error(f"Failed to save metrics on interrupt: {metrics_err}")
+            try:
+                app_script.session_mgr.save_session(
+                    app_script.session_id,
+                    app_script.dialog,
+                    app_script.metrics.metrics,
+                )
+                print(
+                    Fore.YELLOW
+                    + f"[SESSION SAVED] Partial session {app_script.session_id} saved."
+                    + Style.RESET_ALL
+                )
+                logger.info(
+                    f"Partial session {app_script.session_id} saved on interrupt"
+                )
+            except Exception as save_err:
+                logger.error(f"Failed to save session on interrupt: {save_err}")
         sys.exit(0)
     except Exception as e:
         print(Fore.RED + f"[FATAL ERROR] {e}" + Style.RESET_ALL)
