@@ -11,17 +11,20 @@ fastapi>=0.104.0
 uvicorn>=0.24.0
 pydantic>=2.0.0
 
-# Optional utilities
-python-dateutil>=2.8.2
-
 # Optional: semantic similarity in Fixy's _detect_repetition
-# Install with: pip install "entelgia[semantic]"  or  pip install sentence-transformers scikit-learn
+# Install with: pip install "entelgia[semantic]"  or  pip install sentence-transformers scikit-learn numpy
 # sentence-transformers>=2.2.0
 # scikit-learn>=1.0.0
+# numpy>=1.24.0
 
-# Development / testing (optional)
+# Development / testing
 pytest>=7.4.0
 pytest-mock>=3.12.0
+pytest-cov>=4.1.0
+numpy>=1.24.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
 
 # Windows-only: replace broken pyreadline with Python 3.10-compatible fork
 pyreadline3>=3.4.1; sys_platform == "win32"
