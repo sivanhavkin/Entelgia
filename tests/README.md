@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **422 tests** in 13 suites:
+Entelgia ships with comprehensive test coverage across **454 tests** in 14 suites:
 
 ### Enhanced Dialogue Tests (7 tests)
 
@@ -304,7 +304,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 422 total tests (166 web research + 7 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 18 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 21 superego critique + 15 limbic hijack) |
+| **Unit Tests** | `pytest` | Runs 454 total tests (166 web research + 7 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 18 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 21 superego critique + 15 limbic hijack + 12 semantic repetition detection) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -312,6 +312,31 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 | **Documentation** | Doc integrity checks | Validates documentation consistency |
 
 > 🛡️ Together these jobs ensure that **every commit** adheres to style guidelines, passes vulnerability scans and produces a valid package and documentation.
+
+---
+
+### 🔁 Semantic Repetition Detection Tests (12 tests + 1 skipped)
+
+```bash
+pytest tests/test_detect_repetition_semantic.py -v
+```
+
+Tests verify the semantic similarity layer added to `InteractiveFixy._detect_repetition` in `entelgia/fixy_interactive.py`:
+
+- ✅ **Jaccard-only fallback** — `_semantic_similarity` returns `0.0` when `sentence-transformers` is not installed
+- ✅ **Model-None fallback** — `_semantic_similarity` returns `0.0` when the model fails to load
+- ⏭️ **Float range guard** — `_semantic_similarity` always returns a value in `[0, 1]` *(skipped if `sentence-transformers` not installed)*
+- ✅ **`_encode_turns` unavailable** — returns `None` when `_SEMANTIC_AVAILABLE` is `False`
+- ✅ **`_encode_turns` model-None** — returns `None` when model is `None`
+- ✅ **Short-turn early exit** — fewer than 4 turns returns `False` without encoding
+- ✅ **Jaccard repetition detected** — 5 identical turns flagged under Jaccard-only path
+- ✅ **Jaccard no repetition** — 4 fully distinct turns not flagged
+- ✅ **High semantic boosts detection** — high cosine similarity pushes combined score above threshold
+- ✅ **Low combined score** — low Jaccard + low semantic keeps combined ≤ 0.5 → not repetitive
+- ✅ **Boundary exactly 0.5** — `combined_score == 0.5` is NOT repetitive (strict `>` threshold)
+- ✅ **Encode-None falls back to Jaccard** — when `_encode_turns` returns `None` at runtime, Jaccard-only path takes over
+
+> `sentence-transformers` and `scikit-learn` are optional (`pip install "entelgia[semantic]"`). All tests that require the library are automatically skipped when it is not installed.
 
 ---
 
