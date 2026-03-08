@@ -324,6 +324,7 @@ class Config:
     superego_critique_enabled: bool = True
     superego_dominance_margin: float = 0.5
     superego_critique_conflict_min: float = 2.0
+    enable_observer: bool = True  # When False, Fixy is fully disabled (no turns, no interventions)
     # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
     web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "1")))
     web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "3"))
@@ -2767,11 +2768,19 @@ class MainScript:
         # Initialize enhanced dialogue components if available
         if ENTELGIA_ENHANCED:
             self.dialogue_engine = DialogueEngine()
-            self.interactive_fixy = InteractiveFixy(self.llm, cfg.model_fixy)
+            # InteractiveFixy is only created when the observer is enabled
+            self.interactive_fixy = (
+                InteractiveFixy(self.llm, cfg.model_fixy)
+                if cfg.enable_observer
+                else None
+            )
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
             self.interactive_fixy = None
+
+        if not cfg.enable_observer:
+            logger.info("Observer (Fixy) disabled via enable_observer=False")
 
         logger.info(f"MainScript initialized - Session: {self.session_id}")
 
@@ -2992,9 +3001,13 @@ class MainScript:
             # Dynamic speaker selection (if enhanced mode available)
             if self.dialogue_engine:
                 # Check if Fixy should be allowed to speak
-                allow_fixy, fixy_prob = self.dialogue_engine.should_allow_fixy(
-                    self.dialog, self.turn_index
-                )
+                # Fixy is excluded entirely when enable_observer is False
+                if self.cfg.enable_observer:
+                    allow_fixy, fixy_prob = self.dialogue_engine.should_allow_fixy(
+                        self.dialog, self.turn_index
+                    )
+                else:
+                    allow_fixy, fixy_prob = False, 0.0
 
                 # Select next speaker dynamically
                 if self.turn_index == 1:
@@ -3072,7 +3085,8 @@ class MainScript:
             self.print_meta_state(speaker, _meta_actions)
 
             # Interactive Fixy (need-based) or legacy scheduled Fixy
-            if self.interactive_fixy and speaker.name != "Fixy":
+            # Skipped entirely when enable_observer is False
+            if self.cfg.enable_observer and self.interactive_fixy and speaker.name != "Fixy":
                 should_intervene, reason = self.interactive_fixy.should_intervene(
                     self.dialog, self.turn_index
                 )
