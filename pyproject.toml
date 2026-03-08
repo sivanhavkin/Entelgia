@@ -42,6 +42,10 @@ dev = [
     "mypy>=1.5.0",
     "pyreadline3>=3.4.1; sys_platform == 'win32'",
 ]
+semantic = [
+    "sentence-transformers>=2.2.0",
+    "scikit-learn>=1.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/sivanhavkin/Entelgia"
