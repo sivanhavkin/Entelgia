@@ -12,15 +12,26 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
-- **FreudianSlip rate-limiting**: Added `slip_cooldown_turns` (default 10) — a minimum number of turns that must elapse between two successful slips. Prevents burst sequences of `[SLIP]` output.
-- **FreudianSlip deduplication**: Added `slip_dedup_window` (default 10) — remembers the last N slipped content hashes and suppresses identical (normalised) repeats within the window.
-- **FreudianSlip instrumentation**: `FreudianSlip` now exposes `attempts` and `successes` integer counters. Both values are logged per-agent at session end: `FreudianSlip stats [<name>]: attempts=N, successes=M`.
-- **Configurable slip controls**: `slip_probability`, `slip_cooldown_turns`, and `slip_dedup_window` are all available as `Config` fields and as environment variables (`ENTELGIA_SLIP_PROBABILITY`, `ENTELGIA_SLIP_COOLDOWN`, `ENTELGIA_SLIP_DEDUP_WINDOW`).
+- **`enable_observer` flag** — new `Config` boolean field (default `True`). When set to `False`, Fixy is completely excluded from the dialogue: no speaker turns, no need-based interventions, and no `InteractiveFixy` instance is created. Socrates and Athena are unaffected. Available as env var `ENTELGIA_ENABLE_OBSERVER`. (PR #207)
+- **Semantic similarity in Fixy repetition detection** — `_detect_repetition` in `InteractiveFixy` now combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers` / `all-MiniLM-L6-v2`) when the library is available. The two scores are merged into a single repetition signal, catching paraphrased repetition that pure keyword overlap misses. Gracefully degrades to Jaccard-only when `sentence_transformers` is not installed (`_SEMANTIC_AVAILABLE = False`). Model is lazily loaded and cached on first use. (PR #208)
+- **FreudianSlip rate-limiting**: Added `slip_cooldown_turns` (default 10) — a minimum number of turns that must elapse between two successful slips. Prevents burst sequences of `[SLIP]` output. (PR #205)
+- **FreudianSlip deduplication**: Added `slip_dedup_window` (default 10) — remembers the last N slipped content hashes and suppresses identical (normalised) repeats within the window. (PR #205)
+- **FreudianSlip instrumentation**: `FreudianSlip` now exposes `attempts` and `successes` integer counters. Both values are logged per-agent at session end: `FreudianSlip stats [<name>]: attempts=N, successes=M`. (PR #205)
+- **Configurable slip controls**: `slip_probability`, `slip_cooldown_turns`, and `slip_dedup_window` are all available as `Config` fields and as environment variables (`ENTELGIA_SLIP_PROBABILITY`, `ENTELGIA_SLIP_COOLDOWN`, `ENTELGIA_SLIP_DEDUP_WINDOW`). (PR #205)
 
 ### Changed
 
-- **FreudianSlip default probability** lowered from `0.15` to `0.05` to reduce `[SLIP]` output frequency during normal runs.
-- `Agent.apply_freudian_slip` now reuses a single persistent `FreudianSlip` engine instance (`self._slip_engine`) instead of constructing a new one per turn. This is required for cooldown and dedup state to be maintained across turns.
+- **FreudianSlip default probability** lowered from `0.15` to `0.05` to reduce `[SLIP]` output frequency during normal runs. (PR #205)
+- `Agent.apply_freudian_slip` now reuses a single persistent `FreudianSlip` engine instance (`self._slip_engine`) instead of constructing a new one per turn. This is required for cooldown and dedup state to be maintained across turns. (PR #205)
+- **Black formatting pass** applied to `Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`, and `tests/test_long_term_memory.py` — pure style changes, no logic modified. (PR #206)
+
+### Fixed
+
+- **Dependency synchronisation** — `requirements.txt` and `pyproject.toml` are now in sync with actual code imports: (PR #209)
+  - Added `numpy>=1.24.0` (hard-imported by tests and optionally by `fixy_interactive.py`)
+  - Added `pytest-cov`, `black`, `flake8`, `mypy` to `requirements.txt` (already in `pyproject.toml` dev extras)
+  - Removed `python-dateutil` from `requirements.txt` (appeared only in a docstring, never imported)
+  - Added `beautifulsoup4>=4.12.0` to `pyproject.toml` core dependencies
 
 ## [2.8.1] - 2026-03-07
 ### Added
