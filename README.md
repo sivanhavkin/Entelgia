@@ -56,6 +56,10 @@ Instead of external guardrails, agents develop regulation through:
   <img src="Assets/entelgia_architecture.png" width="900">
 </p>
 
+<p align="center">
+  <img src="Assets/entelgia_correlation_map.png" alt="Entelgia Correlation Map" width="900">
+</p>
+
 📄 Full Professional Demo: 
 [Entelgia Full Demo](docs/entelgia_demo.md)
 
