@@ -7,11 +7,18 @@
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
+## [Unreleased]
+
 
 ## [2.9.0] - 2026-03-09
-
 ### Added
-
+- New test module `tests/test_memory_features.py` with 25 tests covering all five new features.
+- **`enable_observer` flag** — new `Config` boolean field (default `True`). When set to `False`, Fixy is completely excluded from the dialogue: no speaker turns, no need-based interventions, and no `InteractiveFixy` instance is created. Socrates and Athena are unaffected. Available as env var `ENTELGIA_ENABLE_OBSERVER`. (PR #207)
+- **Semantic similarity in Fixy repetition detection** — `_detect_repetition` in `InteractiveFixy` now combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers` / `all-MiniLM-L6-v2`) when the library is available. The two scores are merged into a single repetition signal, catching paraphrased repetition that pure keyword overlap misses. Gracefully degrades to Jaccard-only when `sentence_transformers` is not installed (`_SEMANTIC_AVAILABLE = False`). Model is lazily loaded and cached on first use. (PR #208)
+- **FreudianSlip rate-limiting**: Added `slip_cooldown_turns` (default 10) — a minimum number of turns that must elapse between two successful slips. Prevents burst sequences of `[SLIP]` output. (PR #205)
+- **FreudianSlip deduplication**: Added `slip_dedup_window` (default 10) — remembers the last N slipped content hashes and suppresses identical (normalised) repeats within the window. (PR #205)
+- **FreudianSlip instrumentation**: `FreudianSlip` now exposes `attempts` and `successes` integer counters. Both values are logged per-agent at session end: `FreudianSlip stats [<name>]: attempts=N, successes=M`. (PR #205)
+- **Configurable slip controls**: `slip_probability`, `slip_cooldown_turns`, and `slip_dedup_window` are all available as `Config` fields and as environment variables (`ENTELGIA_SLIP_PROBABILITY`, `ENTELGIA_SLIP_COOLDOWN`, `ENTELGIA_SLIP_DEDUP_WINDOW`). (PR #205)
 #### 1. Forgetting Policy – TTL/decay per memory layer
 - `MemoryCore.ltm_apply_forgetting_policy()` — deletes all LTM records whose `expires_at` timestamp has passed. Returns the number of purged rows.
 - `MemoryCore._compute_expires_at(layer, ts)` — static helper that computes the expiry ISO timestamp for a given layer and insertion time, using the per-layer TTL from `Config`.
@@ -21,7 +28,7 @@ All notable changes to this project will be documented in this file. The format 
   - `forgetting_episodic_ttl: int = 604800` — subconscious/episodic TTL in seconds (7 days).
   - `forgetting_semantic_ttl: int = 7776000` — conscious/semantic TTL (90 days).
   - `forgetting_autobio_ttl: int = 31536000` — autobiographical TTL (365 days).
-- `dream_cycle()` now calls `ltm_apply_forgetting_policy()` after each dream cycle, so expired memories are cleaned up automatically.
+  - `dream_cycle()` now calls `ltm_apply_forgetting_policy()` after each dream cycle, so expired memories are cleaned up automatically.
 
 #### 2. Affective Routing for RAG
 - `MemoryCore.ltm_search_affective(agent, limit, emotion_weight, layer)` — retrieves memories ranked by the combined affective score `importance × (1 − w) + emotion_intensity × w`. Memories with high emotional salience surface ahead of merely important ones.
@@ -56,29 +63,10 @@ All notable changes to this project will be documented in this file. The format 
 - Existing HMAC-SHA256 signatures are **unchanged** — `confidence`/`provenance` are excluded from the signed payload to maintain backward compatibility.
 
 ### Changed
-
 - `dream_cycle()` docstring updated to reflect nightmare + forgetting integration.
 - All five features are parity-applied to **both** `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`.
 - `pyproject.toml` version bumped to **2.9.0**.
 - `entelgia/__init__.py` `__version__` bumped to **2.9.0**.
-
-### Tests
-
-- New test module `tests/test_memory_features.py` with 25 tests covering all five new features.
-
-## [Unreleased]
-
-### Added
-
-- **`enable_observer` flag** — new `Config` boolean field (default `True`). When set to `False`, Fixy is completely excluded from the dialogue: no speaker turns, no need-based interventions, and no `InteractiveFixy` instance is created. Socrates and Athena are unaffected. Available as env var `ENTELGIA_ENABLE_OBSERVER`. (PR #207)
-- **Semantic similarity in Fixy repetition detection** — `_detect_repetition` in `InteractiveFixy` now combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers` / `all-MiniLM-L6-v2`) when the library is available. The two scores are merged into a single repetition signal, catching paraphrased repetition that pure keyword overlap misses. Gracefully degrades to Jaccard-only when `sentence_transformers` is not installed (`_SEMANTIC_AVAILABLE = False`). Model is lazily loaded and cached on first use. (PR #208)
-- **FreudianSlip rate-limiting**: Added `slip_cooldown_turns` (default 10) — a minimum number of turns that must elapse between two successful slips. Prevents burst sequences of `[SLIP]` output. (PR #205)
-- **FreudianSlip deduplication**: Added `slip_dedup_window` (default 10) — remembers the last N slipped content hashes and suppresses identical (normalised) repeats within the window. (PR #205)
-- **FreudianSlip instrumentation**: `FreudianSlip` now exposes `attempts` and `successes` integer counters. Both values are logged per-agent at session end: `FreudianSlip stats [<name>]: attempts=N, successes=M`. (PR #205)
-- **Configurable slip controls**: `slip_probability`, `slip_cooldown_turns`, and `slip_dedup_window` are all available as `Config` fields and as environment variables (`ENTELGIA_SLIP_PROBABILITY`, `ENTELGIA_SLIP_COOLDOWN`, `ENTELGIA_SLIP_DEDUP_WINDOW`). (PR #205)
-
-### Changed
-
 - **FreudianSlip default probability** lowered from `0.15` to `0.05` to reduce `[SLIP]` output frequency during normal runs. (PR #205)
 - `Agent.apply_freudian_slip` now reuses a single persistent `FreudianSlip` engine instance (`self._slip_engine`) instead of constructing a new one per turn. This is required for cooldown and dedup state to be maintained across turns. (PR #205)
 - **Black formatting pass** applied to `Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`, and `tests/test_long_term_memory.py` — pure style changes, no logic modified. (PR #206)
