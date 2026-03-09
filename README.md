@@ -294,6 +294,11 @@ What would you like to delete?
 * **🔬 Ablation Study** — 4 reproducible conditions, fully deterministic
 * **🛡️ Safety & Quality** — PII redaction, output artifact cleanup, memory poisoning protection
 * **🌐 Web Research Module** — Fixy-triggered DuckDuckGo search, credibility scoring, and external knowledge injection into agent dialogue
+* **🕰️ Forgetting Policy** — per-layer TTL expiry (episodic 7d · semantic 90d · autobiographical 365d) with automatic purge during dream cycle
+* **❤️ Affective Routing** — emotion-weighted LTM retrieval (`ltm_search_affective`) that surfaces emotionally salient memories ahead of merely important ones
+* **⚖️ Adjudication System** — four-role LLM conflict resolution (Proposer / Defence / Prosecution / Judge) for new memories that contradict existing knowledge
+* **😨 Nightmare Phase** — adversarial stress-test during sleep that measures agent resilience and stores insights in subconscious LTM
+* **🏷️ Confidence Metadata** — every LTM record can carry a `confidence` score (0–1) and a `provenance` label (e.g. `"dream_reflection"`, `"nightmare_phase"`, `"user_input"`)
 
 ---
 
@@ -355,6 +360,34 @@ config.drive_oscillation_range = 0.15     # ±random noise added to drives per t
 # Memory depth scales automatically:
 #   ltm_limit = max(2, min(10, int(2 + ego/2 + self_awareness*4)))
 #   stm_tail  = max(3, min(12, int(3 + ego/2)))
+```
+
+### 🕰️ Forgetting Policy Settings
+
+```python
+config.forgetting_enabled = True             # Master switch (default: True)
+config.forgetting_episodic_ttl = 604800      # Episodic/subconscious TTL: 7 days (seconds)
+config.forgetting_semantic_ttl = 7776000     # Semantic/conscious TTL: 90 days (seconds)
+config.forgetting_autobio_ttl = 31536000     # Autobiographical TTL: 365 days (seconds)
+# Set any TTL to 0 to disable expiry for that layer.
+# ltm_apply_forgetting_policy() is called automatically during each dream cycle.
+```
+
+### ❤️ Affective Routing Settings
+
+```python
+config.affective_emotion_weight = 0.4  # Emotion weight in retrieval score (default: 0.4)
+# Score = importance * (1 - w) + emotion_intensity * w
+# Use memory.ltm_search_affective(agent, emotion_weight=0.7) for high-emotion bias.
+```
+
+### 😨 Nightmare Phase Settings
+
+```python
+config.nightmare_enabled = True              # Enable nightmare stress-test (default: True)
+config.nightmare_tolerance_threshold = 0.5   # Below this = "low tolerance" (default: 0.5)
+config.nightmare_response_target_length = 400  # Response length for full-engagement (default: 400)
+config.nightmare_avoidance_penalty = 0.15    # Score deduction per avoidance word (default: 0.15)
 ```
 
 
@@ -515,17 +548,18 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.8.1** | ✅ **Latest** | current |
-| **v2.8.0** | ⚠️ Superseded | Use v2.8.1 instead |
+| **v2.9.0** | ✅ **Latest** | Forgetting Policy, Affective Routing, Adjudication, Nightmare Phase, Confidence Metadata |
+| **v2.8.1** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.8.0** | ⚠️ Superseded | Use v2.9.0 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
 | **v2.5.0** | ✅ **Stable** | previous stable release |
-| **v2.4.0** | ⚠️ Superseded | Use v2.8.1 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v2.8.1 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v2.8.1 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v2.8.1 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.8.1 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.8.1 instead |
+| **v2.4.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.9.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.9.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.9.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -610,6 +644,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.8.1 
+* **Version:** 2.9.0 
 * **Last Updated:** 07 March 2026
 ---

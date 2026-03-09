@@ -7,7 +7,7 @@
 ## A Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation
 
 **Author:** Sivan Havkin
-**Version:** 2.8.1
+**Version:** 2.9.0
 **Status:** Research / Production Hybrid
 
 ---
@@ -124,6 +124,7 @@ Entelgia employs a two-layer memory structure:
 * Persistent across sessions
 * Indexed and structured
 * Integrity-protected
+* **v2.9.0**: per-layer TTL expiry (`expires_at`), emotion-weighted retrieval, adjudication, confidence + provenance metadata
 
 This design enables identity continuity beyond session boundaries.
 
@@ -140,6 +141,42 @@ Each memory entry may be cryptographically signed using:
 * **Unicode support** - Mixed-language, Arabic, emoji compatible
 
 Tampered entries are automatically rejected, protecting against memory poisoning attacks.
+
+---
+
+## 4.3 Cognitive Memory Lifecycle (v2.9.0)
+
+Entelgia v2.9.0 introduces five interlinked memory lifecycle features that model how biological memory systems handle retention, emotional salience, conflict, stress, and uncertainty.
+
+### Forgetting Policy
+
+Each memory layer has a configurable **Time-To-Live (TTL)**. On insertion, `_compute_expires_at(layer, ts)` sets an `expires_at` timestamp. During every dream cycle, `ltm_apply_forgetting_policy()` deletes expired rows:
+
+| Layer | Default TTL |
+|-------|-------------|
+| Episodic / subconscious | 7 days |
+| Semantic / conscious | 90 days |
+| Autobiographical | 365 days |
+
+### Affective Routing
+
+`ltm_search_affective()` retrieves memories ranked by a combined affective score, giving priority to emotionally intense memories over merely important ones. The emotion/importance balance is governed by `affective_emotion_weight` (default 0.4).
+
+### Adjudication System
+
+When a new memory may contradict existing knowledge on the same topic, a **four-role LLM panel** is convened: Proposer, Defence, Prosecution, and Judge. The panel returns one of three verdicts: `promote`, `hold`, or `reject`. Results are typed as `AdjudicationResult(verdict, confidence, reasoning)`.
+
+### Nightmare Phase
+
+During the dream/sleep cycle, `BehaviorCore.nightmare_phase()` generates an adversarial stress scenario from recent STM, prompts the agent to respond, and computes a `stress_score ∈ [0, 1]`. Low scores indicate avoidance; high scores indicate resilience. Insights are stored in subconscious LTM with `provenance="nightmare_phase"`.
+
+### Confidence Metadata
+
+Every LTM record may carry:
+- `confidence` (float 0–1): how certain the system is about this memory
+- `provenance` (text): origin label (e.g. `"dream_reflection"`, `"nightmare_phase"`, `"user_input"`)
+
+These fields are excluded from the HMAC signature for backward compatibility. Existing databases are auto-migrated.
 
 ---
 
@@ -800,6 +837,48 @@ CREATE TABLE external_knowledge (
 
 This table is separate from the agent `memories` table to preserve the integrity
 of the signed LTM system.
+
+---
+
+## 23. Cognitive Memory Lifecycle — v2.9.0
+
+### 23.1 Motivation
+
+Classical agent memory systems treat all stored information as equally permanent.  Biological memory research shows the opposite: memory retention depends on emotional intensity, recency, relevance, and confidence.  Version 2.9.0 introduces five mechanisms that move Entelgia's memory model closer to this biologically grounded ideal.
+
+### 23.2 Forgetting Policy (TTL/Decay)
+
+Short-lived episodic memories expire after 7 days.  Semantic memories survive for 90 days.  Autobiographical memories persist for a full year.  These defaults are configurable.  The `ltm_apply_forgetting_policy()` sweep runs automatically after every dream cycle, maintaining a clean and temporally realistic memory store.
+
+### 23.3 Affective Routing
+
+Human memory famously prioritises emotionally salient events.  `ltm_search_affective()` implements this by scoring each candidate memory as:
+
+```
+score = importance × (1 − w) + emotion_intensity × w
+```
+
+With the default weight of 0.4, memories with high emotional intensity are ranked above those that are merely important.  This ensures that traumatic, joyful, or otherwise emotionally significant exchanges are more readily retrieved.
+
+### 23.4 Adjudication System
+
+Memory contradictions — storing "X is true" when "X is false" already exists — are a structural problem for cognitive coherence.  The Adjudication System resolves these conflicts by convening a four-role LLM panel before any contested memory is stored.  The panel's verdict (`promote`, `hold`, or `reject`) determines whether the new information is accepted, deferred, or discarded.  This mechanism supports belief revision without corruption.
+
+### 23.5 Nightmare Phase
+
+The nightmare phase extends the dream/sleep cycle with adversarial self-testing.  While the standard reflection pass integrates memories constructively, the nightmare phase stress-tests the agent's psychological resilience.  It generates a challenging hypothetical scenario, elicits a response, and scores the agent's tolerance.  Low tolerance scores are recorded, allowing the system to track psychological fragility over time.
+
+### 23.6 Confidence Metadata
+
+Every LTM record can now be annotated with:
+- **confidence** — a 0–1 float representing how certain the system is about the content.
+- **provenance** — a label identifying the origin of the memory (e.g. `"dream_reflection"`, `"nightmare_phase"`, `"web_research"`, `"user_input"`).
+
+These fields enable downstream reasoning about the reliability and origin of stored knowledge without altering the HMAC-SHA256 integrity model.
+
+### 23.7 Compatibility
+
+All five features are implemented in both `Entelgia_production_meta.py` (30-minute edition) and `Entelgia_production_meta_200t.py` (200-turn edition).  Existing databases are automatically migrated on first startup.
 
 ---
 

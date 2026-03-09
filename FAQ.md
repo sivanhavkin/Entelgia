@@ -30,7 +30,7 @@ Entelgia is derived from philosophical concepts related to entelechy (the realiz
 
 ### Is Entelgia production-ready?
 
-Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.8.1) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
+Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.9.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
 
 ### Who should use Entelgia?
 
@@ -274,6 +274,38 @@ If memory signatures fail validation:
 - Corrupted entries are rejected
 - Warning is logged
 - System can continue with valid memories or reset
+
+### Do memories expire? (v2.9.0)
+
+Yes. Starting in v2.9.0, each LTM record has a per-layer TTL:
+- **Episodic / subconscious**: 7 days
+- **Semantic / conscious**: 90 days
+- **Autobiographical**: 365 days
+
+Expired memories are automatically purged during each dream cycle. Set `forgetting_enabled = False` in `Config` to disable this behaviour.
+
+### How does emotion affect which memories are retrieved? (v2.9.0)
+
+Use `memory.ltm_search_affective(agent, emotion_weight=0.7)` to retrieve memories ranked by a combined score of importance and emotional intensity. The default `emotion_weight` of 0.4 gives moderate priority to emotional salience. Setting it to 1.0 retrieves purely by emotion; 0.0 retrieves purely by importance.
+
+### What happens when a new memory contradicts an existing one? (v2.9.0)
+
+The Adjudication System (`ltm_adjudicate()`) convenes a four-role LLM panel — Proposer, Defence, Prosecution, and Judge — that examines the conflict and returns one of three verdicts:
+- **promote** — store the new memory
+- **hold** — defer the memory pending more evidence
+- **reject** — discard the incoming memory as contradictory
+
+### What is the Nightmare Phase? (v2.9.0)
+
+During each dream/sleep cycle (when `Config.nightmare_enabled = True`), `BehaviorCore.nightmare_phase()` generates an adversarial stress scenario from recent short-term memory entries and prompts the agent to respond. The response is scored for resilience (stress tolerance, 0–1). Insights are stored in subconscious LTM. This process models how biological sleep involves emotional processing of difficult experiences.
+
+### What are `confidence` and `provenance` in LTM records? (v2.9.0)
+
+Every LTM record may carry optional metadata:
+- `confidence` (0–1 float): how certain the system is about this memory
+- `provenance` (text): the origin of the memory — e.g. `"dream_reflection"`, `"nightmare_phase"`, `"user_input"`, `"web_research"`
+
+Pass them to `ltm_insert()`: `memory.ltm_insert(agent, layer, content, confidence=0.9, provenance="user_input")`
 
 ---
 
@@ -553,4 +585,4 @@ Yes! Entelgia is released under the MIT License. See [LICENSE](LICENSE) for deta
 
 ---
 
-**Last Updated**: Version 2.8.1
+**Last Updated**: Version 2.9.0

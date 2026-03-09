@@ -153,6 +153,9 @@ Fallback when enhanced modules are missing or disabled.
 * persistent store (e.g., SQLite)
 * may contain layers (e.g., `conscious`, `subconscious`) depending on build
 * accessed either “recent” (legacy) or “relevant” (enhanced)
+* **v2.9.0 columns**: `expires_at TEXT`, `confidence REAL`, `provenance TEXT`
+* **v2.9.0 retrieval**: `ltm_recent()` (time-ordered), `ltm_search_affective()` (emotion-weighted)
+* **v2.9.0 conflict resolution**: `ltm_adjudicate()` panel before storing contested memories
 
 ### 4.3 Drives / Internal Variables
 
@@ -696,3 +699,68 @@ id, timestamp, query, url, summary, credibility_score
 - Max results: 5 (configurable)
 - Text cap: 6 000 chars per page
 - All exceptions caught; returns `""` on any failure
+
+---
+
+## 17) Cognitive Memory Lifecycle (v2.9.0)
+
+### 17.1 Forgetting Policy
+
+**Requirement:** Each LTM record SHALL carry an `expires_at` ISO timestamp computed at insertion time based on its layer.
+
+| Layer | Default TTL | Config field |
+|-------|-------------|--------------|
+| `subconscious` / `episodic` | 7 days | `forgetting_episodic_ttl` |
+| `conscious` / `semantic` | 90 days | `forgetting_semantic_ttl` |
+| `autobiographical` | 365 days | `forgetting_autobio_ttl` |
+
+- `MemoryCore._compute_expires_at(layer, ts)` returns `None` when `forgetting_enabled = False` or TTL = 0.
+- `MemoryCore.ltm_apply_forgetting_policy()` executes `DELETE FROM memories WHERE expires_at <= NOW`.
+- **Invocation**: called automatically at the end of every `dream_cycle()`.
+
+### 17.2 Affective Routing
+
+**Requirement:** `ltm_search_affective(agent, limit, emotion_weight, layer)` SHALL return up to `limit` memories ranked by:
+
+```
+score = importance × (1 − w) + emotion_intensity × w
+where w = Config.affective_emotion_weight  (default 0.4)
+```
+
+- Internally fetches `limit × 3` candidates from `ltm_recent()` and re-ranks in Python.
+- `emotion_weight` is clamped to `[0, 1]`.
+
+### 17.3 Adjudication System
+
+**Requirement:** When incoming content may conflict with existing same-topic memories, `ltm_adjudicate()` SHALL run a four-role LLM panel and return an `AdjudicationResult`.
+
+`AdjudicationResult` fields: `verdict: str` (`"promote"` | `"hold"` | `"reject"`), `confidence: float`, `reasoning: str`.
+
+Rules:
+1. If no same-topic memories exist → immediate `promote`, no LLM call.
+2. Otherwise → LLM prompt with Proposer / Defence / Prosecution / Judge roles.
+3. LLM response MUST be valid JSON; on parse failure → default `promote`.
+4. `verdict` must be one of `{"promote", "hold", "reject"}`; any other value → `"promote"`.
+
+### 17.4 Nightmare Phase
+
+**Requirement:** During `dream_cycle()`, when `Config.nightmare_enabled = True`, `BehaviorCore.nightmare_phase()` SHALL:
+
+1. Generate one adversarial stress scenario from recent STM (max 10 entries × 80 chars each).
+2. Prompt the agent to respond to the scenario.
+3. Compute `stress_score ∈ [0, 1]` using the heuristic:
+   ```
+   avoidance_hits = count(word in NIGHTMARE_AVOIDANCE_WORDS)
+   length_score   = min(1, len(response) / nightmare_response_target_length)
+   stress_score   = max(0, min(1, length_score − avoidance_hits × nightmare_avoidance_penalty))
+   ```
+4. Return `{scenario, response, stress_score, insights}`.
+5. Caller (`dream_cycle`) stores insights as a `subconscious` LTM record with `provenance="nightmare_phase"` and `confidence=stress_score`.
+
+### 17.5 Confidence Metadata
+
+**Requirement:** `ltm_insert()` SHALL accept `confidence: Optional[float]` and `provenance: Optional[str]` and persist them to the `memories` table.
+
+- Both columns are `NULL` by default (backward compatible).
+- Confidence and provenance are **not** included in the HMAC-SHA256 signature payload.
+- Existing databases without these columns SHALL be automatically upgraded via `ALTER TABLE … ADD COLUMN` in `_init_db()`.

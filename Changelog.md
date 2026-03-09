@@ -8,6 +8,64 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [2.9.0] - 2026-03-09
+
+### Added
+
+#### 1. Forgetting Policy – TTL/decay per memory layer
+- `MemoryCore.ltm_apply_forgetting_policy()` — deletes all LTM records whose `expires_at` timestamp has passed. Returns the number of purged rows.
+- `MemoryCore._compute_expires_at(layer, ts)` — static helper that computes the expiry ISO timestamp for a given layer and insertion time, using the per-layer TTL from `Config`.
+- `MemoryCore._LAYER_TTL_ATTR` — mapping from layer name (e.g. `"subconscious"`, `"conscious"`, `"autobiographical"`) to the corresponding `Config` TTL attribute.
+- New `Config` fields:
+  - `forgetting_enabled: bool = True` — master switch; set `False` to disable all expiry.
+  - `forgetting_episodic_ttl: int = 604800` — subconscious/episodic TTL in seconds (7 days).
+  - `forgetting_semantic_ttl: int = 7776000` — conscious/semantic TTL (90 days).
+  - `forgetting_autobio_ttl: int = 31536000` — autobiographical TTL (365 days).
+- `dream_cycle()` now calls `ltm_apply_forgetting_policy()` after each dream cycle, so expired memories are cleaned up automatically.
+
+#### 2. Affective Routing for RAG
+- `MemoryCore.ltm_search_affective(agent, limit, emotion_weight, layer)` — retrieves memories ranked by the combined affective score `importance × (1 − w) + emotion_intensity × w`. Memories with high emotional salience surface ahead of merely important ones.
+- New `Config` field:
+  - `affective_emotion_weight: float = 0.4` — weight of `emotion_intensity` vs `importance` in the affective retrieval score.
+
+#### 3. Adjudication System – memory conflict resolution
+- `AdjudicationResult` dataclass — `verdict: str` (`"promote"` / `"hold"` / `"reject"`), `confidence: float`, `reasoning: str`.
+- `MemoryCore.ltm_adjudicate(agent, incoming_content, topic, llm, model, layer)` — detects same-topic conflicts among existing memories and runs a four-role LLM pipeline:
+  - **Proposer** — argues to promote the incoming memory.
+  - **Defence** — argues to defer.
+  - **Prosecution** — argues to reject.
+  - **Judge** — weighs all arguments and emits the final verdict.
+- When no conflicting memories are found the verdict defaults to `"promote"` without calling the LLM.
+
+#### 4. Nightmare Phase – adversarial stress test during sleep
+- `BehaviorCore.nightmare_phase(model, stm_batch, llm)` — during the dream/sleep cycle, generates an adversarial stress scenario from recent STM entries and measures the agent's stress tolerance (heuristic `stress_score` in `[0, 1]`).
+- `dream_cycle()` calls `nightmare_phase()` automatically when `Config.nightmare_enabled` is `True`, and stores the resulting insight as a subconscious LTM record.
+- New `Config` fields:
+  - `nightmare_enabled: bool = True`
+  - `nightmare_tolerance_threshold: float = 0.5`
+  - `nightmare_response_target_length: int = 400`
+  - `nightmare_avoidance_penalty: float = 0.15`
+- New module-level constant `NIGHTMARE_AVOIDANCE_WORDS` — list of avoidance words used in the heuristic stress score.
+
+#### 5. Confidence Metadata per LTM record
+- Two new columns on the `memories` table: `confidence REAL DEFAULT NULL` and `provenance TEXT DEFAULT NULL`.
+- `MemoryCore.ltm_insert()` accepts two new keyword arguments: `confidence` and `provenance`.
+- `MemoryCore._init_db()` applies `ALTER TABLE … ADD COLUMN` migrations on startup so existing databases are upgraded automatically.
+- Dream-cycle insertions now carry `provenance="dream_reflection"`, `provenance="dream_promotion"`, or `provenance="nightmare_phase"` as appropriate.
+- A new index `idx_mem_expires` is created on `expires_at` for efficient TTL sweeps.
+- Existing HMAC-SHA256 signatures are **unchanged** — `confidence`/`provenance` are excluded from the signed payload to maintain backward compatibility.
+
+### Changed
+
+- `dream_cycle()` docstring updated to reflect nightmare + forgetting integration.
+- All five features are parity-applied to **both** `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`.
+- `pyproject.toml` version bumped to **2.9.0**.
+- `entelgia/__init__.py` `__version__` bumped to **2.9.0**.
+
+### Tests
+
+- New test module `tests/test_memory_features.py` with 25 tests covering all five new features.
+
 ## [Unreleased]
 
 ### Added

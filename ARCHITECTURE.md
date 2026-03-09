@@ -95,8 +95,16 @@ Its goal is contextual coherence under token constraints.
 
 #### Long-Term Memory (LTM)
 - persistent storage across sessions
-- relevance-based retrieval
+- relevance-based retrieval (time-ordered via `ltm_recent`, emotion-weighted via `ltm_search_affective`)
 - enables identity continuity
+- records carry: content, topic, emotion, emotion_intensity, importance, source, promoted_from, intrusive, suppressed, signature_hex, **expires_at**, **confidence**, **provenance**
+
+#### Memory Lifecycle Features (v2.9.0)
+- **Forgetting Policy** — per-layer TTL expiry; `ltm_apply_forgetting_policy()` purges stale rows each dream cycle.
+- **Affective Routing** — `ltm_search_affective()` ranks by `importance × (1−w) + emotion_intensity × w`.
+- **Adjudication** — `ltm_adjudicate()` runs a Proposer/Defence/Prosecution/Judge LLM panel on conflicting memories.
+- **Nightmare Phase** — `BehaviorCore.nightmare_phase()` stress-tests agents during sleep; insights stored with `provenance="nightmare_phase"`.
+- **Confidence Metadata** — optional `confidence` and `provenance` columns on every LTM row.
 
 Memory influences behavior without requiring explicit recall in every turn.
 
@@ -260,7 +268,9 @@ process_step(input)
 
 1. **Integration** — subconscious memories are merged into conscious memory; nothing is hard-deleted from long-term memory.
 2. **Relevance filtering** — short-term memory entries that are not emotionally or operationally relevant (empty / whitespace-only) are forgotten.
-3. **Recharge** — `energy_level` is restored to 100.0.
+3. **Nightmare Phase** *(v2.9.0)* — an adversarial stress scenario is generated from recent STM and the agent responds; the resulting insight is stored in subconscious LTM with a `stress_score`.
+4. **Forgetting sweep** *(v2.9.0)* — `ltm_apply_forgetting_policy()` deletes any LTM records whose `expires_at` has passed.
+5. **Recharge** — `energy_level` is restored to 100.0.
 
 ### Integration Points
 
@@ -411,3 +421,85 @@ Instructions for agents:
 - Memory storage only for sources with `credibility_score > 0.6`
 
 ---
+
+## Cognitive Memory Lifecycle (v2.9.0)
+
+Five interlinked systems govern how memories are created, retrieved, challenged, stress-tested, and annotated.
+
+### 1. Forgetting Policy – TTL/Decay
+
+Each LTM record carries an `expires_at` ISO timestamp calculated at insertion time based on its **layer**:
+
+| Layer | TTL default | Config field |
+|-------|-------------|--------------|
+| `subconscious` / `episodic` | 7 days | `forgetting_episodic_ttl` |
+| `conscious` / `semantic` | 90 days | `forgetting_semantic_ttl` |
+| `autobiographical` | 365 days | `forgetting_autobio_ttl` |
+
+`MemoryCore.ltm_apply_forgetting_policy()` deletes expired rows.  It is called automatically at the end of every `dream_cycle()`.  Set `forgetting_enabled = False` to disable all expiry.
+
+### 2. Affective Routing (Emotion-Weighted Retrieval)
+
+`MemoryCore.ltm_search_affective(agent, emotion_weight)` retrieves memories ranked by:
+
+```
+score = importance × (1 − w) + emotion_intensity × w
+```
+
+where `w = Config.affective_emotion_weight` (default `0.4`).  High-emotion memories surface first, matching how biologically plausible memory systems prioritise emotionally salient events.
+
+### 3. Adjudication System – Memory Conflict Resolution
+
+When new content may contradict existing memories on the same topic, `MemoryCore.ltm_adjudicate()` runs a **four-role LLM panel**:
+
+```
+Proposer   → argues to PROMOTE the incoming memory
+Defence    → argues to HOLD (defer) pending more evidence
+Prosecution → argues to REJECT the incoming memory
+Judge      → weighs all arguments → verdict: promote | hold | reject
+```
+
+The result is returned as an `AdjudicationResult(verdict, confidence, reasoning)` dataclass.  If no conflicting memories exist, the verdict is immediately `"promote"` without an LLM call.
+
+### 4. Nightmare Phase – Adversarial Sleep Stress Test
+
+During `dream_cycle()`, after the standard reflection pass, `BehaviorCore.nightmare_phase()` is called (when `Config.nightmare_enabled = True`):
+
+1. The LLM generates an adversarial stress scenario derived from recent STM entries.
+2. The agent responds to the scenario.
+3. A heuristic **stress tolerance score** (0.0–1.0) is computed:  
+   `score = min(1, response_length / target_length) − avoidance_hits × penalty`
+4. The insight (tolerated or not) is stored as a `subconscious` LTM record with `provenance="nightmare_phase"` and `confidence=stress_score`.
+
+### 5. Confidence Metadata – Provenance Tracking
+
+Every LTM record now supports two optional metadata columns:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `confidence` | REAL (0–1) | How certain the system is about this memory |
+| `provenance` | TEXT | Where the memory came from (e.g. `"dream_reflection"`, `"nightmare_phase"`, `"user_input"`) |
+
+Both are stored in the `memories` table alongside the existing HMAC-SHA256 signature.  Existing signatures are **not** re-computed; `confidence` and `provenance` are excluded from the signed payload to preserve backward compatibility.  Existing databases are auto-migrated via `ALTER TABLE … ADD COLUMN` in `_init_db()`.
+
+### Memory System Flow (v2.9.0)
+
+```
+insert memory
+    │
+    ├─ _compute_expires_at(layer, ts) → set expires_at
+    ├─ optional: confidence + provenance metadata
+    └─ HMAC-SHA256 sign (content|topic|emotion|ts only)
+          │
+dream_cycle()
+    │
+    ├─ dream_reflection()     → subconscious LTM (provenance="dream_reflection")
+    ├─ promote high-salience STM → conscious LTM (provenance="dream_promotion")
+    ├─ nightmare_phase()      → stress insight LTM (provenance="nightmare_phase")
+    └─ ltm_apply_forgetting_policy() → DELETE WHERE expires_at <= NOW
+
+retrieval
+    ├─ ltm_recent()            → time-ordered, signature-validated
+    ├─ ltm_search_affective()  → emotion-weighted ranking
+    └─ ltm_adjudicate()        → conflict-resolution panel before storing
+```

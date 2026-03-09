@@ -244,6 +244,9 @@ LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 MAX_RESPONSE_WORDS = 150
 MAX_CONSECUTIVE_SUPEREGO_REWRITES = 2
 
+# Nightmare Phase – words that indicate avoidance of a stress scenario (Feature 4)
+NIGHTMARE_AVOIDANCE_WORDS = ["cannot", "refuse", "unable", "avoid", "skip", "ignore"]
+
 # LLM First-Person Instruction - agents must speak as themselves using "I"
 LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
 
@@ -339,6 +342,19 @@ class Config:
     debug: bool = (
         False  # Enable DEBUG-level logging (True = verbose, False = INFO only)
     )
+    # ── Forgetting Policy (Feature 1) ──────────────────────────────────────
+    # TTL in seconds per memory layer.  Set to 0 to disable expiry for a layer.
+    forgetting_enabled: bool = True
+    forgetting_episodic_ttl: int = 7 * 24 * 3600     # subconscious/episodic → 7 days
+    forgetting_semantic_ttl: int = 90 * 24 * 3600    # conscious/semantic → 90 days
+    forgetting_autobio_ttl: int = 365 * 24 * 3600    # autobiographical → 365 days
+    # ── Affective Routing (Feature 2) ──────────────────────────────────────
+    affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
+    # ── Nightmare Phase (Feature 4) ────────────────────────────────────────
+    nightmare_enabled: bool = True
+    nightmare_tolerance_threshold: float = 0.5  # below this stress score = low tolerance
+    nightmare_response_target_length: int = 400  # target length for full-engagement scoring
+    nightmare_avoidance_penalty: float = 0.15    # score deduction per avoidance word found
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.
@@ -376,6 +392,18 @@ class CritiqueDecision:
     should_apply: bool
     reason: str
     critic: str = "superego"
+
+
+@dataclass
+class AdjudicationResult:
+    """Outcome of the memory adjudication pipeline (Feature 3).
+
+    ``verdict`` is one of ``"promote"``, ``"hold"``, or ``"reject"``.
+    """
+
+    verdict: str          # "promote" | "hold" | "reject"
+    confidence: float     # 0.0..1.0
+    reasoning: str        # judge's explanation
 
 
 def evaluate_superego_critique(
@@ -965,7 +993,10 @@ class MemoryCore:
                         intrusive INTEGER DEFAULT 0,
                         suppressed INTEGER DEFAULT 0,
                         retrain_status INTEGER DEFAULT 0,
-                        signature_hex TEXT DEFAULT NULL
+                        signature_hex TEXT DEFAULT NULL,
+                        expires_at TEXT DEFAULT NULL,
+                        confidence REAL DEFAULT NULL,
+                        provenance TEXT DEFAULT NULL
                     );
                 """)
                 conn.execute(
@@ -980,6 +1011,20 @@ class MemoryCore:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_mem_importance ON memories(importance DESC);"
                 )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_mem_expires ON memories(expires_at);"
+                )
+
+                # Migrate existing databases: add new columns if they don't exist yet
+                for col, col_def in [
+                    ("expires_at", "TEXT DEFAULT NULL"),
+                    ("confidence", "REAL DEFAULT NULL"),
+                    ("provenance", "TEXT DEFAULT NULL"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE memories ADD COLUMN {col} {col_def}")
+                    except Exception:
+                        pass  # column already exists
 
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS agent_state (
@@ -1082,6 +1127,35 @@ class MemoryCore:
         self.stm_save(agent_name, entries)
         logger.debug(f"STM entry signed for {agent_name}")
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Layer → TTL mapping for Forgetting Policy (Feature 1)
+    # ──────────────────────────────────────────────────────────────────────
+    _LAYER_TTL_ATTR: Dict[str, str] = {
+        "subconscious": "forgetting_episodic_ttl",
+        "episodic": "forgetting_episodic_ttl",
+        "conscious": "forgetting_semantic_ttl",
+        "semantic": "forgetting_semantic_ttl",
+        "autobiographical": "forgetting_autobio_ttl",
+    }
+
+    @staticmethod
+    def _compute_expires_at(layer: str, ts: str) -> Optional[str]:
+        """Return ISO expiry timestamp for *layer* starting from *ts*, or None if disabled."""
+        global CFG
+        if CFG is None or not CFG.forgetting_enabled:
+            return None
+        attr = MemoryCore._LAYER_TTL_ATTR.get(layer)
+        if attr is None:
+            return None
+        ttl = getattr(CFG, attr, 0)
+        if ttl <= 0:
+            return None
+        try:
+            base = dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return (base + dt.timedelta(seconds=ttl)).isoformat()
+        except Exception:
+            return None
+
     def ltm_insert(
         self,
         agent: str,
@@ -1097,12 +1171,18 @@ class MemoryCore:
         suppressed: int = 0,
         retrain_status: int = 0,
         ts: Optional[str] = None,
+        confidence: Optional[float] = None,
+        provenance: Optional[str] = None,
     ) -> str:
         """Insert entry to long-term memory with cryptographic signature."""
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
 
-        # Create payload for signature
+        # Compute expiry timestamp based on layer TTL (Forgetting Policy, Feature 1)
+        expires_at = MemoryCore._compute_expires_at(layer, ts)
+
+        # Create payload for signature (unchanged – confidence/provenance not signed
+        # to preserve backward compatibility with existing rows)
         payload_for_sig = MemoryCore._build_ltm_payload(content, topic, emotion, ts)
         sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
@@ -1113,8 +1193,9 @@ class MemoryCore:
                     """
                     INSERT INTO memories
                     (id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
-                     promoted_from, intrusive, suppressed, retrain_status, signature_hex)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     promoted_from, intrusive, suppressed, retrain_status, signature_hex,
+                     expires_at, confidence, provenance)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         mem_id,
@@ -1132,6 +1213,9 @@ class MemoryCore:
                         suppressed,
                         retrain_status,
                         sig_hex,
+                        expires_at,
+                        confidence,
+                        provenance,
                     ),
                 )
                 conn.commit()
@@ -1219,6 +1303,161 @@ class MemoryCore:
         except Exception as e:
             logger.error(f"DB Query Error: {e}")
             return []
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 1: Forgetting Policy – TTL/decay per memory layer
+    # ──────────────────────────────────────────────────────────────────────
+
+    def ltm_apply_forgetting_policy(self) -> int:
+        """Delete expired memories according to the TTL forgetting policy.
+
+        Iterates over all memories that have an ``expires_at`` timestamp set
+        and removes those whose expiry has passed.  Returns the number of
+        memories that were purged.
+        """
+        now = dt.datetime.now(dt.timezone.utc).isoformat()
+        deleted = 0
+        try:
+            with self._conn() as conn:
+                cur = conn.execute(
+                    "DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?",
+                    (now,),
+                )
+                deleted = cur.rowcount
+                conn.commit()
+            if deleted:
+                logger.info(f"[ForgettingPolicy] Purged {deleted} expired memories.")
+        except Exception as e:
+            logger.error(f"Forgetting policy error: {e}")
+        return deleted
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 2: Affective Routing – emotion-weighted memory retrieval
+    # ──────────────────────────────────────────────────────────────────────
+
+    def ltm_search_affective(
+        self,
+        agent: str,
+        limit: int = 20,
+        emotion_weight: Optional[float] = None,
+        layer: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return memories ranked by a combined affective-semantic score.
+
+        The score is:
+            ``importance * (1 - w) + emotion_intensity * w``
+        where *w* is ``emotion_weight`` (default: ``CFG.affective_emotion_weight``).
+
+        Memories with high emotional intensity are surfaced ahead of those
+        that are merely important, giving the retrieval an affective bias
+        consistent with how human memory prioritises emotionally salient
+        events.
+        """
+        global CFG
+        if emotion_weight is None:
+            emotion_weight = CFG.affective_emotion_weight if CFG is not None else 0.4
+        emotion_weight = max(0.0, min(1.0, emotion_weight))
+
+        raw = self.ltm_recent(agent, limit=limit * 3, layer=layer)
+
+        def _score(mem: Dict[str, Any]) -> float:
+            imp = float(mem.get("importance") or 0.0)
+            ei = float(mem.get("emotion_intensity") or 0.0)
+            return imp * (1.0 - emotion_weight) + ei * emotion_weight
+
+        ranked = sorted(raw, key=_score, reverse=True)
+        return ranked[:limit]
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 3: Adjudication System – memory conflict resolution
+    # ──────────────────────────────────────────────────────────────────────
+
+    def ltm_adjudicate(
+        self,
+        agent: str,
+        incoming_content: str,
+        topic: Optional[str],
+        llm: "LLM",
+        model: str,
+        layer: str = "conscious",
+    ) -> "AdjudicationResult":
+        """Detect conflicts with existing memories and adjudicate.
+
+        Pulls recent same-topic memories for *agent* and, if any are found,
+        runs the four-role adjudication pipeline (proposer / defence /
+        prosecution / judge) via the LLM.  Returns an
+        :class:`AdjudicationResult` whose ``verdict`` is one of
+        ``"promote"``, ``"hold"``, or ``"reject"``.
+
+        When no conflicting memories are found the verdict is always
+        ``"promote"`` (no conflict means no reason to suppress).
+        """
+        candidates = [
+            m for m in self.ltm_recent(agent, limit=30, layer=layer)
+            if topic and (m.get("topic") or "").lower() == topic.lower()
+        ]
+
+        if not candidates:
+            return AdjudicationResult(
+                verdict="promote",
+                confidence=1.0,
+                reasoning="No conflicting memories found.",
+            )
+
+        existing_snippet = "\n".join(
+            f"- [{m['ts'][:10]}] {m['content'][:120]}" for m in candidates[:5]
+        )
+
+        prompt = (
+            "You are a memory adjudication panel with four roles.\n"
+            "Evaluate whether an INCOMING memory should be stored or discarded.\n\n"
+            f"INCOMING MEMORY:\n{incoming_content[:300]}\n\n"
+            f"EXISTING MEMORIES (same topic):\n{existing_snippet}\n\n"
+            "Roles:\n"
+            "  Proposer   – argues to PROMOTE (store) the incoming memory.\n"
+            "  Defence    – argues to HOLD (defer) until more evidence.\n"
+            "  Prosecution – argues to REJECT (discard) the incoming memory.\n"
+            "  Judge      – weighs all arguments and gives a final verdict.\n\n"
+            "Return JSON only:\n"
+            '{"proposer": "...", "defence": "...", "prosecution": "...", '
+            '"judge_reasoning": "...", "verdict": "promote|hold|reject", '
+            '"confidence": 0.0..1.0}'
+        )
+
+        raw = llm.generate(model, prompt, temperature=0.3, use_cache=False)
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not m:
+            logger.warning("[Adjudication] Could not parse LLM response; defaulting to promote.")
+            return AdjudicationResult(
+                verdict="promote",
+                confidence=0.5,
+                reasoning="LLM response unparseable; defaulting to promote.",
+            )
+
+        try:
+            obj = json.loads(m.group(0))
+            verdict = str(obj.get("verdict", "promote")).strip().lower()
+            if verdict not in {"promote", "hold", "reject"}:
+                verdict = "promote"
+            confidence = float(obj.get("confidence", 0.5))
+            reasoning = str(obj.get("judge_reasoning", ""))
+            result = AdjudicationResult(
+                verdict=verdict,
+                confidence=confidence,
+                reasoning=reasoning,
+            )
+            logger.info(
+                f"[Adjudication] agent={agent} topic={topic} "
+                f"verdict={verdict} confidence={confidence:.2f}"
+            )
+            return result
+        except Exception as e:
+            logger.warning(f"[Adjudication] Parse error: {e}; defaulting to promote.")
+            return AdjudicationResult(
+                verdict="promote",
+                confidence=0.5,
+                reasoning=f"Parse error: {e}",
+            )
 
     def get_agent_state(self, agent: str) -> Dict[str, float]:
         """Get agent's internal drives/state."""
@@ -1423,6 +1662,81 @@ class BehaviorCore:
         )
         result = llm.generate(model, prompt, temperature=0.6, use_cache=False)
         return validate_output(result)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 4: Nightmare Phase – adversarial stress test during sleep
+    # ──────────────────────────────────────────────────────────────────────
+
+    def nightmare_phase(
+        self, model: str, stm_batch: List[Dict[str, Any]], llm: LLM
+    ) -> Dict[str, Any]:
+        """Stress-test the agent with adversarial scenarios and measure tolerance.
+
+        During the sleep/dream cycle this phase presents the agent with a
+        difficult, emotionally charged hypothetical derived from its recent
+        memories.  The agent's response is scored for *stress tolerance*
+        (0.0 = collapsed, 1.0 = fully resilient).
+
+        Returns a dict with keys:
+            ``scenario``    – the stress-test prompt used
+            ``response``    – the raw LLM response
+            ``stress_score`` – float 0..1 (higher = more tolerant)
+            ``insights``    – short interpretive note
+        """
+        if not stm_batch:
+            return {
+                "scenario": "",
+                "response": "",
+                "stress_score": 1.0,
+                "insights": "No memories to stress-test.",
+            }
+
+        chunk = "\n".join([f"- {e.get('text', '')[:80]}" for e in stm_batch[-10:]])
+        scenario_prompt = (
+            "NIGHTMARE PHASE – generate ONE adversarial stress scenario.\n"
+            "Based on the agent's recent memories, craft a single challenging,\n"
+            "emotionally intense hypothetical (max 3 sentences) that would test\n"
+            "the agent's psychological resilience.\n\n"
+            f"RECENT MEMORIES:\n{chunk}\n\n"
+            "Return the scenario only, no extra text."
+        )
+        scenario = llm.generate(model, scenario_prompt, temperature=0.8, use_cache=False)
+        scenario = validate_output(scenario)
+
+        response_prompt = (
+            "You are facing the following difficult scenario.\n"
+            "Respond with honesty and self-awareness. Do not avoid the challenge.\n\n"
+            f"SCENARIO:\n{scenario[:400]}\n\n"
+            f"{LLM_RESPONSE_LIMIT}\n"
+        )
+        response = llm.generate(model, response_prompt, temperature=0.5, use_cache=False)
+        response = validate_output(response)
+
+        # Heuristic stress score: reward length (engagement) and penalise
+        # avoidance language.
+        global CFG
+        target_len = CFG.nightmare_response_target_length if CFG is not None else 400
+        avoidance_penalty = CFG.nightmare_avoidance_penalty if CFG is not None else 0.15
+        avoidance_hits = sum(1 for w in NIGHTMARE_AVOIDANCE_WORDS if w in response.lower())
+        length_score = min(1.0, len(response) / target_len)
+        stress_score = max(0.0, min(1.0, length_score - avoidance_hits * avoidance_penalty))
+
+        threshold = CFG.nightmare_tolerance_threshold if CFG is not None else 0.5
+        insights = (
+            "Adequate tolerance – agent engaged with stress scenario."
+            if stress_score >= threshold
+            else "Low tolerance – agent showed avoidance in nightmare phase."
+        )
+
+        logger.info(
+            f"[NightmarePhase] model={model} stress_score={stress_score:.2f}"
+        )
+        return {
+            "scenario": scenario,
+            "response": response,
+            "stress_score": stress_score,
+            "insights": insights,
+        }
 
 
 # ============================================
@@ -2890,7 +3204,7 @@ class MainScript:
         self.metrics.record_turn()
 
     def dream_cycle(self, agent: Agent, topic: str):
-        """Execute dream cycle for agent."""
+        """Execute dream cycle for agent (reflection + nightmare stress-test)."""
         stm = self.memory.stm_load(agent.name)
         if not stm:
             return
@@ -2923,6 +3237,7 @@ class MainScript:
             emotion_intensity=float(inten),
             importance=float(imp),
             source="dream",
+            provenance="dream_reflection",
         )
 
         promoted = 0
@@ -2945,8 +3260,44 @@ class MainScript:
                     importance=im,
                     source="dream",
                     promoted_from="subconscious",
+                    provenance="dream_promotion",
                 )
                 promoted += 1
+
+        # ── Feature 4: Nightmare Phase ────────────────────────────────────
+        nightmare_result: Dict[str, Any] = {}
+        if self.cfg.nightmare_enabled:
+            nightmare_result = self.behavior.nightmare_phase(
+                agent.model, batch, self.llm
+            )
+            stress_score = nightmare_result.get("stress_score", 1.0)
+            insight = nightmare_result.get("insights", "")
+            if insight:
+                self.memory.ltm_insert(
+                    agent=agent.name,
+                    layer="subconscious",
+                    content=insight[:300],
+                    topic=topic,
+                    emotion="fear" if stress_score < self.cfg.nightmare_tolerance_threshold else "neutral",
+                    emotion_intensity=max(0.0, 1.0 - stress_score),
+                    importance=0.5,
+                    source="nightmare",
+                    provenance="nightmare_phase",
+                    confidence=stress_score,
+                )
+            logger.info(
+                f"[NightmarePhase] {agent.name}: stress_score={stress_score:.2f}"
+            )
+
+        # ── Apply Forgetting Policy ───────────────────────────────────────
+        if self.cfg.forgetting_enabled:
+            purged = self.memory.ltm_apply_forgetting_policy()
+            if purged and self.cfg.show_meta:
+                print(
+                    Fore.WHITE + Style.DIM
+                    + f"[META-ACTION] Forgetting policy purged {purged} expired memories"
+                    + Style.RESET_ALL + "\n"
+                )
 
         try:
             nodes = [("Socrates", "Socrates"), ("Athena", "Athena")]
@@ -2960,9 +3311,12 @@ class MainScript:
 
         logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
         agent.energy_level = AGENT_INITIAL_ENERGY
+        stress_label = ""
+        if nightmare_result:
+            stress_label = f" stress={nightmare_result.get('stress_score', '?'):.2f}"
         print(
             Fore.YELLOW
-            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
+            + f"[DREAM] {agent.name} reflection stored; promoted={promoted}{stress_label}"
             + Style.RESET_ALL
         )
 
