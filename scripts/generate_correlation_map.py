@@ -19,7 +19,7 @@ import sys
 def main() -> None:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     html_path = os.path.join(repo_root, "Assets", "entelgia_correlation_map.html")
-    out_path  = os.path.join(repo_root, "Assets", "entelgia_correlation_map.png")
+    out_path = os.path.join(repo_root, "Assets", "entelgia_correlation_map.png")
 
     if not os.path.exists(html_path):
         sys.exit(f"Source not found: {html_path}")

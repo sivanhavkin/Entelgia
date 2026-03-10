@@ -324,7 +324,9 @@ class Config:
     superego_critique_enabled: bool = True
     superego_dominance_margin: float = 0.5
     superego_critique_conflict_min: float = 2.0
-    enable_observer: bool = True  # When False, Fixy is fully disabled (no turns, no interventions)
+    enable_observer: bool = (
+        True  # When False, Fixy is fully disabled (no turns, no interventions)
+    )
     # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
     web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "1")))
     web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "3"))
@@ -3103,7 +3105,11 @@ class MainScript:
 
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             # Skipped entirely when enable_observer is False
-            if self.cfg.enable_observer and self.interactive_fixy and speaker.name != "Fixy":
+            if (
+                self.cfg.enable_observer
+                and self.interactive_fixy
+                and speaker.name != "Fixy"
+            ):
                 should_intervene, reason = self.interactive_fixy.should_intervene(
                     self.dialog, self.turn_index
                 )
