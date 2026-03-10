@@ -267,6 +267,41 @@ Memory enables:
 - **Identity**: Persistent personality traits
 - **Context**: Relevant past experiences inform responses
 
+### What is the Forgetting Policy?
+
+The Forgetting Policy automatically deletes expired LTM records each dream cycle. Every row receives an `expires_at` timestamp at insertion time based on its memory layer:
+
+| Layer | Default TTL |
+|---|---|
+| `subconscious` / `episodic` | 7 days |
+| `conscious` / `semantic` | 90 days |
+| `autobiographical` | 365 days |
+
+You can adjust TTLs via `Config`: `forgetting_episodic_ttl`, `forgetting_semantic_ttl`, `forgetting_autobio_ttl` (all in seconds). Set `forgetting_enabled = False` to disable expiry entirely.
+
+### What is Affective Routing?
+
+Affective routing is an emotion-weighted LTM retrieval mode. Instead of returning the most recent memories, `ltm_search_affective()` ranks them by a blended score:
+
+```
+score = importance × (1 − w) + emotion_intensity × w
+```
+
+where `w` is `Config.affective_emotion_weight` (default `0.4`). Increase `w` toward `1.0` to strongly prefer emotionally intense memories. This models how biologically plausible memory systems prioritise emotionally salient events.
+
+### What are confidence and provenance metadata?
+
+Every LTM row can carry two optional metadata fields:
+
+- **`confidence`** (REAL, 0–1) — how certain the system is about this memory.
+- **`provenance`** (TEXT) — where the memory came from. Common values: `"dream_reflection"`, `"dream_promotion"`, `"user_input"`.
+
+These are stored in the `memories` table but are **not included in the HMAC-SHA256 signature**, preserving backward compatibility with existing databases. Pass them to `ltm_insert()` via keyword arguments:
+
+```python
+memory.ltm_insert(agent, "conscious", content, confidence=0.9, provenance="user_input")
+```
+
 ### What happens if memory becomes corrupted?
 
 If memory signatures fail validation:

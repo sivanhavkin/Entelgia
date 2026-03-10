@@ -294,6 +294,9 @@ What would you like to delete?
 * **🔬 Ablation Study** — 4 reproducible conditions, fully deterministic
 * **🛡️ Safety & Quality** — PII redaction, output artifact cleanup, memory poisoning protection
 * **🌐 Web Research Module** — Fixy-triggered DuckDuckGo search, credibility scoring, and external knowledge injection into agent dialogue
+* **🗂️ Forgetting Policy** — per-layer TTL expiry purges stale LTM memories each dream cycle (7 d / 90 d / 365 d defaults; configurable)
+* **💡 Affective Routing** — `ltm_search_affective()` ranks memories by a blended importance + emotional-intensity score, surfacing emotionally salient memories first
+* **🏷️ Confidence Metadata** — every LTM row can carry an optional `confidence` (0–1) and `provenance` label; `dream_cycle()` tags its insertions automatically
 
 ---
 
@@ -379,6 +382,27 @@ Pressure: 6.42  Unresolved: 2  Stagnation: 0.75
 ```
 
 For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
+
+### 🗂️ Forgetting Policy Settings
+
+```python
+config.forgetting_enabled = True              # Master switch; False disables all TTL expiry (default: True)
+config.forgetting_episodic_ttl = 604800       # Subconscious / episodic layer TTL in seconds (default: 7 days)
+config.forgetting_semantic_ttl = 7776000      # Conscious / semantic layer TTL in seconds (default: 90 days)
+config.forgetting_autobio_ttl = 31536000      # Autobiographical layer TTL in seconds (default: 365 days)
+```
+
+`MemoryCore.ltm_apply_forgetting_policy()` is called automatically at the end of every `dream_cycle()`.
+Set a TTL to `0` to disable expiry for a specific layer without disabling the feature globally.
+
+### 💡 Affective Routing Settings
+
+```python
+config.affective_emotion_weight = 0.4   # Weight of emotion_intensity vs importance (default: 0.4)
+                                         # Score = importance*(1-w) + emotion_intensity*w
+```
+
+Use `memory.ltm_search_affective(agent, emotion_weight=0.7)` for more emotion-biased retrieval.
 
 ---
 

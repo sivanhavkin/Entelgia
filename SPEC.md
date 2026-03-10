@@ -152,7 +152,15 @@ Fallback when enhanced modules are missing or disabled.
 
 * persistent store (e.g., SQLite)
 * may contain layers (e.g., `conscious`, `subconscious`) depending on build
-* accessed either “recent” (legacy) or “relevant” (enhanced)
+* accessed either “recent” (legacy) or “relevant” (enhanced), or emotion-weighted via `ltm_search_affective`
+
+**LTM record columns:** `id`, `agent`, `ts`, `layer`, `content`, `topic`, `emotion`, `emotion_intensity`, `importance`, `source`, `promoted_from`, `intrusive`, `suppressed`, `retrain_status`, `signature_hex`, `expires_at`, `confidence`, `provenance`
+
+| Column | Type | Description |
+|---|---|---|
+| `expires_at` | TEXT (ISO) | TTL expiry timestamp; row deleted by `ltm_apply_forgetting_policy()` when this passes |
+| `confidence` | REAL (0–1) | How certain the system is about this memory |
+| `provenance` | TEXT | Memory origin label (e.g. `"dream_reflection"`, `"dream_promotion"`, `"user_input"`) |
 
 ### 4.3 Drives / Internal Variables
 
@@ -409,6 +417,17 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 * `store_raw_subconscious_ltm` — Store un-redacted text in subconscious LTM (default: `False`)
 * `enable_auto_patch` — Enable automatic self-patching (default: `False`)
 * `allow_write_self_file` — Allow the agent to write to its own source file (default: `False`)
+
+### Forgetting Policy
+
+* `forgetting_enabled` — Master switch; `False` disables all TTL expiry (default: `True`)
+* `forgetting_episodic_ttl` — Subconscious/episodic layer TTL in seconds (default: `604800` — 7 days)
+* `forgetting_semantic_ttl` — Conscious/semantic layer TTL in seconds (default: `7776000` — 90 days)
+* `forgetting_autobio_ttl` — Autobiographical layer TTL in seconds (default: `31536000` — 365 days)
+
+### Affective Routing
+
+* `affective_emotion_weight` — Weight of `emotion_intensity` vs `importance` in `ltm_search_affective` score (default: `0.4`)
 
 ### Energy & Drive (v2.5.0+)
 

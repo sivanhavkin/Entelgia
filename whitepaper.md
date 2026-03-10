@@ -124,8 +124,46 @@ Entelgia employs a two-layer memory structure:
 * Persistent across sessions
 * Indexed and structured
 * Integrity-protected
+* Per-layer TTL expiry (Forgetting Policy)
+* Emotion-weighted retrieval (Affective Routing)
+* Confidence and provenance metadata per row
 
 This design enables identity continuity beyond session boundaries.
+
+---
+
+## 4.3 Forgetting Policy
+
+Each LTM record receives an `expires_at` ISO timestamp at insertion time based on its layer:
+
+| Layer | Default TTL | Config field |
+|---|---|---|
+| `subconscious` / `episodic` | 7 days | `forgetting_episodic_ttl` |
+| `conscious` / `semantic` | 90 days | `forgetting_semantic_ttl` |
+| `autobiographical` | 365 days | `forgetting_autobio_ttl` |
+
+`MemoryCore.ltm_apply_forgetting_policy()` deletes expired rows. It is called automatically at the end of every `dream_cycle()`. Set `forgetting_enabled = False` to disable all expiry.
+
+## 4.4 Affective Routing
+
+`MemoryCore.ltm_search_affective(agent, emotion_weight)` retrieves memories ranked by:
+
+```
+score = importance × (1 − w) + emotion_intensity × w
+```
+
+where `w = Config.affective_emotion_weight` (default `0.4`). Memories with high emotional intensity surface first, matching how biologically plausible memory systems prioritise emotionally salient events.
+
+## 4.5 Confidence Metadata
+
+Each LTM row optionally carries:
+
+| Field | Type | Description |
+|---|---|---|
+| `confidence` | REAL (0–1) | How certain the system is about this memory |
+| `provenance` | TEXT | Where the memory came from (e.g. `"dream_reflection"`, `"dream_promotion"`, `"user_input"`) |
+
+Both are stored in the `memories` table alongside the existing HMAC-SHA256 signature. Existing signatures are **not** re-computed; `confidence` and `provenance` are excluded from the signed payload to preserve backward compatibility. Existing databases are auto-migrated via `ALTER TABLE … ADD COLUMN` in `_init_db()`.
 
 ---
 

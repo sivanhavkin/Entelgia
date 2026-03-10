@@ -95,8 +95,14 @@ Its goal is contextual coherence under token constraints.
 
 #### Long-Term Memory (LTM)
 - persistent storage across sessions
-- relevance-based retrieval
+- relevance-based retrieval (time-ordered via `ltm_recent`, emotion-weighted via `ltm_search_affective`)
 - enables identity continuity
+- records carry: content, topic, emotion, emotion_intensity, importance, source, promoted_from, intrusive, suppressed, signature_hex, **expires_at**, **confidence**, **provenance**
+
+**Memory subsystems:**
+- **Forgetting Policy** — per-layer TTL expiry; `ltm_apply_forgetting_policy()` purges stale rows each dream cycle.
+- **Affective Routing** — `ltm_search_affective()` ranks by `importance × (1−w) + emotion_intensity × w`.
+- **Confidence Metadata** — optional `confidence` and `provenance` columns on every LTM row.
 
 Memory influences behavior without requiring explicit recall in every turn.
 
@@ -258,9 +264,11 @@ process_step(input)
 
 ### Dream Cycle Phases
 
-1. **Integration** — subconscious memories are merged into conscious memory; nothing is hard-deleted from long-term memory.
+1. **Integration** — subconscious memories are merged into conscious memory; nothing is hard-deleted from long-term memory. Tagged with `provenance="dream_reflection"`.
 2. **Relevance filtering** — short-term memory entries that are not emotionally or operationally relevant (empty / whitespace-only) are forgotten.
-3. **Recharge** — `energy_level` is restored to 100.0.
+3. **Promotion** — high-salience STM entries are promoted to conscious LTM. Tagged with `provenance="dream_promotion"`.
+4. **Forgetting sweep** — `ltm_apply_forgetting_policy()` deletes any LTM records whose `expires_at` has passed.
+5. **Recharge** — `energy_level` is restored to 100.0.
 
 ### Integration Points
 
