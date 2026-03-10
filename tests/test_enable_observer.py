@@ -30,10 +30,10 @@ from unittest.mock import MagicMock, patch, call
 import Entelgia_production_meta as _meta
 from Entelgia_production_meta import Config
 
-
 # ---------------------------------------------------------------------------
 # Shared patch context: mocks out all heavy MainScript.__init__ dependencies
 # ---------------------------------------------------------------------------
+
 
 def _build_init_patches(enhanced: bool = True):
     """Return a list of patch objects needed to construct a MainScript safely."""
@@ -103,7 +103,9 @@ class TestInteractiveFixyInit:
         mock_interactive_fixy_cls = MagicMock()
 
         patches = _build_init_patches(enhanced=True)
-        patches.append(patch.object(_meta, "InteractiveFixy", mock_interactive_fixy_cls))
+        patches.append(
+            patch.object(_meta, "InteractiveFixy", mock_interactive_fixy_cls)
+        )
 
         with _apply_patches(patches):
             ms = _meta.MainScript(cfg)
@@ -127,7 +129,9 @@ class TestInteractiveFixyInit:
         mock_interactive_fixy_cls = MagicMock(return_value=mock_fixy_instance)
 
         patches = _build_init_patches(enhanced=True)
-        patches.append(patch.object(_meta, "InteractiveFixy", mock_interactive_fixy_cls))
+        patches.append(
+            patch.object(_meta, "InteractiveFixy", mock_interactive_fixy_cls)
+        )
 
         with _apply_patches(patches):
             ms = _meta.MainScript(cfg)
@@ -153,9 +157,9 @@ class TestInteractiveFixyInit:
             with _apply_patches(patches):
                 ms = _meta.MainScript(cfg)
 
-            assert ms.interactive_fixy is None, (
-                f"interactive_fixy should be None in legacy mode (enable_observer={flag})"
-            )
+            assert (
+                ms.interactive_fixy is None
+            ), f"interactive_fixy should be None in legacy mode (enable_observer={flag})"
 
 
 # ---------------------------------------------------------------------------
@@ -264,7 +268,10 @@ class TestInterventionBlockNoObserver:
 
         # Attach a mock interactive_fixy even though the flag is False
         mock_interactive_fixy = MagicMock()
-        mock_interactive_fixy.should_intervene.return_value = (True, "circular_reasoning")
+        mock_interactive_fixy.should_intervene.return_value = (
+            True,
+            "circular_reasoning",
+        )
         ms.interactive_fixy = mock_interactive_fixy
 
         speaker = MagicMock()
@@ -325,4 +332,3 @@ def _apply_patches(patch_list):
                 p.stop()
             except RuntimeError:
                 pass
-

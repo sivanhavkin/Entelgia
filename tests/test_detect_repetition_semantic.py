@@ -25,10 +25,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import entelgia.fixy_interactive as _fi
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_turns(texts):
     """Convert a list of strings into turn dicts."""
@@ -147,12 +147,14 @@ class TestDetectRepetitionJaccardFallback:
     def test_not_repetitive_with_diverse_turns(self):
         """Completely different texts should not be flagged."""
         fixy = self._make_fixy()
-        turns = _make_turns([
-            "apple orange banana mango",
-            "python javascript ruby golang",
-            "mountain river ocean desert",
-            "jupiter saturn neptune uranus",
-        ])
+        turns = _make_turns(
+            [
+                "apple orange banana mango",
+                "python javascript ruby golang",
+                "mountain river ocean desert",
+                "jupiter saturn neptune uranus",
+            ]
+        )
         with patch.object(_fi, "_SEMANTIC_AVAILABLE", False):
             result = fixy._detect_repetition(turns)
         assert result is False
@@ -204,12 +206,14 @@ class TestDetectRepetitionCombinedScore:
         Low Jaccard + low semantic similarity → combined < 0.5 → not repetitive.
         """
         fixy = self._make_fixy()
-        turns = _make_turns([
-            "apple orange mango banana cherry",
-            "python javascript ruby golang swift",
-            "mountain river ocean desert canyon",
-            "jupiter saturn neptune uranus pluto",
-        ])
+        turns = _make_turns(
+            [
+                "apple orange mango banana cherry",
+                "python javascript ruby golang swift",
+                "mountain river ocean desert canyon",
+                "jupiter saturn neptune uranus pluto",
+            ]
+        )
         embeddings = _identity_embeddings(4)
 
         with (
@@ -271,4 +275,3 @@ class TestDetectRepetitionCombinedScore:
             result = fixy._detect_repetition(turns)
 
         assert result is True
-
