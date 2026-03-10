@@ -120,8 +120,12 @@ class InteractiveFixy:
         if turn_count < 3:
             return (False, "")
 
-        # Get last 10 turns for analysis
-        last_10 = dialog[-10:] if len(dialog) >= 10 else dialog
+        # Only analyse main-agent turns; excluding Fixy's own past interventions
+        # prevents a feedback loop where Fixy's meta-commentary (which references
+        # the dialogue topic and therefore has high semantic similarity) inflates
+        # the repetition score and triggers yet more Fixy interventions.
+        agent_turns = [t for t in dialog if t.get("role") != "Fixy"]
+        last_10 = agent_turns[-10:] if len(agent_turns) >= 10 else agent_turns
 
         # Pattern 1: Circular reasoning (repetition)
         if self._detect_repetition(last_10):
@@ -423,7 +427,11 @@ Generate your intervention (2-4 sentences, direct and concrete).
         if turn_count < 3:
             return (False, None)
 
-        last_10 = dialog[-10:] if len(dialog) >= 10 else dialog
+        # Only analyse main-agent turns; excluding Fixy's own past interventions
+        # prevents a feedback loop where Fixy's meta-commentary inflates the
+        # repetition score and triggers further unwanted interventions.
+        agent_turns = [t for t in dialog if t.get("role") != "Fixy"]
+        last_10 = agent_turns[-10:] if len(agent_turns) >= 10 else agent_turns
 
         # Condition 1: high conflict without resolution
         if turn_count >= 6 and self._detect_high_conflict(last_10):
