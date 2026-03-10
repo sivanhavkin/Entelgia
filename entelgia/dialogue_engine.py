@@ -283,36 +283,20 @@ class DialogueEngine:
     def should_allow_fixy(
         self, dialog_history: List[Dict[str, str]], turn_count: int
     ) -> Tuple[bool, float]:
-        """
-        Determine if Fixy should be allowed to speak.
-
-        Args:
-            dialog_history: Dialogue history
-            turn_count: Current turn number
-
-        Returns:
-            Tuple of (allow_fixy, probability)
-        """
         # Don't allow Fixy too early
-        if turn_count < 4:
+        if turn_count < 3:
             return False, 0.0
 
-        # Don't allow if Fixy spoke recently (within last 3 turns)
-        recent_speakers = [turn.get("role", "") for turn in dialog_history[-3:]]
-        if "Fixy" in recent_speakers:
-            return False, 0.0
+        # Base probability
+        probability = 0.40
 
-        # Base probability: 20% after turn 4
-        probability = 0.20
-
-        # Increase if dialogue seems stuck (similar patterns)
+        # Increase if repetition detected
         if len(dialog_history) >= 5:
             last_5_texts = [
                 turn.get("text", "")[:100].lower() for turn in dialog_history[-5:]
             ]
-            # Simple heuristic: check for word overlap
             if self._detect_repetition_simple(last_5_texts):
-                probability = 0.35
+                probability = 0.80
 
         return True, probability
 
