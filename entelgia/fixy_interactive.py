@@ -178,7 +178,7 @@ class InteractiveFixy:
 RECENT DIALOGUE:
 {context}
 
-Generate your intervention (2-4 sentences, direct and concrete).
+Respond in maximum 2 sentences. Be direct and address the specific agent by name if needed.
 {LLM_RESPONSE_LIMIT}
 """
 

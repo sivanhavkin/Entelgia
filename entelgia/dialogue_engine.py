@@ -8,7 +8,7 @@ Manages dynamic speaker selection and flexible seed generation for natural dialo
 
 import logging
 import random
-from typing import Dict, List, Any, Tuple, TYPE_CHECKING
+from typing import Dict, List, Any, Tuple, Optional, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +190,11 @@ class DialogueEngine:
         if allow_fixy and random.random() < fixy_probability:
             fixy = next((a for a in agents if a.name == "Fixy"), None)
             if fixy:
+                last_speaker = dialog_history[-1].get("role", "") if dialog_history else ""
+                if last_speaker == "Fixy":
+                    # Force non-Fixy speaker to prevent two consecutive Fixy turns
+                    candidates = [a for a in agents if a.name != "Fixy"]
+                    return self._select_by_engagement(candidates, dialog_history)
                 return fixy
 
         # Calculate engagement scores for each agent
@@ -282,10 +287,10 @@ class DialogueEngine:
 
     def should_allow_fixy(
         self, dialog_history: List[Dict[str, str]], turn_count: int
-    ) -> Tuple[bool, float]:
+    ) -> Tuple[bool, float, Optional[str]]:
         # Don't allow Fixy too early
         if turn_count < 3:
-            return False, 0.0
+            return False, 0.0, None
 
         # Base probability
         probability = 0.40
@@ -298,7 +303,62 @@ class DialogueEngine:
             if self._detect_repetition_simple(last_5_texts):
                 probability = 0.80
 
-        return True, probability
+        # Detect if a specific agent is repeating themselves
+        repeating_agent = self._detect_repeating_agent(dialog_history)
+        if repeating_agent:
+            return True, 0.90, repeating_agent
+
+        return True, probability, None
+
+    def _detect_repeating_agent(
+        self, dialog_history: List[Dict[str, str]]
+    ) -> Optional[str]:
+        """
+        Detect if a specific agent is repeating the same words in their last 3 turns.
+
+        Args:
+            dialog_history: Full dialogue history
+
+        Returns:
+            Name of the repeating agent, or None if no repetition detected
+        """
+        if len(dialog_history) < 6:
+            return None
+
+        # Gather unique non-Fixy agent names
+        agent_names = list(
+            {turn.get("role", "") for turn in dialog_history if turn.get("role") != "Fixy"}
+        )
+
+        for agent_name in agent_names:
+            agent_turns = [t for t in dialog_history if t.get("role") == agent_name]
+            if len(agent_turns) < 3:
+                continue
+            last_3 = agent_turns[-3:]
+
+            # Extract keywords (words >4 chars) from each of the last 3 turns
+            turn_words = []
+            for turn in last_3:
+                text = turn.get("text", "").lower()
+                words = set(w for w in text.split() if len(w) > 4)
+                turn_words.append(words)
+
+            # Count pairs with high word overlap
+            overlaps = 0
+            for i in range(len(turn_words) - 1):
+                for j in range(i + 1, len(turn_words)):
+                    if len(turn_words[i]) > 0 and len(turn_words[j]) > 0:
+                        overlap = len(turn_words[i] & turn_words[j]) / max(
+                            len(turn_words[i]), len(turn_words[j])
+                        )
+                        if overlap > 0.5:
+                            overlaps += 1
+
+            # At least 2 of the 3 possible pairs must overlap to flag repetition
+            if overlaps >= 2:
+                return agent_name
+
+        return None
 
     def _detect_repetition_simple(self, texts: List[str]) -> bool:
         """
