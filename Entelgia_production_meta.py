@@ -1881,6 +1881,23 @@ class Agent:
         # Validate output (sanitization only, no truncation)
         out = validate_output(raw_response)
 
+        # Strip echoed prompt-section headers.  The LLM sometimes copies the
+        # "Key memories:", "Recent thoughts:", or "External Knowledge Context:"
+        # sections verbatim into its reply.  Everything from those headers
+        # onwards is prompt scaffolding, not the agent's own words.
+        for _section_header in (
+            "Key memories",
+            "Recent thoughts",
+            "External Knowledge Context",
+        ):
+            _parts = re.split(
+                rf"(?i)\n\s*{re.escape(_section_header)}\s*:\s*\n",
+                out,
+                maxsplit=1,
+            )
+            if len(_parts) > 1:
+                out = _parts[0].strip()
+
         # Superego → second-pass critique (internal governor)
         _cfg = self.cfg
         _critique = evaluate_superego_critique(
