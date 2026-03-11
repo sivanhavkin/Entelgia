@@ -2036,6 +2036,109 @@ class TestQueryCooldown:
         assert fixy_should_search("latest AI research") is True
 
 
+class TestSanitizedQueryCooldown:
+    """Tests that per-query cooldown is keyed on the sanitized query, not seed_text.
+
+    This guards against the bug where two fixy_should_search() calls with
+    *different* seed_text strings that resolve to the *same* sanitized query
+    would both fire searches within the same cooldown window.
+    """
+
+    def test_same_sanitized_query_different_seed_text_is_suppressed(self):
+        """Different seed_text values with identical query_cooldown_key must share cooldown."""
+        query_key = "self-awareness emerges ourselves lens identity truth"
+        # Both seeds contain trigger keyword "truth" but the seeds differ
+        seed1 = "TOPIC: Freedom — what is the truth about authentic living?"
+        seed2 = "TOPIC: truth & epistemology — how does truth shape identity?"
+
+        assert fixy_should_search(seed1, query_cooldown_key=query_key) is True
+        # Same sanitized query key within cooldown window → must be suppressed
+        assert fixy_should_search(seed2, query_cooldown_key=query_key) is False
+
+    def test_different_sanitized_queries_are_independent(self):
+        """Different query_cooldown_key values must not share a cooldown slot."""
+        query_key1 = "self-awareness emerges ourselves lens identity truth"
+        query_key2 = "credibility bias epistemic justification sources"
+        # Use different seeds with different trigger keywords so per-trigger
+        # cooldown does not block the second call
+        seed1 = "TOPIC: Freedom — what is the truth about authentic living?"
+        seed2 = "TOPIC: sourcing — credibility of evidence matters for research"
+
+        assert fixy_should_search(seed1, query_cooldown_key=query_key1) is True
+        # Different query key → must be allowed through (per-query cooldown is independent)
+        assert fixy_should_search(seed2, query_cooldown_key=query_key2) is True
+
+    def test_query_cooldown_key_expires(self):
+        """Per-sanitized-query cooldown must expire after _COOLDOWN_TURNS turns."""
+        from entelgia import fixy_research_trigger as frt
+
+        query_key = "self-awareness emerges ourselves lens identity truth"
+        seed1 = "TOPIC: Freedom — what is the truth about authentic living?"
+        seed2 = "TOPIC: truth & epistemology — how does truth shape identity?"
+
+        assert fixy_should_search(seed1, query_cooldown_key=query_key) is True
+        assert fixy_should_search(seed2, query_cooldown_key=query_key) is False
+        # Advance past cooldown window
+        frt._trigger_turn_counter += frt._COOLDOWN_TURNS
+        assert fixy_should_search(seed2, query_cooldown_key=query_key) is True
+
+    def test_no_query_cooldown_key_falls_back_to_seed_text(self):
+        """Without query_cooldown_key, per-query cooldown still uses seed_text as before."""
+        seed = "latest AI research"
+        assert fixy_should_search(seed) is True
+        assert fixy_should_search(seed) is False
+
+    def test_maybe_add_web_context_deduplicates_same_sanitized_query(self):
+        """maybe_add_web_context must suppress a second call whose sanitized query matches first.
+
+        Simulates the bug scenario from the 2026-03-11 logs: two turns with
+        different seed_text but the same sanitized query should result in only
+        one network search.
+        """
+        from unittest.mock import patch
+
+        from entelgia.web_research import maybe_add_web_context
+
+        # Minimal source bundle that passes all quality gates
+        bundle = {
+            "query": "self-awareness emerges ourselves lens identity truth",
+            "sources": [
+                {
+                    "url": "https://example.com/article",
+                    "title": "Self-Awareness and Identity",
+                    "snippet": "Self-awareness helps identify truth.",
+                    "text": (
+                        "self-awareness emerges ourselves lens identity truth "
+                        * 30
+                    ),
+                }
+            ],
+        }
+
+        dialog = [
+            {"role": "Socrates", "text": (
+                "Reflecting upon the true essence of freedom, I find it to be a concept "
+                "deeply intertwined within our psyche. Self-awareness emerges when we "
+                "understand ourselves through the lens of memory, which shapes identity "
+                "and perception of truth within society. " * 3
+            )},
+        ]
+
+        seed1 = "TOPIC: Freedom\nEXPLORE consequences. Where does this line of thinking lead?"
+        seed2 = "TOPIC: truth & epistemology\nQUESTION a hidden assumption. What are we taking for"
+
+        with patch("entelgia.web_research.search_and_fetch", return_value=bundle) as mock_search:
+            maybe_add_web_context(seed1, dialog_tail=dialog)
+            maybe_add_web_context(seed2, dialog_tail=dialog)
+
+        # The network search should have been called at most once because the
+        # second call's sanitized query duplicates the first.
+        assert mock_search.call_count <= 1, (
+            f"Expected search_and_fetch to be called at most once, "
+            f"but it was called {mock_search.call_count} time(s)"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Failed-URL blacklist (Fix 1)
 # ---------------------------------------------------------------------------

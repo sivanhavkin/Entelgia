@@ -1145,11 +1145,18 @@ def maybe_add_web_context(
                 )
                 return ""
 
-        if not fixy_should_search(seed_text, dialog_tail, fixy_reason):
+        # Build the sanitized query early so it can be used as the per-query
+        # cooldown key.  Two calls with different seed_text values that resolve
+        # to the same search query will share a single cooldown slot, preventing
+        # duplicate searches within the cooldown window.
+        query = build_research_query(seed_text, dialog_tail, fixy_reason)
+
+        if not fixy_should_search(
+            seed_text, dialog_tail, fixy_reason, query_cooldown_key=query
+        ):
             logger.debug("maybe_add_web_context: Fixy decided no search needed.")
             return ""
 
-        query = build_research_query(seed_text, dialog_tail, fixy_reason)
         logger.info("sanitized query: %r", query)
 
         # Use cached bundle when available
