@@ -20,6 +20,9 @@ It represents exploration goals rather than fixed delivery promises.
 - ✅ **Limbic hijack** — Id-dominant emotional override with temporary Superego suppression (v2.7.0)
 - ✅ **Meta output refinement** — context-sensitive meta logging replacing constant noise (v2.7.0)
 - ✅ **Web Research Module** — Fixy-triggered DuckDuckGo search, credibility evaluation, and external knowledge injection (v2.8.0)
+- ✅ **Forgetting Policy** — per-layer TTL expiry (`ltm_apply_forgetting_policy`) purges stale LTM rows automatically each dream cycle
+- ✅ **Affective Routing** — `ltm_search_affective()` ranks memories by blended importance + emotion-intensity score
+- ✅ **Confidence Metadata** — optional `confidence` (0–1) and `provenance` fields on every LTM row; `dream_cycle()` tags insertions automatically
 
 Focus: stability, clarity, and architectural refinement.
 

@@ -341,6 +341,14 @@ class Config:
     debug: bool = (
         False  # Enable DEBUG-level logging (True = verbose, False = INFO only)
     )
+    # ── Forgetting Policy (Feature 1) ──────────────────────────────────────
+    # TTL in seconds per memory layer.  Set to 0 to disable expiry for a layer.
+    forgetting_enabled: bool = True
+    forgetting_episodic_ttl: int = 7 * 24 * 3600     # subconscious/episodic → 7 days
+    forgetting_semantic_ttl: int = 90 * 24 * 3600    # conscious/semantic → 90 days
+    forgetting_autobio_ttl: int = 365 * 24 * 3600    # autobiographical → 365 days
+    # ── Affective Routing (Feature 2) ──────────────────────────────────────
+    affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.
@@ -967,7 +975,10 @@ class MemoryCore:
                         intrusive INTEGER DEFAULT 0,
                         suppressed INTEGER DEFAULT 0,
                         retrain_status INTEGER DEFAULT 0,
-                        signature_hex TEXT DEFAULT NULL
+                        signature_hex TEXT DEFAULT NULL,
+                        expires_at TEXT DEFAULT NULL,
+                        confidence REAL DEFAULT NULL,
+                        provenance TEXT DEFAULT NULL
                     );
                 """)
                 conn.execute(
@@ -982,6 +993,20 @@ class MemoryCore:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_mem_importance ON memories(importance DESC);"
                 )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_mem_expires ON memories(expires_at);"
+                )
+
+                # Migrate existing databases: add new columns if they don't exist yet
+                for col, col_def in [
+                    ("expires_at", "TEXT DEFAULT NULL"),
+                    ("confidence", "REAL DEFAULT NULL"),
+                    ("provenance", "TEXT DEFAULT NULL"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE memories ADD COLUMN {col} {col_def}")
+                    except Exception:
+                        pass  # column already exists
 
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS agent_state (
@@ -1084,6 +1109,35 @@ class MemoryCore:
         self.stm_save(agent_name, entries)
         logger.debug(f"STM entry signed for {agent_name}")
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Layer → TTL mapping for Forgetting Policy (Feature 1)
+    # ──────────────────────────────────────────────────────────────────────
+    _LAYER_TTL_ATTR: Dict[str, str] = {
+        "subconscious": "forgetting_episodic_ttl",
+        "episodic": "forgetting_episodic_ttl",
+        "conscious": "forgetting_semantic_ttl",
+        "semantic": "forgetting_semantic_ttl",
+        "autobiographical": "forgetting_autobio_ttl",
+    }
+
+    @staticmethod
+    def _compute_expires_at(layer: str, ts: str) -> Optional[str]:
+        """Return ISO expiry timestamp for *layer* starting from *ts*, or None if disabled."""
+        global CFG
+        if CFG is None or not CFG.forgetting_enabled:
+            return None
+        attr = MemoryCore._LAYER_TTL_ATTR.get(layer)
+        if attr is None:
+            return None
+        ttl = getattr(CFG, attr, 0)
+        if ttl <= 0:
+            return None
+        try:
+            base = dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return (base + dt.timedelta(seconds=ttl)).isoformat()
+        except Exception:
+            return None
+
     def ltm_insert(
         self,
         agent: str,
@@ -1099,12 +1153,18 @@ class MemoryCore:
         suppressed: int = 0,
         retrain_status: int = 0,
         ts: Optional[str] = None,
+        confidence: Optional[float] = None,
+        provenance: Optional[str] = None,
     ) -> str:
         """Insert entry to long-term memory with cryptographic signature."""
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
 
-        # Create payload for signature
+        # Compute expiry timestamp based on layer TTL (Forgetting Policy, Feature 1)
+        expires_at = MemoryCore._compute_expires_at(layer, ts)
+
+        # Create payload for signature (unchanged – confidence/provenance not signed
+        # to preserve backward compatibility with existing rows)
         payload_for_sig = MemoryCore._build_ltm_payload(content, topic, emotion, ts)
         sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
@@ -1115,8 +1175,9 @@ class MemoryCore:
                     """
                     INSERT INTO memories
                     (id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
-                     promoted_from, intrusive, suppressed, retrain_status, signature_hex)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     promoted_from, intrusive, suppressed, retrain_status, signature_hex,
+                     expires_at, confidence, provenance)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         mem_id,
@@ -1134,6 +1195,9 @@ class MemoryCore:
                         suppressed,
                         retrain_status,
                         sig_hex,
+                        expires_at,
+                        confidence,
+                        provenance,
                     ),
                 )
                 conn.commit()
@@ -1221,6 +1285,72 @@ class MemoryCore:
         except Exception as e:
             logger.error(f"DB Query Error: {e}")
             return []
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 1: Forgetting Policy – TTL/decay per memory layer
+    # ──────────────────────────────────────────────────────────────────────
+
+    def ltm_apply_forgetting_policy(self) -> int:
+        """Delete expired memories according to the TTL forgetting policy.
+
+        Iterates over all memories that have an ``expires_at`` timestamp set
+        and removes those whose expiry has passed.  Returns the number of
+        memories that were purged.
+        """
+        now = dt.datetime.now(dt.timezone.utc).isoformat()
+        deleted = 0
+        try:
+            with self._conn() as conn:
+                cur = conn.execute(
+                    "DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?",
+                    (now,),
+                )
+                deleted = cur.rowcount
+                conn.commit()
+            if deleted:
+                logger.info(f"[ForgettingPolicy] Purged {deleted} expired memories.")
+        except Exception as e:
+            logger.error(f"Forgetting policy error: {e}")
+        return deleted
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 2: Affective Routing – emotion-weighted memory retrieval
+    # ──────────────────────────────────────────────────────────────────────
+
+    def ltm_search_affective(
+        self,
+        agent: str,
+        limit: int = 20,
+        emotion_weight: Optional[float] = None,
+        layer: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return memories ranked by a combined affective-semantic score.
+
+        The score is:
+            ``importance * (1 - w) + emotion_intensity * w``
+        where *w* is ``emotion_weight`` (default: ``CFG.affective_emotion_weight``).
+
+        Memories with high emotional intensity are surfaced ahead of those
+        that are merely important, giving the retrieval an affective bias
+        consistent with how human memory prioritizes emotionally salient
+        events.
+        """
+        global CFG
+        if emotion_weight is None:
+            emotion_weight = CFG.affective_emotion_weight if CFG is not None else 0.4
+        emotion_weight = max(0.0, min(1.0, emotion_weight))
+
+        # Fetch a larger candidate pool then re-rank in Python so we don't
+        # embed arithmetic in SQL (keeps the query portable).
+        raw = self.ltm_recent(agent, limit=limit * 3, layer=layer)
+
+        def _score(mem: Dict[str, Any]) -> float:
+            imp = float(mem.get("importance") or 0.0)
+            ei = float(mem.get("emotion_intensity") or 0.0)
+            return imp * (1.0 - emotion_weight) + ei * emotion_weight
+
+        ranked = sorted(raw, key=_score, reverse=True)
+        return ranked[:limit]
 
     def get_agent_state(self, agent: str) -> Dict[str, float]:
         """Get agent's internal drives/state."""
@@ -2942,6 +3072,7 @@ class MainScript:
             emotion_intensity=float(inten),
             importance=float(imp),
             source="dream",
+            provenance="dream_reflection",
         )
 
         promoted = 0
@@ -2964,6 +3095,7 @@ class MainScript:
                     importance=im,
                     source="dream",
                     promoted_from="subconscious",
+                    provenance="dream_promotion",
                 )
                 promoted += 1
 
@@ -2979,6 +3111,12 @@ class MainScript:
 
         logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
         agent.energy_level = AGENT_INITIAL_ENERGY
+
+        # Apply forgetting policy at the end of each dream cycle (Feature 1)
+        purged = self.memory.ltm_apply_forgetting_policy()
+        if purged:
+            logger.info(f"[ForgettingPolicy] dream_cycle purged {purged} expired memories for {agent.name}.")
+
         print(
             Fore.YELLOW
             + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
