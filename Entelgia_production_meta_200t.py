@@ -3036,8 +3036,10 @@ class MainScript:
                 # Check if Fixy should be allowed to speak
                 # Fixy is excluded entirely when enable_observer is False
                 if self.cfg.enable_observer:
-                    allow_fixy, fixy_prob, _repeating_agent = self.dialogue_engine.should_allow_fixy(
-                        self.dialog, self.turn_index
+                    allow_fixy, fixy_prob, _repeating_agent = (
+                        self.dialogue_engine.should_allow_fixy(
+                            self.dialog, self.turn_index
+                        )
                     )
                 else:
                     allow_fixy, fixy_prob = False, 0.0
