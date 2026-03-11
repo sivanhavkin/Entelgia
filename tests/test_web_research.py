@@ -1995,3 +1995,143 @@ class TestBranchLevelDebugLogging:
             "detected_trigger=" in m and "detected_trigger=None" not in m
             for m in dialogue_trigger_msgs
         ), "Dialogue branch should find a trigger in at least one turn"
+
+
+# ---------------------------------------------------------------------------
+# Per-query cooldown (Fix 2)
+# ---------------------------------------------------------------------------
+
+
+class TestQueryCooldown:
+    """Tests for the per-query cooldown in fixy_should_search."""
+
+    def test_same_query_within_cooldown_is_suppressed(self):
+        """Same seed_text within cooldown window must not trigger twice."""
+        assert fixy_should_search("latest AI research") is True
+        assert fixy_should_search("latest AI research") is False
+
+    def test_different_queries_are_independent(self):
+        """Two different seed texts with the same trigger word should each fire once."""
+        assert fixy_should_search("latest AI research") is True
+        # Different query text – per-query cooldown should not block this
+        assert fixy_should_search("latest quantum computing") is True
+
+    def test_query_cooldown_expires(self):
+        """Per-query cooldown must expire after _COOLDOWN_TURNS turns."""
+        from entelgia import fixy_research_trigger as frt
+
+        assert fixy_should_search("latest AI research") is True
+        assert fixy_should_search("latest AI research") is False
+        # Advance the turn counter past the cooldown window
+        frt._trigger_turn_counter += frt._COOLDOWN_TURNS
+        assert fixy_should_search("latest AI research") is True
+
+    def test_clear_cooldown_resets_query_state(self):
+        """clear_trigger_cooldown must also clear per-query state."""
+        from entelgia.fixy_research_trigger import clear_trigger_cooldown
+
+        assert fixy_should_search("latest AI research") is True
+        assert fixy_should_search("latest AI research") is False
+        clear_trigger_cooldown()
+        assert fixy_should_search("latest AI research") is True
+
+
+# ---------------------------------------------------------------------------
+# Failed-URL blacklist (Fix 1)
+# ---------------------------------------------------------------------------
+
+
+class TestFailedUrlBlacklist:
+    """Tests for the _failed_urls blacklist in web_tool.fetch_page_text."""
+
+    def test_blacklisted_url_returns_empty_result(self):
+        """A URL added to the blacklist must return empty title/text immediately."""
+        from entelgia.web_tool import _failed_urls, fetch_page_text
+
+        url = "https://example.com/blocked"
+        _failed_urls.add(url)
+        result = fetch_page_text(url)
+        assert result == {"url": url, "title": "", "text": ""}
+
+    def test_403_response_adds_url_to_blacklist(self):
+        """A 403 HTTP response must add the URL to _failed_urls."""
+        from unittest.mock import MagicMock, patch
+
+        import requests
+
+        from entelgia.web_tool import _failed_urls, fetch_page_text
+
+        url = "https://example.com/forbidden"
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        http_error = requests.HTTPError(response=mock_response)
+
+        with patch("entelgia.web_tool.requests.get") as mock_get:
+            mock_get.return_value.__enter__ = lambda s: s
+            mock_get.return_value.__exit__ = MagicMock(return_value=False)
+            mock_get.return_value.raise_for_status.side_effect = http_error
+            mock_get.return_value.status_code = 403
+            result = fetch_page_text(url)
+
+        assert url in _failed_urls
+        assert result == {"url": url, "title": "", "text": ""}
+
+    def test_404_response_adds_url_to_blacklist(self):
+        """A 404 HTTP response must add the URL to _failed_urls."""
+        from unittest.mock import MagicMock, patch
+
+        import requests
+
+        from entelgia.web_tool import _failed_urls, fetch_page_text
+
+        url = "https://example.com/notfound"
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        http_error = requests.HTTPError(response=mock_response)
+
+        with patch("entelgia.web_tool.requests.get") as mock_get:
+            mock_get.return_value.raise_for_status.side_effect = http_error
+            result = fetch_page_text(url)
+
+        assert url in _failed_urls
+        assert result == {"url": url, "title": "", "text": ""}
+
+    def test_non_403_404_does_not_blacklist_url(self):
+        """A 500 HTTP response must NOT add the URL to _failed_urls."""
+        from unittest.mock import MagicMock, patch
+
+        import requests
+
+        from entelgia.web_tool import _failed_urls, fetch_page_text
+
+        url = "https://example.com/servererror"
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        http_error = requests.HTTPError(response=mock_response)
+
+        with patch("entelgia.web_tool.requests.get") as mock_get:
+            mock_get.return_value.raise_for_status.side_effect = http_error
+            fetch_page_text(url)
+
+        assert url not in _failed_urls
+
+    def test_blacklisted_url_is_skipped_on_subsequent_calls(self):
+        """After being blacklisted, a URL must not attempt a network request."""
+        from unittest.mock import patch
+
+        from entelgia.web_tool import _failed_urls, fetch_page_text
+
+        url = "https://example.com/cached-failure"
+        _failed_urls.add(url)
+
+        with patch("entelgia.web_tool.requests.get") as mock_get:
+            fetch_page_text(url)
+            mock_get.assert_not_called()
+
+    def test_clear_failed_urls_resets_blacklist(self):
+        """clear_failed_urls must empty the blacklist."""
+        from entelgia.web_tool import _failed_urls, clear_failed_urls
+
+        _failed_urls.add("https://example.com/x")
+        clear_failed_urls()
+        assert len(_failed_urls) == 0

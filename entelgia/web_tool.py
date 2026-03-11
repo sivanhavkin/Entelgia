@@ -34,6 +34,22 @@ _DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/"
 
 _UNWANTED_TAGS = {"script", "style", "nav", "footer", "header", "aside", "noscript"}
 
+# ---------------------------------------------------------------------------
+# Failed URL blacklist
+# ---------------------------------------------------------------------------
+
+# URLs that returned a permanent error (403/404) are remembered for the
+# duration of the process so that subsequent fetches are skipped instantly.
+_failed_urls: set = set()
+
+
+def clear_failed_urls() -> None:
+    """Reset the failed-URL blacklist.
+
+    Intended for use in tests to ensure a clean state between test runs.
+    """
+    _failed_urls.clear()
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -151,6 +167,9 @@ def fetch_page_text(url: str, text_limit: int = _DEFAULT_TEXT_LIMIT) -> Dict[str
     On error ``title`` and ``text`` will be empty strings.
     """
     result: Dict[str, str] = {"url": url, "title": "", "text": ""}
+    if url in _failed_urls:
+        logger.debug("fetch_page_text: skipping blacklisted URL %r", url)
+        return result
     try:
         response = requests.get(
             url,
@@ -158,6 +177,17 @@ def fetch_page_text(url: str, text_limit: int = _DEFAULT_TEXT_LIMIT) -> Dict[str
             timeout=_REQUEST_TIMEOUT,
         )
         response.raise_for_status()
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code in (403, 404):
+            logger.warning(
+                "fetch_page_text: %d for %r; adding to failed-URL blacklist",
+                exc.response.status_code,
+                url,
+            )
+            _failed_urls.add(url)
+        else:
+            logger.warning("fetch_page_text: failed to fetch %r: %s", url, exc)
+        return result
     except requests.RequestException as exc:
         logger.warning("fetch_page_text: failed to fetch %r: %s", url, exc)
         return result
