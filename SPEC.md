@@ -663,10 +663,13 @@ Two independent cooldown layers prevent excessive searching:
 
 1. **Per-trigger cooldown** (`_recent_triggers`) — a specific trigger keyword cannot
    fire again within `_COOLDOWN_TURNS` (5) turns after it last triggered a search.
-2. **Per-query cooldown** (`_recent_queries`) — the exact `seed_text` passed to
-   `fixy_should_search` is also tracked; if the same string is seen again within
+2. **Per-query cooldown** (`_recent_queries`) — the *sanitized search query* built by
+   `build_research_query` is tracked; if the same query string is seen again within
    `_COOLDOWN_TURNS` turns the search is suppressed immediately, before any trigger
-   keyword evaluation.
+   keyword evaluation.  `maybe_add_web_context` passes this pre-built query to
+   `fixy_should_search` via the `query_cooldown_key` parameter so that different
+   `seed_text` values that resolve to the same compact query share a single cooldown
+   slot.
 
 Both cooldown dicts are reset by `clear_trigger_cooldown()`.
 

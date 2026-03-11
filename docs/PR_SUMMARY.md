@@ -177,11 +177,16 @@ Module and Fixy's intervention quality.
 ### Fix 2 — Per-Query Cooldown (`fixy_research_trigger.py`) ⏱️
 
 - Added `_recent_queries: Dict[str, int]` alongside the existing `_recent_triggers` dict.
-- At the start of `fixy_should_search`, if `seed_text` was already searched within
+- At the start of `fixy_should_search`, if the same sanitized query was already searched within
   `_COOLDOWN_TURNS` turns, the function returns `False` immediately.
-- Different query strings are tracked independently — only the exact same `seed_text`
-  is suppressed.
-- `clear_trigger_cooldown()` now also clears `_recent_queries`.
+- `fixy_should_search` accepts an optional `query_cooldown_key` parameter; when provided,
+  this pre-built sanitized query string is used as the `_recent_queries` key instead of
+  `seed_text`.  `maybe_add_web_context` builds the query early and passes it as
+  `query_cooldown_key` so that different `seed_text` values resolving to the same compact
+  query share a single cooldown slot (fixes repeated searches despite cooldown).
+- When a search is suppressed by per-query cooldown, an INFO-level log message shows the
+  sanitized query key and the relevant turn numbers for easier debugging.
+- `clear_trigger_cooldown()` also clears `_recent_queries`.
 
 ### Fix 3 — Fixy 1–2 Sentence Prompt (`fixy_interactive.py`) 🎯
 

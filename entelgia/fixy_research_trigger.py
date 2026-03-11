@@ -240,6 +240,7 @@ def fixy_should_search(
     seed_text: str,
     dialog_tail: Optional[List[Dict[str, str]]] = None,
     fixy_reason: Optional[str] = None,
+    query_cooldown_key: Optional[str] = None,
 ) -> bool:
     """Decide whether Fixy should trigger a web research cycle.
 
@@ -265,6 +266,12 @@ def fixy_should_search(
         inspected.
     fixy_reason:
         Optional meta-reasoning signal emitted by Fixy.
+    query_cooldown_key:
+        Optional pre-built sanitized search query string.  When provided,
+        this key is used for ``_recent_queries`` tracking instead of
+        ``seed_text``.  Pass the actual sanitized query (as built by
+        ``build_research_query``) so that different ``seed_text`` values
+        that resolve to the same search query share a single cooldown slot.
 
     Returns
     -------
@@ -274,14 +281,22 @@ def fixy_should_search(
     _trigger_turn_counter += 1
     current_turn = _trigger_turn_counter
 
-    # 0. Per-query cooldown: if this exact seed_text was already searched
-    #    within the cooldown window, suppress the search immediately.
-    if seed_text in _recent_queries:
-        if (current_turn - _recent_queries[seed_text]) <= _COOLDOWN_TURNS:
-            logger.debug(
-                "query %r is in cooldown (last fired on turn %d, current %d), skipping",
-                seed_text[:160],
-                _recent_queries[seed_text],
+    # Determine the key used for per-query cooldown tracking.
+    # When the caller provides a pre-built sanitized query, use that so
+    # that different seed_text values which resolve to the same search
+    # query correctly share a cooldown slot.
+    _cooldown_key = query_cooldown_key if query_cooldown_key is not None else seed_text
+
+    # 0. Per-query cooldown: if the same sanitized query (or seed_text when
+    #    no sanitized key is given) was already searched within the cooldown
+    #    window, suppress the search immediately.
+    if _cooldown_key in _recent_queries:
+        if (current_turn - _recent_queries[_cooldown_key]) <= _COOLDOWN_TURNS:
+            logger.info(
+                "per-query cooldown active: query %r skipped "
+                "(last fired on turn %d, current %d)",
+                _cooldown_key[:160],
+                _recent_queries[_cooldown_key],
                 current_turn,
             )
             return False
@@ -303,7 +318,7 @@ def fixy_should_search(
             )
         else:
             _recent_triggers[trigger] = current_turn
-            _recent_queries[seed_text] = current_turn
+            _recent_queries[_cooldown_key] = current_turn
             logger.info("web search triggered by keyword: %r", trigger)
             return True
 
@@ -333,7 +348,7 @@ def fixy_should_search(
                     )
                     continue
                 _recent_triggers[trigger] = current_turn
-                _recent_queries[seed_text] = current_turn
+                _recent_queries[_cooldown_key] = current_turn
                 logger.info("web search triggered by keyword: %r", trigger)
                 return True
 
@@ -343,7 +358,7 @@ def fixy_should_search(
         (fixy_reason or "")[:160],
     )
     if fixy_reason and fixy_reason in _FIXY_RESEARCH_REASONS:
-        _recent_queries[seed_text] = current_turn
+        _recent_queries[_cooldown_key] = current_turn
         logger.info("web search triggered by fixy_reason: %r", fixy_reason)
         return True
 
