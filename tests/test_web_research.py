@@ -2090,7 +2090,10 @@ class TestFailedUrlBlacklist:
         http_error = requests.HTTPError(response=mock_response)
 
         with patch("entelgia.web_tool.requests.get") as mock_get:
+            mock_get.return_value.__enter__ = lambda s: s
+            mock_get.return_value.__exit__ = MagicMock(return_value=False)
             mock_get.return_value.raise_for_status.side_effect = http_error
+            mock_get.return_value.status_code = 404
             result = fetch_page_text(url)
 
         assert url in _failed_urls

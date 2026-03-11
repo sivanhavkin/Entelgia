@@ -285,7 +285,6 @@ def fixy_should_search(
                 current_turn,
             )
             return False
-    _recent_queries[seed_text] = current_turn
 
     # 1. Check seed text
     logger.debug(
@@ -304,6 +303,7 @@ def fixy_should_search(
             )
         else:
             _recent_triggers[trigger] = current_turn
+            _recent_queries[seed_text] = current_turn
             logger.info("web search triggered by keyword: %r", trigger)
             return True
 
@@ -333,6 +333,7 @@ def fixy_should_search(
                     )
                     continue
                 _recent_triggers[trigger] = current_turn
+                _recent_queries[seed_text] = current_turn
                 logger.info("web search triggered by keyword: %r", trigger)
                 return True
 
@@ -342,6 +343,7 @@ def fixy_should_search(
         (fixy_reason or "")[:160],
     )
     if fixy_reason and fixy_reason in _FIXY_RESEARCH_REASONS:
+        _recent_queries[seed_text] = current_turn
         logger.info("web search triggered by fixy_reason: %r", fixy_reason)
         return True
 

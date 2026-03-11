@@ -638,14 +638,34 @@ terms (`credibility`, `bias`, `epistemology`, `truth`, `reasoning`, `research`,
 When multiple triggers appear in the same fragment the highest-scoring one is chosen;
 ties are broken by earliest position.
 
+### Cooldown Mechanism
+
+Two independent cooldown layers prevent excessive searching:
+
+1. **Per-trigger cooldown** (`_recent_triggers`) — a specific trigger keyword cannot
+   fire again within `_COOLDOWN_TURNS` (5) turns after it last triggered a search.
+2. **Per-query cooldown** (`_recent_queries`) — the exact `seed_text` passed to
+   `fixy_should_search` is also tracked; if the same string is seen again within
+   `_COOLDOWN_TURNS` turns the search is suppressed immediately, before any trigger
+   keyword evaluation.
+
+Both cooldown dicts are reset by `clear_trigger_cooldown()`.
+
 ### Pipeline Steps
 
 1. `web_tool.web_search(query, max_results=5)` — DuckDuckGo HTML search
-2. `web_tool.fetch_page_text(url)` — download + extract text (limit 6 000 chars)
+2. `web_tool.fetch_page_text(url)` — download + extract text (limit 6 000 chars); skips blacklisted URLs
 3. `source_evaluator.evaluate_sources(sources)` — score each source
 4. Sort by `credibility_score` descending
 5. `research_context_builder.build_research_context(bundle, scored)` — format top-3
 6. Return context string for injection into `build_enriched_context(web_context=...)`
+
+### Failed-URL Blacklist
+
+`web_tool.fetch_page_text` maintains a module-level `_failed_urls` set.  When a
+fetch returns HTTP **403** or **404** the URL is added to the set and all future
+calls for that URL within the same process return an empty result immediately,
+without making a network request.  `clear_failed_urls()` resets the set.
 
 ### Query Rewriting
 

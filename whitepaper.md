@@ -731,6 +731,8 @@ Crucially:
 - It never blocks or crashes the main dialogue loop
 - All HTTP requests are time-bounded (10 s)
 - Memory persistence is opt-in (requires `db_path`)
+- URLs returning 403 or 404 are permanently blacklisted within the process, preventing repeated failed requests
+- Duplicate queries are suppressed by a per-query cooldown (5 turns) in addition to the per-trigger cooldown
 
 ### 22.3 Pipeline
 
@@ -738,10 +740,13 @@ Crucially:
 User message
 ↓
 fixy_research_trigger.fixy_should_search()
-↓ (True only when message contains research-intent keywords)
+  ├─ per-query cooldown check  ← suppresses duplicate seed_text within 5 turns
+  └─ per-trigger cooldown check ← suppresses same keyword within 5 turns
+↓ (True only when message contains research-intent keywords and cooldowns pass)
 web_tool.search_and_fetch(query)
   ├─ web_search()        ← DuckDuckGo HTML POST
   └─ fetch_page_text()   ← requests + BeautifulSoup
+        └─ blacklist check ← 403/404 URLs skipped permanently
 ↓
 source_evaluator.evaluate_sources()
 ↓

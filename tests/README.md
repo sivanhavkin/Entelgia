@@ -340,7 +340,7 @@ Tests verify the semantic similarity layer added to `InteractiveFixy._detect_rep
 
 ---
 
-### 🌐 Web Research Module Tests (166 tests)
+### 🌐 Web Research Module Tests (176 tests)
 
 The web research modules include unit tests for all components:
 
@@ -365,6 +365,8 @@ Tests cover:
 - ✅ **`_sanitize_text`** — possessive stripping, punctuation removal, agent-name removal, mode-string removal, whitespace normalisation
 - ✅ **`_compress_to_keywords`** — stopword removal, 6-word limit
 - ✅ **Trigger cooldown** — same keyword blocked within window; different keywords independent; `clear_cooldown` resets state
+- ✅ **Per-query cooldown** — same `seed_text` suppressed within cooldown window; different queries independent; cooldown expires after `_COOLDOWN_TURNS`; `clear_trigger_cooldown` resets per-query state
+- ✅ **Failed-URL blacklist** — URLs returning 403/404 are blacklisted and skipped on retry; non-403/404 errors do not blacklist; `clear_failed_urls` resets the set; blacklisted URLs make no network request
 - ✅ **Query cache** — second call with same query skips network; returns valid context
 - ✅ **Topic research cache** — same topic not repeated within session; different topics independent
 - ✅ **Quality gate** — skips injection when no pages fetched or topic overlap too low; injects when gate passes
