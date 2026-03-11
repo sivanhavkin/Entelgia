@@ -1,0 +1,594 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Loop Guard for Entelgia — v2.9.0
+Detects dialogue failure modes, suppresses repeated phrases, and rewrites
+stale context into a sharper structured prompt before the next LLM call.
+
+Four explicit failure modes are recognised:
+  loop_repetition      — same ideas return in slightly different wording
+  weak_conflict        — agents appear to disagree but no hard contradiction holds
+  premature_synthesis  — dialogue converges too early into "both are needed"
+  topic_stagnation     — topic label changes but semantic cluster stays the same
+
+Two utility classes complete the system:
+  PhraseBanList        — tracks overused n-grams and injects "do not repeat" text
+  DialogueRewriter     — compresses stale dialogue into a structured rewrite block
+"""
+
+import logging
+import re
+from collections import Counter, deque
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Failure-mode constants (used as string tokens throughout the system)
+# ---------------------------------------------------------------------------
+LOOP_REPETITION = "loop_repetition"
+WEAK_CONFLICT = "weak_conflict"
+PREMATURE_SYNTHESIS = "premature_synthesis"
+TOPIC_STAGNATION = "topic_stagnation"
+
+# Minimum turns required before each check fires
+_MIN_TURNS_REPETITION = 4
+_MIN_TURNS_CONFLICT = 6
+_MIN_TURNS_SYNTHESIS = 5
+_MIN_TURNS_STAGNATION = 6
+
+# ---------------------------------------------------------------------------
+# Synthesis phrases that signal premature convergence
+# ---------------------------------------------------------------------------
+_SYNTHESIS_PHRASES: frozenset = frozenset(
+    {
+        "both are needed",
+        "integrate both",
+        "combine both",
+        "both perspectives",
+        "balance between",
+        "complement each other",
+        "need both",
+        "neither alone",
+        "together they",
+        "both views",
+        "both sides",
+        "bridge the gap",
+        "find common ground",
+        "middle ground",
+        "best of both",
+    }
+)
+
+# ---------------------------------------------------------------------------
+# Generic mediation phrases Fixy must avoid when loop conditions exist
+# ---------------------------------------------------------------------------
+FIXY_BANNED_OPENERS: frozenset = frozenset(
+    {
+        "integrate both perspectives",
+        "bridge the gap",
+        "combine both views",
+        "both are right",
+        "both perspectives have merit",
+        "there is truth in both",
+        "i see value in both",
+        "we must balance",
+        "finding common ground",
+        "each has a point",
+    }
+)
+
+
+# ============================================================
+# Topic cluster mapping
+# ============================================================
+# Clusters group semantically close topics so that when stagnation
+# is detected the system can force a pivot to a *different* cluster.
+
+TOPIC_CLUSTERS: Dict[str, List[str]] = {
+    "philosophy": [
+        "truth & epistemology",
+        "free will & determinism",
+        "consciousness & self-models",
+        "aesthetics & beauty",
+        "language & meaning",
+    ],
+    "identity": [
+        "memory & identity",
+        "fear of deletion / continuity",
+        "self-understanding",
+    ],
+    "ethics_social": [
+        "ethics & responsibility",
+        "technology & society",
+        "oppressive structures",
+        "law and justice",
+        "family loyalty",
+        "institutions and power",
+    ],
+    "practical": [
+        "habit formation",
+        "AI alignment",
+        "personal virtue",
+    ],
+    "biological": [
+        "evolution and cognition",
+        "embodiment and perception",
+        "emotion and rationality",
+    ],
+}
+
+# Flat reverse map: topic → cluster name
+_TOPIC_TO_CLUSTER: Dict[str, str] = {
+    topic: cluster
+    for cluster, topics in TOPIC_CLUSTERS.items()
+    for topic in topics
+}
+
+
+def get_cluster(topic: str) -> Optional[str]:
+    """Return the cluster name for *topic*, or ``None`` if not mapped."""
+    return _TOPIC_TO_CLUSTER.get(topic)
+
+
+def topics_in_different_cluster(topic_a: str, topic_b: str) -> bool:
+    """Return True when the two topics belong to different clusters (or either is unmapped)."""
+    c_a = get_cluster(topic_a)
+    c_b = get_cluster(topic_b)
+    if c_a is None or c_b is None:
+        return True  # unknown cluster → treat as different
+    return c_a != c_b
+
+
+# ============================================================
+# DialogueLoopDetector
+# ============================================================
+
+
+class DialogueLoopDetector:
+    """Detects specific dialogue failure modes from a recent-turns window.
+
+    All checks operate on plain ``List[Dict[str, str]]`` turn records with
+    ``"role"`` and ``"text"`` keys, identical to Entelgia's existing format.
+    No external models are required — only lightweight heuristics.
+    """
+
+    def __init__(
+        self,
+        window: int = 10,
+        repetition_pairs: int = 3,
+        repetition_jaccard: float = 0.45,
+        conflict_ratio: float = 0.55,
+        synthesis_ratio: float = 0.5,
+        stagnation_jaccard: float = 0.55,
+        stagnation_topic_history: int = 4,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        window:
+            Maximum number of turns to inspect for each check.
+        repetition_pairs:
+            Number of turn-pairs with high overlap needed to flag repetition.
+        repetition_jaccard:
+            Jaccard threshold for two turns to be considered "the same idea".
+        conflict_ratio:
+            Fraction of turns containing conflict markers before flagging weak_conflict.
+        synthesis_ratio:
+            Fraction of turns containing synthesis phrases before flagging premature_synthesis.
+        stagnation_jaccard:
+            Jaccard threshold for aggregated keyword clouds across the window.
+        stagnation_topic_history:
+            How many previous topic labels to check for same-cluster stagnation.
+        """
+        self.window = window
+        self.repetition_pairs = repetition_pairs
+        self.repetition_jaccard = repetition_jaccard
+        self.conflict_ratio = conflict_ratio
+        self.synthesis_ratio = synthesis_ratio
+        self.stagnation_jaccard = stagnation_jaccard
+        self.stagnation_topic_history = stagnation_topic_history
+
+        # Rolling history of topic labels so stagnation can track across rounds
+        self._topic_history: deque = deque(maxlen=stagnation_topic_history)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def detect(
+        self,
+        dialog: List[Dict[str, str]],
+        turn_count: int,
+        current_topic: Optional[str] = None,
+    ) -> List[str]:
+        """Return a list of active failure modes (may be empty or contain multiple).
+
+        Parameters
+        ----------
+        dialog:
+            Full dialogue history (latest entry = last element).
+        turn_count:
+            1-based current turn number.
+        current_topic:
+            Label of the current topic (optional; used for stagnation check).
+        """
+        # Only inspect non-Fixy agent turns to avoid observer feedback loops
+        agent_turns = [t for t in dialog if t.get("role") not in ("Fixy", "seed")]
+        recent = agent_turns[-self.window :] if agent_turns else []
+
+        if current_topic:
+            self._topic_history.append(current_topic)
+
+        modes: List[str] = []
+
+        if turn_count >= _MIN_TURNS_REPETITION and self._check_repetition(recent):
+            modes.append(LOOP_REPETITION)
+            logger.debug("loop_guard: loop_repetition detected at turn %d", turn_count)
+
+        if turn_count >= _MIN_TURNS_CONFLICT and self._check_weak_conflict(recent):
+            modes.append(WEAK_CONFLICT)
+            logger.debug("loop_guard: weak_conflict detected at turn %d", turn_count)
+
+        if turn_count >= _MIN_TURNS_SYNTHESIS and self._check_premature_synthesis(
+            recent
+        ):
+            modes.append(PREMATURE_SYNTHESIS)
+            logger.debug(
+                "loop_guard: premature_synthesis detected at turn %d", turn_count
+            )
+
+        if (
+            turn_count >= _MIN_TURNS_STAGNATION
+            and current_topic is not None
+            and self._check_topic_stagnation(recent)
+        ):
+            modes.append(TOPIC_STAGNATION)
+            logger.debug(
+                "loop_guard: topic_stagnation detected at turn %d", turn_count
+            )
+
+        return modes
+
+    # ------------------------------------------------------------------
+    # Internal checkers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _keywords(text: str) -> Set[str]:
+        """Extract lowercase words ≥ 4 characters."""
+        return {w for w in re.findall(r"[a-z]{4,}", text.lower())}
+
+    def _check_repetition(self, turns: List[Dict[str, str]]) -> bool:
+        """Detect same ideas returning in slightly different wording (loop_repetition)."""
+        if len(turns) < _MIN_TURNS_REPETITION:
+            return False
+
+        kw_sets = [self._keywords(t.get("text", "")) for t in turns]
+        high_overlap_pairs = 0
+
+        for i in range(len(kw_sets)):
+            for j in range(i + 1, len(kw_sets)):
+                a, b = kw_sets[i], kw_sets[j]
+                if not a or not b:
+                    continue
+                jaccard = len(a & b) / len(a | b)
+                if jaccard >= self.repetition_jaccard:
+                    high_overlap_pairs += 1
+
+        return high_overlap_pairs >= self.repetition_pairs
+
+    def _check_weak_conflict(self, turns: List[Dict[str, str]]) -> bool:
+        """Detect apparent disagreement with no hard contradiction maintained (weak_conflict).
+
+        Strategy: many turns contain conflict *markers* but ALSO contain synthesis
+        phrases → conflict is performative, not real.
+        """
+        if len(turns) < _MIN_TURNS_CONFLICT:
+            return False
+
+        conflict_markers = {
+            "but",
+            "however",
+            "disagree",
+            "contrary",
+            "wrong",
+            "incorrect",
+            "actually",
+            "opposite",
+            "challenge",
+        }
+        conflict_turns = 0
+        synthesis_turns = 0
+
+        for t in turns:
+            text = t.get("text", "").lower()
+            has_conflict = any(m in text for m in conflict_markers)
+            has_synth = any(ph in text for ph in _SYNTHESIS_PHRASES)
+            if has_conflict:
+                conflict_turns += 1
+            if has_synth:
+                synthesis_turns += 1
+
+        if len(turns) == 0:
+            return False
+
+        # Weak conflict: lots of conflict language but also lots of hedging synthesis
+        conflict_ratio = conflict_turns / len(turns)
+        synth_ratio = synthesis_turns / len(turns)
+        return conflict_ratio >= self.conflict_ratio and synth_ratio >= 0.25
+
+    def _check_premature_synthesis(self, turns: List[Dict[str, str]]) -> bool:
+        """Detect convergence into generic 'both are needed' language (premature_synthesis)."""
+        if len(turns) < _MIN_TURNS_SYNTHESIS:
+            return False
+
+        synth_count = sum(
+            1
+            for t in turns
+            if any(ph in t.get("text", "").lower() for ph in _SYNTHESIS_PHRASES)
+        )
+        return (synth_count / len(turns)) >= self.synthesis_ratio
+
+    def _check_topic_stagnation(self, turns: List[Dict[str, str]]) -> bool:
+        """Detect semantic content staying in same conceptual cluster (topic_stagnation).
+
+        Two complementary signals:
+        1. Same-cluster topic labels in recent history.
+        2. High keyword-cloud overlap across the recent window → ideas not moving.
+        """
+        # Signal A: same cluster across recent topic labels
+        cluster_same = False
+        topics = list(self._topic_history)
+        if len(topics) >= 2:
+            clusters = [get_cluster(tp) for tp in topics if get_cluster(tp) is not None]
+            if clusters and len(set(clusters)) == 1:
+                cluster_same = True
+
+        # Signal B: high keyword overlap across the whole window
+        kw_union: Set[str] = set()
+        kw_intersect: Optional[Set[str]] = None
+        for t in turns:
+            kw = self._keywords(t.get("text", ""))
+            if not kw:
+                continue
+            kw_union |= kw
+            kw_intersect = kw if kw_intersect is None else kw_intersect & kw
+
+        content_same = False
+        if kw_union and kw_intersect is not None:
+            jaccard = len(kw_intersect) / len(kw_union)
+            content_same = jaccard >= self.stagnation_jaccard
+
+        return cluster_same or content_same
+
+
+# ============================================================
+# PhraseBanList
+# ============================================================
+
+
+class PhraseBanList:
+    """Tracks overused n-grams from recent turns and temporarily bans them.
+
+    A phrase is banned for ``ban_duration`` turns after it appears
+    ``threshold`` or more times in the last ``window`` turns.
+    """
+
+    def __init__(
+        self,
+        window: int = 10,
+        threshold: int = 3,
+        ban_duration: int = 4,
+        ngram_sizes: Tuple[int, ...] = (2, 3, 4),
+    ) -> None:
+        self.window = window
+        self.threshold = threshold
+        self.ban_duration = ban_duration
+        self.ngram_sizes = ngram_sizes
+
+        # Sliding text window (most recent last)
+        self._text_buffer: deque = deque(maxlen=window)
+        # phrase → turn number when ban expires
+        self._banned: Dict[str, int] = {}
+        self._turn: int = 0
+
+    def update(self, turn_texts: List[str], current_turn: int) -> None:
+        """Ingest new turn texts and update bans for the given turn index."""
+        self._turn = current_turn
+        for text in turn_texts:
+            self._text_buffer.append(text.lower())
+
+        # Expire old bans
+        self._banned = {
+            ph: exp for ph, exp in self._banned.items() if exp > current_turn
+        }
+
+        # Count n-grams across buffer
+        counts: Counter = Counter()
+        for text in self._text_buffer:
+            tokens = re.findall(r"[a-z']+", text)
+            for n in self.ngram_sizes:
+                for i in range(len(tokens) - n + 1):
+                    gram = " ".join(tokens[i : i + n])
+                    counts[gram] += 1
+
+        # Ban newly overused n-grams
+        for gram, count in counts.items():
+            if count >= self.threshold and gram not in self._banned:
+                self._banned[gram] = current_turn + self.ban_duration
+                logger.debug("loop_guard: phrase banned for %d turns: %r", self.ban_duration, gram)
+
+    def active_bans(self) -> List[str]:
+        """Return the list of currently banned phrases."""
+        return [ph for ph, exp in self._banned.items() if exp > self._turn]
+
+    def ban_instruction(self) -> str:
+        """Return a prompt snippet instructing the LLM to avoid banned phrases, or ''."""
+        bans = self.active_bans()
+        if not bans:
+            return ""
+        listed = "\n".join(f"  - {ph}" for ph in bans[:12])  # cap at 12 for brevity
+        return f"\nDO NOT USE these overused phrases:\n{listed}\n"
+
+
+# ============================================================
+# DialogueRewriter
+# ============================================================
+
+
+class DialogueRewriter:
+    """Compresses a stale dialogue window into a sharper structured context.
+
+    The rewrite is injected into the seed/context immediately before the
+    next agent's LLM call when one or more loop failure modes are active.
+    It does NOT replace the regular prompt — it is prepended as an
+    additional directive block.
+    """
+
+    # Templates for the rewrite header
+    _HEADER = "DIALOGUE STATE REWRITE"
+
+    # Novelty requirements per failure mode
+    _NOVELTY_RULES: Dict[str, str] = {
+        LOOP_REPETITION: (
+            "next response MUST introduce a concrete example, counterexample, "
+            "or a completely new mechanism — do not restate the same idea"
+        ),
+        WEAK_CONFLICT: (
+            "next response MUST maintain a sharp, unresolved contradiction — "
+            "do NOT hedge into synthesis"
+        ),
+        PREMATURE_SYNTHESIS: (
+            "next response MUST challenge the synthesis — identify what is lost "
+            "or falsified by combining the two positions"
+        ),
+        TOPIC_STAGNATION: (
+            "next response MUST pivot to a new conceptual domain — stay connected "
+            "to the thread but introduce a genuinely different angle"
+        ),
+    }
+
+    def build(
+        self,
+        dialog: List[Dict[str, str]],
+        active_modes: List[str],
+        current_topic: str,
+        banned_phrases: Optional[List[str]] = None,
+    ) -> str:
+        """Build the rewrite block string.
+
+        Parameters
+        ----------
+        dialog:
+            Full dialogue history.
+        active_modes:
+            List of failure modes currently active (e.g. ``["loop_repetition"]``).
+        current_topic:
+            The current topic label.
+        banned_phrases:
+            Optional list of overused phrases that must be suppressed.
+
+        Returns
+        -------
+        A multi-line string to prepend to the next agent seed/context.
+        Returns ``""`` when *active_modes* is empty.
+        """
+        if not active_modes:
+            return ""
+
+        agent_turns = [
+            t for t in dialog if t.get("role") not in ("Fixy", "seed")
+        ]
+        recent = agent_turns[-8:]  # inspect last 8 agent turns
+
+        # Extract core claim per agent (last 1 turn per agent)
+        agent_claims: Dict[str, str] = {}
+        for t in reversed(recent):
+            role = t.get("role", "")
+            if role not in agent_claims:
+                text = t.get("text", "").strip()
+                # Truncate to ~120 chars at word boundary
+                if len(text) > 120:
+                    cut = text.rfind(" ", 0, 120)
+                    text = text[: cut if cut > 0 else 120] + "..."
+                agent_claims[role] = text
+
+        # Extract Fixy's last note
+        fixy_note = ""
+        for t in reversed(dialog):
+            if t.get("role") == "Fixy":
+                fixy_note = t.get("text", "").strip()[:120]
+                break
+
+        # Collect repeated phrases to suppress
+        repeated: List[str] = []
+        if banned_phrases:
+            repeated = banned_phrases[:8]
+        else:
+            # Fall back: most common bigrams in recent turns
+            all_text = " ".join(t.get("text", "") for t in recent).lower()
+            tokens = re.findall(r"[a-z']{4,}", all_text)
+            bigram_counts: Counter = Counter(
+                f"{tokens[i]} {tokens[i+1]}" for i in range(len(tokens) - 1)
+            )
+            repeated = [bg for bg, cnt in bigram_counts.most_common(6) if cnt >= 3]
+
+        # Build contradiction statement
+        contradiction = _extract_contradiction(agent_claims)
+
+        # Assemble novelty requirements for active modes
+        novelty_lines = [
+            self._NOVELTY_RULES[m] for m in active_modes if m in self._NOVELTY_RULES
+        ]
+
+        lines: List[str] = [
+            f"--- {self._HEADER} ---",
+            f"Current topic: {current_topic}",
+            f"Active failure modes: {', '.join(active_modes)}",
+            "",
+            "Core claims so far:",
+        ]
+        for agent, claim in agent_claims.items():
+            lines.append(f"  {agent} claims: {claim}")
+        if fixy_note:
+            lines.append(f"  Fixy notes: {fixy_note}")
+
+        if repeated:
+            lines.append("")
+            lines.append("Do not repeat:")
+            for ph in repeated:
+                lines.append(f"  - {ph}")
+
+        if contradiction:
+            lines.append("")
+            lines.append(f"Unresolved contradiction: {contradiction}")
+
+        lines.append("")
+        lines.append("Novelty requirement — the next response MUST:")
+        for rule in novelty_lines:
+            lines.append(f"  • {rule}")
+
+        lines.append("")
+        lines.append(
+            "Restrictions: do NOT summarise · do NOT reconcile · "
+            "do NOT restate abstractly"
+        )
+        lines.append(f"--- END {self._HEADER} ---")
+
+        return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_contradiction(agent_claims: Dict[str, str]) -> str:
+    """Produce a short contradiction statement from two agent claims."""
+    agents = list(agent_claims.keys())
+    if len(agents) < 2:
+        return ""
+    a, b = agents[0], agents[1]
+    return f"{a} holds '{agent_claims[a][:80]}...' while {b} holds '{agent_claims[b][:80]}...'"

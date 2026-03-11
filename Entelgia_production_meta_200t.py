@@ -122,6 +122,16 @@ try:
         SelfReplication,
     )
     from entelgia.web_research import maybe_add_web_context
+    # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
+    from entelgia.loop_guard import (
+        DialogueLoopDetector,
+        PhraseBanList,
+        DialogueRewriter,
+        TOPIC_CLUSTERS,
+        _TOPIC_TO_CLUSTER,
+        _LOOP_AGENT_POLICY,
+    )
+    from entelgia.dialogue_engine import AgentMode
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -889,7 +899,12 @@ TOPIC_CYCLE = [
 
 
 class TopicManager:
-    """Manages topic rotation."""
+    """Manages topic rotation with optional cluster-aware pivots.
+
+    v2.9.0: ``force_cluster_pivot()`` selects a topic from a *different*
+    semantic cluster than the current one, so stagnation cannot be escaped
+    by cycling through conceptually adjacent labels.
+    """
 
     def __init__(
         self, topics: List[str], rotate_every_rounds: int = 1, shuffle: bool = False
@@ -916,6 +931,51 @@ class TopicManager:
         if self.rounds % self.rotate_every_rounds == 0 and self.topics:
             self.i = (self.i + 1) % len(self.topics)
             logger.info(f"Topic advanced to: {self.current()}")
+
+    def force_cluster_pivot(self) -> str:
+        """Select a topic from a different semantic cluster than the current one.
+
+        Used when topic_stagnation is detected: instead of advancing to the
+        next topic in the ordered list (which may be in the same cluster),
+        we jump to a candidate from a genuinely different cluster.
+
+        Returns the new topic label (the internal pointer is updated).
+        """
+        current = self.current()
+        current_cluster: Optional[str] = None
+        if ENTELGIA_ENHANCED:
+            try:
+                current_cluster = _TOPIC_TO_CLUSTER.get(current)
+            except Exception:
+                current_cluster = None
+
+        candidates = []
+        for topic in self.topics:
+            if topic == current:
+                continue
+            candidate_cluster: Optional[str] = None
+            if ENTELGIA_ENHANCED:
+                try:
+                    candidate_cluster = _TOPIC_TO_CLUSTER.get(topic)
+                except Exception:
+                    candidate_cluster = None
+            if current_cluster is None or candidate_cluster != current_cluster:
+                candidates.append(topic)
+
+        if candidates:
+            new_topic = random.choice(candidates)
+            try:
+                self.i = self.topics.index(new_topic)
+            except ValueError:
+                self.advance_round()
+                return self.current()
+            logger.info(
+                "TopicManager: cluster pivot from %r → %r", current, new_topic
+            )
+            return new_topic
+
+        self.advance_round()
+        return self.current()
 
 
 # ============================================
