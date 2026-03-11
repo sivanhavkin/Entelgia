@@ -344,9 +344,9 @@ class Config:
     # ── Forgetting Policy (Feature 1) ──────────────────────────────────────
     # TTL in seconds per memory layer.  Set to 0 to disable expiry for a layer.
     forgetting_enabled: bool = True
-    forgetting_episodic_ttl: int = 7 * 24 * 3600     # subconscious/episodic → 7 days
-    forgetting_semantic_ttl: int = 90 * 24 * 3600    # conscious/semantic → 90 days
-    forgetting_autobio_ttl: int = 365 * 24 * 3600    # autobiographical → 365 days
+    forgetting_episodic_ttl: int = 7 * 24 * 3600  # subconscious/episodic → 7 days
+    forgetting_semantic_ttl: int = 90 * 24 * 3600  # conscious/semantic → 90 days
+    forgetting_autobio_ttl: int = 365 * 24 * 3600  # autobiographical → 365 days
     # ── Affective Routing (Feature 2) ──────────────────────────────────────
     affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
 
@@ -1802,11 +1802,16 @@ class Agent:
         if stm:
             prompt += "\nRecent thoughts:\n"
             for e in stm[-3:]:
+                # Only the `text` field is forwarded; internal fields
+                # (_signature, emotion, ts, etc.) are intentionally excluded.
                 prompt += f"- {e.get('text', '')[:300]}\n"
 
         if recent_ltm:
             prompt += "\nKey memories:\n"
             for m in recent_ltm[:2]:
+                # Only the `content` field is forwarded; internal fields
+                # (signature_hex, expires_at, confidence, provenance, etc.)
+                # are intentionally excluded.
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
@@ -3115,7 +3120,9 @@ class MainScript:
         # Apply forgetting policy at the end of each dream cycle (Feature 1)
         purged = self.memory.ltm_apply_forgetting_policy()
         if purged:
-            logger.info(f"[ForgettingPolicy] dream_cycle purged {purged} expired memories for {agent.name}.")
+            logger.info(
+                f"[ForgettingPolicy] dream_cycle purged {purged} expired memories for {agent.name}."
+            )
 
         print(
             Fore.YELLOW

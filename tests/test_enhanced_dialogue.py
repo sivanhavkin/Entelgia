@@ -464,6 +464,211 @@ def test_seed_topic_consistency():
     assert not mismatches, f"seed_text topic mismatches detected: {mismatches}"
 
 
+# ---------------------------------------------------------------------------
+# Memory-to-prompt leakage prevention tests
+# ---------------------------------------------------------------------------
+
+
+def test_safe_ltm_content_excludes_internal_fields():
+    """_safe_ltm_content must return only the content string, never internal fields."""
+    from entelgia.context_manager import _safe_ltm_content
+
+    SIG = "aa" * 32  # 64-char hex sentinel uniquely identifying signature_hex leakage
+    mem = {
+        "content": "The unexamined life is not worth living.",
+        "importance": 0.9,
+        # --- internal fields that must NOT appear in output ---
+        "id": "deadbeef-cafe-babe-dead-feedface0000",
+        "agent": "Socrates",
+        "ts": "2024-01-01T00:00:00",
+        "layer": "conscious",
+        "source": "dream",
+        "promoted_from": "subconscious",
+        "intrusive": 0,
+        "suppressed": 0,
+        "retrain_status": 0,
+        "signature_hex": SIG,
+        "expires_at": "2099-12-31T23:59:59",
+        "confidence": 0.9,
+        "provenance": "dream_reflection_sentinel",
+    }
+
+    result = _safe_ltm_content(mem)
+
+    assert result == "The unexamined life is not worth living."
+    assert SIG not in result, "signature_hex leaked via _safe_ltm_content"
+    assert "deadbeef" not in result, "id leaked via _safe_ltm_content"
+    assert "2099-12-31" not in result, "expires_at leaked via _safe_ltm_content"
+    assert (
+        "dream_reflection_sentinel" not in result
+    ), "provenance leaked via _safe_ltm_content"
+
+
+def test_safe_stm_text_excludes_internal_fields():
+    """_safe_stm_text must return only the text string, never internal fields."""
+    from entelgia.context_manager import _safe_stm_text
+
+    STM_SIG = "bb" * 32  # 64-char hex sentinel uniquely identifying _signature leakage
+    entry = {
+        "text": "I wonder about the nature of thought.",
+        # --- internal fields that must NOT appear in output ---
+        "ts": "2024-01-01T00:00:00",
+        "topic": "consciousness",
+        "emotion": "curious",
+        "emotion_intensity": 0.7,
+        "importance": 0.6,
+        "source": "stm",
+        "sensitive": 0,
+        "_signature": STM_SIG,
+    }
+
+    result = _safe_stm_text(entry)
+
+    assert result == "I wonder about the nature of thought."
+    assert STM_SIG not in result, "_signature leaked via _safe_stm_text"
+    assert "consciousness" not in result, "topic leaked via _safe_stm_text"
+    assert "curious" not in result, "emotion leaked via _safe_stm_text"
+
+
+def test_no_internal_memory_fields_leak_into_prompt():
+    """Internal LTM/STM fields must never appear in the generated agent prompt."""
+    from entelgia.context_manager import ContextManager
+
+    # Use sentinel values that could ONLY appear in the prompt through leakage
+    SIG_SENTINEL = "aabbccdd" * 8  # 64-char hex — uniquely identifies signature_hex
+    STM_SIG_SENTINEL = "11223344" * 8  # 64-char hex — uniquely identifies _signature
+    UUID_SENTINEL = "deadbeef-cafe-babe-dead-feedface0000"
+    EXPIRES_SENTINEL = "2099-12-31T23:59:59"
+    PROV_SENTINEL = "dream_reflection_leak_sentinel"
+
+    ltm = [
+        {
+            "content": "Consciousness is a deep mystery worth exploring.",
+            "importance": 0.85,
+            # Internal fields — must not leak
+            "id": UUID_SENTINEL,
+            "agent": "Socrates",
+            "ts": "2024-01-01T00:00:00",
+            "layer": "conscious",
+            "source": "stm",
+            "promoted_from": "subconscious",
+            "intrusive": 0,
+            "suppressed": 0,
+            "retrain_status": 0,
+            "signature_hex": SIG_SENTINEL,
+            "expires_at": EXPIRES_SENTINEL,
+            "confidence": 0.9,
+            "provenance": PROV_SENTINEL,
+        }
+    ]
+
+    stm = [
+        {
+            "text": "I wonder about the nature of thought itself.",
+            # Internal fields — must not leak
+            "ts": "2024-01-01T00:00:00",
+            "topic": "consciousness",
+            "emotion": "curious",
+            "emotion_intensity": 0.7,
+            "importance": 0.6,
+            "source": "stm",
+            "sensitive": 0,
+            "_signature": STM_SIG_SENTINEL,
+        }
+    ]
+
+    mgr = ContextManager()
+    drives = {"id_strength": 5.0, "ego_strength": 5.0, "superego_strength": 5.0}
+    debate_profile = {"style": "integrative"}
+
+    prompt = mgr.build_enriched_context(
+        agent_name="Socrates",
+        agent_lang="en",
+        persona="A philosopher who seeks truth through questioning.",
+        drives=drives,
+        user_seed="TOPIC: consciousness",
+        dialog_tail=[],
+        stm=stm,
+        ltm=ltm,
+        debate_profile=debate_profile,
+    )
+
+    # --- Assert no internal sentinel values appear in the prompt ---
+    assert SIG_SENTINEL not in prompt, "signature_hex leaked into agent prompt"
+    assert STM_SIG_SENTINEL not in prompt, "_signature leaked into agent prompt"
+    assert UUID_SENTINEL not in prompt, "id (UUID) leaked into agent prompt"
+    assert EXPIRES_SENTINEL not in prompt, "expires_at leaked into agent prompt"
+    assert PROV_SENTINEL not in prompt, "provenance leaked into agent prompt"
+
+    # --- Assert the human-readable content IS present ---
+    assert "Consciousness is a deep mystery worth exploring." in prompt
+    assert "I wonder about the nature of thought itself." in prompt
+
+    _print_table(
+        ["check", "pass?"],
+        [
+            ["signature_hex not in prompt", "✓" if SIG_SENTINEL not in prompt else "✗"],
+            [
+                "_signature not in prompt",
+                "✓" if STM_SIG_SENTINEL not in prompt else "✗",
+            ],
+            ["uuid not in prompt", "✓" if UUID_SENTINEL not in prompt else "✗"],
+            [
+                "expires_at not in prompt",
+                "✓" if EXPIRES_SENTINEL not in prompt else "✗",
+            ],
+            ["provenance not in prompt", "✓" if PROV_SENTINEL not in prompt else "✗"],
+            [
+                "ltm content present",
+                "✓" if "Consciousness is a deep mystery" in prompt else "✗",
+            ],
+            [
+                "stm text present",
+                "✓" if "I wonder about the nature of thought" in prompt else "✗",
+            ],
+        ],
+        title="test_no_internal_memory_fields_leak_into_prompt",
+    )
+
+
+def test_internal_field_constants_are_complete():
+    """_INTERNAL_LTM_FIELDS and _INTERNAL_STM_FIELDS must cover all known internal fields."""
+    from entelgia.context_manager import _INTERNAL_LTM_FIELDS, _INTERNAL_STM_FIELDS
+
+    # All LTM columns that are NOT meant for the LLM
+    expected_ltm_internal = {
+        "id",
+        "agent",
+        "ts",
+        "layer",
+        "source",
+        "promoted_from",
+        "intrusive",
+        "suppressed",
+        "retrain_status",
+        "signature_hex",
+        "expires_at",
+        "confidence",
+        "provenance",
+    }
+    # All STM fields that are NOT meant for the LLM
+    expected_stm_internal = {
+        "ts",
+        "topic",
+        "emotion",
+        "emotion_intensity",
+        "source",
+        "sensitive",
+        "_signature",
+    }
+
+    missing_ltm = expected_ltm_internal - _INTERNAL_LTM_FIELDS
+    missing_stm = expected_stm_internal - _INTERNAL_STM_FIELDS
+
+    assert not missing_ltm, f"Missing LTM internal fields in constant: {missing_ltm}"
+    assert not missing_stm, f"Missing STM internal fields in constant: {missing_stm}"
+
+
 if __name__ == "__main__":
     import pytest
 

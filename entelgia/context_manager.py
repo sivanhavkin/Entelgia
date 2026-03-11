@@ -26,6 +26,61 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "'A recent thought', 'I ponder', or any variation of these phrases."
 )
 
+# ── Memory leakage guard ────────────────────────────────────────────────────
+# These sets enumerate every LTM / STM field that is *internal* to the
+# memory subsystem and must **never** be forwarded verbatim into an agent
+# prompt.  Only ``content`` (LTM) and ``text`` (STM) carry human-readable
+# narrative that the LLM should see.
+_INTERNAL_LTM_FIELDS: frozenset = frozenset(
+    {
+        "id",
+        "agent",
+        "ts",
+        "layer",
+        "source",
+        "promoted_from",
+        "intrusive",
+        "suppressed",
+        "retrain_status",
+        "signature_hex",  # HMAC-SHA256 cryptographic signature
+        "expires_at",  # TTL expiry timestamp (Forgetting Policy)
+        "confidence",  # confidence score (Confidence Metadata)
+        "provenance",  # memory origin label (Confidence Metadata)
+    }
+)
+
+_INTERNAL_STM_FIELDS: frozenset = frozenset(
+    {
+        "ts",
+        "topic",
+        "emotion",
+        "emotion_intensity",
+        "source",
+        "sensitive",
+        "_signature",  # HMAC-SHA256 cryptographic signature
+    }
+)
+
+
+def _safe_ltm_content(mem: Dict[str, Any]) -> str:
+    """Return only the human-readable content from an LTM record.
+
+    All internal fields (``signature_hex``, ``expires_at``, ``confidence``,
+    ``provenance``, ``id``, ``ts``, ``layer``, ``source``, etc.) are
+    deliberately ignored so they can never be forwarded to the LLM.
+    """
+    return str(mem.get("content") or "")
+
+
+def _safe_stm_text(entry: Dict[str, Any]) -> str:
+    """Return only the human-readable text from an STM entry.
+
+    Internal fields such as ``_signature``, ``topic``, ``emotion``, and
+    ``ts`` are deliberately ignored so they can never be forwarded to the
+    LLM.
+    """
+    return str(entry.get("text") or "")
+
 
 class ContextManager:
     """Manages intelligent context windowing and summarization."""
@@ -208,7 +263,10 @@ class ContextManager:
         if recent_thoughts:
             prompt += "\nRecent thoughts:\n"
             for thought in recent_thoughts:
-                text = self._truncate_text(thought.get("text", ""), max_thought_text)
+                # _safe_stm_text ensures only the human-readable text field is
+                # forwarded – internal fields (_signature, emotion, ts …) are
+                # never included.
+                text = self._truncate_text(_safe_stm_text(thought), max_thought_text)
                 prompt += f"- {text}\n"
 
         # Add important memories if available - truncate long entries at word boundary with "..."
@@ -216,8 +274,12 @@ class ContextManager:
         if important_memories:
             prompt += "\nKey memories:\n"
             for memory in important_memories:
+                # _safe_ltm_content ensures only the human-readable content
+                # field is forwarded – internal fields (signature_hex,
+                # expires_at, confidence, provenance, id, ts, layer …) are
+                # never included.
                 content = self._truncate_text(
-                    memory.get("content", ""), max_memory_text
+                    _safe_ltm_content(memory), max_memory_text
                 )
                 importance = memory.get("importance", 0.0)
 
