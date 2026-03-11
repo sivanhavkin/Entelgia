@@ -150,23 +150,58 @@ class DialogueLoopDetector:
     All checks operate on plain ``List[Dict[str, str]]`` turn records with
     ``"role"`` and ``"text"`` keys, identical to Entelgia's existing format.
     No external models are required — only lightweight heuristics.
+
+    A failure mode is only returned when **at least two** of the four input
+    signals are active simultaneously:
+
+      A  ``_check_repetition``             — repeated key phrases / concepts
+      B  ``_check_rhetorical_role_repetition`` — agents locked in the same
+                                                  rhetorical role every turn
+      C  ``_check_high_textual_similarity``  — high similarity between
+                                                  consecutive turns
+      D  ``_check_fixy_mediation_language``  — Fixy repeating generic
+                                                  mediation / bridge phrases
+
+    Exception: ``_check_weak_conflict`` and ``_check_premature_synthesis``
+    are inherently compound checks (they require both conflict/synthesis
+    markers AND synthesis hedging / synthesis ratio); they are treated as
+    already satisfying the two-condition requirement on their own.
     """
+
+    # Socrates introspection: question words at the start of a sentence or
+    # a literal question mark anywhere in the turn.
+    _SOCRATES_QUESTION_WORDS: frozenset = frozenset(
+        {"what", "why", "how", "when", "where", "who", "which", "whether",
+         "does", "can", "could", "would", "should", "is", "are", "do"}
+    )
+
+    # Athena systemic critique: structural / collective vocabulary.
+    _ATHENA_SYSTEMIC_WORDS: frozenset = frozenset(
+        {"system", "structure", "society", "framework", "institution",
+         "mechanism", "collective", "social", "cultural", "context",
+         "pattern", "paradigm", "network", "systemic", "structural"}
+    )
 
     def __init__(
         self,
-        window: int = 10,
+        window: int = 6,
         repetition_pairs: int = 3,
         repetition_jaccard: float = 0.45,
         conflict_ratio: float = 0.55,
         synthesis_ratio: float = 0.5,
         stagnation_jaccard: float = 0.55,
         stagnation_topic_history: int = 4,
+        consecutive_sim_jaccard: float = 0.35,
+        consecutive_sim_pairs: int = 3,
+        role_lock_threshold: float = 0.8,
+        fixy_mediation_min_turns: int = 2,
     ) -> None:
         """
         Parameters
         ----------
         window:
             Maximum number of turns to inspect for each check.
+            Default reduced to 6 (last 4–6 turns per spec).
         repetition_pairs:
             Number of turn-pairs with high overlap needed to flag repetition.
         repetition_jaccard:
@@ -179,6 +214,16 @@ class DialogueLoopDetector:
             Jaccard threshold for aggregated keyword clouds across the window.
         stagnation_topic_history:
             How many previous topic labels to check for same-cluster stagnation.
+        consecutive_sim_jaccard:
+            Jaccard threshold for consecutive-turn similarity (Signal C).
+        consecutive_sim_pairs:
+            Minimum number of consecutive high-similarity pairs to flag Signal C.
+        role_lock_threshold:
+            Fraction of an agent's turns that must match a rhetorical role
+            pattern before that agent is considered "locked in" (Signal B).
+        fixy_mediation_min_turns:
+            Minimum number of Fixy turns using mediation language before
+            Signal D fires.
         """
         self.window = window
         self.repetition_pairs = repetition_pairs
@@ -187,6 +232,10 @@ class DialogueLoopDetector:
         self.synthesis_ratio = synthesis_ratio
         self.stagnation_jaccard = stagnation_jaccard
         self.stagnation_topic_history = stagnation_topic_history
+        self.consecutive_sim_jaccard = consecutive_sim_jaccard
+        self.consecutive_sim_pairs = consecutive_sim_pairs
+        self.role_lock_threshold = role_lock_threshold
+        self.fixy_mediation_min_turns = fixy_mediation_min_turns
 
         # Rolling history of topic labels so stagnation can track across rounds
         self._topic_history: deque = deque(maxlen=stagnation_topic_history)
@@ -202,6 +251,18 @@ class DialogueLoopDetector:
         current_topic: Optional[str] = None,
     ) -> List[str]:
         """Return a list of active failure modes (may be empty or contain multiple).
+
+        A loop is only flagged when **at least two** of the four input signals
+        are simultaneously active:
+
+          A  repeated key phrases / concepts        (_check_repetition)
+          B  same rhetorical roles locked in        (_check_rhetorical_role_repetition)
+          C  high textual similarity between turns  (_check_high_textual_similarity)
+          D  Fixy repeating mediation language      (_check_fixy_mediation_language)
+
+        Exception: ``weak_conflict`` and ``premature_synthesis`` are compound
+        checks that inherently satisfy the two-condition requirement on their
+        own (they look for two co-occurring patterns internally).
 
         Parameters
         ----------
@@ -219,19 +280,65 @@ class DialogueLoopDetector:
         if current_topic:
             self._topic_history.append(current_topic)
 
+        # ── Gather the four input signals ──────────────────────────────────
+        # Signal A: repeated key phrases / concepts
+        sig_phrase_rep = (
+            turn_count >= _MIN_TURNS_REPETITION and self._check_repetition(recent)
+        )
+        # Signal B: agents locked in the same rhetorical role every turn
+        sig_role_lock = (
+            turn_count >= _MIN_TURNS_REPETITION
+            and self._check_rhetorical_role_repetition(recent)
+        )
+        # Signal C: high textual similarity between consecutive turns
+        sig_text_sim = (
+            turn_count >= _MIN_TURNS_REPETITION
+            and self._check_high_textual_similarity(recent)
+        )
+        # Signal D: Fixy repeating generic mediation / bridge phrases
+        sig_fixy_med = self._check_fixy_mediation_language(dialog)
+
+        active_signal_count = sum([sig_phrase_rep, sig_role_lock, sig_text_sim, sig_fixy_med])
+
+        # Compound checks that satisfy the two-condition requirement internally
+        sig_weak_conflict = (
+            turn_count >= _MIN_TURNS_CONFLICT and self._check_weak_conflict(recent)
+        )
+        sig_premature_synth = (
+            turn_count >= _MIN_TURNS_SYNTHESIS
+            and self._check_premature_synthesis(recent)
+        )
+
+        # ── Two-condition gate ─────────────────────────────────────────────
+        # A loop is real only when at least 2 conditions confirm it.
+        # weak_conflict and premature_synthesis already embed two co-occurring
+        # patterns and are treated as inherently satisfying the gate.
+        two_condition_met = (
+            active_signal_count >= 2
+            or sig_weak_conflict
+            or sig_premature_synth
+        )
+
+        if not two_condition_met:
+            logger.debug(
+                "loop_guard: only %d signal(s) active at turn %d — gate not triggered",
+                active_signal_count,
+                turn_count,
+            )
+            return []
+
+        # ── Determine specific failure modes ───────────────────────────────
         modes: List[str] = []
 
-        if turn_count >= _MIN_TURNS_REPETITION and self._check_repetition(recent):
+        if sig_phrase_rep:
             modes.append(LOOP_REPETITION)
             logger.debug("loop_guard: loop_repetition detected at turn %d", turn_count)
 
-        if turn_count >= _MIN_TURNS_CONFLICT and self._check_weak_conflict(recent):
+        if sig_weak_conflict:
             modes.append(WEAK_CONFLICT)
             logger.debug("loop_guard: weak_conflict detected at turn %d", turn_count)
 
-        if turn_count >= _MIN_TURNS_SYNTHESIS and self._check_premature_synthesis(
-            recent
-        ):
+        if sig_premature_synth:
             modes.append(PREMATURE_SYNTHESIS)
             logger.debug(
                 "loop_guard: premature_synthesis detected at turn %d", turn_count
@@ -358,6 +465,111 @@ class DialogueLoopDetector:
             content_same = jaccard >= self.stagnation_jaccard
 
         return cluster_same or content_same
+
+    def _check_rhetorical_role_repetition(
+        self, turns: List[Dict[str, str]]
+    ) -> bool:
+        """Detect agents locked in the same rhetorical role on every turn.
+
+        Specifically checks for:
+        - Socrates exclusively playing the introspective interrogator
+          (≥ ``role_lock_threshold`` of Socrates turns are questions).
+        - Athena exclusively playing the systemic analyst
+          (≥ ``role_lock_threshold`` of Athena turns contain systemic vocabulary).
+
+        Both must be locked simultaneously to trigger this signal (Signal B).
+        """
+        if len(turns) < _MIN_TURNS_REPETITION:
+            return False
+
+        socrates_turns = [t for t in turns if t.get("role") == "Socrates"]
+        athena_turns = [t for t in turns if t.get("role") == "Athena"]
+
+        # Need at least 2 turns per agent to measure a pattern
+        if len(socrates_turns) < 2 or len(athena_turns) < 2:
+            return False
+
+        # Socrates introspection: turn contains a "?" or starts with a question word
+        socrates_q_count = 0
+        for t in socrates_turns:
+            text = t.get("text", "")
+            lower = text.lower()
+            first_word = lower.split()[0] if lower.split() else ""
+            if "?" in text or first_word in self._SOCRATES_QUESTION_WORDS:
+                socrates_q_count += 1
+
+        # Athena systemic critique: turn text contains a structural / collective root word
+        # Use substring matching so forms like "institutional", "structural",
+        # "patterns" etc. match the root entries in _ATHENA_SYSTEMIC_WORDS.
+        athena_sys_count = sum(
+            1
+            for t in athena_turns
+            if any(w in t.get("text", "").lower() for w in self._ATHENA_SYSTEMIC_WORDS)
+        )
+
+        socrates_ratio = socrates_q_count / len(socrates_turns)
+        athena_ratio = athena_sys_count / len(athena_turns)
+
+        return (
+            socrates_ratio >= self.role_lock_threshold
+            and athena_ratio >= self.role_lock_threshold
+        )
+
+    def _check_high_textual_similarity(
+        self, turns: List[Dict[str, str]]
+    ) -> bool:
+        """Detect high textual similarity between consecutive turns (Signal C).
+
+        Measures Jaccard keyword overlap between each adjacent turn pair.
+        If ``consecutive_sim_pairs`` or more consecutive pairs all exceed
+        ``consecutive_sim_jaccard``, the content is stagnating turn-by-turn.
+
+        This is distinct from ``_check_repetition`` (which checks *all* pairs)
+        and acts as a fast confirmation of per-step stagnation.
+        """
+        if len(turns) < _MIN_TURNS_REPETITION:
+            return False
+
+        kw_sets = [self._keywords(t.get("text", "")) for t in turns]
+        consecutive_high = 0
+
+        for i in range(len(kw_sets) - 1):
+            a, b = kw_sets[i], kw_sets[i + 1]
+            if not a or not b:
+                continue
+            jaccard = len(a & b) / len(a | b)
+            if jaccard >= self.consecutive_sim_jaccard:
+                consecutive_high += 1
+
+        return consecutive_high >= self.consecutive_sim_pairs
+
+    def _check_fixy_mediation_language(
+        self, dialog: List[Dict[str, str]]
+    ) -> bool:
+        """Detect Fixy repeatedly using generic mediation / bridging phrases (Signal D).
+
+        Looks at Fixy's turns in the most recent window and checks whether
+        ``fixy_mediation_min_turns`` or more of them contain phrases from
+        ``FIXY_BANNED_OPENERS`` or ``_SYNTHESIS_PHRASES``.  When Fixy keeps
+        defaulting to "integrate both perspectives" / "bridge the gap" style
+        language, it is itself contributing to the loop it is supposed to fix.
+        """
+        # Examine Fixy turns within a generous window (2× agent window)
+        fixy_turns = [
+            t
+            for t in dialog[-(self.window * 2) :]
+            if t.get("role") == "Fixy"
+        ]
+        if len(fixy_turns) < self.fixy_mediation_min_turns:
+            return False
+
+        mediation_count = sum(
+            1
+            for t in fixy_turns
+            if any(phrase in t.get("text", "").lower() for phrase in FIXY_BANNED_OPENERS)
+            or any(phrase in t.get("text", "").lower() for phrase in _SYNTHESIS_PHRASES)
+        )
+        return mediation_count >= self.fixy_mediation_min_turns
 
 
 # ============================================================
@@ -543,7 +755,7 @@ class DialogueRewriter:
 
         lines: List[str] = [
             f"--- {self._HEADER} ---",
-            f"Current topic: {current_topic}",
+            f"Topic: {current_topic}",
             f"Active failure modes: {', '.join(active_modes)}",
             "",
             "Core claims so far:",
