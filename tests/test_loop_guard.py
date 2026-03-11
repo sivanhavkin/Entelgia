@@ -331,7 +331,7 @@ def test_rewriter_builds_block_with_required_sections():
         banned_phrases=["both are needed", "integrate both"],
     )
     assert "DIALOGUE STATE REWRITE" in block
-    assert "Current topic: freedom" in block
+    assert "Topic: freedom" in block
     assert "premature_synthesis" in block
     assert "Novelty requirement" in block
     assert "Restrictions" in block
@@ -492,3 +492,148 @@ def test_seed_generator_normal_mode_no_extra_instruction():
     )
     # NORMAL should not append extra instruction text
     assert seed_none == seed_normal
+
+
+# ---------------------------------------------------------------------------
+# New signal detectors — Signal B, C, D
+# ---------------------------------------------------------------------------
+
+
+def test_check_rhetorical_role_repetition_flags_locked_agents():
+    """Signal B: Socrates locked in questions + Athena locked in systemic critique."""
+    detector = DialogueLoopDetector()
+    # Socrates always asks questions; Athena always frames systemically
+    turns = _make_turns(
+        [
+            "What is the foundation of freedom in society?",       # Socrates Q
+            "The social system determines individual freedoms through structure.",  # Athena sys
+            "Why does the framework constrain personal autonomy?",  # Socrates Q
+            "Institutional patterns shape what is culturally possible.",  # Athena sys
+            "How can the mechanism of power be questioned?",        # Socrates Q
+            "Collective context frames every systemic boundary here.",  # Athena sys
+        ]
+    )
+    result = detector._check_rhetorical_role_repetition(turns)
+    assert result, "Expected rhetorical role repetition to be flagged"
+
+
+def test_check_rhetorical_role_repetition_no_flag_varied_roles():
+    """Signal B should NOT fire when agents vary their discourse style."""
+    detector = DialogueLoopDetector()
+    turns = _make_turns(
+        [
+            "Freedom requires structure — that is my claim.",  # Socrates asserts
+            "What does your claim entail for individuals?",    # Athena questions
+            "Let me give a concrete example from history.",    # Socrates example
+            "Actually, the data contradicts that view.",       # Athena critique
+        ]
+    )
+    result = detector._check_rhetorical_role_repetition(turns)
+    assert not result, "Should NOT flag varied rhetorical roles"
+
+
+def test_check_fixy_mediation_language_flags_repeated_mediation():
+    """Signal D: Fixy repeatedly using integration / bridge phrases."""
+    detector = DialogueLoopDetector()
+    dialog = [
+        {"role": "Socrates", "text": "Freedom is pure individual will."},
+        {"role": "Athena", "text": "Freedom requires collective norms."},
+        {"role": "Fixy", "text": "We must integrate both perspectives here."},
+        {"role": "Socrates", "text": "The individual precedes the collective."},
+        {"role": "Athena", "text": "Collective structures make individuals possible."},
+        {"role": "Fixy", "text": "Let us bridge the gap between both views."},
+    ]
+    result = detector._check_fixy_mediation_language(dialog)
+    assert result, "Expected Fixy mediation language to be flagged"
+
+
+def test_check_fixy_mediation_language_no_flag_disruptive_fixy():
+    """Signal D should NOT fire when Fixy uses disruptive (non-mediation) language."""
+    detector = DialogueLoopDetector()
+    dialog = [
+        {"role": "Socrates", "text": "Freedom is pure individual will."},
+        {"role": "Athena", "text": "Freedom requires collective norms."},
+        {
+            "role": "Fixy",
+            "text": "Give me one historical case that disproves your claim.",
+        },
+        {"role": "Socrates", "text": "The individual precedes the collective."},
+        {"role": "Athena", "text": "Collective structures make individuals possible."},
+        {
+            "role": "Fixy",
+            "text": "Either freedom is prior to society or it is not — choose one.",
+        },
+    ]
+    result = detector._check_fixy_mediation_language(dialog)
+    assert not result, "Should NOT flag disruptive (non-mediating) Fixy turns"
+
+
+def test_check_high_textual_similarity_flags_consecutive_stagnation():
+    """Signal C: Consecutive turns with very similar keyword sets."""
+    detector = DialogueLoopDetector()
+    turns = _make_turns(
+        [
+            "freedom autonomy liberty personal independence rights",
+            "autonomy liberty freedom rights personal independence",
+            "liberty freedom autonomy independence rights personal",
+            "freedom independence autonomy liberty personal rights",
+            "autonomy freedom liberty rights independence personal",
+        ]
+    )
+    result = detector._check_high_textual_similarity(turns)
+    assert result, "Expected high textual similarity to be flagged for stagnant turns"
+
+
+def test_check_high_textual_similarity_no_flag_varied_content():
+    """Signal C should NOT fire for turns with varied content."""
+    detector = DialogueLoopDetector()
+    turns = _make_turns(
+        [
+            "What is the nature of knowledge?",
+            "Law determines societal obligations in practice.",
+            "Habit formation changes neural circuits over years.",
+            "Economic incentives shape institutional behaviour.",
+        ]
+    )
+    result = detector._check_high_textual_similarity(turns)
+    assert not result, "Should NOT flag varied turns for high textual similarity"
+
+
+def test_detect_requires_two_conditions_single_non_compound_signal():
+    """If only Signal A (phrase repetition) fires but not Signal C / B / D,
+    the gate should block results for non-compound failure modes."""
+    # Construct a scenario where _check_repetition might fire but no other
+    # signal is active.  Use turns that have some overlap but no stagnation,
+    # no rhetorical lock, no Fixy turns, and no synthesis language.
+    detector = DialogueLoopDetector()
+    # Turns share some vocabulary but are genuinely evolving
+    turns = _make_turns(
+        [
+            "freedom means self-determination and personal choice",
+            "society constrains freedom through collective agreements",
+            "freedom requires society — neither stands alone here",
+        ]
+    )
+    # Only 3 turns — below _MIN_TURNS_REPETITION=4 for sig_phrase_rep;
+    # also no Fixy turns, no synthesis phrases → gate should not trigger
+    modes = detector.detect(turns, turn_count=3)
+    assert modes == [], f"Gate should block with < 4 turns, got {modes}"
+
+
+def test_detect_two_conditions_gate_passes_with_signals_a_and_c():
+    """When both Signal A (phrase repetition) and Signal C (textual similarity)
+    are active, the gate should pass and return loop_repetition."""
+    detector = DialogueLoopDetector()
+    turns = _make_turns(
+        [
+            "freedom autonomy liberty independence means personal freedom",
+            "autonomy liberty freedom independence are fundamental values",
+            "liberty means freedom autonomy personal independence always",
+            "independence freedom liberty autonomy interrelated core concepts",
+            "freedom liberty autonomy independence personal core values",
+        ]
+    )
+    modes = detector.detect(turns, turn_count=5)
+    assert LOOP_REPETITION in modes, (
+        f"Expected loop_repetition with Signals A+C active; got {modes}"
+    )
