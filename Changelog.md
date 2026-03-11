@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+---
+
+## [2.9.0] - 2026-03-11
+
 ### Added
 
 - **Forgetting Policy** — per-layer TTL expiry for Long-Term Memory. New `Config` fields: `forgetting_enabled` (default `True`), `forgetting_episodic_ttl` (7 days), `forgetting_semantic_ttl` (90 days), `forgetting_autobio_ttl` (365 days). `MemoryCore.ltm_apply_forgetting_policy()` deletes expired rows; called automatically at the end of every `dream_cycle()`. `MemoryCore._compute_expires_at(layer, ts)` stamps each inserted row with its expiry timestamp. New `expires_at` column added to `memories` table with `idx_mem_expires` index; existing databases auto-migrated via `ALTER TABLE`.
@@ -897,7 +901,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.8.1
+- ✅ **Latest stable:** v2.9.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -908,7 +912,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.8.1** | 2026-03-07 | Patch | ✅ **Current** | Version bump across all documentation |
+| **v2.9.0** | 2026-03-11 | Minor | ✅ **Current** | Forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |
+| **v2.8.1** | 2026-03-07 | Patch | ✅ **Stable** | Version bump across all documentation |
 | **v2.8.0** | 2026-03-06 | Minor | ⚠️ Superseded | Web Research Module — Fixy-triggered external knowledge pipeline |
 | **v2.7.0** | 2026-03-03 | Minor | ✅ **Stable** | Limbic hijack state, meta output refinement |
 | **v2.6.0** | 2026-02-26 | Minor | ✅ **Stable** | Dialogue metrics, ablation study, drive pressure & research tools |

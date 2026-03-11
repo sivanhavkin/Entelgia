@@ -437,7 +437,7 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 
 ```
 entelgia/
-├── __init__.py              # Package exports (v2.7.0)
+├── __init__.py              # Package exports (v2.9.0)
 ├── dialogue_engine.py       # Dynamic speaker & seed generation
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
@@ -451,6 +451,7 @@ entelgia/
 ├── source_evaluator.py      # Heuristic credibility scoring for web sources (v2.8.0)
 ├── research_context_builder.py  # Format research bundle as LLM context (v2.8.0)
 ├── fixy_research_trigger.py # Keyword-based search trigger detection (v2.8.0)
+├── loop_guard.py            # DialogueLoopDetector, PhraseBanList, DialogueRewriter (v2.9.0)
 └── web_research.py          # maybe_add_web_context integration + memory storage (v2.8.0)
 ```
 
@@ -541,17 +542,18 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.8.1** | ✅ **Latest** | current |
-| **v2.8.0** | ⚠️ Superseded | Use v2.8.1 instead |
+| **v2.9.0** | ✅ **Latest** | current |
+| **v2.8.1** | ✅ **Stable** | previous stable release |
+| **v2.8.0** | ⚠️ Superseded | Use v2.9.0 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
 | **v2.5.0** | ✅ **Stable** | previous stable release |
-| **v2.4.0** | ⚠️ Superseded | Use v2.8.1 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v2.8.1 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v2.8.1 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v2.8.1 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.8.1 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.8.1 instead |
+| **v2.4.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v2.9.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v2.9.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v2.9.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -636,6 +638,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.8.1 
-* **Last Updated:** 07 March 2026
+* **Version:** 2.9.0 
+* **Last Updated:** 11 March 2026
 ---

@@ -28,7 +28,6 @@ from entelgia.loop_guard import (
 from entelgia.fixy_interactive import FixyMode, _LOOP_MODE_POLICY
 from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
 
-
 # ---------------------------------------------------------------------------
 # Helper factories
 # ---------------------------------------------------------------------------
@@ -259,9 +258,9 @@ def test_phrase_ban_list_detects_overused_ngrams():
     ban.update(texts, current_turn=5)
     active = ban.active_bans()
     # "integrate both" should be banned (appears 3 times)
-    assert any("integrate both" in phrase for phrase in active), (
-        f"Expected 'integrate both' to be banned; active bans: {active}"
-    )
+    assert any(
+        "integrate both" in phrase for phrase in active
+    ), f"Expected 'integrate both' to be banned; active bans: {active}"
 
 
 def test_phrase_ban_expires():
@@ -282,9 +281,9 @@ def test_phrase_ban_expires():
     # current_turn=4 is past expiry (1 + ban_duration 2 = 3, so 4 > 3)
     ban.update(neutral, current_turn=4)
     # Now the old texts are out of the buffer AND the ban has expired
-    assert len(ban.active_bans()) == 0, (
-        f"Bans should have expired; still active: {ban.active_bans()}"
-    )
+    assert (
+        len(ban.active_bans()) == 0
+    ), f"Bans should have expired; still active: {ban.active_bans()}"
 
 
 def test_phrase_ban_instruction_empty_when_no_bans():
@@ -348,9 +347,7 @@ def test_rewriter_includes_novelty_for_each_mode():
         {"role": "Athena", "text": "A different claim about society."},
     ]
     for mode in (LOOP_REPETITION, WEAK_CONFLICT, PREMATURE_SYNTHESIS, TOPIC_STAGNATION):
-        block = rewriter.build(
-            dialog=dialog, active_modes=[mode], current_topic="test"
-        )
+        block = rewriter.build(dialog=dialog, active_modes=[mode], current_topic="test")
         assert block, f"Expected non-empty block for mode {mode!r}"
         assert "Novelty requirement" in block, f"Missing novelty for mode {mode!r}"
 
@@ -377,9 +374,9 @@ def test_loop_mode_policy_covers_all_failure_modes():
         PREMATURE_SYNTHESIS,
         TOPIC_STAGNATION,
     ):
-        assert failure_mode in _LOOP_MODE_POLICY, (
-            f"_LOOP_MODE_POLICY missing entry for {failure_mode!r}"
-        )
+        assert (
+            failure_mode in _LOOP_MODE_POLICY
+        ), f"_LOOP_MODE_POLICY missing entry for {failure_mode!r}"
         assert _LOOP_MODE_POLICY[failure_mode] in (
             FixyMode.MEDIATE,
             FixyMode.CONTRADICT,
@@ -412,9 +409,9 @@ def test_agent_loop_policy_covers_all_failure_modes():
         PREMATURE_SYNTHESIS,
         TOPIC_STAGNATION,
     ):
-        assert failure_mode in _LOOP_AGENT_POLICY, (
-            f"_LOOP_AGENT_POLICY missing entry for {failure_mode!r}"
-        )
+        assert (
+            failure_mode in _LOOP_AGENT_POLICY
+        ), f"_LOOP_AGENT_POLICY missing entry for {failure_mode!r}"
         assert _LOOP_AGENT_POLICY[failure_mode] in (
             AgentMode.NORMAL,
             AgentMode.CONTRADICT,

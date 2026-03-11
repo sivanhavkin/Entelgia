@@ -21,7 +21,7 @@ Advanced Multi-Agent Dialogue System with:
 - NO AUTO-TIMEOUT (turn-based stop only)
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 2.8.1.
+Version Note: Latest release: 2.9.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -122,6 +122,7 @@ try:
         SelfReplication,
     )
     from entelgia.web_research import maybe_add_web_context
+
     # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
     from entelgia.loop_guard import (
         DialogueLoopDetector,
@@ -968,9 +969,7 @@ class TopicManager:
             except ValueError:
                 self.advance_round()
                 return self.current()
-            logger.info(
-                "TopicManager: cluster pivot from %r → %r", current, new_topic
-            )
+            logger.info("TopicManager: cluster pivot from %r → %r", current, new_topic)
             return new_topic
 
         self.advance_round()
@@ -3268,9 +3267,7 @@ class MainScript:
                             Fore.WHITE
                             + Style.DIM
                             + f"[LOOP-GUARD] Failure modes: {_active_loop_modes} → "
-                            f"agent mode: {_agent_mode}"
-                            + Style.RESET_ALL
-                            + "\n"
+                            f"agent mode: {_agent_mode}" + Style.RESET_ALL + "\n"
                         )
 
             # ── Update phrase ban list ───────────────────────────────────────
