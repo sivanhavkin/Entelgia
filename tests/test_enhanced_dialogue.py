@@ -302,7 +302,12 @@ def test_fixy_interventions():
         {"role": "Socrates", "text": "Freedom liberty autonomy are interconnected"},
     ]
     should2, reason2 = fixy.should_intervene(dialog_repetitive, turn_count=5)
-    repetitive_pass = should2 and reason2 == "circular_reasoning"
+    # Accept both the legacy 'circular_reasoning' reason and the new loop-guard
+    # reason 'loop_repetition' — both correctly identify the same failure mode.
+    repetitive_pass = should2 and reason2 in (
+        "circular_reasoning",
+        "loop_repetition",
+    )
 
     # Test 3: Normal dialogue - should not intervene
     dialog_normal = [
@@ -328,7 +333,7 @@ def test_fixy_interventions():
                 "repetitive (turn 5)",
                 str(should2),
                 str(reason2),
-                "True/circular_reasoning",
+                "True/loop_repetition|circular_reasoning",
                 "✓" if repetitive_pass else "✗",
             ],
             [
@@ -346,8 +351,8 @@ def test_fixy_interventions():
         early_pass
     ), f"Early turns (turn 2): Fixy should NOT intervene, got should_intervene={should1}, reason={reason1}"
     assert repetitive_pass, (
-        f"Repetitive dialogue (turn 5): Fixy SHOULD intervene with reason='circular_reasoning', "
-        f"got should_intervene={should2}, reason={reason2}"
+        f"Repetitive dialogue (turn 5): Fixy SHOULD intervene with reason='loop_repetition' or "
+        f"'circular_reasoning', got should_intervene={should2}, reason={reason2}"
     )
     assert (
         normal_pass

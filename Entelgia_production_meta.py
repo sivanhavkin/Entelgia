@@ -125,9 +125,8 @@ try:
         DialogueRewriter,
         TOPIC_CLUSTERS,
         _TOPIC_TO_CLUSTER,
-        _LOOP_AGENT_POLICY,
     )
-    from entelgia.dialogue_engine import AgentMode
+    from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -3317,8 +3316,6 @@ class MainScript:
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
             # ── v2.9.0: Force cluster pivot on topic_stagnation ─────────────
-            from entelgia.loop_guard import TOPIC_STAGNATION
-
             if "topic_stagnation" in _active_loop_modes:
                 new_topic = topicman.force_cluster_pivot()
                 logger.info(

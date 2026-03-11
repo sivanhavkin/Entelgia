@@ -20,7 +20,7 @@ from .enhanced_personas import (
     is_global_show_pronouns,
 )
 from .context_manager import ContextManager, EnhancedMemoryIntegration
-from .fixy_interactive import InteractiveFixy
+from .fixy_interactive import InteractiveFixy, FixyMode
 from .energy_regulation import FixyRegulator, EntelgiaAgent
 from .long_term_memory import DefenseMechanism, FreudianSlip, SelfReplication
 from .dialogue_metrics import (
@@ -37,10 +37,18 @@ from .ablation_study import (
     print_results_table,
     plot_circularity,
 )
+from .loop_guard import (
+    DialogueLoopDetector,
+    PhraseBanList,
+    DialogueRewriter,
+    TOPIC_CLUSTERS,
+)
+from .dialogue_engine import AgentMode
 
 __all__ = [
     "DialogueEngine",
     "SeedGenerator",
+    "AgentMode",
     "SOCRATES_PERSONA",
     "ATHENA_PERSONA",
     "FIXY_PERSONA",
@@ -50,6 +58,7 @@ __all__ = [
     "ContextManager",
     "EnhancedMemoryIntegration",
     "InteractiveFixy",
+    "FixyMode",
     "is_global_show_pronouns",
     "FixyRegulator",
     "EntelgiaAgent",
@@ -66,6 +75,10 @@ __all__ = [
     "run_ablation",
     "print_results_table",
     "plot_circularity",
+    "DialogueLoopDetector",
+    "PhraseBanList",
+    "DialogueRewriter",
+    "TOPIC_CLUSTERS",
 ]
 
 __version__ = "2.8.1"

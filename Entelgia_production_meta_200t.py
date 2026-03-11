@@ -129,9 +129,8 @@ try:
         DialogueRewriter,
         TOPIC_CLUSTERS,
         _TOPIC_TO_CLUSTER,
-        _LOOP_AGENT_POLICY,
     )
-    from entelgia.dialogue_engine import AgentMode
+    from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -2992,10 +2991,17 @@ class MainScript:
                 if cfg.enable_observer
                 else None
             )
+            # v2.9.0: Loop-guard subsystems
+            self._loop_detector = DialogueLoopDetector()
+            self._phrase_ban = PhraseBanList()
+            self._dialogue_rewriter = DialogueRewriter()
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
             self.interactive_fixy = None
+            self._loop_detector = None
+            self._phrase_ban = None
+            self._dialogue_rewriter = None
 
         if not cfg.enable_observer:
             logger.info("Observer (Fixy) disabled via enable_observer=False")
@@ -3236,6 +3242,46 @@ class MainScript:
         while time.time() - self.start_time < timeout_seconds:
             self.turn_index += 1
 
+            # ── v2.9.0: Loop guard — run detection before each turn ──────────
+            # Detect active failure modes (loop_repetition, weak_conflict,
+            # premature_synthesis, topic_stagnation) using recent dialogue.
+            _active_loop_modes: List[str] = []
+            _agent_mode: Optional[str] = None
+            if self._loop_detector is not None:
+                _active_loop_modes = self._loop_detector.detect(
+                    self.dialog,
+                    self.turn_index,
+                    current_topic=topicman.current(),
+                )
+                if _active_loop_modes:
+                    # Select the agent mode that best counters the primary failure
+                    _agent_mode = _LOOP_AGENT_POLICY.get(
+                        _active_loop_modes[0], AgentMode.NORMAL
+                    )
+                    logger.info(
+                        "loop_guard: active=%s agent_mode=%s",
+                        _active_loop_modes,
+                        _agent_mode,
+                    )
+                    if self.cfg.show_meta:
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[LOOP-GUARD] Failure modes: {_active_loop_modes} → "
+                            f"agent mode: {_agent_mode}"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
+
+            # ── Update phrase ban list ───────────────────────────────────────
+            if self._phrase_ban is not None:
+                recent_texts = [
+                    t.get("text", "")
+                    for t in self.dialog[-6:]
+                    if t.get("role") not in ("seed", "Fixy")
+                ]
+                self._phrase_ban.update(recent_texts, self.turn_index)
+
             # Dynamic speaker selection (if enhanced mode available)
             if self.dialogue_engine:
                 # Check if Fixy should be allowed to speak
@@ -3278,6 +3324,21 @@ class MainScript:
                 # Legacy: simple alternation
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
+            # ── v2.9.0: Force cluster pivot on topic_stagnation ─────────────
+            if "topic_stagnation" in _active_loop_modes:
+                new_topic = topicman.force_cluster_pivot()
+                logger.info(
+                    "loop_guard: topic_stagnation → cluster pivot → %r", new_topic
+                )
+                if self.cfg.show_meta:
+                    print(
+                        Fore.WHITE
+                        + Style.DIM
+                        + f"[LOOP-GUARD] Topic stagnation → cluster pivot → {new_topic!r}"
+                        + Style.RESET_ALL
+                        + "\n"
+                    )
+
             topic_label = topicman.current()
             logger.debug(
                 "MainScript.run: turn=%d selected active topic=%r",
@@ -3292,12 +3353,35 @@ class MainScript:
                     dialog_history=self.dialog,
                     speaker=speaker,
                     turn_count=self.turn_index,
+                    agent_mode=_agent_mode,  # v2.9.0: inject mode when loop active
                 )
             else:
                 # Legacy or Fixy seed
                 seed = (
                     f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
                 )
+
+            # ── v2.9.0: Prepend rewrite block when loop is active ─────────
+            if (
+                _active_loop_modes
+                and self._dialogue_rewriter is not None
+                and speaker.name != "Fixy"
+            ):
+                _banned_phrases = (
+                    self._phrase_ban.active_bans() if self._phrase_ban else None
+                )
+                _rewrite_block = self._dialogue_rewriter.build(
+                    dialog=self.dialog,
+                    active_modes=_active_loop_modes,
+                    current_topic=topic_label,
+                    banned_phrases=_banned_phrases,
+                )
+                if _rewrite_block:
+                    seed = _rewrite_block + "\n\n" + seed
+                    logger.debug(
+                        "loop_guard: rewrite block prepended to seed for %s",
+                        speaker.name,
+                    )
 
             logger.debug(
                 "MainScript.run: turn=%d speaker=%s final seed_text=%r",
@@ -3331,12 +3415,15 @@ class MainScript:
                 and self.interactive_fixy
                 and speaker.name != "Fixy"
             ):
+                # v2.9.0: pass current_topic so stagnation detection works inside Fixy too
                 should_intervene, reason = self.interactive_fixy.should_intervene(
-                    self.dialog, self.turn_index
+                    self.dialog, self.turn_index, current_topic=topic_label
                 )
                 if should_intervene:
+                    # v2.9.0: Fixy selects disruption mode based on detected loop type
+                    fixy_mode = self.interactive_fixy.get_fixy_mode(reason)
                     intervention = self.interactive_fixy.generate_intervention(
-                        self.dialog, reason
+                        self.dialog, reason, mode=fixy_mode
                     )
                     self.dialog.append({"role": "Fixy", "text": intervention})
                     self.fixy_agent.store_turn(
@@ -3346,12 +3433,14 @@ class MainScript:
                     print(
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
-                    logger.info(f"Fixy intervention: {reason}")
+                    logger.info(
+                        "Fixy intervention: reason=%s mode=%s", reason, fixy_mode
+                    )
                     if self.cfg.show_meta:
                         print(
                             Fore.WHITE
                             + Style.DIM
-                            + f"[META-ACTION] Fixy intervened: {reason}"
+                            + f"[META-ACTION] Fixy intervened: {reason} (mode={fixy_mode})"
                             + Style.RESET_ALL
                             + "\n"
                         )
