@@ -17,16 +17,20 @@ def reset_trigger_cooldown():
 
     This prevents cooldown state set in one test from bleeding into another,
     ensuring deterministic test results regardless of execution order.
-    Also resets the web_research module-level caches for the same reason.
+    Also resets the web_research module-level caches and the failed-URL
+    blacklist in web_tool for the same reason.
     """
     from entelgia.fixy_research_trigger import clear_trigger_cooldown
     from entelgia.web_research import clear_research_caches
+    from entelgia.web_tool import clear_failed_urls
 
     clear_trigger_cooldown()
     clear_research_caches()
+    clear_failed_urls()
     yield
     clear_trigger_cooldown()
     clear_research_caches()
+    clear_failed_urls()
 
 
 @pytest.fixture

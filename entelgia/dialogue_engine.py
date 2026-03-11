@@ -190,7 +190,9 @@ class DialogueEngine:
         if allow_fixy and random.random() < fixy_probability:
             fixy = next((a for a in agents if a.name == "Fixy"), None)
             if fixy:
-                last_speaker = dialog_history[-1].get("role", "") if dialog_history else ""
+                last_speaker = (
+                    dialog_history[-1].get("role", "") if dialog_history else ""
+                )
                 if last_speaker == "Fixy":
                     # Force non-Fixy speaker to prevent two consecutive Fixy turns
                     candidates = [a for a in agents if a.name != "Fixy"]
@@ -327,7 +329,11 @@ class DialogueEngine:
 
         # Gather unique non-Fixy agent names
         agent_names = list(
-            {turn.get("role", "") for turn in dialog_history if turn.get("role") != "Fixy"}
+            {
+                turn.get("role", "")
+                for turn in dialog_history
+                if turn.get("role") != "Fixy"
+            }
         )
 
         for agent_name in agent_names:

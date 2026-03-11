@@ -386,10 +386,10 @@ High-credibility sources (score > 0.6) stored in external_knowledge SQLite table
 
 | Module | Purpose |
 |--------|---------|
-| `entelgia/web_tool.py` | `web_search` (DuckDuckGo HTML), `fetch_page_text` (BeautifulSoup), `search_and_fetch` |
+| `entelgia/web_tool.py` | `web_search` (DuckDuckGo HTML), `fetch_page_text` (BeautifulSoup + failed-URL blacklist), `search_and_fetch` |
 | `entelgia/source_evaluator.py` | Domain-based + text-length credibility scoring |
 | `entelgia/research_context_builder.py` | Formats top-3 sources as structured LLM prompt section |
-| `entelgia/fixy_research_trigger.py` | Keyword set trigger: `latest`, `research`, `news`, `current`, `today`, `web`, `find`, `search`, `paper`, … |
+| `entelgia/fixy_research_trigger.py` | Keyword set trigger with per-trigger **and** per-query cooldown (`_COOLDOWN_TURNS = 5`) |
 | `entelgia/web_research.py` | `maybe_add_web_context` — full orchestration + optional LTM persistence |
 
 ### Agent Instructions Injected with Web Context
@@ -409,5 +409,7 @@ Instructions for agents:
 - Text extracted from pages capped at 6 000 characters
 - All errors are caught and logged; the main pipeline always continues
 - Memory storage only for sources with `credibility_score > 0.6`
+- **Failed-URL blacklist**: URLs returning 403 or 404 are permanently skipped for the process lifetime, preventing redundant retries
+- **Per-query cooldown**: the same `seed_text` cannot trigger a search more than once per `_COOLDOWN_TURNS` turns, in addition to the existing per-trigger-keyword cooldown
 
 ---

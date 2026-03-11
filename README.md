@@ -465,10 +465,10 @@ High-credibility sources stored in long-term memory
 
 | Module | Description |
 |--------|-------------|
-| `entelgia/web_tool.py` | `web_search`, `fetch_page_text`, `search_and_fetch` |
+| `entelgia/web_tool.py` | `web_search`, `fetch_page_text` (with failed-URL blacklist), `search_and_fetch` |
 | `entelgia/source_evaluator.py` | Heuristic credibility scoring (`.edu`, `.gov`, trusted domains) |
 | `entelgia/research_context_builder.py` | Formats ranked sources as LLM-ready context block |
-| `entelgia/fixy_research_trigger.py` | Keyword-based trigger with semantic scoring — concept terms (`credibility`, `bias`, `epistemology`, `truth`, `reasoning`) rank above generic labels like `source` |
+| `entelgia/fixy_research_trigger.py` | Keyword-based trigger with per-trigger **and** per-query cooldown |
 | `entelgia/web_research.py` | `maybe_add_web_context` — full pipeline + memory persistence |
 
 ### Quick Start
@@ -492,12 +492,14 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 - Network errors never crash the main dialogue system
 - Results are capped at 5 sources by default
 - High-credibility threshold: score > 0.6 for memory storage
+- **Failed-URL blacklist** — 403/404 URLs are remembered and skipped on retries
+- **Per-query cooldown** — same query suppressed for 5 turns to prevent redundant searches
 
 ---
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **454 tests** in 14 suites.
+Entelgia ships with comprehensive test coverage across **464 tests** in 14 suites.
 
 For full test documentation, per-suite details, CI/CD pipeline information, and sample output, see the **[Test Suite README (tests/README.md)](tests/README.md)**.
 

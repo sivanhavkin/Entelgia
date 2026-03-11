@@ -35,6 +35,11 @@ _trigger_turn_counter: int = 0
 # Maps trigger word/phrase → turn number on which it last triggered a search
 _recent_triggers: Dict[str, int] = {}
 
+# Maps full query string → turn number on which it last triggered a search.
+# Prevents the same query from firing again within the cooldown window even
+# when different trigger keywords are present.
+_recent_queries: Dict[str, int] = {}
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -210,6 +215,7 @@ def clear_trigger_cooldown() -> None:
     global _trigger_turn_counter
     _trigger_turn_counter = 0
     _recent_triggers.clear()
+    _recent_queries.clear()
 
 
 def _is_trigger_cooled_down(trigger: str, current_turn: int) -> bool:
@@ -268,6 +274,18 @@ def fixy_should_search(
     _trigger_turn_counter += 1
     current_turn = _trigger_turn_counter
 
+    # 0. Per-query cooldown: if this exact seed_text was already searched
+    #    within the cooldown window, suppress the search immediately.
+    if seed_text in _recent_queries:
+        if (current_turn - _recent_queries[seed_text]) <= _COOLDOWN_TURNS:
+            logger.debug(
+                "query %r is in cooldown (last fired on turn %d, current %d), skipping",
+                seed_text[:160],
+                _recent_queries[seed_text],
+                current_turn,
+            )
+            return False
+
     # 1. Check seed text
     logger.debug(
         "[branch=seed] source_type=seed_text text_preview=%r",
@@ -285,6 +303,7 @@ def fixy_should_search(
             )
         else:
             _recent_triggers[trigger] = current_turn
+            _recent_queries[seed_text] = current_turn
             logger.info("web search triggered by keyword: %r", trigger)
             return True
 
@@ -314,6 +333,7 @@ def fixy_should_search(
                     )
                     continue
                 _recent_triggers[trigger] = current_turn
+                _recent_queries[seed_text] = current_turn
                 logger.info("web search triggered by keyword: %r", trigger)
                 return True
 
@@ -323,6 +343,7 @@ def fixy_should_search(
         (fixy_reason or "")[:160],
     )
     if fixy_reason and fixy_reason in _FIXY_RESEARCH_REASONS:
+        _recent_queries[seed_text] = current_turn
         logger.info("web search triggered by fixy_reason: %r", fixy_reason)
         return True
 

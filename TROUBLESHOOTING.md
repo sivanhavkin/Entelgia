@@ -536,6 +536,27 @@ pip install -r requirements.txt
 - **DuckDuckGo blocked or rate-limited** — try again later or check connectivity.
 - **Query does not contain trigger keywords** — ensure the message contains one of:
   `latest`, `recent`, `research`, `news`, `current`, `today`, `web`, `find`, `search`, `paper`, `study`, `article`, `published`, `updated`, `new`, `trend`, `report`, `source`.
+- **Per-query cooldown active** — if the same `seed_text` already triggered a search within the last 5 turns, the search is suppressed. Wait a few turns or call `clear_trigger_cooldown()` in tests.
+
+---
+
+### Problem: Some pages are always skipped (no text extracted)
+
+**Symptoms:**
+Certain URLs consistently return empty `title` and `text` even with a valid network connection.
+
+**Explanation:**
+URLs that returned HTTP **403 Forbidden** or **404 Not Found** are permanently added to
+the `_failed_urls` blacklist for the lifetime of the process.  This is intentional —
+it prevents repeated failed requests to pages that have blocked the scraper or do not
+exist.
+
+If you need to retry a blacklisted URL (e.g. in a long-running process or test), call:
+
+```python
+from entelgia.web_tool import clear_failed_urls
+clear_failed_urls()
+```
 
 ---
 

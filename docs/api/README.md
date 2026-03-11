@@ -186,20 +186,45 @@ context = maybe_add_web_context(
 ### Individual Components
 
 ```python
-from entelgia.web_tool import web_search, fetch_page_text, search_and_fetch
+from entelgia.web_tool import web_search, fetch_page_text, search_and_fetch, clear_failed_urls
 from entelgia.source_evaluator import evaluate_sources
 from entelgia.research_context_builder import build_research_context
 
 # Search only
 results = web_search("quantum computing 2026", max_results=3)
 
-# Fetch single page
+# Fetch single page — URLs that return 403 or 404 are automatically blacklisted
+# and skipped on all subsequent calls within the same process.
 page = fetch_page_text("https://arxiv.org/abs/2401.12345")
 
 # Full bundle
 bundle = search_and_fetch("AI regulation news")
 scored = evaluate_sources(bundle["sources"])
 context_block = build_research_context(bundle, scored)
+
+# Reset the failed-URL blacklist (useful in tests or long-running processes)
+clear_failed_urls()
+```
+
+### Per-Query Cooldown
+
+`fixy_should_search` applies two independent cooldown layers so the same search
+is never repeated too frequently:
+
+```python
+from entelgia.fixy_research_trigger import fixy_should_search, clear_trigger_cooldown
+
+# First call fires
+fixy_should_search("latest AI research")  # → True
+
+# Same query within _COOLDOWN_TURNS turns is suppressed
+fixy_should_search("latest AI research")  # → False
+
+# A different query fires independently
+fixy_should_search("latest quantum computing")  # → True
+
+# Reset both per-trigger and per-query cooldown state
+clear_trigger_cooldown()
 ```
 
 ---

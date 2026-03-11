@@ -62,6 +62,9 @@ requests to DuckDuckGo and to third-party web pages.  Be aware of the following:
 - **Timeout & failure safety**: all requests use a 10-second timeout.  Any exception
   is caught and logged; the main dialogue pipeline always continues with an empty
   context block.
+- **Failed-URL blacklist**: URLs that return HTTP 403 or 404 are added to a
+  module-level set and permanently skipped for the process lifetime, reducing
+  exposure to repeatedly blocked or non-existent endpoints.
 - **Memory persistence**: sources with `credibility_score > 0.6` are stored in the
   `external_knowledge` table.  Review and rotate this table as needed.
 

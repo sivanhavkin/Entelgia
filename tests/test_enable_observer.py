@@ -200,8 +200,8 @@ class TestSpeakerSelectionNoObserver:
 
         # Execute the actual gating logic path from MainScript.run()
         if ms.cfg.enable_observer:
-            allow_fixy, fixy_prob, _repeating_agent = ms.dialogue_engine.should_allow_fixy(
-                ms.dialog, ms.turn_index
+            allow_fixy, fixy_prob, _repeating_agent = (
+                ms.dialogue_engine.should_allow_fixy(ms.dialog, ms.turn_index)
             )
         else:
             allow_fixy, fixy_prob = False, 0.0
@@ -225,8 +225,8 @@ class TestSpeakerSelectionNoObserver:
         ms, mock_engine = self._make_ms_with_engine(cfg, tmp_path)
 
         if ms.cfg.enable_observer:
-            allow_fixy, fixy_prob, _repeating_agent = ms.dialogue_engine.should_allow_fixy(
-                ms.dialog, ms.turn_index
+            allow_fixy, fixy_prob, _repeating_agent = (
+                ms.dialogue_engine.should_allow_fixy(ms.dialog, ms.turn_index)
             )
         else:
             allow_fixy, fixy_prob = False, 0.0

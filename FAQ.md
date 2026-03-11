@@ -382,6 +382,30 @@ The Web Research Module (v2.8.0) is an optional external knowledge pipeline:
 
 All requests use a 10-second timeout and errors never crash the main system.
 
+### Why does Entelgia sometimes skip fetching certain web pages?
+
+URLs that previously returned HTTP **403 Forbidden** or **404 Not Found** are added
+to a module-level **failed-URL blacklist** (`_failed_urls` in `web_tool.py`).  Any
+future fetch for a blacklisted URL is skipped instantly, without making a network
+request, so the system does not waste time on pages that have permanently blocked or
+removed their content.
+
+The blacklist persists for the lifetime of the process.  It is automatically cleared
+between test runs via `clear_failed_urls()` in the test fixture.
+
+### Why does Fixy not trigger a web search even when I ask the same question twice?
+
+Two cooldown layers prevent duplicate searches:
+
+1. **Per-trigger-keyword cooldown** — once a keyword like `latest` fires, it is
+   suppressed for `_COOLDOWN_TURNS` (5) turns.
+2. **Per-query cooldown** — the exact `seed_text` string passed to `fixy_should_search`
+   is also tracked; the same query string cannot trigger again within 5 turns.
+
+These mechanisms prevent redundant network calls during rapid re-prompting or looping
+dialogue.  The cooldown resets automatically after 5 turns, or immediately when
+`clear_trigger_cooldown()` is called.
+
 ### How do I run the Web Research demo?
 
 ```bash

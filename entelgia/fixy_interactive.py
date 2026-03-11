@@ -178,7 +178,7 @@ class InteractiveFixy:
 RECENT DIALOGUE:
 {context}
 
-Respond in maximum 2 sentences. Be direct and address the specific agent by name if needed.
+Respond in 1-2 sentences only. Be direct and concrete.
 {LLM_RESPONSE_LIMIT}
 """
 
