@@ -4,9 +4,9 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **454 tests** in 14 suites:
+Entelgia ships with comprehensive test coverage across **490 tests** in 16 suites:
 
-### Enhanced Dialogue Tests (7 tests)
+### Enhanced Dialogue Tests (11 tests)
 
 ```bash
 pytest tests/test_enhanced_dialogue.py -v
@@ -20,6 +20,10 @@ Tests verify:
 - ✅ **Persona formatting** - Rich traits and speech patterns
 - ✅ **Persona pronouns** - Pronoun injection into persona context
 - ✅ **Seed topic consistency** - Seed topic preserved across consecutive turns
+- ✅ **Safe LTM content** — internal fields excluded from LTM memory content
+- ✅ **Safe STM text** — internal fields excluded from STM text
+- ✅ **No internal field leakage** — internal memory fields never surface in prompts
+- ✅ **Internal field constants** — all internal field constants are complete and consistent
 
 ---
 
@@ -41,7 +45,7 @@ Tests verify:
 
 ---
 
-### 🧠 Long-Term Memory Tests (33 tests)
+### 🧠 Long-Term Memory Tests (43 tests)
 
 ```bash
 pytest tests/test_long_term_memory.py -v
@@ -52,6 +56,9 @@ Tests verify `DefenseMechanism`, `FreudianSlip`, and `SelfReplication` classes:
 - ✅ **Suppression classification** — mildly negative content
 - ✅ **Freudian slip surfacing** — probabilistic recall of defended memories
 - ✅ **Self-replication promotion** — recurring keyword detection
+- ✅ **FreudianSlip rate-limiting** — `slip_cooldown_turns` blocks burst sequences
+- ✅ **FreudianSlip deduplication** — `slip_dedup_window` suppresses identical repeats
+- ✅ **FreudianSlip counters** — `attempts` and `successes` increment correctly
 
 ---
 
@@ -304,7 +311,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 454 total tests (166 web research + 7 dialogue + 35 energy + 33 LTM + 19 security + 21 drive correlations + 23 drive pressure + 18 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 21 superego critique + 15 limbic hijack + 12 semantic repetition detection) |
+| **Unit Tests** | `pytest` | Runs 490 total tests (176 web research + 11 dialogue + 35 energy + 43 LTM + 19 security + 21 drive correlations + 23 drive pressure + 18 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 21 superego critique + 15 limbic hijack + 12 semantic repetition detection + 10 enable observer + 22 loop guard) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -312,6 +319,60 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 | **Documentation** | Doc integrity checks | Validates documentation consistency |
 
 > 🛡️ Together these jobs ensure that **every commit** adheres to style guidelines, passes vulnerability scans and produces a valid package and documentation.
+
+---
+
+### 👁️ Enable Observer Tests (10 tests)
+
+```bash
+pytest tests/test_enable_observer.py -v
+```
+
+Tests verify the `enable_observer` configuration flag introduced in v2.9.0 (PR #207):
+
+- ✅ **Default is True** — `Config.enable_observer` defaults to `True`
+- ✅ **False accepted** — `Config.enable_observer=False` passes validation without error
+- ✅ **Observer disabled → no InteractiveFixy** — `MainScript.__init__` skips creating `interactive_fixy` when `enable_observer=False`
+- ✅ **Observer enabled → InteractiveFixy created** — `interactive_fixy` is created in enhanced mode with default config
+- ✅ **Fixy excluded from speakers** — `allow_fixy` forced to `False` / `0.0` when observer is disabled
+- ✅ **No intervention calls** — `should_intervene` is never called when observer is off
+- ✅ **Speaker selection bypass** — Fixy is never added to the speaker pool when `enable_observer=False`
+- ✅ **Env var respected** — `ENTELGIA_ENABLE_OBSERVER=false` disables the observer via environment
+- ✅ **Non-enhanced mode unaffected** — disabling observer in non-enhanced mode does not crash
+- ✅ **Both modes consistent** — `enable_observer` behaviour is uniform across enhanced and standard modes
+
+---
+
+### 🔁 Loop Guard Tests (22 tests)
+
+```bash
+pytest tests/test_loop_guard.py -v
+```
+
+Tests verify `DialogueLoopDetector`, `PhraseBanList`, `DialogueRewriter`, `TopicManager.force_cluster_pivot`, and `FixyMode`/`AgentMode` integration in `entelgia/loop_guard.py`:
+
+- ✅ **LOOP_REPETITION detection** — identical turns above threshold flagged as repetition loop
+- ✅ **WEAK_CONFLICT detection** — dialogue with insufficient conflict markers flagged
+- ✅ **PREMATURE_SYNTHESIS detection** — synthesis-like closing before adequate depth reached
+- ✅ **TOPIC_STAGNATION detection** — topic unchanged across too many consecutive turns
+- ✅ **PhraseBanList blocking** — banned phrases are detected and blocked
+- ✅ **PhraseBanList allow** — non-banned phrases pass through
+- ✅ **DialogueRewriter rewrite** — stagnating turns rewritten with injected alternatives
+- ✅ **TopicManager cluster pivot** — forced pivot moves to a different topic cluster
+- ✅ **TOPIC_CLUSTERS structure** — all clusters non-empty and contain unique topics
+- ✅ **_TOPIC_TO_CLUSTER mapping** — every topic maps to a valid cluster
+- ✅ **get_cluster** — returns correct cluster for known topics
+- ✅ **topics_in_different_cluster** — cross-cluster pairs detected correctly
+- ✅ **FixyMode loop policy** — Fixy mode escalates correctly on detected loop type
+- ✅ **AgentMode loop policy** — agent mode adapts to loop type
+- ✅ **No false positive — clean dialogue** — healthy dialogue produces no loop flags
+- ✅ **Boundary conditions** — exact threshold values handled correctly
+- ✅ **Empty dialogue** — no crash on zero turns
+- ✅ **Single turn** — no false loop on single-turn dialogue
+- ✅ **Two turns** — minimum context handled gracefully
+- ✅ **Mixed loops** — multiple loop types in same dialogue all detected
+- ✅ **Reset state** — detector state resets correctly between checks
+- ✅ **Unknown topic** — graceful handling of topic not in any cluster
 
 ---
 

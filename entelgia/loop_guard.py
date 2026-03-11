@@ -121,9 +121,7 @@ TOPIC_CLUSTERS: Dict[str, List[str]] = {
 
 # Flat reverse map: topic → cluster name
 _TOPIC_TO_CLUSTER: Dict[str, str] = {
-    topic: cluster
-    for cluster, topics in TOPIC_CLUSTERS.items()
-    for topic in topics
+    topic: cluster for cluster, topics in TOPIC_CLUSTERS.items() for topic in topics
 }
 
 
@@ -245,9 +243,7 @@ class DialogueLoopDetector:
             and self._check_topic_stagnation(recent)
         ):
             modes.append(TOPIC_STAGNATION)
-            logger.debug(
-                "loop_guard: topic_stagnation detected at turn %d", turn_count
-            )
+            logger.debug("loop_guard: topic_stagnation detected at turn %d", turn_count)
 
         return modes
 
@@ -418,7 +414,11 @@ class PhraseBanList:
         for gram, count in counts.items():
             if count >= self.threshold and gram not in self._banned:
                 self._banned[gram] = current_turn + self.ban_duration
-                logger.debug("loop_guard: phrase banned for %d turns: %r", self.ban_duration, gram)
+                logger.debug(
+                    "loop_guard: phrase banned for %d turns: %r",
+                    self.ban_duration,
+                    gram,
+                )
 
     def active_bans(self) -> List[str]:
         """Return the list of currently banned phrases."""
@@ -498,9 +498,7 @@ class DialogueRewriter:
         if not active_modes:
             return ""
 
-        agent_turns = [
-            t for t in dialog if t.get("role") not in ("Fixy", "seed")
-        ]
+        agent_turns = [t for t in dialog if t.get("role") not in ("Fixy", "seed")]
         recent = agent_turns[-8:]  # inspect last 8 agent turns
 
         # Extract core claim per agent (last 1 turn per agent)

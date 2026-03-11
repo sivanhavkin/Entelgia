@@ -7,7 +7,7 @@
 ## A Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation
 
 **Author:** Sivan Havkin
-**Version:** 2.8.1
+**Version:** 2.9.0
 **Status:** Research / Production Hybrid
 
 ---

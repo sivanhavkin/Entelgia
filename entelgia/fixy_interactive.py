@@ -356,7 +356,9 @@ class InteractiveFixy:
                     "3. Suggests where to go next"
                 ),
             }
-            prompt_template = legacy_prompts.get(reason, _MODE_PROMPTS[FixyMode.MEDIATE])
+            prompt_template = legacy_prompts.get(
+                reason, _MODE_PROMPTS[FixyMode.MEDIATE]
+            )
 
         full_prompt = (
             f"{prompt_template}\n\n"
