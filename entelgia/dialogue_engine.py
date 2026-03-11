@@ -4,6 +4,8 @@
 """
 Dialogue Engine for Entelgia
 Manages dynamic speaker selection and flexible seed generation for natural dialogue flow.
+
+v2.9.0: Added AgentMode enum and cluster-aware topic pivot support.
 """
 
 import logging
@@ -21,6 +23,60 @@ if TYPE_CHECKING:
         name: str
 
         def conflict_index(self) -> float: ...
+
+
+# ---------------------------------------------------------------------------
+# Agent response modes
+# ---------------------------------------------------------------------------
+# These modes are injected into the seed when a loop failure mode is active,
+# directing the agent to respond in a specific way rather than its default
+# pattern.
+
+
+class AgentMode:
+    """Named constants for agent response modes."""
+
+    NORMAL = "NORMAL"
+    CONTRADICT = "CONTRADICT"
+    CONCRETIZE = "CONCRETIZE"
+    INVERT = "INVERT"
+    MECHANIZE = "MECHANIZE"
+    PIVOT = "PIVOT"
+
+
+# Policy: loop failure mode → agent response mode
+_LOOP_AGENT_POLICY: Dict[str, str] = {
+    "loop_repetition": AgentMode.CONCRETIZE,
+    "weak_conflict": AgentMode.INVERT,
+    "premature_synthesis": AgentMode.CONTRADICT,
+    "topic_stagnation": AgentMode.PIVOT,
+}
+
+# Mode-specific instruction appended to the seed
+_AGENT_MODE_INSTRUCTION: Dict[str, str] = {
+    AgentMode.CONTRADICT: (
+        "\nMODE: CONTRADICT — sharpen the disagreement. "
+        "Identify one claim in the previous turn and argue directly against it. "
+        "Do NOT synthesise or hedge."
+    ),
+    AgentMode.CONCRETIZE: (
+        "\nMODE: CONCRETIZE — give one specific real-world example, case study, "
+        "or counterexample. No abstract restatement. Facts only."
+    ),
+    AgentMode.INVERT: (
+        "\nMODE: INVERT — temporarily defend the opposite of your usual position. "
+        "Commit to the reversal; do not qualify it as hypothetical."
+    ),
+    AgentMode.MECHANIZE: (
+        "\nMODE: MECHANIZE — explain the step-by-step causal mechanism behind "
+        "your claim. No slogans. Show how it actually works."
+    ),
+    AgentMode.PIVOT: (
+        "\nMODE: PIVOT — shift to a genuinely different conceptual domain while "
+        "keeping one clear bridge to the previous idea. "
+        "Do not stay inside the same philosophical cluster."
+    ),
+}
 
 
 class SeedGenerator:
@@ -59,44 +115,58 @@ class SeedGenerator:
         recent_turns: List[Dict[str, str]],
         speaker: Any,  # Agent type
         turn_count: int,
+        agent_mode: Optional[str] = None,
     ) -> str:
         """
         Generate contextual seed based on dialogue state.
+
+        v2.9.0: *agent_mode* (one of AgentMode constants) appends a targeted
+        instruction so that the agent responds in a specific way when a loop
+        failure mode is active.  When ``AgentMode.NORMAL`` or ``None``, the
+        seed is generated as before.
 
         Args:
             topic: Current topic label
             recent_turns: Recent dialogue turns
             speaker: Current speaker agent
             turn_count: Current turn number
+            agent_mode: Optional AgentMode override injected when loop is active
 
         Returns:
             Formatted seed instruction
         """
         if not recent_turns:
-            return self.SEED_TEMPLATES["constructive_disagree"].format(topic=topic)
+            base = self.SEED_TEMPLATES["constructive_disagree"].format(topic=topic)
+        else:
+            # Get last emotion if available
+            last_turn = recent_turns[-1]
+            last_emotion = last_turn.get("emotion", "neutral")
 
-        # Get last emotion if available
-        last_turn = recent_turns[-1]
-        last_emotion = last_turn.get("emotion", "neutral")
+            # Get conflict level
+            try:
+                conflict_level = speaker.conflict_index()
+            except Exception:
+                conflict_level = 5.0
 
-        # Get conflict level
-        try:
-            conflict_level = speaker.conflict_index()
-        except:
-            conflict_level = 5.0
+            # Select strategy based on dialogue state
+            strategy = self._select_strategy(turn_count, conflict_level, last_emotion)
 
-        # Select strategy based on dialogue state
-        strategy = self._select_strategy(turn_count, conflict_level, last_emotion)
+            # Format seed
+            template = self.SEED_TEMPLATES.get(
+                strategy, self.SEED_TEMPLATES["constructive_disagree"]
+            )
+            base = template.format(topic=topic)
 
-        # Format and return seed
-        template = self.SEED_TEMPLATES.get(
-            strategy, self.SEED_TEMPLATES["constructive_disagree"]
-        )
-        seed_text = template.format(topic=topic)
+        # Append mode-specific instruction when a loop is active
+        mode_instruction = ""
+        if agent_mode and agent_mode != AgentMode.NORMAL:
+            mode_instruction = _AGENT_MODE_INSTRUCTION.get(agent_mode, "")
+
+        seed_text = base + mode_instruction
         logger.debug(
-            "SeedGenerator.generate_seed: topic=%r strategy=%r seed_text=%r",
+            "SeedGenerator.generate_seed: topic=%r agent_mode=%r seed_text=%r",
             topic,
-            strategy,
+            agent_mode,
             seed_text,
         )
         return seed_text
@@ -267,15 +337,20 @@ class DialogueEngine:
         dialog_history: List[Dict[str, str]],
         speaker: Any,  # Agent
         turn_count: int,
+        agent_mode: Optional[str] = None,
     ) -> str:
         """
         Generate contextual seed for speaker.
+
+        v2.9.0: *agent_mode* is forwarded to ``SeedGenerator.generate_seed``
+        so that loop-aware mode instructions are embedded in the seed.
 
         Args:
             topic: Current topic
             dialog_history: Recent dialogue
             speaker: Current speaker
             turn_count: Turn number
+            agent_mode: Optional AgentMode constant (injected when loop active)
 
         Returns:
             Seed instruction string
@@ -284,7 +359,7 @@ class DialogueEngine:
             dialog_history[-5:] if len(dialog_history) >= 5 else dialog_history
         )
         return self.seed_generator.generate_seed(
-            topic, recent_turns, speaker, turn_count
+            topic, recent_turns, speaker, turn_count, agent_mode=agent_mode
         )
 
     def should_allow_fixy(

@@ -4,6 +4,10 @@
 """
 Interactive Fixy for Entelgia
 Need-based interventions rather than scheduled interventions.
+
+v2.9.0: Added FixyMode enum and disruption strategies so that when the
+DialogueLoopDetector flags a failure mode, Fixy forces novelty instead of
+defaulting to generic mediation / synthesis language.
 """
 
 import re
@@ -14,6 +18,113 @@ from typing import Dict, List, Tuple, Any, Optional
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Fixy response modes
+# ---------------------------------------------------------------------------
+# These modes determine *how* Fixy intervenes.  MEDIATE is the legacy
+# behaviour.  All other modes are disruptive — they force the dialogue out
+# of a detected loop rather than summarising or bridging it.
+
+
+class FixyMode:
+    """Named constants for Fixy intervention modes."""
+
+    MEDIATE = "MEDIATE"
+    CONTRADICT = "CONTRADICT"
+    CONCRETIZE = "CONCRETIZE"
+    INVERT = "INVERT"
+    PIVOT = "PIVOT"
+    EXPOSE_SYNTHESIS = "EXPOSE_SYNTHESIS"
+    FORCE_MECHANISM = "FORCE_MECHANISM"
+
+
+# Policy: loop failure mode → preferred Fixy mode
+# (imported lazily to avoid circular import — loop_guard must not import fixy)
+_LOOP_MODE_POLICY: Dict[str, str] = {
+    "loop_repetition": FixyMode.CONCRETIZE,
+    "weak_conflict": FixyMode.CONTRADICT,
+    "premature_synthesis": FixyMode.EXPOSE_SYNTHESIS,
+    "topic_stagnation": FixyMode.PIVOT,
+}
+
+# Mode-specific prompt templates
+# {context} is replaced with the last 6 turns of dialogue
+_MODE_PROMPTS: Dict[str, str] = {
+    FixyMode.MEDIATE: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue needs rebalancing.\n"
+        "Generate a brief intervention (2-4 sentences) that:\n"
+        "1. Names the pattern you observe\n"
+        "2. Suggests a specific reframe or new angle\n"
+        "3. Helps break the loop"
+    ),
+    FixyMode.CONTRADICT: (
+        "You are Fixy, the meta-cognitive observer.  The conflict is weak — "
+        "agents appear to disagree but keep softening into synthesis.\n"
+        "Your job: FORCE a sharper contradiction.\n"
+        "In 2-3 sentences:\n"
+        "1. Identify the one claim that the two agents cannot BOTH hold simultaneously\n"
+        "2. State it as an unresolved binary: either X or Y — not both\n"
+        "3. Demand that the next speaker choose a side and defend it without hedging\n"
+        "Do NOT reconcile. Do NOT bridge. Do NOT use 'both have merit'."
+    ),
+    FixyMode.CONCRETIZE: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue is repeating "
+        "abstract claims without adding new content.\n"
+        "Your job: demand a concrete case.\n"
+        "In 2-3 sentences:\n"
+        "1. Name the abstract claim that keeps recurring\n"
+        "2. Challenge: provide ONE real-world case, historical example, or "
+        "counterexample that either proves or disproves it\n"
+        "3. Make clear that abstract restatement is not acceptable — specifics only\n"
+        "Do NOT summarise the dialogue."
+    ),
+    FixyMode.INVERT: (
+        "You are Fixy, the meta-cognitive observer.  An agent is stuck defending "
+        "the same position repeatedly.\n"
+        "Your job: temporarily invert that position.\n"
+        "In 2-3 sentences:\n"
+        "1. State the position that has become repetitive\n"
+        "2. Argue the opposite view as forcefully as possible\n"
+        "3. Ask the repeating agent to respond to the strongest version of the counter-argument\n"
+        "Do NOT say this is hypothetical. Commit to the inversion."
+    ),
+    FixyMode.PIVOT: (
+        "You are Fixy, the meta-cognitive observer.  The semantic content of the "
+        "dialogue has not moved — the topic label changed but the ideas stayed "
+        "in the same conceptual neighbourhood.\n"
+        "Your job: force a real pivot.\n"
+        "In 2-3 sentences:\n"
+        "1. Name the conceptual cluster that dialogue has been stuck in\n"
+        "2. Introduce a question or concept from a genuinely different domain "
+        "(e.g., biology, law, engineering, economics, practice)\n"
+        "3. Show one concrete bridge so the shift feels motivated\n"
+        "Do NOT stay inside philosophy or abstract ethics."
+    ),
+    FixyMode.EXPOSE_SYNTHESIS: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue has collapsed "
+        "into premature synthesis — 'both are needed', 'integrate both views'.\n"
+        "Your job: expose what is false or lost in that synthesis.\n"
+        "In 2-3 sentences:\n"
+        "1. State what the synthesis claim actually says\n"
+        "2. Identify what genuine contradiction it papers over or what "
+        "costs it ignores\n"
+        "3. Restore the tension: declare which side of the contradiction "
+        "must be resolved before synthesis is earned\n"
+        "Do NOT accept the synthesis. Do NOT soften the contradiction."
+    ),
+    FixyMode.FORCE_MECHANISM: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue is stuck in "
+        "slogans and abstract labels with no causal mechanism.\n"
+        "Your job: demand a mechanism.\n"
+        "In 2-3 sentences:\n"
+        "1. Name the abstract claim being repeated\n"
+        "2. Ask: what is the step-by-step causal process by which this claim "
+        "produces its supposed effect?\n"
+        "3. Warn that without a mechanism the claim is empty rhetoric\n"
+        "Do NOT accept abstract restatement."
+    ),
+}
 
 # ---------------------------------------------------------------------------
 # Optional semantic similarity support (sentence-transformers)
@@ -90,7 +201,13 @@ def _encode_turns(turns: List[Dict[str, str]]):
 
 
 class InteractiveFixy:
-    """Fixy as active dialogue participant with intelligent interventions."""
+    """Fixy as active dialogue participant with intelligent interventions.
+
+    v2.9.0: Fixy now selects a *disruption mode* based on the active failure
+    mode detected by DialogueLoopDetector.  When a loop is active, Fixy uses
+    CONTRADICT / CONCRETIZE / EXPOSE_SYNTHESIS / PIVOT / FORCE_MECHANISM
+    instead of the default mediating style.
+    """
 
     def __init__(self, llm, model: str):
         """
@@ -103,15 +220,30 @@ class InteractiveFixy:
         self.llm = llm
         self.model = model
 
+        # Lazy import to avoid circular dependency (loop_guard → no imports from fixy)
+        try:
+            from entelgia.loop_guard import DialogueLoopDetector
+
+            self._loop_detector = DialogueLoopDetector()
+        except ImportError:  # pragma: no cover
+            self._loop_detector = None
+
     def should_intervene(
-        self, dialog: List[Dict[str, str]], turn_count: int
+        self,
+        dialog: List[Dict[str, str]],
+        turn_count: int,
+        current_topic: Optional[str] = None,
     ) -> Tuple[bool, str]:
         """
         Decide if intervention needed based on dialogue state.
 
+        v2.9.0: First checks explicit loop failure modes via DialogueLoopDetector.
+        Falls back to the existing heuristic patterns when no loop is active.
+
         Args:
             dialog: Full dialogue history
             turn_count: Current turn number
+            current_topic: Current topic label (optional; used for stagnation check)
 
         Returns:
             Tuple of (should_intervene, reason)
@@ -120,6 +252,16 @@ class InteractiveFixy:
         if turn_count < 3:
             return (False, "")
 
+        # ── Loop-guard checks (new v2.9.0) ─────────────────────────────────
+        if self._loop_detector is not None:
+            active_modes = self._loop_detector.detect(
+                dialog, turn_count, current_topic=current_topic
+            )
+            if active_modes:
+                # Use the first (highest-priority) failure mode as the reason
+                return (True, active_modes[0])
+
+        # ── Legacy heuristic patterns (preserved for backward compat) ───────
         # Only analyse main-agent turns; excluding Fixy's own past interventions
         # prevents a feedback loop where Fixy's meta-commentary (which references
         # the dialogue topic and therefore has high semantic similarity) inflates
@@ -149,38 +291,79 @@ class InteractiveFixy:
 
         return (False, "")
 
-    def generate_intervention(self, dialog: List[Dict[str, str]], reason: str) -> str:
+    def get_fixy_mode(self, reason: str) -> str:
+        """Return the FixyMode that best matches *reason*.
+
+        Loop-guard reasons are mapped via _LOOP_MODE_POLICY.  Legacy reasons
+        use MEDIATE (the neutral default).
+
+        Args:
+            reason: Intervention reason string
+
+        Returns:
+            One of the FixyMode constants
         """
-        Generate contextual intervention.
+        return _LOOP_MODE_POLICY.get(reason, FixyMode.MEDIATE)
+
+    def generate_intervention(
+        self,
+        dialog: List[Dict[str, str]],
+        reason: str,
+        mode: Optional[str] = None,
+    ) -> str:
+        """
+        Generate contextual intervention using the appropriate Fixy mode.
+
+        v2.9.0: When *reason* maps to a loop failure mode, Fixy selects a
+        disruptive mode (CONTRADICT, CONCRETIZE, etc.) instead of the
+        default mediating style, ensuring it does not reinforce loops.
 
         Args:
             dialog: Dialogue history
             reason: Reason for intervention
+            mode: Override FixyMode (optional; auto-selected from reason if omitted)
 
         Returns:
             Intervention text
         """
         context = self._build_intervention_context(dialog, reason)
 
-        # Create intervention prompt based on reason
-        prompts = {
-            "circular_reasoning": "You are Fixy, the meta-cognitive observer. The dialogue has circled back to the same points multiple times. Generate a brief intervention (2-4 sentences) that:\n1. Names the circular pattern you observe\n2. Suggests a specific reframe or new angle\n3. Helps break the loop",
-            "high_conflict_no_resolution": "You are Fixy, the meta-cognitive observer. The dialogue has high conflict without moving toward synthesis. Generate a brief intervention (2-4 sentences) that:\n1. Acknowledges the tension\n2. Points out the complementary aspects being missed\n3. Suggests a bridging perspective",
-            "shallow_discussion": "You are Fixy, the meta-cognitive observer. The dialogue has stayed at a surface level for a while. Generate a brief intervention (2-4 sentences) that:\n1. Notes the pattern of surface-level engagement\n2. Suggests going deeper\n3. Offers a specific deeper question or angle",
-            "synthesis_opportunity": "You are Fixy, the meta-cognitive observer. There's an obvious synthesis opportunity being missed. Generate a brief intervention (2-4 sentences) that:\n1. Points out the complementary ideas\n2. Suggests how they might connect\n3. Encourages integration",
-            "meta_reflection_needed": "You are Fixy, the meta-cognitive observer. It's time for meta-reflection on the dialogue. Generate a brief intervention (2-4 sentences) that:\n1. Reflects on what's been accomplished\n2. Notes what patterns have emerged\n3. Suggests where to go next",
-        }
+        # Select Fixy mode — loop-guard reasons override legacy behaviour
+        if mode is None:
+            mode = self.get_fixy_mode(reason)
 
-        prompt_template = prompts.get(reason, prompts["circular_reasoning"])
+        # Use disruption prompt when mode is non-mediation; fall back for legacy reasons
+        if mode in _MODE_PROMPTS:
+            prompt_template = _MODE_PROMPTS[mode]
+        else:
+            # Legacy fallback prompts for reasons not covered by _MODE_PROMPTS
+            legacy_prompts = {
+                "circular_reasoning": _MODE_PROMPTS[FixyMode.CONCRETIZE],
+                "high_conflict_no_resolution": _MODE_PROMPTS[FixyMode.CONTRADICT],
+                "shallow_discussion": (
+                    "You are Fixy, the meta-cognitive observer. The dialogue has stayed at a "
+                    "surface level for a while. Generate a brief intervention (2-4 sentences) that:\n"
+                    "1. Notes the pattern of surface-level engagement\n"
+                    "2. Suggests going deeper\n"
+                    "3. Offers a specific deeper question or angle"
+                ),
+                "synthesis_opportunity": _MODE_PROMPTS[FixyMode.EXPOSE_SYNTHESIS],
+                "meta_reflection_needed": (
+                    "You are Fixy, the meta-cognitive observer. It's time for meta-reflection on "
+                    "the dialogue. Generate a brief intervention (2-4 sentences) that:\n"
+                    "1. Reflects on what's been accomplished\n"
+                    "2. Notes what patterns have emerged\n"
+                    "3. Suggests where to go next"
+                ),
+            }
+            prompt_template = legacy_prompts.get(reason, _MODE_PROMPTS[FixyMode.MEDIATE])
 
-        full_prompt = f"""{prompt_template}
-
-RECENT DIALOGUE:
-{context}
-
-Respond in 1-2 sentences only. Be direct and concrete.
-{LLM_RESPONSE_LIMIT}
-"""
+        full_prompt = (
+            f"{prompt_template}\n\n"
+            f"RECENT DIALOGUE:\n{context}\n\n"
+            f"Respond in 1-2 sentences only. Be direct and concrete.\n"
+            f"{LLM_RESPONSE_LIMIT}\n"
+        )
 
         intervention = self.llm.generate(
             self.model, full_prompt, temperature=0.4, use_cache=False

@@ -118,6 +118,15 @@ try:
         SelfReplication,
     )
     from entelgia.web_research import maybe_add_web_context
+    # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
+    from entelgia.loop_guard import (
+        DialogueLoopDetector,
+        PhraseBanList,
+        DialogueRewriter,
+        TOPIC_CLUSTERS,
+        _TOPIC_TO_CLUSTER,
+    )
+    from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -337,6 +346,14 @@ class Config:
     debug: bool = (
         False  # Enable DEBUG-level logging (True = verbose, False = INFO only)
     )
+    # ── Forgetting Policy (Feature 1) ──────────────────────────────────────
+    # TTL in seconds per memory layer.  Set to 0 to disable expiry for a layer.
+    forgetting_enabled: bool = True
+    forgetting_episodic_ttl: int = 7 * 24 * 3600  # subconscious/episodic → 7 days
+    forgetting_semantic_ttl: int = 90 * 24 * 3600  # conscious/semantic → 90 days
+    forgetting_autobio_ttl: int = 365 * 24 * 3600  # autobiographical → 365 days
+    # ── Affective Routing (Feature 2) ──────────────────────────────────────
+    affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.
@@ -877,7 +894,12 @@ TOPIC_CYCLE = [
 
 
 class TopicManager:
-    """Manages topic rotation."""
+    """Manages topic rotation with optional cluster-aware pivots.
+
+    v2.9.0: ``force_cluster_pivot()`` selects a topic from a *different*
+    semantic cluster than the current one, so stagnation cannot be escaped
+    by cycling through conceptually adjacent labels.
+    """
 
     def __init__(
         self, topics: List[str], rotate_every_rounds: int = 1, shuffle: bool = False
@@ -904,6 +926,56 @@ class TopicManager:
         if self.rounds % self.rotate_every_rounds == 0 and self.topics:
             self.i = (self.i + 1) % len(self.topics)
             logger.info(f"Topic advanced to: {self.current()}")
+
+    def force_cluster_pivot(self) -> str:
+        """Select a topic from a different semantic cluster than the current one.
+
+        Used when topic_stagnation is detected: instead of advancing to the
+        next topic in the ordered list (which may be in the same cluster),
+        we jump to a candidate from a genuinely different cluster.
+
+        Returns the new topic label (the internal pointer is updated).
+        """
+        current = self.current()
+        # Determine current cluster (use loop_guard constants if available)
+        current_cluster: Optional[str] = None
+        if ENTELGIA_ENHANCED:
+            try:
+                current_cluster = _TOPIC_TO_CLUSTER.get(current)
+            except Exception:
+                current_cluster = None
+
+        # Build candidates from other clusters
+        candidates = []
+        for topic in self.topics:
+            if topic == current:
+                continue
+            candidate_cluster: Optional[str] = None
+            if ENTELGIA_ENHANCED:
+                try:
+                    candidate_cluster = _TOPIC_TO_CLUSTER.get(topic)
+                except Exception:
+                    candidate_cluster = None
+            # Accept if different cluster (or unmapped)
+            if current_cluster is None or candidate_cluster != current_cluster:
+                candidates.append(topic)
+
+        if candidates:
+            new_topic = random.choice(candidates)
+            try:
+                self.i = self.topics.index(new_topic)
+            except ValueError:
+                # Safety: just advance normally if topic not in list
+                self.advance_round()
+                return self.current()
+            logger.info(
+                "TopicManager: cluster pivot from %r → %r", current, new_topic
+            )
+            return new_topic
+
+        # Fallback: normal advance if no cross-cluster candidate found
+        self.advance_round()
+        return self.current()
 
 
 # ============================================
@@ -963,7 +1035,10 @@ class MemoryCore:
                         intrusive INTEGER DEFAULT 0,
                         suppressed INTEGER DEFAULT 0,
                         retrain_status INTEGER DEFAULT 0,
-                        signature_hex TEXT DEFAULT NULL
+                        signature_hex TEXT DEFAULT NULL,
+                        expires_at TEXT DEFAULT NULL,
+                        confidence REAL DEFAULT NULL,
+                        provenance TEXT DEFAULT NULL
                     );
                 """)
                 conn.execute(
@@ -978,6 +1053,20 @@ class MemoryCore:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_mem_importance ON memories(importance DESC);"
                 )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_mem_expires ON memories(expires_at);"
+                )
+
+                # Migrate existing databases: add new columns if they don't exist yet
+                for col, col_def in [
+                    ("expires_at", "TEXT DEFAULT NULL"),
+                    ("confidence", "REAL DEFAULT NULL"),
+                    ("provenance", "TEXT DEFAULT NULL"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE memories ADD COLUMN {col} {col_def}")
+                    except Exception:
+                        pass  # column already exists
 
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS agent_state (
@@ -1080,6 +1169,35 @@ class MemoryCore:
         self.stm_save(agent_name, entries)
         logger.debug(f"STM entry signed for {agent_name}")
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Layer → TTL mapping for Forgetting Policy (Feature 1)
+    # ──────────────────────────────────────────────────────────────────────
+    _LAYER_TTL_ATTR: Dict[str, str] = {
+        "subconscious": "forgetting_episodic_ttl",
+        "episodic": "forgetting_episodic_ttl",
+        "conscious": "forgetting_semantic_ttl",
+        "semantic": "forgetting_semantic_ttl",
+        "autobiographical": "forgetting_autobio_ttl",
+    }
+
+    @staticmethod
+    def _compute_expires_at(layer: str, ts: str) -> Optional[str]:
+        """Return ISO expiry timestamp for *layer* starting from *ts*, or None if disabled."""
+        global CFG
+        if CFG is None or not CFG.forgetting_enabled:
+            return None
+        attr = MemoryCore._LAYER_TTL_ATTR.get(layer)
+        if attr is None:
+            return None
+        ttl = getattr(CFG, attr, 0)
+        if ttl <= 0:
+            return None
+        try:
+            base = dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return (base + dt.timedelta(seconds=ttl)).isoformat()
+        except Exception:
+            return None
+
     def ltm_insert(
         self,
         agent: str,
@@ -1095,12 +1213,18 @@ class MemoryCore:
         suppressed: int = 0,
         retrain_status: int = 0,
         ts: Optional[str] = None,
+        confidence: Optional[float] = None,
+        provenance: Optional[str] = None,
     ) -> str:
         """Insert entry to long-term memory with cryptographic signature."""
         mem_id = str(uuid.uuid4())
         ts = ts or now_iso()
 
-        # Create payload for signature
+        # Compute expiry timestamp based on layer TTL (Forgetting Policy, Feature 1)
+        expires_at = MemoryCore._compute_expires_at(layer, ts)
+
+        # Create payload for signature (unchanged – confidence/provenance not signed
+        # to preserve backward compatibility with existing rows)
         payload_for_sig = MemoryCore._build_ltm_payload(content, topic, emotion, ts)
         sig = create_signature(payload_for_sig.encode("utf-8"), MEMORY_SECRET_KEY_BYTES)
         sig_hex = sig.hex()
@@ -1111,8 +1235,9 @@ class MemoryCore:
                     """
                     INSERT INTO memories
                     (id, agent, ts, layer, content, topic, emotion, emotion_intensity, importance, source,
-                     promoted_from, intrusive, suppressed, retrain_status, signature_hex)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     promoted_from, intrusive, suppressed, retrain_status, signature_hex,
+                     expires_at, confidence, provenance)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         mem_id,
@@ -1130,6 +1255,9 @@ class MemoryCore:
                         suppressed,
                         retrain_status,
                         sig_hex,
+                        expires_at,
+                        confidence,
+                        provenance,
                     ),
                 )
                 conn.commit()
@@ -1217,6 +1345,72 @@ class MemoryCore:
         except Exception as e:
             logger.error(f"DB Query Error: {e}")
             return []
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 1: Forgetting Policy – TTL/decay per memory layer
+    # ──────────────────────────────────────────────────────────────────────
+
+    def ltm_apply_forgetting_policy(self) -> int:
+        """Delete expired memories according to the TTL forgetting policy.
+
+        Iterates over all memories that have an ``expires_at`` timestamp set
+        and removes those whose expiry has passed.  Returns the number of
+        memories that were purged.
+        """
+        now = dt.datetime.now(dt.timezone.utc).isoformat()
+        deleted = 0
+        try:
+            with self._conn() as conn:
+                cur = conn.execute(
+                    "DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?",
+                    (now,),
+                )
+                deleted = cur.rowcount
+                conn.commit()
+            if deleted:
+                logger.info(f"[ForgettingPolicy] Purged {deleted} expired memories.")
+        except Exception as e:
+            logger.error(f"Forgetting policy error: {e}")
+        return deleted
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Feature 2: Affective Routing – emotion-weighted memory retrieval
+    # ──────────────────────────────────────────────────────────────────────
+
+    def ltm_search_affective(
+        self,
+        agent: str,
+        limit: int = 20,
+        emotion_weight: Optional[float] = None,
+        layer: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return memories ranked by a combined affective-semantic score.
+
+        The score is:
+            ``importance * (1 - w) + emotion_intensity * w``
+        where *w* is ``emotion_weight`` (default: ``CFG.affective_emotion_weight``).
+
+        Memories with high emotional intensity are surfaced ahead of those
+        that are merely important, giving the retrieval an affective bias
+        consistent with how human memory prioritizes emotionally salient
+        events.
+        """
+        global CFG
+        if emotion_weight is None:
+            emotion_weight = CFG.affective_emotion_weight if CFG is not None else 0.4
+        emotion_weight = max(0.0, min(1.0, emotion_weight))
+
+        # Fetch a larger candidate pool then re-rank in Python so we don't
+        # embed arithmetic in SQL (keeps the query portable).
+        raw = self.ltm_recent(agent, limit=limit * 3, layer=layer)
+
+        def _score(mem: Dict[str, Any]) -> float:
+            imp = float(mem.get("importance") or 0.0)
+            ei = float(mem.get("emotion_intensity") or 0.0)
+            return imp * (1.0 - emotion_weight) + ei * emotion_weight
+
+        ranked = sorted(raw, key=_score, reverse=True)
+        return ranked[:limit]
 
     def get_agent_state(self, agent: str) -> Dict[str, float]:
         """Get agent's internal drives/state."""
@@ -1668,11 +1862,16 @@ class Agent:
         if stm:
             prompt += "\nRecent thoughts:\n"
             for e in stm[-3:]:
+                # Only the `text` field is forwarded; internal fields
+                # (_signature, emotion, ts, etc.) are intentionally excluded.
                 prompt += f"- {e.get('text', '')[:300]}\n"
 
         if recent_ltm:
             prompt += "\nKey memories:\n"
             for m in recent_ltm[:2]:
+                # Only the `content` field is forwarded; internal fields
+                # (signature_hex, expires_at, confidence, provenance, etc.)
+                # are intentionally excluded.
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
@@ -2793,10 +2992,17 @@ class MainScript:
                 if cfg.enable_observer
                 else None
             )
+            # v2.9.0: Loop-guard subsystems
+            self._loop_detector = DialogueLoopDetector()
+            self._phrase_ban = PhraseBanList()
+            self._dialogue_rewriter = DialogueRewriter()
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
             self.interactive_fixy = None
+            self._loop_detector = None
+            self._phrase_ban = None
+            self._dialogue_rewriter = None
 
         if not cfg.enable_observer:
             logger.info("Observer (Fixy) disabled via enable_observer=False")
@@ -2938,6 +3144,7 @@ class MainScript:
             emotion_intensity=float(inten),
             importance=float(imp),
             source="dream",
+            provenance="dream_reflection",
         )
 
         promoted = 0
@@ -2960,6 +3167,7 @@ class MainScript:
                     importance=im,
                     source="dream",
                     promoted_from="subconscious",
+                    provenance="dream_promotion",
                 )
                 promoted += 1
 
@@ -2975,6 +3183,14 @@ class MainScript:
 
         logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
         agent.energy_level = AGENT_INITIAL_ENERGY
+
+        # Apply forgetting policy at the end of each dream cycle (Feature 1)
+        purged = self.memory.ltm_apply_forgetting_policy()
+        if purged:
+            logger.info(
+                f"[ForgettingPolicy] dream_cycle purged {purged} expired memories for {agent.name}."
+            )
+
         print(
             Fore.YELLOW
             + f"[DREAM] {agent.name} reflection stored; promoted={promoted}"
@@ -3016,6 +3232,46 @@ class MainScript:
 
         while time.time() - self.start_time < timeout_seconds:
             self.turn_index += 1
+
+            # ── v2.9.0: Loop guard — run detection before each turn ──────────
+            # Detect active failure modes (loop_repetition, weak_conflict,
+            # premature_synthesis, topic_stagnation) using recent dialogue.
+            _active_loop_modes: List[str] = []
+            _agent_mode: Optional[str] = None
+            if self._loop_detector is not None:
+                _active_loop_modes = self._loop_detector.detect(
+                    self.dialog,
+                    self.turn_index,
+                    current_topic=topicman.current(),
+                )
+                if _active_loop_modes:
+                    # Select the agent mode that best counters the primary failure
+                    _agent_mode = _LOOP_AGENT_POLICY.get(
+                        _active_loop_modes[0], AgentMode.NORMAL
+                    )
+                    logger.info(
+                        "loop_guard: active=%s agent_mode=%s",
+                        _active_loop_modes,
+                        _agent_mode,
+                    )
+                    if self.cfg.show_meta:
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[LOOP-GUARD] Failure modes: {_active_loop_modes} → "
+                            f"agent mode: {_agent_mode}"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
+
+            # ── Update phrase ban list ───────────────────────────────────────
+            if self._phrase_ban is not None:
+                recent_texts = [
+                    t.get("text", "")
+                    for t in self.dialog[-6:]
+                    if t.get("role") not in ("seed", "Fixy")
+                ]
+                self._phrase_ban.update(recent_texts, self.turn_index)
 
             # Dynamic speaker selection (if enhanced mode available)
             if self.dialogue_engine:
@@ -3059,6 +3315,21 @@ class MainScript:
                 # Legacy: simple alternation
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
+            # ── v2.9.0: Force cluster pivot on topic_stagnation ─────────────
+            if "topic_stagnation" in _active_loop_modes:
+                new_topic = topicman.force_cluster_pivot()
+                logger.info(
+                    "loop_guard: topic_stagnation → cluster pivot → %r", new_topic
+                )
+                if self.cfg.show_meta:
+                    print(
+                        Fore.WHITE
+                        + Style.DIM
+                        + f"[LOOP-GUARD] Topic stagnation → cluster pivot → {new_topic!r}"
+                        + Style.RESET_ALL
+                        + "\n"
+                    )
+
             topic_label = topicman.current()
             logger.debug(
                 "MainScript.run: turn=%d selected active topic=%r",
@@ -3073,12 +3344,35 @@ class MainScript:
                     dialog_history=self.dialog,
                     speaker=speaker,
                     turn_count=self.turn_index,
+                    agent_mode=_agent_mode,  # v2.9.0: inject mode when loop active
                 )
             else:
                 # Legacy or Fixy seed
                 seed = (
                     f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
                 )
+
+            # ── v2.9.0: Prepend rewrite block when loop is active ─────────
+            if (
+                _active_loop_modes
+                and self._dialogue_rewriter is not None
+                and speaker.name != "Fixy"
+            ):
+                _banned_phrases = (
+                    self._phrase_ban.active_bans() if self._phrase_ban else None
+                )
+                _rewrite_block = self._dialogue_rewriter.build(
+                    dialog=self.dialog,
+                    active_modes=_active_loop_modes,
+                    current_topic=topic_label,
+                    banned_phrases=_banned_phrases,
+                )
+                if _rewrite_block:
+                    seed = _rewrite_block + "\n\n" + seed
+                    logger.debug(
+                        "loop_guard: rewrite block prepended to seed for %s",
+                        speaker.name,
+                    )
 
             logger.debug(
                 "MainScript.run: turn=%d speaker=%s final seed_text=%r",
@@ -3112,12 +3406,15 @@ class MainScript:
                 and self.interactive_fixy
                 and speaker.name != "Fixy"
             ):
+                # v2.9.0: pass current_topic so stagnation detection works inside Fixy too
                 should_intervene, reason = self.interactive_fixy.should_intervene(
-                    self.dialog, self.turn_index
+                    self.dialog, self.turn_index, current_topic=topic_label
                 )
                 if should_intervene:
+                    # v2.9.0: Fixy selects disruption mode based on detected loop type
+                    fixy_mode = self.interactive_fixy.get_fixy_mode(reason)
                     intervention = self.interactive_fixy.generate_intervention(
-                        self.dialog, reason
+                        self.dialog, reason, mode=fixy_mode
                     )
                     self.dialog.append({"role": "Fixy", "text": intervention})
                     self.fixy_agent.store_turn(
@@ -3127,12 +3424,14 @@ class MainScript:
                     print(
                         Fore.YELLOW + "Fixy: " + Style.RESET_ALL + intervention + "\n"
                     )
-                    logger.info(f"Fixy intervention: {reason}")
+                    logger.info(
+                        "Fixy intervention: reason=%s mode=%s", reason, fixy_mode
+                    )
                     if self.cfg.show_meta:
                         print(
                             Fore.WHITE
                             + Style.DIM
-                            + f"[META-ACTION] Fixy intervened: {reason}"
+                            + f"[META-ACTION] Fixy intervened: {reason} (mode={fixy_mode})"
                             + Style.RESET_ALL
                             + "\n"
                         )
