@@ -494,7 +494,8 @@ class DialogueLoopDetector:
         for t in socrates_turns:
             text = t.get("text", "")
             lower = text.lower()
-            first_word = lower.split()[0] if lower.split() else ""
+            words = lower.split()
+            first_word = words[0] if words else ""
             if "?" in text or first_word in self._SOCRATES_QUESTION_WORDS:
                 socrates_q_count += 1
 
@@ -504,7 +505,8 @@ class DialogueLoopDetector:
         athena_sys_count = sum(
             1
             for t in athena_turns
-            if any(w in t.get("text", "").lower() for w in self._ATHENA_SYSTEMIC_WORDS)
+            for text_lower in [t.get("text", "").lower()]
+            if any(w in text_lower for w in self._ATHENA_SYSTEMIC_WORDS)
         )
 
         socrates_ratio = socrates_q_count / len(socrates_turns)
@@ -566,8 +568,9 @@ class DialogueLoopDetector:
         mediation_count = sum(
             1
             for t in fixy_turns
-            if any(phrase in t.get("text", "").lower() for phrase in FIXY_BANNED_OPENERS)
-            or any(phrase in t.get("text", "").lower() for phrase in _SYNTHESIS_PHRASES)
+            for text_lower in [t.get("text", "").lower()]
+            if any(phrase in text_lower for phrase in FIXY_BANNED_OPENERS)
+            or any(phrase in text_lower for phrase in _SYNTHESIS_PHRASES)
         )
         return mediation_count >= self.fixy_mediation_min_turns
 
