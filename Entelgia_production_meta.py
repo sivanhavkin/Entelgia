@@ -285,6 +285,89 @@ LIMBIC_HIJACK_SUPEREGO_MULTIPLIER: float = 0.3
 # Number of consecutive turns (without re-trigger) before limbic hijack auto-exits
 LIMBIC_HIJACK_MAX_TURNS: int = 3
 
+# ============================================
+# TOPIC CLUSTERS - for random seed selection
+# ============================================
+
+TOPIC_CLUSTERS: dict[str, list[str]] = {
+    "philosophy": [
+        "Freedom",
+        "Truth and knowledge",
+        "Free will vs determinism",
+        "Identity and the self",
+        "Nature of justice",
+        "Meaning of consciousness",
+        "Limits of reason",
+        "Nature of wisdom",
+    ],
+    "psychology": [
+        "Memory and identity",
+        "Fear and decision making",
+        "Habit formation",
+        "Cognitive bias",
+        "Trauma and perception",
+        "Empathy and moral judgment",
+        "Loneliness in modern society",
+        "Motivation and purpose",
+    ],
+    "biology": [
+        "Brain plasticity",
+        "Evolution of cooperation",
+        "Fight or flight response",
+        "Neural basis of consciousness",
+        "Biological roots of morality",
+        "Sleep and memory consolidation",
+        "Embodiment and cognition",
+        "Aging and identity",
+    ],
+    "society": [
+        "Power and institutions",
+        "Social conformity",
+        "Collective memory",
+        "Civil disobedience",
+        "Inequality and opportunity",
+        "Propaganda and belief",
+        "Trust in institutions",
+        "Cultural identity",
+    ],
+    "technology": [
+        "AI alignment",
+        "Machine agency",
+        "Human-AI cooperation",
+        "Algorithmic bias",
+        "Digital identity",
+        "Autonomous systems",
+        "Ethics of artificial intelligence",
+        "Future of work",
+    ],
+    "economics": [
+        "Scarcity and human behavior",
+        "Risk and decision making",
+        "Wealth inequality",
+        "Economic freedom",
+        "Debt and responsibility",
+        "Trust in markets",
+        "Game theory and cooperation",
+        "Public goods dilemmas",
+    ],
+    "practical_dilemmas": [
+        "Loyalty vs honesty",
+        "Security vs freedom",
+        "Tradition vs progress",
+        "Individual vs collective good",
+        "Forgiveness vs justice",
+        "Ambition vs contentment",
+        "Truth vs kindness",
+        "Control vs trust",
+    ],
+}
+
+
+def _pick_random_seed_topic() -> str:
+    """Randomly select a seed topic from TOPIC_CLUSTERS."""
+    cluster = random.choice(list(TOPIC_CLUSTERS.keys()))
+    return random.choice(TOPIC_CLUSTERS[cluster])
+
 
 @dataclass
 class Config:
@@ -311,7 +394,7 @@ class Config:
     store_raw_stm: bool = False
     store_raw_subconscious_ltm: bool = False
     max_turns: int = 200
-    seed_topic: str = "Freedom"
+    seed_topic: str = field(default_factory=_pick_random_seed_topic)
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
@@ -3209,6 +3292,14 @@ class MainScript:
         # active topic always matches the opening seed text.
         first_topic = self.cfg.seed_topic
         logger.debug("MainScript.run: configured first topic=%r", first_topic)
+        _seed_cluster = next(
+            (c for c, topics in TOPIC_CLUSTERS.items() if first_topic in topics), None
+        )
+        logger.info(
+            'Seed topic selected: "%s" (cluster: %s)',
+            first_topic,
+            _seed_cluster if _seed_cluster else "custom",
+        )
         if first_topic in TOPIC_CYCLE:
             idx = TOPIC_CYCLE.index(first_topic)
             topic_list = TOPIC_CYCLE[idx:] + TOPIC_CYCLE[:idx]
