@@ -302,6 +302,10 @@ class TestTopicMismatchPersistWarning:
     """Agent.speak emits [TOPIC-MISMATCH-PERSIST] when regenerated response
     also fails the anchor check."""
 
+    # A prior turn for Socrates is required so the validation is not skipped
+    # (it is intentionally skipped on the first turn — see TestTopicMismatchFirstTurn).
+    _PRIOR_TURN = [{"role": "Socrates", "text": "I have thought about this before."}]
+
     def test_persist_warning_logged_when_regen_also_fails(self, caplog):
         """If both the initial and regenerated responses miss the anchors,
         a [TOPIC-MISMATCH-PERSIST] warning must be emitted."""
@@ -313,7 +317,7 @@ class TestTopicMismatchPersistWarning:
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
             with patch.object(_meta, "CFG", Config()):
-                agent.speak(seed, [])
+                agent.speak(seed, self._PRIOR_TURN)
 
         persist_msgs = [r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message]
         assert persist_msgs, (
@@ -333,11 +337,86 @@ class TestTopicMismatchPersistWarning:
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
             with patch.object(_meta, "CFG", Config()):
-                agent.speak(seed, [])
+                agent.speak(seed, self._PRIOR_TURN)
 
         persist_msgs = [r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message]
         assert not persist_msgs, (
             "Expected no [TOPIC-MISMATCH-PERSIST] warning when regenerated "
             "response satisfies topic anchors"
+        )
+
+
+# ---------------------------------------------------------------------------
+# First-turn topic anchor skip tests (Agent.speak)
+# ---------------------------------------------------------------------------
+
+
+class TestTopicMismatchFirstTurn:
+    """Agent.speak must NOT run topic anchor validation on the agent's first turn.
+
+    On the first turn ``own_texts`` is empty (the agent has not spoken yet).
+    Firing the anchor check at that point would produce [TOPIC-MISMATCH] /
+    [TOPIC-MISMATCH-PERSIST] log entries before the agent has said anything —
+    the bug reported in the issue.
+    """
+
+    def test_no_mismatch_warning_on_first_turn(self, caplog):
+        """No [TOPIC-MISMATCH] warning when the agent speaks for the first time,
+        even if the response lacks required topic anchors."""
+        agent = _make_agent()
+        # Response deliberately contains no anchor concepts for 'AI alignment'
+        agent.llm.generate.return_value = (
+            "Redundancy and real-time monitoring prevent failures."
+        )
+        seed = "TOPIC: AI alignment\nDiscuss."
+        # Empty dialog_tail → agent has not spoken yet (first turn)
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, [])
+
+        mismatch_msgs = [
+            r.message for r in caplog.records if "TOPIC-MISMATCH" in r.message
+        ]
+        assert not mismatch_msgs, (
+            "Expected no [TOPIC-MISMATCH] warning on the agent's first turn; "
+            "validation should be skipped before the agent has spoken at all"
+        )
+
+    def test_no_persist_warning_on_first_turn(self, caplog):
+        """No [TOPIC-MISMATCH-PERSIST] warning on the agent's first turn."""
+        agent = _make_agent()
+        agent.llm.generate.return_value = (
+            "Redundancy and real-time monitoring prevent failures."
+        )
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, [])
+
+        persist_msgs = [
+            r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message
+        ]
+        assert not persist_msgs, (
+            "Expected no [TOPIC-MISMATCH-PERSIST] warning on the agent's first turn"
+        )
+
+    def test_validation_runs_from_second_turn_onwards(self, caplog):
+        """[TOPIC-MISMATCH] warning IS emitted once the agent has a prior turn."""
+        agent = _make_agent()
+        agent.llm.generate.return_value = (
+            "Redundancy and real-time monitoring prevent failures."
+        )
+        seed = "TOPIC: AI alignment\nDiscuss."
+        prior_turn = [{"role": "Socrates", "text": "I have previously spoken on this."}]
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, prior_turn)
+
+        mismatch_msgs = [
+            r.message for r in caplog.records if "TOPIC-MISMATCH" in r.message
+        ]
+        assert mismatch_msgs, (
+            "Expected [TOPIC-MISMATCH] warning on the agent's second turn when "
+            "the response lacks required topic anchors"
         )
 
