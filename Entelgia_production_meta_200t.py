@@ -907,6 +907,40 @@ def safe_ltm_payload(text: str, topic: str, emo: str, inten: float, imp: float) 
     )
 
 
+# Minimum word length (in characters) used by the promotion dedup checker.
+_DEDUP_MIN_WORD_LEN: int = 4
+# Pre-compiled word pattern for Jaccard similarity (Latin letters only).
+_DEDUP_WORD_PATTERN: str = rf"[A-Za-z]{{{_DEDUP_MIN_WORD_LEN},}}"
+
+
+def _word_jaccard(text1: str, text2: str) -> float:
+    """Jaccard similarity on word sets (words ≥ _DEDUP_MIN_WORD_LEN chars, lowercased)."""
+    w1 = set(re.findall(_DEDUP_WORD_PATTERN, text1.lower()))
+    w2 = set(re.findall(_DEDUP_WORD_PATTERN, text2.lower()))
+    if not w1 and not w2:
+        return 1.0
+    if not w1 or not w2:
+        return 0.0
+    return len(w1 & w2) / len(w1 | w2)
+
+
+# Minimum Jaccard score above which a promotion candidate is considered a
+# semantic duplicate of an already-promoted item and is therefore skipped.
+_PROMOTION_DEDUP_THRESHOLD: float = 0.60
+
+
+def _is_too_similar(
+    text: str,
+    existing_texts: List[str],
+    threshold: float = _PROMOTION_DEDUP_THRESHOLD,
+) -> bool:
+    """Return True if *text* is too similar to any item in *existing_texts*."""
+    for existing in existing_texts:
+        if _word_jaccard(text, existing) >= threshold:
+            return True
+    return False
+
+
 # ============================================
 # LLM WRAPPER WITH RETRIES & CACHING
 # ============================================
@@ -1934,10 +1968,57 @@ class Agent:
         ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))
         stm_tail = max(3, min(12, int(3 + ego / 2)))
 
-        recent_ltm = self.memory.ltm_recent(
-            self.name, limit=ltm_limit, layer="conscious"
+        # Extract current topic from seed for topic gating
+        _topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
+        _current_topic = _topic_match.group(1).strip() if _topic_match else ""
+
+        # ── Topic-gated STM ────────────────────────────────────────────────
+        # Only include STM entries whose topic matches the current topic.
+        # Entries with no topic tag are allowed through (backward compat).
+        all_stm = self.memory.stm_load(self.name)
+        if _current_topic:
+            stm_filtered: List[Dict[str, Any]] = []
+            for _e in all_stm:
+                _e_topic = (_e.get("topic") or "").strip()
+                if not _e_topic or _e_topic == _current_topic:
+                    stm_filtered.append(_e)
+                else:
+                    logger.debug(
+                        "[TOPIC-GATE] STM excluded: agent=%s stm_topic=%r current=%r",
+                        self.name,
+                        _e_topic,
+                        _current_topic,
+                    )
+            stm = stm_filtered[-stm_tail:]
+        else:
+            stm = self.memory.stm_load(self.name)[-stm_tail:]
+
+        # ── Topic-gated LTM ────────────────────────────────────────────────
+        # Fetch extra candidates so filtering leaves enough relevant entries.
+        all_ltm_raw = self.memory.ltm_recent(
+            self.name, limit=ltm_limit * 3, layer="conscious"
         )
-        stm = self.memory.stm_load(self.name)[-stm_tail:]
+        if _current_topic:
+            recent_ltm: List[Dict[str, Any]] = []
+            for _m in all_ltm_raw:
+                _m_topic = (_m.get("topic") or "").strip()
+                if not _m_topic or _m_topic == _current_topic:
+                    recent_ltm.append(_m)
+                    logger.debug(
+                        "[TOPIC-GATE] LTM included: agent=%s topic=%r",
+                        self.name,
+                        _m_topic or "(no topic)",
+                    )
+                else:
+                    logger.debug(
+                        "[TOPIC-GATE] LTM excluded: agent=%s mem_topic=%r current=%r",
+                        self.name,
+                        _m_topic,
+                        _current_topic,
+                    )
+            recent_ltm = recent_ltm[:ltm_limit]
+        else:
+            recent_ltm = all_ltm_raw[:ltm_limit]
 
         # Format agent name with optional pronoun
         if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
@@ -2458,8 +2539,30 @@ class Agent:
         replicator = SelfReplication()
         promoted_list = replicator.replicate(recent)
 
+        # Fetch recent conscious contents to detect near-duplicate promotions
+        _recent_conscious = self.memory.ltm_recent(
+            self.name, limit=20, layer="conscious"
+        )
+        _recent_conscious_texts = [
+            str(m.get("content", "")).strip() for m in _recent_conscious
+        ]
+        # Track texts promoted in this cycle (within-cycle dedup)
+        _promoted_this_cycle: List[str] = []
+
+        promoted_count = 0
         for mem in promoted_list:
             content = str(mem.get("content", "")).strip()
+            # Semantic dedup: skip if too similar to recent conscious memories
+            # or to items already promoted in this cycle.
+            _dedup_corpus = _recent_conscious_texts + _promoted_this_cycle
+            if _is_too_similar(content, _dedup_corpus):
+                logger.info(
+                    "[DEDUP] self_replicate skipped (similar to recent conscious): "
+                    "agent=%s content=%r",
+                    self.name,
+                    content[:80],
+                )
+                continue
             msg = replicator.format_replication(mem)
             print(Fore.CYAN + msg + Style.RESET_ALL)
             self.memory.ltm_insert(
@@ -2473,8 +2576,10 @@ class Agent:
                 source="self_replication",
                 promoted_from="subconscious",
             )
+            _promoted_this_cycle.append(content)
+            promoted_count += 1
 
-        return len(promoted_list)
+        return promoted_count
 
 
 # ============================================
@@ -3271,6 +3376,16 @@ class MainScript:
         )
 
         promoted = 0
+        # Fetch recent conscious memories for semantic dedup
+        _recent_conscious = self.memory.ltm_recent(
+            agent.name, limit=20, layer="conscious"
+        )
+        _recent_conscious_texts = [
+            str(m.get("content", "")).strip() for m in _recent_conscious
+        ]
+        # Track texts promoted in this cycle (within-cycle dedup)
+        _promoted_this_cycle: List[str] = []
+
         for e in batch[-40:]:
             ei = float(e.get("emotion_intensity", 0.0))
             im = float(e.get("importance", 0.0))
@@ -3279,6 +3394,16 @@ class MainScript:
             ):
                 content = str(e.get("text", "")).strip()
                 if not content:
+                    continue
+                # Semantic dedup: skip near-duplicate promotions
+                _dedup_corpus = _recent_conscious_texts + _promoted_this_cycle
+                if _is_too_similar(content, _dedup_corpus):
+                    logger.info(
+                        "[DEDUP] dream_cycle skipped promotion (similar to recent): "
+                        "agent=%s content=%r",
+                        agent.name,
+                        content[:80],
+                    )
                     continue
                 self.memory.ltm_insert(
                     agent=agent.name,
@@ -3292,6 +3417,7 @@ class MainScript:
                     promoted_from="subconscious",
                     provenance="dream_promotion",
                 )
+                _promoted_this_cycle.append(content)
                 promoted += 1
 
         try:

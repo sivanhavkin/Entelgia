@@ -37,16 +37,64 @@ class FixyMode:
     PIVOT = "PIVOT"
     EXPOSE_SYNTHESIS = "EXPOSE_SYNTHESIS"
     FORCE_MECHANISM = "FORCE_MECHANISM"
+    # Loop-breaking modes (added to ensure Fixy breaks loops, not amplifies them)
+    FORCE_CONCRETE_EXAMPLE = "FORCE_CONCRETE_EXAMPLE"
+    FORCE_COUNTEREXAMPLE = "FORCE_COUNTEREXAMPLE"
+    FORCE_DIRECT_DISAGREEMENT = "FORCE_DIRECT_DISAGREEMENT"
+    FORCE_TOPIC_RETURN = "FORCE_TOPIC_RETURN"
+    FORCE_SHORT_ANSWER = "FORCE_SHORT_ANSWER"
+    FORCE_NEW_DOMAIN = "FORCE_NEW_DOMAIN"
 
 
 # Policy: loop failure mode → preferred Fixy mode
 # (imported lazily to avoid circular import — loop_guard must not import fixy)
 _LOOP_MODE_POLICY: Dict[str, str] = {
-    "loop_repetition": FixyMode.CONCRETIZE,
-    "weak_conflict": FixyMode.CONTRADICT,
+    "loop_repetition": FixyMode.FORCE_CONCRETE_EXAMPLE,
+    "weak_conflict": FixyMode.FORCE_DIRECT_DISAGREEMENT,
     "premature_synthesis": FixyMode.EXPOSE_SYNTHESIS,
-    "topic_stagnation": FixyMode.PIVOT,
+    "topic_stagnation": FixyMode.FORCE_NEW_DOMAIN,
+    "fixy_mediation_loop": FixyMode.FORCE_SHORT_ANSWER,
 }
+
+# Rotation list for loop_repetition / fixy_mediation_loop — cycles through
+# different breaking strategies so Fixy never repeats the same move twice.
+_LOOP_BREAKING_MODES: List[str] = [
+    FixyMode.FORCE_CONCRETE_EXAMPLE,
+    FixyMode.FORCE_COUNTEREXAMPLE,
+    FixyMode.FORCE_DIRECT_DISAGREEMENT,
+    FixyMode.FORCE_NEW_DOMAIN,
+    FixyMode.FORCE_SHORT_ANSWER,
+    FixyMode.CONCRETIZE,
+    FixyMode.CONTRADICT,
+    FixyMode.PIVOT,
+    FixyMode.FORCE_TOPIC_RETURN,
+]
+
+# Concepts Fixy must NEVER repeat — they signal a semantic attractor
+_FIXY_FORBIDDEN_CONCEPTS: List[str] = [
+    "ethics",
+    "monitoring",
+    "adaptive learning",
+    "societal values",
+    "ethical framework",
+    "societal impact",
+    "ethical considerations",
+    "balance",
+    "integration",
+    "synthesis",
+    "both are needed",
+    "complement each other",
+]
+_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION: str = (
+    "FORBIDDEN CONCEPTS: Do NOT use or repeat these words/phrases in your response: "
+    + ", ".join(_FIXY_FORBIDDEN_CONCEPTS)
+    + ". Use fresh vocabulary and concrete specifics."
+)
+
+# Reasons that trigger rotation through all loop-breaking strategies
+_ROTATION_TRIGGER_REASONS: frozenset = frozenset(
+    {"loop_repetition", "fixy_mediation_loop", "circular_reasoning"}
+)
 
 # Mode-specific prompt templates
 # {context} is replaced with the last 6 turns of dialogue
@@ -123,6 +171,73 @@ _MODE_PROMPTS: Dict[str, str] = {
         "produces its supposed effect?\n"
         "3. Warn that without a mechanism the claim is empty rhetoric\n"
         "Do NOT accept abstract restatement."
+    ),
+    FixyMode.FORCE_CONCRETE_EXAMPLE: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue is looping on "
+        "abstract claims without grounding them in reality.\n"
+        "Your job: demand ONE concrete real-world example.\n"
+        "In 2-3 sentences:\n"
+        "1. Name the abstract claim that keeps returning\n"
+        "2. Demand: give a single specific dated real-world example — a name, "
+        "a place, a documented event — that either proves or disproves it\n"
+        "3. Make clear that abstract restatement will be rejected\n"
+        "Do NOT summarise. Do NOT bridge. Demand the example now."
+    ),
+    FixyMode.FORCE_COUNTEREXAMPLE: (
+        "You are Fixy, the meta-cognitive observer.  One position is being "
+        "asserted repeatedly without challenge.\n"
+        "Your job: produce the strongest possible counterexample.\n"
+        "In 2-3 sentences:\n"
+        "1. State the claim being repeated\n"
+        "2. Provide ONE specific case where that claim demonstrably fails — "
+        "a real event, a documented exception, an empirical disconfirmation\n"
+        "3. Ask the next speaker to either refute the counterexample or abandon the claim\n"
+        "Do NOT hedge. The counterexample must be specific and named."
+    ),
+    FixyMode.FORCE_DIRECT_DISAGREEMENT: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue has drifted "
+        "into polite agreement or vague parallel monologues.\n"
+        "Your job: force a direct, unambiguous disagreement.\n"
+        "In 2-3 sentences:\n"
+        "1. Identify one concrete claim made by the last speaker\n"
+        "2. State flatly that this claim is wrong — no hedging, no 'perhaps', "
+        "no 'in some cases'\n"
+        "3. Give the single strongest reason it is wrong\n"
+        "Do NOT reconcile. Do NOT use 'both'. Be adversarial."
+    ),
+    FixyMode.FORCE_TOPIC_RETURN: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue has drifted "
+        "away from its original question into tangents.\n"
+        "Your job: pull it back to the core question.\n"
+        "In 2-3 sentences:\n"
+        "1. State what the original question or topic was\n"
+        "2. Name the tangent the dialogue has wandered into\n"
+        "3. Demand that the next speaker answer the original question directly — "
+        "not the tangent\n"
+        "Do NOT allow the tangent to continue. Redirect sharply."
+    ),
+    FixyMode.FORCE_SHORT_ANSWER: (
+        "You are Fixy, the meta-cognitive observer.  Responses have become "
+        "verbose, padded, and evasive.\n"
+        "Your job: enforce brevity and precision.\n"
+        "In 1-2 sentences:\n"
+        "1. Identify the question that has not been directly answered\n"
+        "2. Demand a one-sentence answer: yes or no, true or false, or a single "
+        "concrete claim — no qualifications, no context-setting\n"
+        "Do NOT accept a paragraph where a sentence will do."
+    ),
+    FixyMode.FORCE_NEW_DOMAIN: (
+        "You are Fixy, the meta-cognitive observer.  The dialogue is semantically "
+        "trapped — every new topic collapses back into the same conceptual cluster.\n"
+        "Your job: inject a question from a completely unrelated domain.\n"
+        "In 2-3 sentences:\n"
+        "1. Name the conceptual cluster the dialogue keeps returning to\n"
+        "2. Introduce a question or case from a domain with no obvious connection "
+        "(e.g., microbiology, contract law, structural engineering, game theory, "
+        "historical cartography)\n"
+        "3. Explain in one sentence why this new domain actually illuminates "
+        "the original problem from an unexpected angle\n"
+        "Do NOT stay in philosophy, abstract reasoning, or technology."
     ),
 }
 
@@ -205,8 +320,11 @@ class InteractiveFixy:
 
     v2.9.0: Fixy now selects a *disruption mode* based on the active failure
     mode detected by DialogueLoopDetector.  When a loop is active, Fixy uses
-    CONTRADICT / CONCRETIZE / EXPOSE_SYNTHESIS / PIVOT / FORCE_MECHANISM
-    instead of the default mediating style.
+    FORCE_CONCRETE_EXAMPLE / FORCE_COUNTEREXAMPLE / FORCE_DIRECT_DISAGREEMENT /
+    FORCE_NEW_DOMAIN / FORCE_SHORT_ANSWER / FORCE_TOPIC_RETURN (and legacy
+    CONTRADICT / CONCRETIZE / EXPOSE_SYNTHESIS / PIVOT / FORCE_MECHANISM)
+    instead of the default mediating style.  Modes rotate so Fixy never repeats
+    the same breaking strategy in consecutive interventions.
     """
 
     def __init__(self, llm, model: str):
@@ -219,6 +337,9 @@ class InteractiveFixy:
         """
         self.llm = llm
         self.model = model
+        # Counter for rotating through loop-breaking modes so Fixy never
+        # repeats the same breaking strategy in consecutive interventions.
+        self._loop_break_rotation: int = 0
 
         # Lazy import to avoid circular dependency (loop_guard → no imports from fixy)
         try:
@@ -258,8 +379,15 @@ class InteractiveFixy:
                 dialog, turn_count, current_topic=current_topic
             )
             if active_modes:
+                primary = active_modes[0]
+                logger.info(
+                    "[FIXY-LOOP] Loop detected: modes=%s turn=%d topic=%r → Fixy will break loop",
+                    active_modes,
+                    turn_count,
+                    current_topic,
+                )
                 # Use the first (highest-priority) failure mode as the reason
-                return (True, active_modes[0])
+                return (True, primary)
 
         # ── Legacy heuristic patterns (preserved for backward compat) ───────
         # Only analyse main-agent turns; excluding Fixy's own past interventions
@@ -294,8 +422,9 @@ class InteractiveFixy:
     def get_fixy_mode(self, reason: str) -> str:
         """Return the FixyMode that best matches *reason*.
 
-        Loop-guard reasons are mapped via _LOOP_MODE_POLICY.  Legacy reasons
-        use MEDIATE (the neutral default).
+        Loop-guard reasons that signal repetition rotate through all loop-breaking
+        modes so Fixy never repeats the same strategy twice in a row.
+        Legacy reasons use MEDIATE (the neutral default).
 
         Args:
             reason: Intervention reason string
@@ -303,6 +432,18 @@ class InteractiveFixy:
         Returns:
             One of the FixyMode constants
         """
+        if reason in _ROTATION_TRIGGER_REASONS:
+            mode = _LOOP_BREAKING_MODES[
+                self._loop_break_rotation % len(_LOOP_BREAKING_MODES)
+            ]
+            self._loop_break_rotation += 1
+            logger.debug(
+                "[FIXY-MODE] reason=%r → rotating loop-break mode=%s (rotation=%d)",
+                reason,
+                mode,
+                self._loop_break_rotation,
+            )
+            return mode
         return _LOOP_MODE_POLICY.get(reason, FixyMode.MEDIATE)
 
     def generate_intervention(
@@ -364,6 +505,7 @@ class InteractiveFixy:
             f"{prompt_template}\n\n"
             f"RECENT DIALOGUE:\n{context}\n\n"
             f"Respond in 1-2 sentences only. Be direct and concrete.\n"
+            f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
             f"{LLM_RESPONSE_LIMIT}\n"
         )
 

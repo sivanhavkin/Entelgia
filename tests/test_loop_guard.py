@@ -365,6 +365,13 @@ def test_fixy_mode_constants_exist():
     assert FixyMode.PIVOT == "PIVOT"
     assert FixyMode.EXPOSE_SYNTHESIS == "EXPOSE_SYNTHESIS"
     assert FixyMode.FORCE_MECHANISM == "FORCE_MECHANISM"
+    # Loop-breaking modes
+    assert FixyMode.FORCE_CONCRETE_EXAMPLE == "FORCE_CONCRETE_EXAMPLE"
+    assert FixyMode.FORCE_COUNTEREXAMPLE == "FORCE_COUNTEREXAMPLE"
+    assert FixyMode.FORCE_DIRECT_DISAGREEMENT == "FORCE_DIRECT_DISAGREEMENT"
+    assert FixyMode.FORCE_TOPIC_RETURN == "FORCE_TOPIC_RETURN"
+    assert FixyMode.FORCE_SHORT_ANSWER == "FORCE_SHORT_ANSWER"
+    assert FixyMode.FORCE_NEW_DOMAIN == "FORCE_NEW_DOMAIN"
 
 
 def test_loop_mode_policy_covers_all_failure_modes():
@@ -385,6 +392,12 @@ def test_loop_mode_policy_covers_all_failure_modes():
             FixyMode.PIVOT,
             FixyMode.EXPOSE_SYNTHESIS,
             FixyMode.FORCE_MECHANISM,
+            FixyMode.FORCE_CONCRETE_EXAMPLE,
+            FixyMode.FORCE_COUNTEREXAMPLE,
+            FixyMode.FORCE_DIRECT_DISAGREEMENT,
+            FixyMode.FORCE_TOPIC_RETURN,
+            FixyMode.FORCE_SHORT_ANSWER,
+            FixyMode.FORCE_NEW_DOMAIN,
         )
 
 
