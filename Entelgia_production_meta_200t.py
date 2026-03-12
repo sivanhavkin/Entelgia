@@ -2422,10 +2422,14 @@ class Agent:
             self._consecutive_superego_rewrites = 0
 
         # ── Topic Anchor Validation: regenerate if response misses required concepts ─
+        # Skip on the agent's very first turn (own_texts is empty) to avoid
+        # triggering validation before the agent has had any context to engage
+        # with the topic — which would produce regeneration warnings before the
+        # agent speaks at all.
         _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
         _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
         _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
-        if _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
+        if own_texts and _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
             logger.warning(
                 "[TOPIC-MISMATCH] agent=%s topic=%r response did not contain required topic anchors – regenerating",
                 self.name,
