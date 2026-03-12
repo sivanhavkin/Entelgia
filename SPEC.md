@@ -862,3 +862,69 @@ Layer 2 is enforced via the mandatory control block appended by `build_style_ins
 ### Cluster Alias Mapping
 
 `_CLUSTER_ALIAS` maps production-file cluster names to the names used by `loop_guard.TOPIC_CLUSTERS`, allowing both systems to share a unified vocabulary without circular imports.
+
+## 19) Topic Anchors & Forbidden Carryover (v2.9.0)
+
+### Purpose
+
+Prevents topic drift where a model nominally switches topic but continues repeating
+concepts from a previous discussion loop (e.g., substituting "AI alignment" for
+"safety engineering" while still using terms like *redundancy*, *failure modes*,
+*real-time monitoring*).
+
+### TOPIC_ANCHORS
+
+`TOPIC_ANCHORS: dict[str, list[str]]` maps every topic in `TOPIC_CLUSTERS` to a
+list of required concept keywords.
+
+Example:
+```python
+"AI alignment": [
+    "objective misspecification", "reward hacking", "corrigibility",
+    "outer alignment", "inner alignment", "value learning",
+    "specification gaming", "human intent"
+]
+```
+
+### Prompt Injection (in `_build_compact_prompt`)
+
+When the current topic is found in `TOPIC_ANCHORS`, two blocks are injected:
+
+1. **Topic anchor requirement** — the agent must engage with at least one concept:
+   ```
+   CURRENT TOPIC: AI alignment
+   Your response must explicitly engage with at least one of the following concepts:
+   objective misspecification, reward hacking, …
+   ```
+
+2. **Forbidden carryover** — when the topic has changed since the last turn, the
+   previous topic's anchors are injected as forbidden concepts:
+   ```
+   Do NOT reuse concepts from previous discussions such as:
+   self-direction, automation, control systems, …
+   ```
+
+### Topic Match Validation (in `Agent.speak`)
+
+After the LLM returns a response, `_contains_any(response, anchors)` checks whether
+at least one anchor concept appears.  If the check fails and anchors exist:
+
+1. `[TOPIC-MISMATCH]` is logged at WARNING level:
+   ```
+   [TOPIC-MISMATCH] agent=Socrates topic='AI alignment'
+   response did not contain required topic anchors – regenerating
+   ```
+2. The response is regenerated once with the same prompt and temperature.
+
+### `_contains_any` helper
+
+```python
+def _contains_any(text: str, concepts: list[str]) -> bool:
+    """Return True if text contains at least one concept (case-insensitive)."""
+```
+
+### `_last_topic` tracking
+
+`Agent._last_topic: str` persists the most recent active topic across turns.  It is
+set at the end of `Agent.speak()` to enable forbidden-carryover injection in the next
+call to `_build_compact_prompt`.
