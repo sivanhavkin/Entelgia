@@ -46,9 +46,12 @@ from .loop_guard import (
 from .dialogue_engine import AgentMode
 from .topic_style import (
     TOPIC_STYLE,
+    TOPIC_TONE_POLICY,
+    DEFAULT_TOPIC_CLUSTER,
     get_style_for_cluster,
     get_style_for_topic,
     build_style_instruction,
+    scrub_rhetorical_openers,
 )
 
 __all__ = [
@@ -86,9 +89,12 @@ __all__ = [
     "DialogueRewriter",
     "TOPIC_CLUSTERS",
     "TOPIC_STYLE",
+    "TOPIC_TONE_POLICY",
+    "DEFAULT_TOPIC_CLUSTER",
     "get_style_for_cluster",
     "get_style_for_topic",
     "build_style_instruction",
+    "scrub_rhetorical_openers",
 ]
 
 __version__ = "2.9.0"
