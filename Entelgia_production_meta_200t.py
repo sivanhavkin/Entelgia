@@ -135,6 +135,7 @@ try:
     from entelgia.topic_style import (
         get_style_for_topic,
         build_style_instruction,
+        scrub_rhetorical_openers,
     )
 
     ENTELGIA_ENHANCED = True
@@ -149,6 +150,9 @@ except ImportError:
         # Legacy mode: style instructions are not injected; agents rely solely on
         # their persona strings without topic-aware guidance.
         return ""
+
+    def scrub_rhetorical_openers(text, cluster=""):  # type: ignore[no-redef]
+        return text
 
     def maybe_add_web_context(  # type: ignore[no-redef]
         seed_text,
@@ -1779,6 +1783,7 @@ class Agent:
         self._superego_streak_suppressed: bool = False
         # Topic-aware style instruction (set by MainScript at session start)
         self.topic_style: str = ""
+        self.topic_cluster: str = ""  # active cluster for register enforcement
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
@@ -2302,6 +2307,10 @@ class Agent:
                 if stripped:
                     out = stripped
                 break
+
+        # Register scrubber: remove rhetorical openers that violate the active
+        # cluster's tone policy (no-op for philosophy cluster).
+        out = scrub_rhetorical_openers(out, self.topic_cluster)
 
         # Safety net: strip "I am {name}" identity schema leak if LLM started with it
         out_stripped = out.lstrip()
@@ -3330,16 +3339,20 @@ class MainScript:
             (self.athena, "Athena"),
             (self.fixy_agent, "Fixy"),
         ]:
-            _agent.topic_style = build_style_instruction(_topic_style_str, _agent_name)
-        logger.info(
-            "Topic style selected: %s (%s)",
-            _topic_style_str,
-            _seed_cluster,
-        )
+            _agent.topic_style = build_style_instruction(
+                _topic_style_str, _agent_name, _seed_cluster
+            )
+            _agent.topic_cluster = _seed_cluster
         logger.info(
             'Seed topic selected: "%s" (cluster: %s)',
             first_topic,
             _seed_cluster,
+        )
+        logger.info(
+            "Topic style refreshed: %s (%s) for topic '%s'",
+            _topic_style_str,
+            _seed_cluster,
+            first_topic,
         )
         if first_topic in TOPIC_CYCLE:
             idx = TOPIC_CYCLE.index(first_topic)
@@ -3466,8 +3479,15 @@ class MainScript:
                 )
                 for _pa in [self.socrates, self.athena, self.fixy_agent]:
                     _pa.topic_style = build_style_instruction(
-                        _pivot_style_str, _pa.name
+                        _pivot_style_str, _pa.name, _pivot_cluster
                     )
+                    _pa.topic_cluster = _pivot_cluster
+                logger.info(
+                    "Topic style refreshed: %s (%s) for topic '%s'",
+                    _pivot_style_str,
+                    _pivot_cluster,
+                    new_topic,
+                )
                 logger.debug(
                     "topic_style updated after cluster pivot → %r", new_topic
                 )
@@ -3638,8 +3658,15 @@ class MainScript:
                 )
                 for _aa in [self.socrates, self.athena, self.fixy_agent]:
                     _aa.topic_style = build_style_instruction(
-                        _adv_style_str, _aa.name
+                        _adv_style_str, _aa.name, _adv_cluster
                     )
+                    _aa.topic_cluster = _adv_cluster
+                logger.info(
+                    "Topic style refreshed: %s (%s) for topic '%s'",
+                    _adv_style_str,
+                    _adv_cluster,
+                    _adv_topic,
+                )
                 logger.debug(
                     "topic_style updated after advance_round → %r", _adv_topic
                 )
