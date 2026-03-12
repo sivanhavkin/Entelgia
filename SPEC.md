@@ -915,6 +915,12 @@ at least one anchor concept appears.  If the check fails and anchors exist:
    response did not contain required topic anchors – regenerating
    ```
 2. The response is regenerated once with the same prompt and temperature.
+3. If the regenerated response **also** fails the anchor check, a second WARNING is
+   logged and the regenerated response is still used (the dialogue is not blocked):
+   ```
+   [TOPIC-MISMATCH-PERSIST] agent=Socrates topic='AI alignment'
+   regenerated response also did not contain required topic anchors
+   ```
 
 ### `_contains_any` helper
 
