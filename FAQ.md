@@ -104,19 +104,19 @@ The `MEMORY_SECRET_KEY` is a cryptographic key used to sign and verify long-term
 ### What are the three agents?
 
 1. **Socrates** — The Questioner
-   - Reflective and dialectical inquiry
-   - Structures meaning through questions
-   - Challenges assumptions
+   - Investigative and domain-aware inquiry
+   - Probes assumptions with concrete, causal questions
+   - Adapts questioning style to the topic domain
 
 2. **Athena** — The Synthesizer
-   - Integrative and creative
-   - Emotional coherence
-   - Perspective shifts and synthesis
+   - Strategic and structured framework building
+   - Integrates ideas using domain-relevant vocabulary
+   - Synthesis and structured explanation
 
 3. **Fixy** — The Observer
-   - Meta-cognitive monitoring
-   - Corrective feedback
-   - Need-based interventions
+   - Diagnostic and corrective meta-cognitive monitoring
+   - Identifies contradictions, gaps, and reasoning errors
+   - Need-based interventions calibrated to the topic domain
 
 ### What is the CoreMind system?
 
@@ -333,6 +333,10 @@ Yes! Agent personas are defined in:
 - Enhanced mode: `entelgia/enhanced_personas.py`
 
 You can modify personality traits, speech patterns, and behavioral tendencies.
+
+The **topic-aware style** (analytical, scientific, pragmatic, etc.) is determined automatically
+at session start from the seed topic cluster via `entelgia/topic_style.py`. You can extend the
+`TOPIC_STYLE` dict in that module to add new clusters or override existing styles.
 
 ### Can I add more agents?
 

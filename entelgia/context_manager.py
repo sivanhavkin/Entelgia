@@ -102,6 +102,7 @@ class ContextManager:
         show_pronoun: bool = False,
         agent_pronoun: Optional[str] = None,
         web_context: str = "",
+        topic_style: str = "",
     ) -> str:
         """
         Build rich context with smart truncation and memory integration.
@@ -119,6 +120,7 @@ class ContextManager:
             show_pronoun: Whether to display pronoun after agent name
             agent_pronoun: Pronoun to display (e.g., "he", "she") if show_pronoun is True
             web_context: Optional external knowledge context from web research
+            topic_style: Optional style instruction derived from the seed topic cluster
 
         Returns:
             Formatted prompt string
@@ -153,6 +155,7 @@ class ContextManager:
             show_pronoun=show_pronoun,
             agent_pronoun=agent_pronoun,
             web_context=web_context,
+            topic_style=topic_style,
         )
 
         return prompt
@@ -212,6 +215,7 @@ class ContextManager:
         show_pronoun: bool = False,
         agent_pronoun: Optional[str] = None,
         web_context: str = "",
+        topic_style: str = "",
     ) -> str:
         """
         Format enriched prompt with all context.
@@ -228,6 +232,7 @@ class ContextManager:
             show_pronoun: Whether to display pronoun after agent name
             agent_pronoun: Pronoun to display (e.g., "he", "she")
             web_context: Optional external knowledge block from web research
+            topic_style: Optional style instruction derived from the seed topic cluster
 
         Returns:
             Formatted prompt
@@ -298,6 +303,10 @@ class ContextManager:
                 "- Id may resist heavy research if energy is low.\n"
                 "- Fixy monitors reasoning loops and source reliability.\n"
             )
+
+        # Inject topic-aware style instruction when provided
+        if topic_style:
+            prompt += f"\nSTYLE INSTRUCTION: {topic_style}\n"
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         # Identity lock: drives are internal psychology metrics, not persona labels.

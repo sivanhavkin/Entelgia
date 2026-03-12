@@ -27,9 +27,9 @@
 ## 1) Core Entities
 
 ### Agents
-- **Socrates** — inquiry / structure / meaning-making
-- **Athena** — creativity / synthesis / perspective shifts
-- **Fixy** — observer/fixer layer; meta-cognitive intervention policy
+- **Socrates** — investigative inquiry / domain-aware questioning / assumption probing
+- **Athena** — synthesis / framework building / structured explanation
+- **Fixy** — observer/fixer layer; meta-cognitive intervention policy; diagnostic and corrective
 
 Each agent has:
 - `name`, `model`
@@ -54,6 +54,7 @@ Responsible for building an **enriched prompt** with controlled token usage:
 - `thoughts` (internal reflections if available)
 - `memories` (selected LTM + recent STM)
 - persona formatted by drives (if rich persona available)
+- **topic-aware style instruction** (injected from `topic_style.py` at session start)
 
 ### Enhanced Memory Integration (Enhanced Mode)
 Retrieves **relevant** memories rather than “most recent only”:
@@ -260,6 +261,7 @@ Target composition (example):
 * LTM (relevant memories, bounded)
 * Seed / instruction
 * External Knowledge Context (optional, injected by Web Research Module when Fixy triggers a search)
+* **Style Instruction** (injected from `topic_style.py`; adapts reasoning to the topic domain)
 
 Token control:
 

@@ -39,12 +39,17 @@ mechanism rather than from a single prompt.
 Primary conversational entities with persistent identity.
 
 Examples:
-- **Socrates** — inquiry-driven reasoning
-- **Athena** — synthesis and reflection
+- **Socrates** — investigative, domain-aware inquiry; probes assumptions with domain-relevant questioning
+- **Athena** — synthesis and framework building; structures explanations in the vocabulary of the active topic domain
+- **Fixy** — diagnostic observer; detects contradictions and reasoning gaps specific to the domain
 
 Agents maintain evolving internal variables such as drives, coherence,
 and interaction history. Each agent delegates cognitive sub-tasks to
 core components (`ConsciousCore`, `EmotionCore`, `LanguageCore`, `BehaviorCore`).
+
+At session start, each agent receives a **topic-aware style instruction** derived from the
+seed topic cluster (via `entelgia/topic_style.py`) so that reasoning adapts to the domain
+rather than defaulting to abstract philosophical language.
 
 ---
 
@@ -81,6 +86,7 @@ Combines:
 - selected memory fragments
 - internal state snapshot
 - dialogue strategy seed
+- **topic-aware style instruction** (injected from `topic_style.py` based on the seed topic cluster)
 
 Its goal is contextual coherence under token constraints.
 
@@ -140,28 +146,34 @@ Below is a high-level flow depicting how the system processes a conversational t
 1. **Topic/Prompt Initiation**  
    The system receives a new conversation topic or user prompt.
 
-2. **DialogueEngine Selects Next Actor and Seed**  
+2. **Topic Style Detection**  
+   `get_style_for_topic()` maps the seed topic to a cluster (e.g., `technology`, `economics`, `biology`).
+   A per-agent style instruction is built and assigned to each agent.
+   Session start logs: `INFO — Topic style selected: <style> (<cluster>)`.
+
+3. **DialogueEngine Selects Next Actor and Seed**  
    The DialogueEngine decides which agent speaks next and selects a dialogue strategy or "seed" for generating the next turn.
 
-3. **ContextManager Assembles Interaction Context**  
+4. **ContextManager Assembles Interaction Context**  
    ContextManager gathers relevant context: 
    - the current agent's persona
    - dialogue history from Short-Term Memory
    - relevant fragments from Long-Term Memory
-   - internal agent state  
+   - internal agent state
+   - **topic-aware style instruction** (from `topic_style.py`)  
    This context is used to build a structured prompt for the language model.
 
-4. **Agent Produces Response**  
+5. **Agent Produces Response**  
    The designated agent generates a response, updating its own internal state as appropriate.
 
-5. **Memory Update**  
+6. **Memory Update**  
    The new interaction is appended to Short-Term Memory and, as needed, summarized or committed to Long-Term Memory.
 
-6. **Observer Layer Engaged**  
+7. **Observer Layer Engaged**  
    Fixy monitors for repetitive patterns, instability, or undesired conversational dynamics.
    If intervention is required, Fixy may suggest a new topic, adjust agent priorities, or flag anomalies.
 
-7. **Cycle Repeats**  
+8. **Cycle Repeats**  
    The loop resumes with the DialogueEngine evaluating the new state and planning the next conversational turn.
 
 ---
@@ -172,10 +184,14 @@ Below is a high-level flow depicting how the system processes a conversational t
 User/Topic
    |
    v
-DialogueEngine
-   |
-   v
-ContextManager
+TopicStyleDetector (topic_style.py)
+   └─ style instruction ──────────────┐
+   |                                  |
+   v                                  v
+DialogueEngine                     Agents (Socrates / Athena / Fixy)
+   |                                  |
+   v                                  |
+ContextManager ◄───────────────────┘
    |
    v
 Agent ↔ Memory (STM/LTM)

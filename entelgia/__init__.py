@@ -44,6 +44,12 @@ from .loop_guard import (
     TOPIC_CLUSTERS,
 )
 from .dialogue_engine import AgentMode
+from .topic_style import (
+    TOPIC_STYLE,
+    get_style_for_cluster,
+    get_style_for_topic,
+    build_style_instruction,
+)
 
 __all__ = [
     "DialogueEngine",
@@ -79,6 +85,10 @@ __all__ = [
     "PhraseBanList",
     "DialogueRewriter",
     "TOPIC_CLUSTERS",
+    "TOPIC_STYLE",
+    "get_style_for_cluster",
+    "get_style_for_topic",
+    "build_style_instruction",
 ]
 
 __version__ = "2.9.0"
