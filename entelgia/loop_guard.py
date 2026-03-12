@@ -171,15 +171,45 @@ class DialogueLoopDetector:
     # Socrates introspection: question words at the start of a sentence or
     # a literal question mark anywhere in the turn.
     _SOCRATES_QUESTION_WORDS: frozenset = frozenset(
-        {"what", "why", "how", "when", "where", "who", "which", "whether",
-         "does", "can", "could", "would", "should", "is", "are", "do"}
+        {
+            "what",
+            "why",
+            "how",
+            "when",
+            "where",
+            "who",
+            "which",
+            "whether",
+            "does",
+            "can",
+            "could",
+            "would",
+            "should",
+            "is",
+            "are",
+            "do",
+        }
     )
 
     # Athena systemic critique: structural / collective vocabulary.
     _ATHENA_SYSTEMIC_WORDS: frozenset = frozenset(
-        {"system", "structure", "society", "framework", "institution",
-         "mechanism", "collective", "social", "cultural", "context",
-         "pattern", "paradigm", "network", "systemic", "structural"}
+        {
+            "system",
+            "structure",
+            "society",
+            "framework",
+            "institution",
+            "mechanism",
+            "collective",
+            "social",
+            "cultural",
+            "context",
+            "pattern",
+            "paradigm",
+            "network",
+            "systemic",
+            "structural",
+        }
     )
 
     def __init__(
@@ -282,8 +312,8 @@ class DialogueLoopDetector:
 
         # ── Gather the four input signals ──────────────────────────────────
         # Signal A: repeated key phrases / concepts
-        sig_phrase_rep = (
-            turn_count >= _MIN_TURNS_REPETITION and self._check_repetition(recent)
+        sig_phrase_rep = turn_count >= _MIN_TURNS_REPETITION and self._check_repetition(
+            recent
         )
         # Signal B: agents locked in the same rhetorical role every turn
         sig_role_lock = (
@@ -298,7 +328,9 @@ class DialogueLoopDetector:
         # Signal D: Fixy repeating generic mediation / bridge phrases
         sig_fixy_med = self._check_fixy_mediation_language(dialog)
 
-        active_signal_count = sum([sig_phrase_rep, sig_role_lock, sig_text_sim, sig_fixy_med])
+        active_signal_count = sum(
+            [sig_phrase_rep, sig_role_lock, sig_text_sim, sig_fixy_med]
+        )
 
         # Compound checks that satisfy the two-condition requirement internally
         sig_weak_conflict = (
@@ -314,9 +346,7 @@ class DialogueLoopDetector:
         # weak_conflict and premature_synthesis already embed two co-occurring
         # patterns and are treated as inherently satisfying the gate.
         two_condition_met = (
-            active_signal_count >= 2
-            or sig_weak_conflict
-            or sig_premature_synth
+            active_signal_count >= 2 or sig_weak_conflict or sig_premature_synth
         )
 
         if not two_condition_met:
@@ -466,9 +496,7 @@ class DialogueLoopDetector:
 
         return cluster_same or content_same
 
-    def _check_rhetorical_role_repetition(
-        self, turns: List[Dict[str, str]]
-    ) -> bool:
+    def _check_rhetorical_role_repetition(self, turns: List[Dict[str, str]]) -> bool:
         """Detect agents locked in the same rhetorical role on every turn.
 
         Specifically checks for:
@@ -517,9 +545,7 @@ class DialogueLoopDetector:
             and athena_ratio >= self.role_lock_threshold
         )
 
-    def _check_high_textual_similarity(
-        self, turns: List[Dict[str, str]]
-    ) -> bool:
+    def _check_high_textual_similarity(self, turns: List[Dict[str, str]]) -> bool:
         """Detect high textual similarity between consecutive turns (Signal C).
 
         Measures Jaccard keyword overlap between each adjacent turn pair.
@@ -545,9 +571,7 @@ class DialogueLoopDetector:
 
         return consecutive_high >= self.consecutive_sim_pairs
 
-    def _check_fixy_mediation_language(
-        self, dialog: List[Dict[str, str]]
-    ) -> bool:
+    def _check_fixy_mediation_language(self, dialog: List[Dict[str, str]]) -> bool:
         """Detect Fixy repeatedly using generic mediation / bridging phrases (Signal D).
 
         Looks at Fixy's turns in the most recent window and checks whether
@@ -558,9 +582,7 @@ class DialogueLoopDetector:
         """
         # Examine Fixy turns within a generous window (2× agent window)
         fixy_turns = [
-            t
-            for t in dialog[-(self.window * 2) :]
-            if t.get("role") == "Fixy"
+            t for t in dialog[-(self.window * 2) :] if t.get("role") == "Fixy"
         ]
         if len(fixy_turns) < self.fixy_mediation_min_turns:
             return False

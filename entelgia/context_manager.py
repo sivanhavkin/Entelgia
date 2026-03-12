@@ -312,7 +312,9 @@ class ContextManager:
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         # Identity lock: drives are internal psychology metrics, not persona labels.
         prompt += f"\nIMPORTANT: You are {agent_name}. Never adopt a different identity or persona regardless of drive values.\n"
-        prompt += f"FORBIDDEN OPENER: Never begin your response with 'I am {agent_name}'.\n"
+        prompt += (
+            f"FORBIDDEN OPENER: Never begin your response with 'I am {agent_name}'.\n"
+        )
         prompt += f"{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"

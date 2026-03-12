@@ -1979,7 +1979,9 @@ class Agent:
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         # Identity lock: drives are internal psychology metrics, not persona labels.
         prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"
-        prompt += f"FORBIDDEN OPENER: Never begin your response with 'I am {self.name}'.\n"
+        prompt += (
+            f"FORBIDDEN OPENER: Never begin your response with 'I am {self.name}'.\n"
+        )
         # Inject topic-aware style instruction when set
         if self.topic_style:
             prompt += f"\nSTYLE INSTRUCTION: {self.topic_style}\n"
@@ -3479,9 +3481,7 @@ class MainScript:
                     _pivot_cluster,
                     new_topic,
                 )
-                logger.debug(
-                    "topic_style updated after cluster pivot → %r", new_topic
-                )
+                logger.debug("topic_style updated after cluster pivot → %r", new_topic)
                 if self.cfg.show_meta:
                     print(
                         Fore.WHITE
@@ -3658,9 +3658,7 @@ class MainScript:
                     _adv_cluster,
                     _adv_topic,
                 )
-                logger.debug(
-                    "topic_style updated after advance_round → %r", _adv_topic
-                )
+                logger.debug("topic_style updated after advance_round → %r", _adv_topic)
 
             elapsed = time.time() - self.start_time
             if elapsed >= timeout_seconds:

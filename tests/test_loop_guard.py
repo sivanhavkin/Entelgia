@@ -505,11 +505,11 @@ def test_check_rhetorical_role_repetition_flags_locked_agents():
     # Socrates always asks questions; Athena always frames systemically
     turns = _make_turns(
         [
-            "What is the foundation of freedom in society?",       # Socrates Q
+            "What is the foundation of freedom in society?",  # Socrates Q
             "The social system determines individual freedoms through structure.",  # Athena sys
             "Why does the framework constrain personal autonomy?",  # Socrates Q
             "Institutional patterns shape what is culturally possible.",  # Athena sys
-            "How can the mechanism of power be questioned?",        # Socrates Q
+            "How can the mechanism of power be questioned?",  # Socrates Q
             "Collective context frames every systemic boundary here.",  # Athena sys
         ]
     )
@@ -523,9 +523,9 @@ def test_check_rhetorical_role_repetition_no_flag_varied_roles():
     turns = _make_turns(
         [
             "Freedom requires structure — that is my claim.",  # Socrates asserts
-            "What does your claim entail for individuals?",    # Athena questions
-            "Let me give a concrete example from history.",    # Socrates example
-            "Actually, the data contradicts that view.",       # Athena critique
+            "What does your claim entail for individuals?",  # Athena questions
+            "Let me give a concrete example from history.",  # Socrates example
+            "Actually, the data contradicts that view.",  # Athena critique
         ]
     )
     result = detector._check_rhetorical_role_repetition(turns)
@@ -634,6 +634,6 @@ def test_detect_two_conditions_gate_passes_with_signals_a_and_c():
         ]
     )
     modes = detector.detect(turns, turn_count=5)
-    assert LOOP_REPETITION in modes, (
-        f"Expected loop_repetition with Signals A+C active; got {modes}"
-    )
+    assert (
+        LOOP_REPETITION in modes
+    ), f"Expected loop_repetition with Signals A+C active; got {modes}"
