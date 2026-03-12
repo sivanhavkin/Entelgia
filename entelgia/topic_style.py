@@ -99,9 +99,7 @@ def get_style_for_topic(topic: str, topic_clusters: Dict[str, list]) -> Tuple[st
     Searches *topic_clusters* for a cluster whose topic list contains *topic*.
     Falls back to ``("custom", "conceptual and reflective")`` when not found.
     """
-    cluster = next(
-        (c for c, topics in topic_clusters.items() if topic in topics), None
-    )
+    cluster = next((c for c, topics in topic_clusters.items() if topic in topics), None)
     style = get_style_for_cluster(cluster)
     return (cluster or "custom", style)
 

@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-464%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-515%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -285,6 +285,7 @@ What would you like to delete?
 * **Multi-agent dialogue system** (Socrates · Athena · Fixy)
 * **Persistent memory** — short-term (JSON) + long-term (SQLite) with 🔐 HMAC-SHA256 integrity
 * **Enhanced Dialogue Engine** — dynamic speaker selection, 6+ seed strategies, rich context enrichment
+* **🎨 Topic-Aware Style Selection** — `topic_style.py` maps seed topic clusters to domain-specific reasoning styles; agents adapt tone (analytical, scientific, pragmatic, etc.) instead of defaulting to philosophical language
 * **⚡ Energy-Based Regulation** — FixyRegulator, dream cycle consolidation, hallucination-risk detection
 * **🧠 Personal Long-Term Memory** — DefenseMechanism, FreudianSlip, SelfReplication
 * **🎛️ Drive-Aware Cognition** — dynamic LLM temperature, superego critique, ego-driven memory depth
@@ -429,9 +430,9 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 
 | Agent | Personality | Role |
 |-------|-------------|------|
-| 🏛️ **Socrates** | Philosophical questioner | Drives inquiry and productive tension |
-| 🦉 **Athena** | Principled reasoner | Models ethical grounding and structure |
-| 🔍 **Fixy** | Meta-cognitive supervisor | Monitors and regulates dialogue health |
+| 🏛️ **Socrates** | Investigative questioner | Domain-aware inquiry; probes assumptions and causal chains |
+| 🦉 **Athena** | Strategic synthesizer | Builds frameworks and structured explanations in domain vocabulary |
+| 🔍 **Fixy** | Meta-cognitive supervisor | Diagnostic observer; identifies contradictions and reasoning gaps |
 
 ### 📦 Package Structure
 
@@ -441,6 +442,7 @@ entelgia/
 ├── dialogue_engine.py       # Dynamic speaker & seed generation
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
+├── topic_style.py           # Topic-cluster → reasoning style mapping (v2.9.0)
 ├── fixy_interactive.py      # Need-based interventions
 ├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
 ├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)

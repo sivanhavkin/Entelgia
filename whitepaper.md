@@ -60,11 +60,17 @@ This creates a system where regulation is internal and structural rather than ex
 
 Entelgia consists of three primary agents:
 
-* **Socrates** — The Questioner (reflective, dialectical inquiry)
-* **Athena** — The Synthesizer (integrative, emotional coherence)
-* **Fixy** — The Observer (meta-cognitive monitoring)
+* **Socrates** — The Questioner (investigative, domain-aware inquiry; probes assumptions with concrete, causal questions)
+* **Athena** — The Synthesizer (strategic framework building; structured explanation in domain vocabulary)
+* **Fixy** — The Observer (diagnostic, corrective meta-cognitive monitoring)
 
 All agents operate within a shared persistent memory system.
+
+At session start, the **topic-aware style system** (`entelgia/topic_style.py`) maps the seed topic
+to a reasoning style (e.g., `analytical, concrete, system-oriented` for technology topics) and
+injects a per-agent style instruction into every prompt. This prevents agents from defaulting to
+abstract philosophical language when the topic calls for scientific, economic, or sociological
+reasoning.
 
 ## 3.1 Enhanced Dialogue Engine
 
