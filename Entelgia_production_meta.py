@@ -386,6 +386,86 @@ def _pick_random_seed_topic() -> str:
     return random.choice(TOPIC_CLUSTERS[cluster])
 
 
+# ============================================
+# TOPIC ANCHORS - required concept keywords per topic
+# ============================================
+# Maps topic names to a list of concept keywords.  When a topic is active,
+# the prompt requires the agent to engage with at least one of these concepts.
+# When the topic changes, the previous topic's anchors become forbidden carryover
+# to prevent the model from carrying old concepts into the new discussion.
+TOPIC_ANCHORS: dict[str, list[str]] = {
+    # philosophy
+    "Freedom": ["autonomy", "liberty", "constraint", "oppression", "sovereignty", "choice", "will", "determinism"],
+    "Truth and knowledge": ["epistemology", "belief", "justification", "certainty", "empiricism", "rationalism", "doubt", "evidence"],
+    "Free will vs determinism": ["causality", "agency", "necessity", "determinism", "indeterminism", "responsibility", "fate", "compulsion"],
+    "Identity and the self": ["continuity", "personhood", "consciousness", "memory", "selfhood", "individuation", "ego", "authenticity"],
+    "Nature of justice": ["fairness", "rights", "punishment", "retribution", "distribution", "equality", "law", "morality"],
+    "Meaning of consciousness": ["qualia", "subjective experience", "awareness", "sentience", "mind-body", "phenomenology", "perception", "intentionality"],
+    "Limits of reason": ["rationality", "intuition", "paradox", "uncertainty", "bounded rationality", "cognitive limits", "irrationality", "fallibility"],
+    "Nature of wisdom": ["judgment", "virtue", "experience", "prudence", "insight", "contemplation", "understanding", "discernment"],
+    # psychology
+    "Memory and identity": ["recall", "encoding", "identity continuity", "trauma memory", "false memory", "autobiographical", "narrative self", "forgetting"],
+    "Fear and decision making": ["risk aversion", "anxiety", "amygdala", "threat response", "uncertainty", "avoidance", "fight or flight", "cognitive appraisal"],
+    "Habit formation": ["reinforcement", "neural pathway", "automaticity", "cue-routine-reward", "conditioning", "plasticity", "repetition", "behavioral loop"],
+    "Cognitive bias": ["heuristic", "anchoring", "confirmation bias", "availability", "framing effect", "motivated reasoning", "overconfidence", "illusory correlation"],
+    "Trauma and perception": ["PTSD", "hypervigilance", "dissociation", "stress response", "emotional dysregulation", "coping", "resilience", "intrusion"],
+    "Empathy and moral judgment": ["perspective-taking", "compassion", "moral intuition", "affective empathy", "cognitive empathy", "altruism", "fairness", "harm"],
+    "Loneliness in modern society": ["social isolation", "connection", "digital relationships", "belonging", "alienation", "community", "attachment", "disconnection"],
+    "Motivation and purpose": ["intrinsic motivation", "extrinsic motivation", "meaning", "goal-setting", "drive", "agency", "self-determination", "flow"],
+    # biology
+    "Brain plasticity": ["neuroplasticity", "synapse", "learning", "adaptation", "cortex", "neural pathway", "growth", "rehabilitation"],
+    "Evolution of cooperation": ["altruism", "kin selection", "reciprocal altruism", "game theory", "natural selection", "mutualism", "social behavior", "cooperation"],
+    "Fight or flight response": ["stress hormone", "cortisol", "adrenaline", "sympathetic nervous", "survival", "autonomic", "arousal", "threat detection"],
+    "Neural basis of consciousness": ["neural correlates", "integrated information", "global workspace", "binding problem", "thalamus", "cortex", "awareness", "subjective experience"],
+    "Biological roots of morality": ["evolutionary ethics", "social instinct", "empathy", "fairness", "altruism", "moral emotion", "prosocial behavior", "kin selection"],
+    "Sleep and memory consolidation": ["REM sleep", "hippocampus", "memory replay", "consolidation", "slow-wave sleep", "forgetting", "encoding", "retrieval"],
+    "Embodiment and cognition": ["embodied cognition", "proprioception", "motor system", "sensorimotor", "affordance", "body schema", "perception-action", "somatic"],
+    "Aging and identity": ["cognitive decline", "neurodegeneration", "continuity", "life review", "wisdom", "adaptation", "memory loss", "selfhood"],
+    # society
+    "Power and institutions": ["authority", "legitimacy", "bureaucracy", "hegemony", "governance", "accountability", "state", "hierarchy"],
+    "Social conformity": ["normative pressure", "groupthink", "obedience", "peer influence", "social norms", "deviance", "conformity", "social proof"],
+    "Collective memory": ["shared memory", "commemoration", "narrative", "historical consciousness", "monument", "identity", "forgetting", "commemoration"],
+    "Civil disobedience": ["protest", "resistance", "nonviolence", "justice", "moral obligation", "defiance", "conscientious objection", "dissent"],
+    "Inequality and opportunity": ["social mobility", "wealth gap", "access", "discrimination", "privilege", "class", "meritocracy", "redistribution"],
+    "Propaganda and belief": ["manipulation", "misinformation", "narrative control", "persuasion", "ideology", "media", "framing", "indoctrination"],
+    "Trust in institutions": ["legitimacy", "accountability", "transparency", "corruption", "credibility", "institutional trust", "erosion", "social contract"],
+    "Cultural identity": ["ethnicity", "tradition", "belonging", "diaspora", "assimilation", "multiculturalism", "heritage", "identity formation"],
+    # technology
+    "AI alignment": ["objective misspecification", "reward hacking", "corrigibility", "outer alignment", "inner alignment", "value learning", "specification gaming", "human intent"],
+    "Machine agency": ["autonomy", "goal-directedness", "self-direction", "artificial agent", "intentionality", "control problem", "agency", "decision-making"],
+    "Human-AI cooperation": ["collaboration", "complementarity", "human oversight", "shared agency", "automation", "augmentation", "interface", "trust in AI"],
+    "Algorithmic bias": ["fairness", "discrimination", "training data", "disparate impact", "bias amplification", "accountability", "transparency", "protected attribute"],
+    "Digital identity": ["authentication", "privacy", "digital footprint", "anonymity", "identity theft", "online self", "data sovereignty", "persona"],
+    "Autonomous systems": ["self-direction", "automation", "control systems", "safety constraints", "decision logic", "reliability", "fail-safe", "actuator"],
+    "Ethics of artificial intelligence": ["moral agency", "accountability", "harm prevention", "transparency", "fairness", "value alignment", "responsibility", "autonomy"],
+    "Future of work": ["automation", "displacement", "skill gap", "gig economy", "reskilling", "labor transformation", "human-machine collaboration", "productivity"],
+    # economics
+    "Scarcity and human behavior": ["allocation", "trade-off", "opportunity cost", "rational choice", "resource constraint", "utility", "demand", "supply"],
+    "Risk and decision making": ["expected utility", "uncertainty", "probability", "loss aversion", "risk tolerance", "hedging", "prospect theory", "variance"],
+    "Wealth inequality": ["Gini coefficient", "redistribution", "wealth concentration", "poverty", "social mobility", "capital", "labor share", "inequality"],
+    "Economic freedom": ["market", "deregulation", "property rights", "competition", "laissez-faire", "intervention", "liberalization", "entrepreneurship"],
+    "Debt and responsibility": ["obligation", "credit", "fiscal responsibility", "moral hazard", "default", "leverage", "sustainability", "repayment"],
+    "Trust in markets": ["information asymmetry", "market failure", "signaling", "credibility", "reputation", "transparency", "regulation", "coordination"],
+    "Game theory and cooperation": ["Nash equilibrium", "prisoner's dilemma", "defection", "cooperation", "strategy", "payoff", "coordination game", "zero-sum"],
+    "Public goods dilemmas": ["free rider", "commons", "collective action", "externality", "provision", "exclusion", "rivalry", "tragedy of the commons"],
+    # practical_dilemmas
+    "Loyalty vs honesty": ["obligation", "deception", "betrayal", "integrity", "trust", "duty", "truth-telling", "confidentiality"],
+    "Security vs freedom": ["trade-off", "surveillance", "civil liberties", "risk", "restriction", "protection", "balance", "rights"],
+    "Tradition vs progress": ["change", "continuity", "innovation", "heritage", "disruption", "preservation", "adaptation", "reform"],
+    "Individual vs collective good": ["autonomy", "common good", "sacrifice", "rights", "community", "solidarity", "individualism", "collectivism"],
+    "Forgiveness vs justice": ["reconciliation", "accountability", "mercy", "punishment", "healing", "retribution", "restoration", "harm"],
+    "Ambition vs contentment": ["achievement", "satisfaction", "desire", "striving", "peace", "drive", "acceptance", "fulfillment"],
+    "Truth vs kindness": ["honesty", "compassion", "harm", "deception", "benevolence", "brutal truth", "white lie", "integrity"],
+    "Control vs trust": ["delegation", "autonomy", "oversight", "accountability", "micromanagement", "empowerment", "verification", "reliance"],
+}
+
+
+def _contains_any(text: str, concepts: list[str]) -> bool:
+    """Return True if *text* contains at least one concept from *concepts* (case-insensitive)."""
+    text_lower = text.lower()
+    return any(concept.lower() in text_lower for concept in concepts)
+
+
 @dataclass
 class Config:
     """Global configuration object with validation."""
@@ -1819,6 +1899,7 @@ class Agent:
         # Topic-aware style instruction (set by MainScript at session start)
         self.topic_style: str = ""
         self.topic_cluster: str = ""  # active cluster for register enforcement
+        self._last_topic: str = ""  # previous active topic for forbidden carryover
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
@@ -2056,6 +2137,24 @@ class Agent:
                 # (signature_hex, expires_at, confidence, provenance, etc.)
                 # are intentionally excluded.
                 prompt += f"- {m.get('content', '')[:400]}\n"
+
+        # ── Topic Anchors: require engagement with topic-specific concepts ──────
+        _topic_anchors = TOPIC_ANCHORS.get(_current_topic, [])
+        if _current_topic and _topic_anchors:
+            prompt += f"\nCURRENT TOPIC: {_current_topic}\n"
+            prompt += (
+                "Your response must explicitly engage with at least one of the "
+                f"following concepts: {', '.join(_topic_anchors)}.\n"
+            )
+
+        # ── Forbidden Carryover: block concepts from the previous topic ──────────
+        _topic_changed = bool(self._last_topic and self._last_topic != _current_topic)
+        _prev_anchors = TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
+        if _prev_anchors:
+            prompt += (
+                f"Do NOT reuse concepts from previous discussions such as: "
+                f"{', '.join(_prev_anchors)}.\n"
+            )
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         # Identity lock: drives are internal psychology metrics, not persona labels.
@@ -2323,6 +2422,24 @@ class Agent:
         else:
             self._consecutive_superego_rewrites = 0
 
+        # ── Topic Anchor Validation: regenerate if response misses required concepts ─
+        _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
+        _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
+        _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
+        if _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
+            logger.warning(
+                "[TOPIC-MISMATCH] agent=%s topic=%r response did not contain required topic anchors – regenerating",
+                self.name,
+                _active_topic,
+            )
+            _regen_response = (
+                self.llm.generate(
+                    self.model, prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            out = validate_output(_regen_response)
+
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
         if self.limbic_hijack:
@@ -2454,6 +2571,10 @@ class Agent:
         elif self.drive_pressure >= 6.5:
             out = _trim_to_word_limit(out, 120)
         # ─────────────────────────────────────────────────────────────────────────
+
+        # Update last-topic tracker so the next turn can inject forbidden carryover
+        if _active_topic:
+            self._last_topic = _active_topic
 
         return out
 
