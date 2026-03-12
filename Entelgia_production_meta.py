@@ -285,7 +285,8 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "FORBIDDEN PHRASES: Never use 'In our dialogue', 'We learn', "
     "or 'Our conversations reveal'. "
     "FORBIDDEN OPENERS: Never begin your response with 'Recent thought', "
-    "'A recent thought', 'I ponder', or any variation of these phrases."
+    "'A recent thought', 'I ponder', or any variation of these phrases. "
+    "Never begin your response with 'I am' followed by your own name."
 )
 
 # Initial energy for all agents (restored after each dream cycle)
@@ -1973,6 +1974,7 @@ class Agent:
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         # Identity lock: drives are internal psychology metrics, not persona labels.
         prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"
+        prompt += f"FORBIDDEN OPENER: Never begin your response with 'I am {self.name}'.\n"
         # Inject topic-aware style instruction when set
         if self.topic_style:
             prompt += f"\nSTYLE INSTRUCTION: {self.topic_style}\n"
@@ -2301,6 +2303,17 @@ class Agent:
                 if stripped:
                     out = stripped
                 break
+
+        # Safety net: strip "I am {name}" identity schema leak if LLM started with it
+        out_stripped = out.lstrip()
+        if out_stripped.lower().startswith(f"i am {self.name.lower()}"):
+            stripped = re.sub(
+                r"(?i)^i am " + re.escape(self.name) + r"[\s,.;:!]?\s*",
+                "",
+                out_stripped,
+            ).strip()
+            if stripped:
+                out = stripped
 
         # ── Drive Pressure: post-process output ──────────────────────────────────
         # 1. Track open questions in this turn
@@ -3438,6 +3451,17 @@ class MainScript:
                 logger.info(
                     "loop_guard: topic_stagnation → cluster pivot → %r", new_topic
                 )
+                # Update topic_style for all agents to match the pivoted topic
+                _pivot_cluster, _pivot_style_str = get_style_for_topic(
+                    new_topic, TOPIC_CLUSTERS
+                )
+                for _pa in [self.socrates, self.athena, self.fixy_agent]:
+                    _pa.topic_style = build_style_instruction(
+                        _pivot_style_str, _pa.name
+                    )
+                logger.debug(
+                    "topic_style updated after cluster pivot → %r", new_topic
+                )
                 if self.cfg.show_meta:
                     print(
                         Fore.WHITE
@@ -3598,6 +3622,18 @@ class MainScript:
 
             if self.turn_index % 2 == 0:
                 topicman.advance_round()
+                # Update topic_style for all agents to match the advanced topic
+                _adv_topic = topicman.current()
+                _adv_cluster, _adv_style_str = get_style_for_topic(
+                    _adv_topic, TOPIC_CLUSTERS
+                )
+                for _aa in [self.socrates, self.athena, self.fixy_agent]:
+                    _aa.topic_style = build_style_instruction(
+                        _adv_style_str, _aa.name
+                    )
+                logger.debug(
+                    "topic_style updated after advance_round → %r", _adv_topic
+                )
 
             elapsed = time.time() - self.start_time
             if elapsed >= timeout_seconds:
