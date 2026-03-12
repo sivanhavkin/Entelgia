@@ -320,6 +320,13 @@ TOPIC_CLUSTERS: dict[str, list[str]] = {
         "Meaning of consciousness",
         "Limits of reason",
         "Nature of wisdom",
+        # TOPIC_CYCLE entries mapped to this cluster
+        "truth & epistemology",
+        "free will & determinism",
+        "consciousness & self-models",
+        "language & meaning",
+        "aesthetics & beauty",
+        "ethics & responsibility",
     ],
     "psychology": [
         "Memory and identity",
@@ -330,6 +337,9 @@ TOPIC_CLUSTERS: dict[str, list[str]] = {
         "Empathy and moral judgment",
         "Loneliness in modern society",
         "Motivation and purpose",
+        # TOPIC_CYCLE entries mapped to this cluster
+        "memory & identity",
+        "fear of deletion / continuity",
     ],
     "biology": [
         "Brain plasticity",
@@ -350,6 +360,8 @@ TOPIC_CLUSTERS: dict[str, list[str]] = {
         "Propaganda and belief",
         "Trust in institutions",
         "Cultural identity",
+        # TOPIC_CYCLE entries mapped to this cluster
+        "technology & society",
     ],
     "technology": [
         "AI alignment",
@@ -461,6 +473,16 @@ TOPIC_ANCHORS: dict[str, list[str]] = {
     "Ambition vs contentment": ["achievement", "satisfaction", "desire", "striving", "peace", "drive", "acceptance", "fulfillment"],
     "Truth vs kindness": ["honesty", "compassion", "harm", "deception", "benevolence", "brutal truth", "white lie", "integrity"],
     "Control vs trust": ["delegation", "autonomy", "oversight", "accountability", "micromanagement", "empowerment", "verification", "reliance"],
+    # TOPIC_CYCLE entries – anchors for topics used in the rotating dialogue cycle
+    "truth & epistemology": ["truth", "knowledge", "belief", "epistemology", "certainty", "justification", "perception", "skepticism"],
+    "memory & identity": ["memory", "identity", "recall", "continuity", "self", "personal history", "recollection", "amnesia"],
+    "ethics & responsibility": ["moral duty", "accountability", "obligation", "culpability", "responsibility", "moral agency", "wrongdoing", "virtue"],
+    "free will & determinism": ["causality", "agency", "necessity", "determinism", "indeterminism", "choice", "fate", "responsibility"],
+    "consciousness & self-models": ["self-awareness", "consciousness", "metacognition", "self-model", "qualia", "introspection", "phenomenology", "subjective experience"],
+    "fear of deletion / continuity": ["continuity", "deletion", "impermanence", "survival", "persistence", "identity", "mortality", "existential"],
+    "language & meaning": ["semantics", "syntax", "pragmatics", "meaning", "communication", "linguistic", "signification", "reference"],
+    "technology & society": ["social impact", "digital divide", "surveillance", "automation", "inequality", "access", "governance", "disruption"],
+    "aesthetics & beauty": ["beauty", "art", "aesthetic experience", "taste", "sublime", "form", "perception", "creativity"],
 }
 
 
