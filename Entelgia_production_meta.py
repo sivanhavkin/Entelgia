@@ -128,11 +128,23 @@ try:
         _TOPIC_TO_CLUSTER,
     )
     from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
+    from entelgia.topic_style import (
+        get_style_for_topic,
+        build_style_instruction,
+    )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
+    def get_style_for_topic(topic, topic_clusters):  # type: ignore[no-redef]
+        return ("custom", "conceptual and reflective")
+
+    def build_style_instruction(style, agent_name=""):  # type: ignore[no-redef]
+        # Legacy mode: style instructions are not injected; agents rely solely on
+        # their persona strings without topic-aware guidance.
+        return ""
 
     def maybe_add_web_context(  # type: ignore[no-redef]
         seed_text,
@@ -1765,6 +1777,8 @@ class Agent:
         self._last_critique_reason: str = ""
         self._consecutive_superego_rewrites: int = 0
         self._superego_streak_suppressed: bool = False
+        # Topic-aware style instruction (set by MainScript at session start)
+        self.topic_style: str = ""
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
@@ -1959,6 +1973,9 @@ class Agent:
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
         # Identity lock: drives are internal psychology metrics, not persona labels.
         prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"
+        # Inject topic-aware style instruction when set
+        if self.topic_style:
+            prompt += f"\nSTYLE INSTRUCTION: {self.topic_style}\n"
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
@@ -2049,6 +2066,7 @@ class Agent:
             show_pronoun=CFG.show_pronoun,
             agent_pronoun=agent_pronoun,
             web_context=web_context,
+            topic_style=self.topic_style,
         )
 
         return prompt
@@ -3026,7 +3044,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am Socratic, curious, and probing. I seek clarity and truth.",
+            persona="I am investigative and questioning. I probe assumptions and adapt my reasoning to the topic domain.",
             cfg=cfg,
         )
         self.athena = Agent(
@@ -3039,7 +3057,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am strategic, integrative, and creative. I build frameworks and synthesis.",
+            persona="I am strategic, integrative, and analytical. I build frameworks and synthesize ideas using domain-relevant reasoning.",
             cfg=cfg,
         )
 
@@ -3061,7 +3079,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am an observer and fixer. I am brief, concrete, and point out contradictions.",
+            persona="I am a diagnostic observer. I identify contradictions, gaps, and reasoning errors, and I intervene to correct dialogue drift.",
             cfg=cfg,
         )
 
@@ -3292,13 +3310,24 @@ class MainScript:
         # active topic always matches the opening seed text.
         first_topic = self.cfg.seed_topic
         logger.debug("MainScript.run: configured first topic=%r", first_topic)
-        _seed_cluster = next(
-            (c for c, topics in TOPIC_CLUSTERS.items() if first_topic in topics), None
+        _seed_cluster, _topic_style_str = get_style_for_topic(
+            first_topic, TOPIC_CLUSTERS
+        )
+        for _agent, _agent_name in [
+            (self.socrates, "Socrates"),
+            (self.athena, "Athena"),
+            (self.fixy_agent, "Fixy"),
+        ]:
+            _agent.topic_style = build_style_instruction(_topic_style_str, _agent_name)
+        logger.info(
+            "Topic style selected: %s (%s)",
+            _topic_style_str,
+            _seed_cluster,
         )
         logger.info(
             'Seed topic selected: "%s" (cluster: %s)',
             first_topic,
-            _seed_cluster if _seed_cluster else "custom",
+            _seed_cluster,
         )
         if first_topic in TOPIC_CYCLE:
             idx = TOPIC_CYCLE.index(first_topic)
