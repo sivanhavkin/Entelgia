@@ -916,11 +916,25 @@ at least one anchor concept appears.  If the check fails and anchors exist:
    ```
 2. The response is regenerated once with the same prompt and temperature.
 3. If the regenerated response **also** fails the anchor check, a second WARNING is
-   logged and the regenerated response is still used (the dialogue is not blocked):
+   logged and the generic response is **not** used:
    ```
    [TOPIC-MISMATCH-PERSIST] agent=Socrates topic='AI alignment'
    regenerated response also did not contain required topic anchors
    ```
+4. **Hard recovery** — a third, stricter prompt is built and the LLM is called again
+   in short mode.  The hard-recovery prompt contains:
+   - The current topic
+   - 3-5 required topic anchors from `TOPIC_ANCHORS`
+   - A mandatory concrete-claim instruction
+   - Explicit ban on generic abstractions: `balanced approach`,
+     `underlying assumptions`, `ethical considerations`, `flexible systems`
+   - An instruction to respond in 2-4 sentences only
+5. A WARNING is logged at the end of hard recovery:
+   ```
+   [TOPIC-HARD-RECOVERY] agent=Socrates topic='AI alignment'
+   forcing strict anchor prompt – short mode
+   ```
+   The output of the hard-recovery call replaces the second generic response.
 
 ### `_contains_any` helper
 

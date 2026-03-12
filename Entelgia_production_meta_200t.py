@@ -2470,6 +2470,35 @@ class Agent:
                     self.name,
                     _active_topic,
                 )
+                # ── Hard recovery: rebuild prompt with strict topic constraints ─
+                _hard_anchors = _active_anchors[:5]
+                _forbidden_abstractions = (
+                    "balanced approach",
+                    "underlying assumptions",
+                    "ethical considerations",
+                    "flexible systems",
+                )
+                _hard_prompt = (
+                    f"STRICT TOPIC ENFORCEMENT\n"
+                    f"Current topic: {_active_topic}\n"
+                    f"Required topic anchors (use at least one): {', '.join(_hard_anchors)}\n"
+                    f"You MUST make one concrete claim directly about this topic.\n"
+                    f"Do NOT use generic abstractions such as: "
+                    f"{', '.join(_forbidden_abstractions)}.\n"
+                    f"Respond in 2-4 sentences only.\n"
+                )
+                _hard_response = (
+                    self.llm.generate(
+                        self.model, _hard_prompt, temperature=temperature, use_cache=False
+                    )
+                    or out
+                )
+                out = validate_output(_hard_response)
+                logger.warning(
+                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r forcing strict anchor prompt – short mode",
+                    self.name,
+                    _active_topic,
+                )
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
