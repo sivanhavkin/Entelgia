@@ -16,6 +16,7 @@ Validates:
 
 import sys
 import os
+import logging
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -138,6 +139,40 @@ class TestTopicAnchors:
             f"AI alignment anchors missing required terms: {required - actual}"
         )
 
+    def test_risk_and_decision_making_anchors_include_broad_terms(self):
+        """Risk and decision making anchors must include broader vocabulary
+        to prevent false-positive TOPIC-MISMATCH on valid responses that
+        use common risk/decision language instead of narrow technical terms."""
+        required = {
+            "risk",
+            "tradeoff",
+            "trade-off",
+            "safety",
+            "reliability",
+        }
+        actual = set(TOPIC_ANCHORS.get("Risk and decision making", []))
+        assert required.issubset(actual), (
+            f"Risk and decision making anchors missing broad terms: {required - actual}"
+        )
+
+    def test_risk_and_decision_making_anchors_match_autonomous_vehicle_response(self):
+        """A response about autonomous vehicle design risk tradeoffs must match
+        the Risk and decision making anchors (regression for TOPIC-MISMATCH false positive)."""
+        av_response = (
+            "In analyzing the design of autonomous vehicles, I observe a tradeoff between "
+            "robust architectural redundancy and real-time monitoring capabilities. While "
+            "redundancy ensures reliability through multiple systems, it may not fully address "
+            "immediate sensor malfunctions. Integrating a code of ethics into system policies "
+            "could mitigate these issues but introduces complexity in incentive structures for "
+            "manufacturers and users. Balancing these factors requires careful policy-making to "
+            "allocate resources effectively, ensuring both safety and ethical compliance without "
+            "excessive cost or market disruption."
+        )
+        anchors = TOPIC_ANCHORS.get("Risk and decision making", [])
+        assert _contains_any(av_response, anchors), (
+            "Autonomous vehicle risk-tradeoff response should match Risk and decision making anchors"
+        )
+
 
 # ---------------------------------------------------------------------------
 # _contains_any helper tests
@@ -256,4 +291,53 @@ class TestBuildCompactPromptTopicAnchors:
             prompt = agent._build_compact_prompt(seed, [])
 
         assert "Do NOT reuse concepts from previous discussions" not in prompt
+
+
+# ---------------------------------------------------------------------------
+# Topic-mismatch persist warning tests (Agent.speak)
+# ---------------------------------------------------------------------------
+
+
+class TestTopicMismatchPersistWarning:
+    """Agent.speak emits [TOPIC-MISMATCH-PERSIST] when regenerated response
+    also fails the anchor check."""
+
+    def test_persist_warning_logged_when_regen_also_fails(self, caplog):
+        """If both the initial and regenerated responses miss the anchors,
+        a [TOPIC-MISMATCH-PERSIST] warning must be emitted."""
+        agent = _make_agent()
+        # Both calls return a response with no anchor for 'AI alignment'
+        agent.llm.generate.return_value = (
+            "Redundancy and real-time monitoring prevent failures."
+        )
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, [])
+
+        persist_msgs = [r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message]
+        assert persist_msgs, (
+            "Expected [TOPIC-MISMATCH-PERSIST] warning when regenerated response "
+            "also lacks required topic anchors"
+        )
+
+    def test_no_persist_warning_when_regen_succeeds(self, caplog):
+        """If the regenerated response contains the required anchors,
+        no [TOPIC-MISMATCH-PERSIST] warning must be emitted."""
+        agent = _make_agent()
+        # First call misses anchors; second call (regeneration) includes one
+        agent.llm.generate.side_effect = [
+            "Redundancy and real-time monitoring prevent failures.",
+            "Corrigibility is the key concept for AI alignment.",
+        ]
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, [])
+
+        persist_msgs = [r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message]
+        assert not persist_msgs, (
+            "Expected no [TOPIC-MISMATCH-PERSIST] warning when regenerated "
+            "response satisfies topic anchors"
+        )
 

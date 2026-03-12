@@ -445,7 +445,7 @@ TOPIC_ANCHORS: dict[str, list[str]] = {
     "Future of work": ["automation", "displacement", "skill gap", "gig economy", "reskilling", "labor transformation", "human-machine collaboration", "productivity"],
     # economics
     "Scarcity and human behavior": ["allocation", "trade-off", "opportunity cost", "rational choice", "resource constraint", "utility", "demand", "supply"],
-    "Risk and decision making": ["expected utility", "uncertainty", "probability", "loss aversion", "risk tolerance", "hedging", "prospect theory", "variance"],
+    "Risk and decision making": ["expected utility", "uncertainty", "probability", "loss aversion", "risk tolerance", "hedging", "prospect theory", "variance", "risk", "tradeoff", "trade-off", "safety", "reliability"],
     "Wealth inequality": ["Gini coefficient", "redistribution", "wealth concentration", "poverty", "social mobility", "capital", "labor share", "inequality"],
     "Economic freedom": ["market", "deregulation", "property rights", "competition", "laissez-faire", "intervention", "liberalization", "entrepreneurship"],
     "Debt and responsibility": ["obligation", "credit", "fiscal responsibility", "moral hazard", "default", "leverage", "sustainability", "repayment"],
@@ -2438,6 +2438,12 @@ class Agent:
                 or out
             )
             out = validate_output(_regen_response)
+            if _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
+                logger.warning(
+                    "[TOPIC-MISMATCH-PERSIST] agent=%s topic=%r regenerated response also did not contain required topic anchors",
+                    self.name,
+                    _active_topic,
+                )
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
