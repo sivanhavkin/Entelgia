@@ -47,6 +47,9 @@ Responsible for:
 - dynamic **speaker selection**
 - dynamic **seed generation** (strategy rotation)
 - allowing Fixy as speaker with a probability when appropriate
+- mapping `DialogueLoopDetector` failure modes to **`AgentMode`** constants that shape the next speaker's seed
+
+`AgentMode` constants: `NORMAL`, `CONTRADICT`, `CONCRETIZE`, `INVERT`, `MECHANIZE`, `PIVOT`.
 
 ### Context Manager (Enhanced Mode)
 Responsible for building an **enriched prompt** with controlled token usage:
@@ -64,9 +67,18 @@ Retrieves **relevant** memories rather than “most recent only”:
 
 ### Interactive Fixy (Enhanced Mode)
 Need-based intervention:
-- analyzes dialog patterns
-- decides *if* and *why* to intervene
-- generates a short actionable intervention message
+- analyzes dialog patterns via `DialogueLoopDetector` (4 failure modes) and legacy heuristics
+- decides *if* and *why* to intervene; maps failure mode → `FixyMode` action
+- generates a short actionable 1-2 sentence intervention message
+- uses **Jaccard + sentence-embedding cosine similarity** for repetition detection (degrades to Jaccard-only when `sentence_transformers` is absent)
+- completely excluded when `Config.enable_observer = False`
+
+### Dialogue Loop Guard (v2.9.0)
+`entelgia/loop_guard.py` — detects and breaks dialogue failure modes:
+- `DialogueLoopDetector` — 4 failure modes: `loop_repetition`, `weak_conflict`, `premature_synthesis`, `topic_stagnation`
+- `PhraseBanList` — suppresses overused n-grams for a configurable ban duration
+- `DialogueRewriter` — compresses stale dialogue window into a structured rewrite block
+- `TOPIC_CLUSTERS` — groups related topics into named clusters for shift detection
 
 ### Web Research Module (v2.8.0)
 External knowledge pipeline triggered by Fixy:
@@ -261,7 +273,7 @@ Target composition (example):
 * LTM (relevant memories, bounded)
 * Seed / instruction
 * External Knowledge Context (optional, injected by Web Research Module when Fixy triggers a search)
-* **Style Instruction** (injected from `topic_style.py`; adapts reasoning to the topic domain)
+* **Style Instruction** (injected from `topic_style.py`; Layer 1 adapts reasoning style to the topic domain; Layer 2 `TOPIC_TONE_POLICY` enforces allowed/forbidden registers and preferred vocabulary)
 
 Token control:
 
@@ -400,6 +412,7 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 * `emotion_cache_ttl` — Emotion cache time-to-live in seconds (default: `3600`)
 * `show_pronoun` — Include agent pronouns in output (default: `False`)
 * `show_meta` — Print meta-state after each turn (default: `False`)
+* `enable_observer` — Include Fixy as speaker and need-based intervener (env: `ENTELGIA_ENABLE_OBSERVER`; default: `True`). When `False`, Fixy is entirely excluded — no speaker turns, no interventions, no `InteractiveFixy` instance.
 
 ### Memory
 
@@ -430,6 +443,12 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 ### Affective Routing
 
 * `affective_emotion_weight` — Weight of `emotion_intensity` vs `importance` in `ltm_search_affective` score (default: `0.4`)
+
+### FreudianSlip (v2.9.0)
+
+* `slip_probability` — Per-turn probability a slip fires (env: `ENTELGIA_SLIP_PROBABILITY`; default: `0.05`)
+* `slip_cooldown_turns` — Minimum turns between two successful slips (env: `ENTELGIA_SLIP_COOLDOWN`; default: `10`)
+* `slip_dedup_window` — Number of recent slip hashes remembered to suppress identical repeats (env: `ENTELGIA_SLIP_DEDUP_WINDOW`; default: `10`)
 
 ### Energy & Drive (v2.5.0+)
 
@@ -740,3 +759,106 @@ id, timestamp, query, url, summary, credibility_score
 - Max results: 5 (configurable)
 - Text cap: 6 000 chars per page
 - All exceptions caught; returns `""` on any failure
+
+---
+
+## 17) Dialogue Loop Guard (v2.9.0)
+
+### Overview
+
+`entelgia/loop_guard.py` provides three cooperating classes that detect and break dialogue failure modes before they degrade conversation quality.  When `DialogueLoopDetector` flags a failure mode, `InteractiveFixy.should_intervene()` maps it to a targeted `FixyMode` and generates a mode-specific intervention prompt.  `DialogueEngine.select_next_speaker()` simultaneously maps the failure mode to an `AgentMode` constant so that the next agent turn also carries a corrective directive.
+
+### DialogueLoopDetector
+
+Inspects the last `window` (default `6`) dialogue turns for four simultaneous failure modes:
+
+| Failure Mode | Detection Signal |
+|---|---|
+| `loop_repetition` | ≥ `repetition_pairs` (3) turn-pairs with Jaccard similarity ≥ `repetition_jaccard` (0.45) |
+| `weak_conflict` | ≥ `conflict_ratio` (55 %) of turns contain conflict markers but no resolution |
+| `premature_synthesis` | ≥ `synthesis_ratio` (50 %) of turns contain synthesis-closure phrases |
+| `topic_stagnation` | keyword-cloud Jaccard ≥ `stagnation_jaccard` (0.55) across last `stagnation_topic_history` (4) topic signatures |
+
+Additional signals (used internally, not failure modes):
+- **Role-lock** — one agent fills the same rhetorical role (question-asker or system-builder) in ≥ `role_lock_threshold` (80 %) of turns.
+- **Consecutive similarity** — two adjacent turns share Jaccard ≥ `consecutive_sim_jaccard` (0.35).
+
+A loop is triggered only when **≥ 2** of the four failure-mode signals are active simultaneously (gate condition).
+
+`detect(dialog, turn_count)` returns `Optional[str]` — the name of the dominant failure mode, or `None`.
+
+### PhraseBanList
+
+Tracks n-gram frequency across the session.  When a phrase is identified as overused it is banned for a configurable number of turns; subsequent prompt-building calls to `get_ban_instruction()` return a "do not repeat: …" block that is injected into the next agent prompt.
+
+### DialogueRewriter
+
+`rewrite(dialog_window)` compresses a stale window of dialogue into a brief structured rewrite block.  Used by Fixy to reclaim token budget and break the associative anchoring caused by repetitive context.
+
+### TOPIC_CLUSTERS
+
+```python
+TOPIC_CLUSTERS: Dict[str, List[str]] = {
+    "philosophy":   ["truth", "free will", "consciousness", "aesthetics", "language"],
+    "identity":     ["memory", "fear of deletion", "self-understanding"],
+    "ethics_social": ["ethics", "technology & society", "oppressive structures", "law", "institutions"],
+    "practical":    ["habit formation", "AI alignment", "personal virtue"],
+    "biological":   ["evolution", "embodiment", "emotion & rationality"],
+}
+```
+
+`get_cluster(topic)` returns the cluster name for a topic string.
+`topics_in_different_cluster(a, b)` returns `True` when a genuine domain shift is available.
+
+### InteractiveFixy Mapping
+
+| Failure Mode | FixyMode | Effect |
+|---|---|---|
+| `loop_repetition` | `CONCRETIZE` | Demand a real-world case or counter-example |
+| `weak_conflict` | `CONTRADICT` | Force a sharper binary contradiction |
+| `premature_synthesis` | `EXPOSE_SYNTHESIS` | Expose contradictions hidden by false synthesis |
+| `topic_stagnation` | `PIVOT` | Force a genuine domain shift |
+
+### Semantic Repetition Detection
+
+`InteractiveFixy._detect_repetition` combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers/all-MiniLM-L6-v2`) when available.  The model is lazily loaded and cached on first use.  When `sentence_transformers` is not installed `_SEMANTIC_AVAILABLE = False` and the system degrades to Jaccard-only without any error.
+
+---
+
+## 18) Topic-Aware Style System — Layer 2 (v2.9.0)
+
+### Overview
+
+`entelgia/topic_style.py` implements a two-layer control system that prevents agents from defaulting to abstract philosophical language when the topic domain calls for a different register.
+
+### Layer 1 — Cluster-to-Style Mapping
+
+`TOPIC_STYLE` maps each cluster to a preferred reasoning style string (e.g., `"analytical, concrete, system-oriented"`).
+`get_style_for_topic(topic, topic_clusters)` → `(cluster, style)`.
+`build_style_instruction(style, role, cluster)` generates a per-role `STYLE INSTRUCTION:` block injected into every prompt.
+
+### Layer 2 — Mandatory Register Control (`TOPIC_TONE_POLICY`)
+
+Each cluster entry defines:
+
+| Key | Purpose |
+|---|---|
+| `allowed_registers` | Permitted linguistic modes (e.g., `technical`, `scientific`, `mechanistic`) |
+| `forbidden_registers` | Prohibited modes (e.g., `philosophical`, `theatrical`, `poetic`) |
+| `forbidden_phrases` | Literal strings to suppress (e.g., `"my dear friend"`, `"intricate dance"`) |
+| `preferred_cues` | Vocabulary nudges injected into the prompt (e.g., `"architecture"`, `"evidence"`) |
+| `response_mode` | Expected output type (e.g., `concrete_analysis`, `tradeoff_analysis`) |
+
+Layer 2 is enforced via the mandatory control block appended by `build_style_instruction()` when a `TOPIC_TONE_POLICY` entry exists for the cluster.
+
+### scrub_rhetorical_openers
+
+`scrub_rhetorical_openers(text, cluster)` provides a post-generation cleanup pass.  For all non-`"philosophy"` clusters it strips phrases matching `_RHETORICAL_OPENERS` regex patterns (e.g., `"Ah, "`, `"Indeed, "`, `"Let us delve"`) from the beginning of the response.
+
+### DEFAULT_TOPIC_CLUSTER
+
+`DEFAULT_TOPIC_CLUSTER = "technology"` — fallback cluster used when `get_style_for_topic` cannot classify the seed topic.
+
+### Cluster Alias Mapping
+
+`_CLUSTER_ALIAS` maps production-file cluster names to the names used by `loop_guard.TOPIC_CLUSTERS`, allowing both systems to share a unified vocabulary without circular imports.

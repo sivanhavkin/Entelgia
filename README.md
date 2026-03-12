@@ -284,10 +284,14 @@ What would you like to delete?
 
 * **Multi-agent dialogue system** (Socrates · Athena · Fixy)
 * **Persistent memory** — short-term (JSON) + long-term (SQLite) with 🔐 HMAC-SHA256 integrity
-* **Enhanced Dialogue Engine** — dynamic speaker selection, 6+ seed strategies, rich context enrichment
+* **Enhanced Dialogue Engine** — dynamic speaker selection, 6+ seed strategies, rich context enrichment; `AgentMode` constants (`CONTRADICT`, `CONCRETIZE`, `INVERT`, `MECHANIZE`, `PIVOT`) shape per-turn behaviour
 * **🎨 Topic-Aware Style Selection** — `topic_style.py` maps seed topic clusters to domain-specific reasoning styles; agents adapt tone (analytical, scientific, pragmatic, etc.) instead of defaulting to philosophical language
+* **🎨 Two-Layer Tone Enforcement** — `TOPIC_TONE_POLICY` adds a mandatory register-control block (`allowed_registers`, `forbidden_phrases`, `preferred_cues`) on top of style selection; `scrub_rhetorical_openers()` strips legacy theatrical openers from generated responses
+* **🔁 Dialogue Loop Guard** — `loop_guard.py` exposes `DialogueLoopDetector` (4 failure modes: `loop_repetition`, `weak_conflict`, `premature_synthesis`, `topic_stagnation`), `PhraseBanList` (overused n-gram suppression), and `DialogueRewriter` (stale dialogue compression); Fixy maps each failure mode to a targeted `FixyMode` action
+* **🔍 Semantic Repetition Detection** — `InteractiveFixy` combines Jaccard keyword overlap with sentence-embedding cosine similarity (`sentence-transformers/all-MiniLM-L6-v2`) when available, catching paraphrased repetition that keyword overlap alone misses; gracefully degrades to Jaccard-only when the library is absent
+* **🚫 Observer Toggle** — `Config.enable_observer` (env: `ENTELGIA_ENABLE_OBSERVER`) completely excludes Fixy from the dialogue when set to `False`; Socrates and Athena are unaffected
 * **⚡ Energy-Based Regulation** — FixyRegulator, dream cycle consolidation, hallucination-risk detection
-* **🧠 Personal Long-Term Memory** — DefenseMechanism, FreudianSlip, SelfReplication
+* **🧠 Personal Long-Term Memory** — DefenseMechanism, FreudianSlip (rate-limited + deduplicated), SelfReplication
 * **🎛️ Drive-Aware Cognition** — dynamic LLM temperature, superego critique, ego-driven memory depth
 * **🧠 Limbic Hijack** — Id-dominant emotional override: reduces Superego influence, forces impulsive responses, auto-exits after 3 turns or when intensity drops
 * **🔥 Drive Pressure** — per-agent urgency scalar with conciseness + decisiveness thresholds
@@ -324,6 +328,15 @@ config.promote_importance_threshold = 0.72  # Min importance to promote to LTM (
 config.promote_emotion_threshold = 0.65     # Min emotion score to promote to LTM (default: 0.65)
 config.store_raw_stm = False        # Store un-redacted text in STM (default: False)
 config.store_raw_subconscious_ltm = False   # Store un-redacted text in LTM (default: False)
+config.enable_observer = True       # Include Fixy in dialogue (env: ENTELGIA_ENABLE_OBSERVER; default: True)
+```
+
+### 🔁 FreudianSlip Settings
+
+```python
+config.slip_probability = 0.05        # Per-turn probability a slip fires (env: ENTELGIA_SLIP_PROBABILITY)
+config.slip_cooldown_turns = 10       # Min turns between two successful slips (env: ENTELGIA_SLIP_COOLDOWN)
+config.slip_dedup_window = 10         # Recent slip hashes remembered to block repeats (env: ENTELGIA_SLIP_DEDUP_WINDOW)
 ```
 
 ### Response Quality Settings

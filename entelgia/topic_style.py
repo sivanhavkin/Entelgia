@@ -9,7 +9,7 @@ Prevents agents from defaulting to abstract philosophical language when the
 topic domain calls for a different mode of reasoning (analytical, scientific,
 pragmatic, etc.).
 
-v2.10.0: Two-layer topic-style control system separating content domain
+v2.9.0: Two-layer topic-style control system separating content domain
 selection (Layer 1) from linguistic register enforcement (Layer 2).
 ``build_style_instruction()`` now generates a strict mandatory control block
 using the ``TOPIC_TONE_POLICY`` table.  ``scrub_rhetorical_openers()``
@@ -290,9 +290,14 @@ def get_style_for_cluster(cluster: Optional[str]) -> str:
     unknown or ``None``.
     """
     if cluster is None:
-        return TOPIC_STYLE.get(DEFAULT_TOPIC_CLUSTER, "analytical, concrete, system-oriented")
+        return TOPIC_STYLE.get(
+            DEFAULT_TOPIC_CLUSTER, "analytical, concrete, system-oriented"
+        )
     key = _CLUSTER_ALIAS.get(cluster, cluster)
-    return TOPIC_STYLE.get(key, TOPIC_STYLE.get(DEFAULT_TOPIC_CLUSTER, "analytical, concrete, system-oriented"))
+    return TOPIC_STYLE.get(
+        key,
+        TOPIC_STYLE.get(DEFAULT_TOPIC_CLUSTER, "analytical, concrete, system-oriented"),
+    )
 
 
 def get_style_for_topic(topic: str, topic_clusters: Dict[str, list]) -> Tuple[str, str]:
@@ -328,7 +333,9 @@ def build_style_instruction(style: str, role: str = "", cluster: str = "") -> st
         A multi-line STYLE INSTRUCTION block suitable for embedding in a
         prompt before the persona flavour section.
     """
-    resolved_cluster = cluster if cluster in TOPIC_TONE_POLICY else DEFAULT_TOPIC_CLUSTER
+    resolved_cluster = (
+        cluster if cluster in TOPIC_TONE_POLICY else DEFAULT_TOPIC_CLUSTER
+    )
     policy = TOPIC_TONE_POLICY[resolved_cluster]
 
     role_line = _ROLE_LINES.get(role, "Use topic-focused reasoning.")
@@ -381,7 +388,7 @@ def scrub_rhetorical_openers(text: str, cluster: str) -> str:
     for pattern in _RHETORICAL_OPENERS:
         m = re.match(r"(?i)" + pattern + r"\s*", stripped)
         if m:
-            remainder = stripped[m.end():].strip()
+            remainder = stripped[m.end() :].strip()
             if remainder:
                 # Capitalise the first letter of what follows.
                 # str.upper() is a no-op on non-letter characters so this

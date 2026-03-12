@@ -55,16 +55,16 @@ class TestTopicClusters:
         """Every topic must be a non-empty string."""
         for cluster, topics in TOPIC_CLUSTERS.items():
             for topic in topics:
-                assert isinstance(topic, str) and topic.strip(), (
-                    f"Empty or non-string topic in cluster '{cluster}': {topic!r}"
-                )
+                assert (
+                    isinstance(topic, str) and topic.strip()
+                ), f"Empty or non-string topic in cluster '{cluster}': {topic!r}"
 
     def test_no_duplicate_topics_within_cluster(self):
         """No cluster should contain duplicate topics."""
         for cluster, topics in TOPIC_CLUSTERS.items():
-            assert len(topics) == len(set(topics)), (
-                f"Duplicate topics found in cluster '{cluster}'"
-            )
+            assert len(topics) == len(
+                set(topics)
+            ), f"Duplicate topics found in cluster '{cluster}'"
 
 
 class TestPickRandomSeedTopic:
@@ -80,9 +80,9 @@ class TestPickRandomSeedTopic:
         all_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
         for _ in range(20):
             topic = _pick_random_seed_topic()
-            assert topic in all_topics, (
-                f"Returned topic {topic!r} not found in TOPIC_CLUSTERS"
-            )
+            assert (
+                topic in all_topics
+            ), f"Returned topic {topic!r} not found in TOPIC_CLUSTERS"
 
     def test_returns_different_topics_over_runs(self):
         """Multiple calls should not always return the same topic (probabilistic)."""
@@ -97,9 +97,9 @@ class TestPickRandomSeedTopic:
             for cluster, topics in TOPIC_CLUSTERS.items():
                 if topic in topics:
                     seen_clusters.add(cluster)
-        assert len(seen_clusters) >= 2, (
-            f"Expected topics from multiple clusters, got: {seen_clusters}"
-        )
+        assert (
+            len(seen_clusters) >= 2
+        ), f"Expected topics from multiple clusters, got: {seen_clusters}"
 
 
 class TestConfigSeedTopic:
@@ -109,9 +109,9 @@ class TestConfigSeedTopic:
         """Config() default seed_topic must come from TOPIC_CLUSTERS."""
         all_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
         cfg = Config()
-        assert cfg.seed_topic in all_topics, (
-            f"Config default seed_topic {cfg.seed_topic!r} not found in TOPIC_CLUSTERS"
-        )
+        assert (
+            cfg.seed_topic in all_topics
+        ), f"Config default seed_topic {cfg.seed_topic!r} not found in TOPIC_CLUSTERS"
 
     def test_explicit_seed_topic_is_respected(self):
         """Config(seed_topic=...) must use the provided value."""

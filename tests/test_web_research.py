@@ -2108,26 +2108,30 @@ class TestSanitizedQueryCooldown:
                     "title": "Self-Awareness and Identity",
                     "snippet": "Self-awareness helps identify truth.",
                     "text": (
-                        "self-awareness emerges ourselves lens identity truth "
-                        * 30
+                        "self-awareness emerges ourselves lens identity truth " * 30
                     ),
                 }
             ],
         }
 
         dialog = [
-            {"role": "Socrates", "text": (
-                "Reflecting upon the true essence of freedom, I find it to be a concept "
-                "deeply intertwined within our psyche. Self-awareness emerges when we "
-                "understand ourselves through the lens of memory, which shapes identity "
-                "and perception of truth within society. " * 3
-            )},
+            {
+                "role": "Socrates",
+                "text": (
+                    "Reflecting upon the true essence of freedom, I find it to be a concept "
+                    "deeply intertwined within our psyche. Self-awareness emerges when we "
+                    "understand ourselves through the lens of memory, which shapes identity "
+                    "and perception of truth within society. " * 3
+                ),
+            },
         ]
 
         seed1 = "TOPIC: Freedom\nEXPLORE consequences. Where does this line of thinking lead?"
         seed2 = "TOPIC: truth & epistemology\nQUESTION a hidden assumption. What are we taking for"
 
-        with patch("entelgia.web_research.search_and_fetch", return_value=bundle) as mock_search:
+        with patch(
+            "entelgia.web_research.search_and_fetch", return_value=bundle
+        ) as mock_search:
             maybe_add_web_context(seed1, dialog_tail=dialog)
             maybe_add_web_context(seed2, dialog_tail=dialog)
 

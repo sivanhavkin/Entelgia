@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Tests for the two-layer topic-style control system (v2.10.0).
+Tests for the two-layer topic-style control system (v2.9.0).
 
 Validates:
   A. Biology topic → scientific/mechanistic cluster, forbidden philosophical filler.
@@ -101,9 +101,9 @@ class TestBiologyTopic:
         )
         instruction = build_style_instruction(style, role="Athena", cluster=cluster)
         # "philosophical" must appear in the forbidden registers section
-        assert "philosophical" in instruction.lower(), (
-            f"Expected 'philosophical' to be listed as forbidden in:\n{instruction}"
-        )
+        assert (
+            "philosophical" in instruction.lower()
+        ), f"Expected 'philosophical' to be listed as forbidden in:\n{instruction}"
 
     def test_style_instruction_lists_forbidden_phrases(self):
         policy = TOPIC_TONE_POLICY["biology"]
@@ -112,14 +112,12 @@ class TestBiologyTopic:
         )
         instruction = build_style_instruction(style, role="Fixy", cluster=cluster)
         for phrase in policy["forbidden_phrases"]:
-            assert phrase in instruction, (
-                f"Expected forbidden phrase '{phrase}' to appear in instruction"
-            )
+            assert (
+                phrase in instruction
+            ), f"Expected forbidden phrase '{phrase}' to appear in instruction"
 
     def test_style_instruction_is_mandatory_block(self):
-        cluster, style = get_style_for_topic(
-            "neuroplasticity", TOPIC_CLUSTERS_SAMPLE
-        )
+        cluster, style = get_style_for_topic("neuroplasticity", TOPIC_CLUSTERS_SAMPLE)
         instruction = build_style_instruction(style, role="Socrates", cluster=cluster)
         assert "STYLE INSTRUCTION (MANDATORY)" in instruction
 
@@ -153,8 +151,7 @@ class TestTechnologyTopic:
         )
         instruction = build_style_instruction(style, role="Athena", cluster=cluster)
         assert any(
-            kw in instruction.lower()
-            for kw in ("technical", "engineering", "analytic")
+            kw in instruction.lower() for kw in ("technical", "engineering", "analytic")
         ), f"Expected technical register in instruction:\n{instruction}"
 
     def test_style_instruction_forbids_poetic_register(self):
@@ -217,23 +214,23 @@ class TestPhilosophyTopic:
 
     def test_philosophy_has_no_forbidden_registers(self):
         policy = TOPIC_TONE_POLICY["philosophy"]
-        assert policy["forbidden_registers"] == [], (
-            "Philosophy cluster should have no forbidden registers"
-        )
+        assert (
+            policy["forbidden_registers"] == []
+        ), "Philosophy cluster should have no forbidden registers"
 
     def test_philosophy_has_no_forbidden_phrases(self):
         policy = TOPIC_TONE_POLICY["philosophy"]
-        assert policy["forbidden_phrases"] == [], (
-            "Philosophy cluster should have no forbidden phrases"
-        )
+        assert (
+            policy["forbidden_phrases"] == []
+        ), "Philosophy cluster should have no forbidden phrases"
 
     def test_scrub_does_not_strip_openers_for_philosophy(self):
         """scrub_rhetorical_openers must leave philosophy responses unchanged."""
         text = "My dear friend, let us explore the nature of truth."
         result = scrub_rhetorical_openers(text, cluster="philosophy")
-        assert result == text, (
-            f"Philosophy opener should not be stripped. Got: {result!r}"
-        )
+        assert (
+            result == text
+        ), f"Philosophy opener should not be stripped. Got: {result!r}"
 
     def test_philosophy_response_mode_is_dialectical(self):
         cluster, style = get_style_for_topic(
@@ -258,9 +255,9 @@ class TestTopicPivot:
         cluster_b, style_b = get_style_for_topic(
             "inflation and monetary policy", TOPIC_CLUSTERS_SAMPLE
         )
-        assert cluster_a != cluster_b, (
-            f"Expected different clusters: {cluster_a!r} vs {cluster_b!r}"
-        )
+        assert (
+            cluster_a != cluster_b
+        ), f"Expected different clusters: {cluster_a!r} vs {cluster_b!r}"
 
     def test_pivot_changes_style_instruction(self):
         cluster_a, style_a = get_style_for_topic(
@@ -271,18 +268,16 @@ class TestTopicPivot:
         )
         instr_a = build_style_instruction(style_a, role="Socrates", cluster=cluster_a)
         instr_b = build_style_instruction(style_b, role="Socrates", cluster=cluster_b)
-        assert instr_a != instr_b, (
-            "Style instruction should differ after a topic pivot"
-        )
+        assert instr_a != instr_b, "Style instruction should differ after a topic pivot"
 
     def test_pivot_new_instruction_reflects_new_cluster(self):
         cluster_b, style_b = get_style_for_topic(
             "inflation and monetary policy", TOPIC_CLUSTERS_SAMPLE
         )
         instr_b = build_style_instruction(style_b, role="Athena", cluster=cluster_b)
-        assert "economics" in instr_b, (
-            f"Instruction after pivot to economics should mention 'economics':\n{instr_b}"
-        )
+        assert (
+            "economics" in instr_b
+        ), f"Instruction after pivot to economics should mention 'economics':\n{instr_b}"
 
     def test_pivot_biology_to_economics_registers_differ(self):
         _, style_bio = get_style_for_topic(
@@ -331,7 +326,9 @@ class TestDefaultClusterFallback:
 
     def test_custom_cluster_string_falls_back_to_default(self):
         # "custom" is not a valid cluster key in TOPIC_TONE_POLICY
-        instruction = build_style_instruction("some style", role="Athena", cluster="custom")
+        instruction = build_style_instruction(
+            "some style", role="Athena", cluster="custom"
+        )
         assert "STYLE INSTRUCTION (MANDATORY)" in instruction
         assert DEFAULT_TOPIC_CLUSTER in instruction
 
@@ -347,24 +344,24 @@ class TestScrubRhetoricalOpeners:
     def test_strips_my_dear_friend_for_biology(self):
         text = "My dear friend, memory consolidation occurs during sleep."
         result = scrub_rhetorical_openers(text, cluster="biology")
-        assert not result.lower().startswith("my dear friend"), (
-            f"Expected opener stripped. Got: {result!r}"
-        )
+        assert not result.lower().startswith(
+            "my dear friend"
+        ), f"Expected opener stripped. Got: {result!r}"
         assert "memory consolidation occurs during sleep" in result.lower()
 
     def test_strips_let_us_delve_deeper_for_technology(self):
         text = "Let us delve deeper into the architecture of this system."
         result = scrub_rhetorical_openers(text, cluster="technology")
-        assert not result.lower().startswith("let us delve deeper"), (
-            f"Expected opener stripped. Got: {result!r}"
-        )
+        assert not result.lower().startswith(
+            "let us delve deeper"
+        ), f"Expected opener stripped. Got: {result!r}"
 
     def test_strips_let_us_explore_for_economics(self):
         text = "Let us explore the market dynamics at play."
         result = scrub_rhetorical_openers(text, cluster="economics")
-        assert not result.lower().startswith("let us explore"), (
-            f"Expected opener stripped. Got: {result!r}"
-        )
+        assert not result.lower().startswith(
+            "let us explore"
+        ), f"Expected opener stripped. Got: {result!r}"
 
     def test_preserves_philosophy_openers(self):
         text = "My dear friend, let us explore the nature of truth."
@@ -374,7 +371,9 @@ class TestScrubRhetoricalOpeners:
     def test_capitalises_remainder(self):
         text = "my dear friend, distributed systems require careful design."
         result = scrub_rhetorical_openers(text, cluster="technology")
-        assert result[0].isupper(), (
+        assert result[
+            0
+        ].isupper(), (
             f"Expected first char to be uppercase after scrubbing. Got: {result!r}"
         )
 
@@ -411,9 +410,9 @@ class TestTopicTonePolicyCompleteness:
 
     def test_all_production_clusters_present(self):
         for cluster in self.PRODUCTION_CLUSTERS:
-            assert cluster in TOPIC_TONE_POLICY, (
-                f"Missing cluster in TOPIC_TONE_POLICY: {cluster!r}"
-            )
+            assert (
+                cluster in TOPIC_TONE_POLICY
+            ), f"Missing cluster in TOPIC_TONE_POLICY: {cluster!r}"
 
     def test_each_policy_has_required_keys(self):
         required_keys = {
@@ -425,16 +424,14 @@ class TestTopicTonePolicyCompleteness:
         }
         for cluster, policy in TOPIC_TONE_POLICY.items():
             for key in required_keys:
-                assert key in policy, (
-                    f"Cluster '{cluster}' policy missing key: '{key}'"
-                )
+                assert key in policy, f"Cluster '{cluster}' policy missing key: '{key}'"
 
     def test_philosophy_allowed_registers_include_socratic(self):
         policy = TOPIC_TONE_POLICY["philosophy"]
         registers = [r.lower() for r in policy["allowed_registers"]]
-        assert "socratic" in registers or "dialectical" in registers, (
-            f"Philosophy policy should allow socratic/dialectical: {registers}"
-        )
+        assert (
+            "socratic" in registers or "dialectical" in registers
+        ), f"Philosophy policy should allow socratic/dialectical: {registers}"
 
     def test_non_philosophy_clusters_forbid_theatrical(self):
         for cluster, policy in TOPIC_TONE_POLICY.items():
@@ -442,6 +439,6 @@ class TestTopicTonePolicyCompleteness:
                 continue
             # Not every non-philosophy cluster forbids theatrical, but core ones do
             if cluster in ("technology", "biology", "psychology", "society"):
-                assert "theatrical" in policy["forbidden_registers"], (
-                    f"Cluster '{cluster}' should forbid 'theatrical' register"
-                )
+                assert (
+                    "theatrical" in policy["forbidden_registers"]
+                ), f"Cluster '{cluster}' should forbid 'theatrical' register"
