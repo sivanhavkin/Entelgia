@@ -53,6 +53,28 @@ rather than defaulting to abstract philosophical language.
 
 ---
 
+### Topic-Aware Style System (`entelgia/topic_style.py`)
+
+Two cooperating layers control the linguistic register agents use:
+
+**Layer 1 — Cluster-to-Style Mapping** (`TOPIC_STYLE` dict)
+`get_style_for_topic(topic, topic_clusters)` returns a `(cluster, style)` tuple.
+`build_style_instruction(style, role, cluster)` generates a per-role style instruction injected into every prompt.
+
+**Layer 2 — Mandatory Register Control** (`TOPIC_TONE_POLICY` dict)
+Each cluster entry specifies:
+- `allowed_registers` — e.g., `technical`, `scientific`, `mechanistic`
+- `forbidden_registers` — e.g., `philosophical`, `theatrical`, `poetic`
+- `forbidden_phrases` — specific strings to suppress (e.g., `"my dear friend"`, `"intricate dance"`)
+- `preferred_cues` — vocabulary nudges (e.g., `"architecture"`, `"mechanism"`, `"evidence"`)
+- `response_mode` — expected output type (e.g., `concrete_analysis`, `tradeoff_analysis`)
+
+**`scrub_rhetorical_openers(text, cluster)`** — post-generation cleanup pass that strips legacy theatrical openers for non-philosophy topics via `_RHETORICAL_OPENERS` regex patterns.
+
+**`DEFAULT_TOPIC_CLUSTER = "technology"`** — fallback when classification fails.
+
+---
+
 ### Core Mind Modules
 
 | Class | Role |
@@ -74,6 +96,19 @@ Functions:
 - prevention of mechanical alternation
 
 The engine enables adaptive turn-taking rather than fixed sequencing.
+
+**`AgentMode` constants** shape the generated seed on a per-turn basis when Fixy's loop-guard signals demand it:
+
+| Mode | Behaviour |
+|---|---|
+| `NORMAL` | Default; no additional directive |
+| `CONTRADICT` | Force a sharper contradiction; demand a binary choice |
+| `CONCRETIZE` | Demand a real-world case or counter-example (no abstract restatement) |
+| `INVERT` | Temporarily defend the opposite position |
+| `MECHANIZE` | Demand a step-by-step causal process |
+| `PIVOT` | Force a genuine domain shift away from the current cluster |
+
+`_LOOP_AGENT_POLICY` maps each `DialogueLoopDetector` failure mode to the appropriate `AgentMode`.
 
 ---
 
@@ -130,12 +165,49 @@ Memory influences behavior without requiring explicit recall in every turn.
 Fixy acts as a meta-cognitive observer.
 
 Responsibilities:
-- detect dialogue loops
+- detect dialogue loops via `DialogueLoopDetector` (4 failure modes)
 - identify instability or escalation
-- suggest corrective interventions
+- suggest corrective interventions mapped to `FixyMode` actions
 - preserve dialogue quality
 
+**`FixyMode` actions:**
+
+| Mode | Trigger | Effect |
+|---|---|---|
+| `CONCRETIZE` | `loop_repetition` | Demand a concrete real-world example |
+| `CONTRADICT` | `weak_conflict` | Force a sharper binary contradiction |
+| `EXPOSE_SYNTHESIS` | `premature_synthesis` | Expose contradictions hidden by false synthesis |
+| `PIVOT` | `topic_stagnation` | Force a genuine domain shift |
+| `MEDIATE` | Legacy fallback | Neutral mediation |
+
+**Semantic repetition detection** — `InteractiveFixy._detect_repetition` combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers/all-MiniLM-L6-v2`) when available. Degrades gracefully to Jaccard-only when the library is absent (`_SEMANTIC_AVAILABLE = False`).
+
+**Observer toggle** — set `Config.enable_observer = False` (env: `ENTELGIA_ENABLE_OBSERVER`) to completely exclude Fixy from the dialogue. Socrates and Athena are unaffected.
+
 Fixy does not dominate conversation but regulates interaction when needed.
+
+---
+
+### Dialogue Loop Guard (`entelgia/loop_guard.py`)
+
+Three cooperating classes that detect and break dialogue failure modes:
+
+**`DialogueLoopDetector`** — inspects the last `window` turns (default 6) and flags up to four simultaneous failure modes:
+
+| Failure Mode | Detection Signal |
+|---|---|
+| `loop_repetition` | ≥ 3 turn-pairs with Jaccard similarity ≥ 0.45 |
+| `weak_conflict` | ≥ 55 % of turns contain conflict markers but no resolution |
+| `premature_synthesis` | ≥ 50 % of turns contain synthesis-closure phrases |
+| `topic_stagnation` | keyword cloud Jaccard ≥ 0.55 across last 4 topic signatures |
+
+Also detects **role-lock** (one agent stuck in a single rhetorical role ≥ 80 % of turns) and **consecutive similarity** (two adjacent turns with Jaccard ≥ 0.35).
+
+**`PhraseBanList`** — tracks overused n-grams across the session and injects a "do not repeat: …" reminder into subsequent prompts for a configurable number of turns.
+
+**`DialogueRewriter`** — compresses a stale dialogue window into a structured rewrite block; used by Fixy to reclaim token budget when the conversation has been looping.
+
+**`TOPIC_CLUSTERS`** — dict grouping semantically related topics into named clusters (`philosophy`, `identity`, `ethics_social`, `practical`, `biological`). `get_cluster(topic)` returns the cluster name; `topics_in_different_cluster(a, b)` returns `True` when a genuine domain shift is possible.
 
 ---
 

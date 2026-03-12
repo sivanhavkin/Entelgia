@@ -9,7 +9,7 @@ Prevents agents from defaulting to abstract philosophical language when the
 topic domain calls for a different mode of reasoning (analytical, scientific,
 pragmatic, etc.).
 
-v2.10.0: Two-layer topic-style control system separating content domain
+v2.9.0: Two-layer topic-style control system separating content domain
 selection (Layer 1) from linguistic register enforcement (Layer 2).
 ``build_style_instruction()`` now generates a strict mandatory control block
 using the ``TOPIC_TONE_POLICY`` table.  ``scrub_rhetorical_openers()``

@@ -176,6 +176,45 @@ Enhanced mode (v2.2.0+) provides:
 - **Intelligent Fixy** with need-based interventions
 - **Rich personas** with traits and speech patterns
 
+### What is the Dialogue Loop Guard?
+
+`entelgia/loop_guard.py` (v2.9.0) detects four failure modes that degrade dialogue quality and triggers targeted Fixy interventions:
+
+| Failure Mode | Detection | Fixy Response |
+|---|---|---|
+| `loop_repetition` | Same ideas recycled in different words | `CONCRETIZE` — demand a concrete example |
+| `weak_conflict` | Agents disagree but never commit | `CONTRADICT` — force a binary choice |
+| `premature_synthesis` | Closure phrases used before real resolution | `EXPOSE_SYNTHESIS` — surface hidden contradictions |
+| `topic_stagnation` | Keyword cloud barely changes across turns | `PIVOT` — force a genuine domain shift |
+
+Two supporting classes: **`PhraseBanList`** suppresses overused n-grams for a configurable number of turns; **`DialogueRewriter`** compresses stale dialogue into a brief rewrite block to reclaim token budget.
+
+### How does Fixy detect repeated content?
+
+`InteractiveFixy` (v2.9.0) uses a **two-layer repetition signal**:
+1. **Jaccard keyword overlap** — always active; fast and dependency-free.
+2. **Sentence-embedding cosine similarity** — if `sentence-transformers` is installed, `all-MiniLM-L6-v2` is lazily loaded on first use and merged with the Jaccard score. This catches paraphrased repetition that keyword matching alone misses.
+
+Install the optional dependency for semantic detection:
+```bash
+pip install "entelgia[semantic]"
+# or
+pip install sentence-transformers scikit-learn numpy
+```
+
+### Can I disable Fixy?
+
+Yes. Set `Config.enable_observer = False` (or the env var `ENTELGIA_ENABLE_OBSERVER=false`) to completely exclude Fixy from the dialogue. No speaker turns, no need-based interventions, and no `InteractiveFixy` instance will be created. Socrates and Athena continue normally.
+
+### What is the topic-aware style system?
+
+At session start, `get_style_for_topic()` maps the seed topic to a cluster and builds a per-role style instruction injected into every agent prompt. This is a **two-layer** system:
+
+- **Layer 1** (`TOPIC_STYLE`) — maps each cluster to a preferred reasoning style (e.g., `"analytical, concrete, system-oriented"` for technology topics).
+- **Layer 2** (`TOPIC_TONE_POLICY`) — adds a mandatory register-control block specifying `allowed_registers` (e.g., `technical`), `forbidden_registers` (e.g., `theatrical`), `forbidden_phrases`, `preferred_cues`, and an expected `response_mode`.
+
+After each response, `scrub_rhetorical_openers()` strips legacy theatrical openers (e.g., `"Ah, "`, `"Let us delve"`) for all non-philosophy clusters.
+
 ---
 
 ## Usage & Operation
@@ -369,6 +408,18 @@ config.max_output_words = 150  # Guidance for LLM
 ```
 
 Starting from v2.2.0, responses are **never truncated** - the LLM is guided to produce concise responses naturally.
+
+### How do I control FreudianSlip frequency?
+
+Three `Config` fields (also available as environment variables) control the rate of `[SLIP]` events:
+
+```python
+config.slip_probability = 0.05        # Per-turn probability (env: ENTELGIA_SLIP_PROBABILITY)
+config.slip_cooldown_turns = 10       # Min turns between two successful slips (env: ENTELGIA_SLIP_COOLDOWN)
+config.slip_dedup_window = 10         # Hash window to suppress identical slips (env: ENTELGIA_SLIP_DEDUP_WINDOW)
+```
+
+`FreudianSlip` exposes `attempts` and `successes` counters logged per-agent at session end.
 
 ---
 

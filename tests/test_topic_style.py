@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Tests for the two-layer topic-style control system (v2.10.0).
+Tests for the two-layer topic-style control system (v2.9.0).
 
 Validates:
   A. Biology topic → scientific/mechanistic cluster, forbidden philosophical filler.
