@@ -328,7 +328,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 pytest tests/test_enable_observer.py -v
 ```
 
-Tests verify the `enable_observer` configuration flag introduced in v2.9.0 (PR #207):
+Tests verify the `enable_observer` configuration flag introduced in v3.0.0 (PR #207):
 
 - ✅ **Default is True** — `Config.enable_observer` defaults to `True`
 - ✅ **False accepted** — `Config.enable_observer=False` passes validation without error
@@ -519,7 +519,7 @@ Tests verify `entelgia/ablation_study.py` — the four-condition ablation framew
 pytest tests/test_topic_style.py -v
 ```
 
-Tests verify `entelgia/topic_style.py` — the topic-aware style selection system introduced in v2.9.0:
+Tests verify `entelgia/topic_style.py` — the topic-aware style selection system introduced in v3.0.0:
 
 - ✅ **`TOPIC_STYLE` dict** — all seven production clusters mapped to a style
 - ✅ **`get_style_for_cluster`** — returns correct style for each cluster

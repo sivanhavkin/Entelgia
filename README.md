@@ -451,11 +451,11 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 
 ```
 entelgia/
-├── __init__.py              # Package exports (v2.9.0)
+├── __init__.py              # Package exports (v3.0.0)
 ├── dialogue_engine.py       # Dynamic speaker & seed generation
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
-├── topic_style.py           # Topic-cluster → reasoning style mapping (v2.9.0)
+├── topic_style.py           # Topic-cluster → reasoning style mapping (v3.0.0)
 ├── fixy_interactive.py      # Need-based interventions
 ├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
 ├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
@@ -466,7 +466,7 @@ entelgia/
 ├── source_evaluator.py      # Heuristic credibility scoring for web sources (v2.8.0)
 ├── research_context_builder.py  # Format research bundle as LLM context (v2.8.0)
 ├── fixy_research_trigger.py # Keyword-based search trigger detection (v2.8.0)
-├── loop_guard.py            # DialogueLoopDetector, PhraseBanList, DialogueRewriter (v2.9.0)
+├── loop_guard.py            # DialogueLoopDetector, PhraseBanList, DialogueRewriter (v3.0.0)
 └── web_research.py          # maybe_add_web_context integration + memory storage (v2.8.0)
 ```
 
@@ -583,18 +583,18 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.9.0** | ✅ **Latest** | current |
+| **v3.0.0** | ✅ **Latest** | current |
 | **v2.8.1** | ✅ **Stable** | previous stable release |
-| **v2.8.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.8.0** | ⚠️ Superseded | Use v3.0.0 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
 | **v2.5.0** | ✅ **Stable** | previous stable release |
-| **v2.4.0** | ⚠️ Superseded | Use v2.9.0 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v2.9.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v2.9.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v2.9.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.9.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.4.0** | ⚠️ Superseded | Use v3.0.0 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v3.0.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v3.0.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v3.0.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v3.0.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v3.0.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -679,6 +679,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.9.0 
+* **Version:** 3.0.0 
 * **Last Updated:** 11 March 2026
 ---

@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [2.9.0] - 2026-03-12
+## [3.0.0] - 2026-03-12
 
 ### Added
 
@@ -920,7 +920,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.9.0
+- ✅ **Latest stable:** v3.0.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -931,7 +931,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.9.0** | 2026-03-12 | Minor | ✅ **Current** | Topic-aware style selection, forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |
+| **v3.0.0** | 2026-03-12 | Minor | ✅ **Current** | Topic-aware style selection, forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |
 | **v2.8.1** | 2026-03-07 | Patch | ✅ **Stable** | Version bump across all documentation |
 | **v2.8.0** | 2026-03-06 | Minor | ⚠️ Superseded | Web Research Module — Fixy-triggered external knowledge pipeline |
 | **v2.7.0** | 2026-03-03 | Minor | ✅ **Stable** | Limbic hijack state, meta output refinement |

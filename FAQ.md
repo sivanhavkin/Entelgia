@@ -30,7 +30,7 @@ Entelgia is derived from philosophical concepts related to entelechy (the realiz
 
 ### Is Entelgia production-ready?
 
-Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v2.9.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
+Entelgia is currently a **Research Hybrid** project. While it has a stable codebase (v3.0.0) with comprehensive testing and CI/CD pipelines, it is primarily designed as an experimental platform for exploring consciousness-inspired AI architectures rather than a production service.
 
 ### Who should use Entelgia?
 
@@ -178,7 +178,7 @@ Enhanced mode (v2.2.0+) provides:
 
 ### What is the Dialogue Loop Guard?
 
-`entelgia/loop_guard.py` (v2.9.0) detects four failure modes that degrade dialogue quality and triggers targeted Fixy interventions:
+`entelgia/loop_guard.py` (v3.0.0) detects four failure modes that degrade dialogue quality and triggers targeted Fixy interventions:
 
 | Failure Mode | Detection | Fixy Response |
 |---|---|---|
@@ -191,7 +191,7 @@ Two supporting classes: **`PhraseBanList`** suppresses overused n-grams for a co
 
 ### How does Fixy detect repeated content?
 
-`InteractiveFixy` (v2.9.0) uses a **two-layer repetition signal**:
+`InteractiveFixy` (v3.0.0) uses a **two-layer repetition signal**:
 1. **Jaccard keyword overlap** — always active; fast and dependency-free.
 2. **Sentence-embedding cosine similarity** — if `sentence-transformers` is installed, `all-MiniLM-L6-v2` is lazily loaded on first use and merged with the Jaccard score. This catches paraphrased repetition that keyword matching alone misses.
 
@@ -710,4 +710,4 @@ Yes! Entelgia is released under the MIT License. See [LICENSE](LICENSE) for deta
 
 ---
 
-**Last Updated**: Version 2.9.0
+**Last Updated**: Version 3.0.0

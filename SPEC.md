@@ -73,7 +73,7 @@ Need-based intervention:
 - uses **Jaccard + sentence-embedding cosine similarity** for repetition detection (degrades to Jaccard-only when `sentence_transformers` is absent)
 - completely excluded when `Config.enable_observer = False`
 
-### Dialogue Loop Guard (v2.9.0)
+### Dialogue Loop Guard (v3.0.0)
 `entelgia/loop_guard.py` — detects and breaks dialogue failure modes:
 - `DialogueLoopDetector` — 4 failure modes: `loop_repetition`, `weak_conflict`, `premature_synthesis`, `topic_stagnation`
 - `PhraseBanList` — suppresses overused n-grams for a configurable ban duration
@@ -629,7 +629,7 @@ id, timestamp, query, url, summary, credibility_score
 
 ---
 
-## 14) Dialogue Loop Guard (v2.9.0)
+## 14) Dialogue Loop Guard (v3.0.0)
 
 ### Overview
 
@@ -692,7 +692,7 @@ TOPIC_CLUSTERS: Dict[str, List[str]] = {
 
 ---
 
-## 15) Topic-Aware Style System — Layer 2 (v2.9.0)
+## 15) Topic-Aware Style System — Layer 2 (v3.0.0)
 
 ### Overview
 
@@ -730,7 +730,7 @@ Layer 2 is enforced via the mandatory control block appended by `build_style_ins
 
 `_CLUSTER_ALIAS` maps production-file cluster names to the names used by `loop_guard.TOPIC_CLUSTERS`, allowing both systems to share a unified vocabulary without circular imports.
 
-## 16) Topic Anchors & Forbidden Carryover (v2.9.0+)
+## 16) Topic Anchors & Forbidden Carryover (v3.0.0+)
 
 ### Purpose
 
@@ -894,7 +894,7 @@ which caused the system to repeat the same narrow set of topics indefinitely.
 
 ---
 
-## 17) Post-Generation Revision Layer — `revise_draft()` (v2.9.0)
+## 17) Post-Generation Revision Layer — `revise_draft()` (v3.0.0)
 
 ### Overview
 
@@ -1099,7 +1099,7 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 
 * `affective_emotion_weight` — Weight of `emotion_intensity` vs `importance` in `ltm_search_affective` score (default: `0.4`)
 
-### FreudianSlip (v2.9.0)
+### FreudianSlip (v3.0.0)
 
 * `slip_probability` — Per-turn probability a slip fires (env: `ENTELGIA_SLIP_PROBABILITY`; default: `0.05`)
 * `slip_cooldown_turns` — Minimum turns between two successful slips (env: `ENTELGIA_SLIP_COOLDOWN`; default: `10`)
