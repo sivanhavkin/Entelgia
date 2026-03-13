@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [2.9.0] - 2026-03-12
+## [3.0.0] - 2026-03-12
 
 ### Added
 
@@ -53,6 +53,15 @@ All notable changes to this project will be documented in this file. The format 
   - Added `pytest-cov`, `black`, `flake8`, `mypy` to `requirements.txt` (already in `pyproject.toml` dev extras)
   - Removed `python-dateutil` from `requirements.txt` (appeared only in a docstring, never imported)
   - Added `beautifulsoup4>=4.12.0` to `pyproject.toml` core dependencies
+
+### Tests
+
+- **New `tests/test_context_manager.py`** (30 tests) — dedicated test suite for `entelgia/context_manager.py`. Covers `_safe_ltm_content`, `_safe_stm_text`, `ContextManager.build_enriched_context` (seed, persona, LTM/STM injection, internal-field suppression, `web_context` and `topic_style` injection), `_prioritize_memories`, and `EnhancedMemoryIntegration.retrieve_relevant_memories`.
+- **New `tests/test_ablation_study.py`** (27 tests) — dedicated test suite for `entelgia/ablation_study.py`. Covers `AblationCondition` enum, `run_condition` (all four conditions, turn count, determinism), `run_ablation` (all conditions, metrics structure, numeric values, determinism), and `print_results_table` (no exception, non-empty output).
+- **New `tests/test_web_tool.py`** (18 tests) — dedicated test suite for `entelgia/web_tool.py`. Covers `clear_failed_urls`, `_clean_text`, `fetch_page_text` (blacklist skip, 403/404 blacklisting, network error handling, text-limit truncation), `web_search` (network error, max_results), and `search_and_fetch` (result structure, source keys).
+- **Black formatting pass** applied to `tests/test_revise_draft.py`, `tests/test_topic_anchors.py`, `tests/test_context_manager.py`, `tests/test_ablation_study.py`, `tests/test_web_tool.py`, `Entelgia_production_meta.py`, and `Entelgia_production_meta_200t.py` — pure style changes, no logic modified.
+- **`tests/README.md` updated** — test count corrected to **721 tests** (720 passed, 1 skipped) across 23 suites. Added sections for `test_context_manager.py`, `test_ablation_study.py`, `test_web_tool.py`, `test_topic_style.py`, `test_topic_anchors.py`, `test_seed_topic_clusters.py`, and `test_revise_draft.py`. Updated test counts for `test_loop_guard.py` (30), `test_detect_repetition_semantic.py` (13), and `test_web_research.py` (181). Added a "Running All Tests" section.
+- **`README.md` Tests section updated** — badge updated to 720 passed; test suite table now lists all 23 suites with individual test counts.
 
 ## [2.8.1] - 2026-03-07
 ### Added
@@ -911,7 +920,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v2.9.0
+- ✅ **Latest stable:** v3.0.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -922,7 +931,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v2.9.0** | 2026-03-12 | Minor | ✅ **Current** | Topic-aware style selection, forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |
+| **v3.0.0** | 2026-03-12 | Minor | ✅ **Current** | Topic-aware style selection, forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |
 | **v2.8.1** | 2026-03-07 | Patch | ✅ **Stable** | Version bump across all documentation |
 | **v2.8.0** | 2026-03-06 | Minor | ⚠️ Superseded | Web Research Module — Fixy-triggered external knowledge pipeline |
 | **v2.7.0** | 2026-03-03 | Minor | ✅ **Stable** | Limbic hijack state, meta output refinement |

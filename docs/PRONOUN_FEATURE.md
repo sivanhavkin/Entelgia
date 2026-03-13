@@ -106,7 +106,7 @@ When `show_pronoun=False` (default):
 ## Version Information
 
 - **Feature Version:** v2.2.0 
-- **Latest Official Release:** v2.9.0
+- **Latest Official Release:** v3.0.0
 - **Status:** Stable
 
 ---

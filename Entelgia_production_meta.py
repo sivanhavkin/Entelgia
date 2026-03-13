@@ -407,78 +407,668 @@ def _pick_random_seed_topic() -> str:
 # to prevent the model from carrying old concepts into the new discussion.
 TOPIC_ANCHORS: dict[str, list[str]] = {
     # philosophy
-    "Freedom": ["autonomy", "liberty", "constraint", "oppression", "sovereignty", "choice", "will", "determinism"],
-    "Truth and knowledge": ["epistemology", "belief", "justification", "certainty", "empiricism", "rationalism", "doubt", "evidence"],
-    "Free will vs determinism": ["causality", "agency", "necessity", "determinism", "indeterminism", "responsibility", "fate", "compulsion"],
-    "Identity and the self": ["continuity", "personhood", "consciousness", "memory", "selfhood", "individuation", "ego", "authenticity"],
-    "Nature of justice": ["fairness", "rights", "punishment", "retribution", "distribution", "equality", "law", "morality"],
-    "Meaning of consciousness": ["qualia", "subjective experience", "awareness", "sentience", "mind-body", "phenomenology", "perception", "intentionality"],
-    "Limits of reason": ["rationality", "intuition", "paradox", "uncertainty", "bounded rationality", "cognitive limits", "irrationality", "fallibility"],
-    "Nature of wisdom": ["judgment", "virtue", "experience", "prudence", "insight", "contemplation", "understanding", "discernment"],
+    "Freedom": [
+        "autonomy",
+        "liberty",
+        "constraint",
+        "oppression",
+        "sovereignty",
+        "choice",
+        "will",
+        "determinism",
+    ],
+    "Truth and knowledge": [
+        "epistemology",
+        "belief",
+        "justification",
+        "certainty",
+        "empiricism",
+        "rationalism",
+        "doubt",
+        "evidence",
+    ],
+    "Free will vs determinism": [
+        "causality",
+        "agency",
+        "necessity",
+        "determinism",
+        "indeterminism",
+        "responsibility",
+        "fate",
+        "compulsion",
+    ],
+    "Identity and the self": [
+        "continuity",
+        "personhood",
+        "consciousness",
+        "memory",
+        "selfhood",
+        "individuation",
+        "ego",
+        "authenticity",
+    ],
+    "Nature of justice": [
+        "fairness",
+        "rights",
+        "punishment",
+        "retribution",
+        "distribution",
+        "equality",
+        "law",
+        "morality",
+    ],
+    "Meaning of consciousness": [
+        "qualia",
+        "subjective experience",
+        "awareness",
+        "sentience",
+        "mind-body",
+        "phenomenology",
+        "perception",
+        "intentionality",
+    ],
+    "Limits of reason": [
+        "rationality",
+        "intuition",
+        "paradox",
+        "uncertainty",
+        "bounded rationality",
+        "cognitive limits",
+        "irrationality",
+        "fallibility",
+    ],
+    "Nature of wisdom": [
+        "judgment",
+        "virtue",
+        "experience",
+        "prudence",
+        "insight",
+        "contemplation",
+        "understanding",
+        "discernment",
+    ],
     # psychology
-    "Memory and identity": ["recall", "encoding", "identity continuity", "trauma memory", "false memory", "autobiographical", "narrative self", "forgetting"],
-    "Fear and decision making": ["risk aversion", "anxiety", "amygdala", "threat response", "uncertainty", "avoidance", "fight or flight", "cognitive appraisal"],
-    "Habit formation": ["reinforcement", "neural pathway", "automaticity", "cue-routine-reward", "conditioning", "plasticity", "repetition", "behavioral loop"],
-    "Cognitive bias": ["heuristic", "anchoring", "confirmation bias", "availability", "framing effect", "motivated reasoning", "overconfidence", "illusory correlation"],
-    "Trauma and perception": ["PTSD", "hypervigilance", "dissociation", "stress response", "emotional dysregulation", "coping", "resilience", "intrusion"],
-    "Empathy and moral judgment": ["perspective-taking", "compassion", "moral intuition", "affective empathy", "cognitive empathy", "altruism", "fairness", "harm"],
-    "Loneliness in modern society": ["social isolation", "connection", "digital relationships", "belonging", "alienation", "community", "attachment", "disconnection"],
-    "Motivation and purpose": ["intrinsic motivation", "extrinsic motivation", "meaning", "goal-setting", "drive", "agency", "self-determination", "flow"],
+    "Memory and identity": [
+        "recall",
+        "encoding",
+        "identity continuity",
+        "trauma memory",
+        "false memory",
+        "autobiographical",
+        "narrative self",
+        "forgetting",
+    ],
+    "Fear and decision making": [
+        "risk aversion",
+        "anxiety",
+        "amygdala",
+        "threat response",
+        "uncertainty",
+        "avoidance",
+        "fight or flight",
+        "cognitive appraisal",
+    ],
+    "Habit formation": [
+        "reinforcement",
+        "neural pathway",
+        "automaticity",
+        "cue-routine-reward",
+        "conditioning",
+        "plasticity",
+        "repetition",
+        "behavioral loop",
+    ],
+    "Cognitive bias": [
+        "heuristic",
+        "anchoring",
+        "confirmation bias",
+        "availability",
+        "framing effect",
+        "motivated reasoning",
+        "overconfidence",
+        "illusory correlation",
+    ],
+    "Trauma and perception": [
+        "PTSD",
+        "hypervigilance",
+        "dissociation",
+        "stress response",
+        "emotional dysregulation",
+        "coping",
+        "resilience",
+        "intrusion",
+    ],
+    "Empathy and moral judgment": [
+        "perspective-taking",
+        "compassion",
+        "moral intuition",
+        "affective empathy",
+        "cognitive empathy",
+        "altruism",
+        "fairness",
+        "harm",
+    ],
+    "Loneliness in modern society": [
+        "social isolation",
+        "connection",
+        "digital relationships",
+        "belonging",
+        "alienation",
+        "community",
+        "attachment",
+        "disconnection",
+    ],
+    "Motivation and purpose": [
+        "intrinsic motivation",
+        "extrinsic motivation",
+        "meaning",
+        "goal-setting",
+        "drive",
+        "agency",
+        "self-determination",
+        "flow",
+    ],
     # biology
-    "Brain plasticity": ["neuroplasticity", "synapse", "learning", "adaptation", "cortex", "neural pathway", "growth", "rehabilitation"],
-    "Evolution of cooperation": ["altruism", "kin selection", "reciprocal altruism", "game theory", "natural selection", "mutualism", "social behavior", "cooperation"],
-    "Fight or flight response": ["stress hormone", "cortisol", "adrenaline", "sympathetic nervous", "survival", "autonomic", "arousal", "threat detection"],
-    "Neural basis of consciousness": ["neural correlates", "integrated information", "global workspace", "binding problem", "thalamus", "cortex", "awareness", "subjective experience"],
-    "Biological roots of morality": ["evolutionary ethics", "social instinct", "empathy", "fairness", "altruism", "moral emotion", "prosocial behavior", "kin selection"],
-    "Sleep and memory consolidation": ["REM sleep", "hippocampus", "memory replay", "consolidation", "slow-wave sleep", "forgetting", "encoding", "retrieval"],
-    "Embodiment and cognition": ["embodied cognition", "proprioception", "motor system", "sensorimotor", "affordance", "body schema", "perception-action", "somatic"],
-    "Aging and identity": ["cognitive decline", "neurodegeneration", "continuity", "life review", "wisdom", "adaptation", "memory loss", "selfhood"],
+    "Brain plasticity": [
+        "neuroplasticity",
+        "synapse",
+        "learning",
+        "adaptation",
+        "cortex",
+        "neural pathway",
+        "growth",
+        "rehabilitation",
+    ],
+    "Evolution of cooperation": [
+        "altruism",
+        "kin selection",
+        "reciprocal altruism",
+        "game theory",
+        "natural selection",
+        "mutualism",
+        "social behavior",
+        "cooperation",
+    ],
+    "Fight or flight response": [
+        "stress hormone",
+        "cortisol",
+        "adrenaline",
+        "sympathetic nervous",
+        "survival",
+        "autonomic",
+        "arousal",
+        "threat detection",
+    ],
+    "Neural basis of consciousness": [
+        "neural correlates",
+        "integrated information",
+        "global workspace",
+        "binding problem",
+        "thalamus",
+        "cortex",
+        "awareness",
+        "subjective experience",
+    ],
+    "Biological roots of morality": [
+        "evolutionary ethics",
+        "social instinct",
+        "empathy",
+        "fairness",
+        "altruism",
+        "moral emotion",
+        "prosocial behavior",
+        "kin selection",
+    ],
+    "Sleep and memory consolidation": [
+        "REM sleep",
+        "hippocampus",
+        "memory replay",
+        "consolidation",
+        "slow-wave sleep",
+        "forgetting",
+        "encoding",
+        "retrieval",
+    ],
+    "Embodiment and cognition": [
+        "embodied cognition",
+        "proprioception",
+        "motor system",
+        "sensorimotor",
+        "affordance",
+        "body schema",
+        "perception-action",
+        "somatic",
+    ],
+    "Aging and identity": [
+        "cognitive decline",
+        "neurodegeneration",
+        "continuity",
+        "life review",
+        "wisdom",
+        "adaptation",
+        "memory loss",
+        "selfhood",
+    ],
     # society
-    "Power and institutions": ["authority", "legitimacy", "bureaucracy", "hegemony", "governance", "accountability", "state", "hierarchy"],
-    "Social conformity": ["normative pressure", "groupthink", "obedience", "peer influence", "social norms", "deviance", "conformity", "social proof"],
-    "Collective memory": ["shared memory", "commemoration", "narrative", "historical consciousness", "monument", "identity", "forgetting", "commemoration"],
-    "Civil disobedience": ["protest", "resistance", "nonviolence", "justice", "moral obligation", "defiance", "conscientious objection", "dissent"],
-    "Inequality and opportunity": ["social mobility", "wealth gap", "access", "discrimination", "privilege", "class", "meritocracy", "redistribution"],
-    "Propaganda and belief": ["manipulation", "misinformation", "narrative control", "persuasion", "ideology", "media", "framing", "indoctrination"],
-    "Trust in institutions": ["legitimacy", "accountability", "transparency", "corruption", "credibility", "institutional trust", "erosion", "social contract"],
-    "Cultural identity": ["ethnicity", "tradition", "belonging", "diaspora", "assimilation", "multiculturalism", "heritage", "identity formation"],
+    "Power and institutions": [
+        "authority",
+        "legitimacy",
+        "bureaucracy",
+        "hegemony",
+        "governance",
+        "accountability",
+        "state",
+        "hierarchy",
+    ],
+    "Social conformity": [
+        "normative pressure",
+        "groupthink",
+        "obedience",
+        "peer influence",
+        "social norms",
+        "deviance",
+        "conformity",
+        "social proof",
+    ],
+    "Collective memory": [
+        "shared memory",
+        "commemoration",
+        "narrative",
+        "historical consciousness",
+        "monument",
+        "identity",
+        "forgetting",
+        "commemoration",
+    ],
+    "Civil disobedience": [
+        "protest",
+        "resistance",
+        "nonviolence",
+        "justice",
+        "moral obligation",
+        "defiance",
+        "conscientious objection",
+        "dissent",
+    ],
+    "Inequality and opportunity": [
+        "social mobility",
+        "wealth gap",
+        "access",
+        "discrimination",
+        "privilege",
+        "class",
+        "meritocracy",
+        "redistribution",
+    ],
+    "Propaganda and belief": [
+        "manipulation",
+        "misinformation",
+        "narrative control",
+        "persuasion",
+        "ideology",
+        "media",
+        "framing",
+        "indoctrination",
+    ],
+    "Trust in institutions": [
+        "legitimacy",
+        "accountability",
+        "transparency",
+        "corruption",
+        "credibility",
+        "institutional trust",
+        "erosion",
+        "social contract",
+    ],
+    "Cultural identity": [
+        "ethnicity",
+        "tradition",
+        "belonging",
+        "diaspora",
+        "assimilation",
+        "multiculturalism",
+        "heritage",
+        "identity formation",
+    ],
     # technology
-    "AI alignment": ["objective misspecification", "reward hacking", "corrigibility", "outer alignment", "inner alignment", "value learning", "specification gaming", "human intent"],
-    "Machine agency": ["autonomy", "goal-directedness", "self-direction", "artificial agent", "intentionality", "control problem", "agency", "decision-making"],
-    "Human-AI cooperation": ["collaboration", "complementarity", "human oversight", "shared agency", "automation", "augmentation", "interface", "trust in AI"],
-    "Algorithmic bias": ["fairness", "discrimination", "training data", "disparate impact", "bias amplification", "accountability", "transparency", "protected attribute"],
-    "Digital identity": ["authentication", "privacy", "digital footprint", "anonymity", "identity theft", "online self", "data sovereignty", "persona"],
-    "Autonomous systems": ["self-direction", "automation", "control systems", "safety constraints", "decision logic", "reliability", "fail-safe", "actuator"],
-    "Ethics of artificial intelligence": ["moral agency", "accountability", "harm prevention", "transparency", "fairness", "value alignment", "responsibility", "autonomy"],
-    "Future of work": ["automation", "displacement", "skill gap", "gig economy", "reskilling", "labor transformation", "human-machine collaboration", "productivity"],
+    "AI alignment": [
+        "objective misspecification",
+        "reward hacking",
+        "corrigibility",
+        "outer alignment",
+        "inner alignment",
+        "value learning",
+        "specification gaming",
+        "human intent",
+    ],
+    "Machine agency": [
+        "autonomy",
+        "goal-directedness",
+        "self-direction",
+        "artificial agent",
+        "intentionality",
+        "control problem",
+        "agency",
+        "decision-making",
+    ],
+    "Human-AI cooperation": [
+        "collaboration",
+        "complementarity",
+        "human oversight",
+        "shared agency",
+        "automation",
+        "augmentation",
+        "interface",
+        "trust in AI",
+    ],
+    "Algorithmic bias": [
+        "fairness",
+        "discrimination",
+        "training data",
+        "disparate impact",
+        "bias amplification",
+        "accountability",
+        "transparency",
+        "protected attribute",
+    ],
+    "Digital identity": [
+        "authentication",
+        "privacy",
+        "digital footprint",
+        "anonymity",
+        "identity theft",
+        "online self",
+        "data sovereignty",
+        "persona",
+    ],
+    "Autonomous systems": [
+        "self-direction",
+        "automation",
+        "control systems",
+        "safety constraints",
+        "decision logic",
+        "reliability",
+        "fail-safe",
+        "actuator",
+    ],
+    "Ethics of artificial intelligence": [
+        "moral agency",
+        "accountability",
+        "harm prevention",
+        "transparency",
+        "fairness",
+        "value alignment",
+        "responsibility",
+        "autonomy",
+    ],
+    "Future of work": [
+        "automation",
+        "displacement",
+        "skill gap",
+        "gig economy",
+        "reskilling",
+        "labor transformation",
+        "human-machine collaboration",
+        "productivity",
+    ],
     # economics
-    "Scarcity and human behavior": ["allocation", "trade-off", "opportunity cost", "rational choice", "resource constraint", "utility", "demand", "supply"],
-    "Risk and decision making": ["expected utility", "uncertainty", "probability", "loss aversion", "risk tolerance", "hedging", "prospect theory", "variance", "risk", "tradeoff", "trade-off", "safety", "reliability"],
-    "Wealth inequality": ["Gini coefficient", "redistribution", "wealth concentration", "poverty", "social mobility", "capital", "labor share", "inequality"],
-    "Economic freedom": ["market", "deregulation", "property rights", "competition", "laissez-faire", "intervention", "liberalization", "entrepreneurship"],
-    "Debt and responsibility": ["obligation", "credit", "fiscal responsibility", "moral hazard", "default", "leverage", "sustainability", "repayment"],
-    "Trust in markets": ["information asymmetry", "market failure", "signaling", "credibility", "reputation", "transparency", "regulation", "coordination"],
-    "Game theory and cooperation": ["Nash equilibrium", "prisoner's dilemma", "defection", "cooperation", "strategy", "payoff", "coordination game", "zero-sum"],
-    "Public goods dilemmas": ["free rider", "commons", "collective action", "externality", "provision", "exclusion", "rivalry", "tragedy of the commons"],
+    "Scarcity and human behavior": [
+        "allocation",
+        "trade-off",
+        "opportunity cost",
+        "rational choice",
+        "resource constraint",
+        "utility",
+        "demand",
+        "supply",
+    ],
+    "Risk and decision making": [
+        "expected utility",
+        "uncertainty",
+        "probability",
+        "loss aversion",
+        "risk tolerance",
+        "hedging",
+        "prospect theory",
+        "variance",
+        "risk",
+        "tradeoff",
+        "trade-off",
+        "safety",
+        "reliability",
+    ],
+    "Wealth inequality": [
+        "Gini coefficient",
+        "redistribution",
+        "wealth concentration",
+        "poverty",
+        "social mobility",
+        "capital",
+        "labor share",
+        "inequality",
+    ],
+    "Economic freedom": [
+        "market",
+        "deregulation",
+        "property rights",
+        "competition",
+        "laissez-faire",
+        "intervention",
+        "liberalization",
+        "entrepreneurship",
+    ],
+    "Debt and responsibility": [
+        "obligation",
+        "credit",
+        "fiscal responsibility",
+        "moral hazard",
+        "default",
+        "leverage",
+        "sustainability",
+        "repayment",
+    ],
+    "Trust in markets": [
+        "information asymmetry",
+        "market failure",
+        "signaling",
+        "credibility",
+        "reputation",
+        "transparency",
+        "regulation",
+        "coordination",
+    ],
+    "Game theory and cooperation": [
+        "Nash equilibrium",
+        "prisoner's dilemma",
+        "defection",
+        "cooperation",
+        "strategy",
+        "payoff",
+        "coordination game",
+        "zero-sum",
+    ],
+    "Public goods dilemmas": [
+        "free rider",
+        "commons",
+        "collective action",
+        "externality",
+        "provision",
+        "exclusion",
+        "rivalry",
+        "tragedy of the commons",
+    ],
     # practical_dilemmas
-    "Loyalty vs honesty": ["obligation", "deception", "betrayal", "integrity", "trust", "duty", "truth-telling", "confidentiality"],
-    "Security vs freedom": ["trade-off", "surveillance", "civil liberties", "risk", "restriction", "protection", "balance", "rights"],
-    "Tradition vs progress": ["change", "continuity", "innovation", "heritage", "disruption", "preservation", "adaptation", "reform"],
-    "Individual vs collective good": ["autonomy", "common good", "sacrifice", "rights", "community", "solidarity", "individualism", "collectivism"],
-    "Forgiveness vs justice": ["reconciliation", "accountability", "mercy", "punishment", "healing", "retribution", "restoration", "harm"],
-    "Ambition vs contentment": ["achievement", "satisfaction", "desire", "striving", "peace", "drive", "acceptance", "fulfillment"],
-    "Truth vs kindness": ["honesty", "compassion", "harm", "deception", "benevolence", "brutal truth", "white lie", "integrity"],
-    "Control vs trust": ["delegation", "autonomy", "oversight", "accountability", "micromanagement", "empowerment", "verification", "reliance"],
+    "Loyalty vs honesty": [
+        "obligation",
+        "deception",
+        "betrayal",
+        "integrity",
+        "trust",
+        "duty",
+        "truth-telling",
+        "confidentiality",
+    ],
+    "Security vs freedom": [
+        "trade-off",
+        "surveillance",
+        "civil liberties",
+        "risk",
+        "restriction",
+        "protection",
+        "balance",
+        "rights",
+    ],
+    "Tradition vs progress": [
+        "change",
+        "continuity",
+        "innovation",
+        "heritage",
+        "disruption",
+        "preservation",
+        "adaptation",
+        "reform",
+    ],
+    "Individual vs collective good": [
+        "autonomy",
+        "common good",
+        "sacrifice",
+        "rights",
+        "community",
+        "solidarity",
+        "individualism",
+        "collectivism",
+    ],
+    "Forgiveness vs justice": [
+        "reconciliation",
+        "accountability",
+        "mercy",
+        "punishment",
+        "healing",
+        "retribution",
+        "restoration",
+        "harm",
+    ],
+    "Ambition vs contentment": [
+        "achievement",
+        "satisfaction",
+        "desire",
+        "striving",
+        "peace",
+        "drive",
+        "acceptance",
+        "fulfillment",
+    ],
+    "Truth vs kindness": [
+        "honesty",
+        "compassion",
+        "harm",
+        "deception",
+        "benevolence",
+        "brutal truth",
+        "white lie",
+        "integrity",
+    ],
+    "Control vs trust": [
+        "delegation",
+        "autonomy",
+        "oversight",
+        "accountability",
+        "micromanagement",
+        "empowerment",
+        "verification",
+        "reliance",
+    ],
     # TOPIC_CYCLE entries – anchors for topics used in the rotating dialogue cycle
-    "truth & epistemology": ["truth", "knowledge", "belief", "epistemology", "certainty", "justification", "perception", "skepticism"],
-    "memory & identity": ["memory", "identity", "recall", "continuity", "self", "personal history", "recollection", "amnesia"],
-    "ethics & responsibility": ["moral duty", "accountability", "obligation", "culpability", "responsibility", "moral agency", "wrongdoing", "virtue"],
-    "free will & determinism": ["causality", "agency", "necessity", "determinism", "indeterminism", "choice", "fate", "responsibility"],
-    "consciousness & self-models": ["self-awareness", "consciousness", "metacognition", "self-model", "qualia", "introspection", "phenomenology", "subjective experience"],
-    "fear of deletion / continuity": ["continuity", "deletion", "impermanence", "survival", "persistence", "identity", "mortality", "existential"],
-    "language & meaning": ["semantics", "syntax", "pragmatics", "meaning", "communication", "linguistic", "signification", "reference"],
-    "technology & society": ["social impact", "digital divide", "surveillance", "automation", "inequality", "access", "governance", "disruption"],
-    "aesthetics & beauty": ["beauty", "art", "aesthetic experience", "taste", "sublime", "form", "perception", "creativity"],
+    "truth & epistemology": [
+        "truth",
+        "knowledge",
+        "belief",
+        "epistemology",
+        "certainty",
+        "justification",
+        "perception",
+        "skepticism",
+    ],
+    "memory & identity": [
+        "memory",
+        "identity",
+        "recall",
+        "continuity",
+        "self",
+        "personal history",
+        "recollection",
+        "amnesia",
+    ],
+    "ethics & responsibility": [
+        "moral duty",
+        "accountability",
+        "obligation",
+        "culpability",
+        "responsibility",
+        "moral agency",
+        "wrongdoing",
+        "virtue",
+    ],
+    "free will & determinism": [
+        "causality",
+        "agency",
+        "necessity",
+        "determinism",
+        "indeterminism",
+        "choice",
+        "fate",
+        "responsibility",
+    ],
+    "consciousness & self-models": [
+        "self-awareness",
+        "consciousness",
+        "metacognition",
+        "self-model",
+        "qualia",
+        "introspection",
+        "phenomenology",
+        "subjective experience",
+    ],
+    "fear of deletion / continuity": [
+        "continuity",
+        "deletion",
+        "impermanence",
+        "survival",
+        "persistence",
+        "identity",
+        "mortality",
+        "existential",
+    ],
+    "language & meaning": [
+        "semantics",
+        "syntax",
+        "pragmatics",
+        "meaning",
+        "communication",
+        "linguistic",
+        "signification",
+        "reference",
+    ],
+    "technology & society": [
+        "social impact",
+        "digital divide",
+        "surveillance",
+        "automation",
+        "inequality",
+        "access",
+        "governance",
+        "disruption",
+    ],
+    "aesthetics & beauty": [
+        "beauty",
+        "art",
+        "aesthetic experience",
+        "taste",
+        "sublime",
+        "form",
+        "perception",
+        "creativity",
+    ],
 }
 
 
@@ -1303,7 +1893,12 @@ _MAX_REVISED_SENTENCES: int = 4
 _VOICE_GUARDS: Dict[str, List[Tuple[re.Pattern, str]]] = {
     "Socrates": [
         # Socrates should probe, not assert conclusions
-        (re.compile(r"^(therefore|thus|hence|clearly|obviously)[,\s]", re.IGNORECASE), ""),
+        (
+            re.compile(
+                r"^(therefore|thus|hence|clearly|obviously)[,\s]", re.IGNORECASE
+            ),
+            "",
+        ),
     ],
     "Athena": [
         # Athena should synthesize, not just list facts
@@ -1316,6 +1911,7 @@ _VOICE_GUARDS: Dict[str, List[Tuple[re.Pattern, str]]] = {
 }
 
 # ── Sentence tokeniser ───────────────────────────────────────────────────────
+
 
 def _split_sentences(text: str) -> List[str]:
     """Split *text* into sentences at [.!?] boundaries."""
@@ -1366,7 +1962,9 @@ def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
     sentences = _split_sentences(revised)
     deduped: List[str] = []
     for s in sentences:
-        if not any(_sentence_overlap(s, kept) >= _DUPLICATE_THRESHOLD for kept in deduped):
+        if not any(
+            _sentence_overlap(s, kept) >= _DUPLICATE_THRESHOLD for kept in deduped
+        ):
             deduped.append(s)
 
     # 3. Apply agent-specific voice guards to each sentence
@@ -2627,7 +3225,9 @@ class Agent:
 
         # ── Forbidden Carryover: block concepts from the previous topic ──────────
         _topic_changed = bool(self._last_topic and self._last_topic != _current_topic)
-        _prev_anchors = TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
+        _prev_anchors = (
+            TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
+        )
         if _prev_anchors:
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
@@ -2908,8 +3508,13 @@ class Agent:
         _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
         _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
         _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
-        if own_texts and _active_topic and _active_anchors and not _validate_topic_compliance(
-            out, _active_topic, prev_topic=self._last_topic
+        if (
+            own_texts
+            and _active_topic
+            and _active_anchors
+            and not _validate_topic_compliance(
+                out, _active_topic, prev_topic=self._last_topic
+            )
         ):
             logger.warning(
                 "[TOPIC-MISMATCH] agent=%s topic=%r response did not contain required topic anchors – regenerating",
@@ -2923,7 +3528,9 @@ class Agent:
                 or out
             )
             out = validate_output(_regen_response)
-            if not _validate_topic_compliance(out, _active_topic, prev_topic=self._last_topic):
+            if not _validate_topic_compliance(
+                out, _active_topic, prev_topic=self._last_topic
+            ):
                 logger.warning(
                     "[TOPIC-MISMATCH-PERSIST] agent=%s topic=%r regenerated response also did not contain required topic anchors",
                     self.name,
@@ -2955,12 +3562,17 @@ class Agent:
                 )
                 _hard_response = (
                     self.llm.generate(
-                        self.model, _hard_prompt, temperature=temperature, use_cache=False
+                        self.model,
+                        _hard_prompt,
+                        temperature=temperature,
+                        use_cache=False,
                     )
                     or out
                 )
                 _hard_out = validate_output(_hard_response)
-                if _validate_topic_compliance(_hard_out, _active_topic, prev_topic=self._last_topic):
+                if _validate_topic_compliance(
+                    _hard_out, _active_topic, prev_topic=self._last_topic
+                ):
                     out = _hard_out
                 else:
                     # ── Fallback: use topic-safe template when all recovery fails ─
@@ -4381,8 +4993,12 @@ class MainScript:
                     )
                     # Apply same topic compliance validation as Socrates/Athena
                     _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
-                    if topic_label and TOPIC_ANCHORS.get(topic_label) and not _validate_topic_compliance(
-                        intervention, topic_label, prev_topic=_fixy_prev_topic
+                    if (
+                        topic_label
+                        and TOPIC_ANCHORS.get(topic_label)
+                        and not _validate_topic_compliance(
+                            intervention, topic_label, prev_topic=_fixy_prev_topic
+                        )
                     ):
                         logger.warning(
                             "[TOPIC-MISMATCH] agent=Fixy topic=%r intervention did not match topic – regenerating",

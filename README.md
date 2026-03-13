@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-515%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-720%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -451,11 +451,11 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 
 ```
 entelgia/
-├── __init__.py              # Package exports (v2.9.0)
+├── __init__.py              # Package exports (v3.0.0)
 ├── dialogue_engine.py       # Dynamic speaker & seed generation
 ├── enhanced_personas.py     # Rich character definitions
 ├── context_manager.py       # Smart context enrichment
-├── topic_style.py           # Topic-cluster → reasoning style mapping (v2.9.0)
+├── topic_style.py           # Topic-cluster → reasoning style mapping (v3.0.0)
 ├── fixy_interactive.py      # Need-based interventions
 ├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
 ├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
@@ -466,7 +466,7 @@ entelgia/
 ├── source_evaluator.py      # Heuristic credibility scoring for web sources (v2.8.0)
 ├── research_context_builder.py  # Format research bundle as LLM context (v2.8.0)
 ├── fixy_research_trigger.py # Keyword-based search trigger detection (v2.8.0)
-├── loop_guard.py            # DialogueLoopDetector, PhraseBanList, DialogueRewriter (v2.9.0)
+├── loop_guard.py            # DialogueLoopDetector, PhraseBanList, DialogueRewriter (v3.0.0)
 └── web_research.py          # maybe_add_web_context integration + memory storage (v2.8.0)
 ```
 
@@ -539,7 +539,33 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **464 tests** in 14 suites.
+Entelgia ships with comprehensive test coverage across **721 tests** (720 passed, 1 skipped) in 23 suites.
+
+| Category | Tests | Suite |
+|---|---|---|
+| Web Research | 181 | `test_web_research.py` |
+| Topic Anchors | 59 | `test_topic_anchors.py` |
+| Dialogue Metrics | 58 | `test_dialogue_metrics.py` |
+| Long-Term Memory | 43 | `test_long_term_memory.py` |
+| Topic Style | 39 | `test_topic_style.py` |
+| Energy Regulation | 35 | `test_energy_regulation.py` |
+| Revise Draft | 32 | `test_revise_draft.py` |
+| Context Manager | 30 | `test_context_manager.py` |
+| Loop Guard | 30 | `test_loop_guard.py` |
+| Ablation Study | 27 | `test_ablation_study.py` |
+| Drive Pressure | 23 | `test_drive_pressure.py` |
+| Drive Correlations | 21 | `test_drive_correlations.py` |
+| SuperEgo Critique | 21 | `test_superego_critique.py` |
+| Memory Security | 19 | `test_memory_security.py` |
+| Web Tool | 18 | `test_web_tool.py` |
+| Behavioral Rules | 18 | `test_behavioral_rules.py` |
+| Limbic Hijack | 15 | `test_limbic_hijack.py` |
+| Semantic Repetition | 13 | `test_detect_repetition_semantic.py` |
+| Seed Topic Clusters | 12 | `test_seed_topic_clusters.py` |
+| Enable Observer | 10 | `test_enable_observer.py` |
+| Memory Signing Migration | 5 | `test_memory_signing_migration.py` |
+| Enhanced Dialogue | 11 | `test_enhanced_dialogue.py` |
+| Demo Dialogue | 1 | `test_demo_dialogue.py` |
 
 For full test documentation, per-suite details, CI/CD pipeline information, and sample output, see the **[Test Suite README (tests/README.md)](tests/README.md)**.
 
@@ -557,18 +583,18 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v2.9.0** | ✅ **Latest** | current |
+| **v3.0.0** | ✅ **Latest** | current |
 | **v2.8.1** | ✅ **Stable** | previous stable release |
-| **v2.8.0** | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.8.0** | ⚠️ Superseded | Use v3.0.0 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
 | **v2.5.0** | ✅ **Stable** | previous stable release |
-| **v2.4.0** | ⚠️ Superseded | Use v2.9.0 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v2.9.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v2.9.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v2.9.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v2.9.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v2.9.0 instead |
+| **v2.4.0** | ⚠️ Superseded | Use v3.0.0 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v3.0.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v3.0.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v3.0.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v3.0.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v3.0.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -653,6 +679,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 2.9.0 
+* **Version:** 3.0.0 
 * **Last Updated:** 11 March 2026
 ---

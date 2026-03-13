@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **490 tests** in 16 suites:
+Entelgia ships with comprehensive test coverage across **721 tests** (720 passed, 1 skipped) in 23 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -311,7 +311,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 490 total tests (176 web research + 11 dialogue + 35 energy + 43 LTM + 19 security + 21 drive correlations + 23 drive pressure + 18 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 21 superego critique + 15 limbic hijack + 12 semantic repetition detection + 10 enable observer + 22 loop guard) |
+| **Unit Tests** | `pytest` | Runs 721 total tests (181 web research + 30 web tool + 30 context manager + 27 ablation study + 59 topic anchors + 39 topic style + 32 revise draft + 12 seed topic clusters + 11 dialogue + 35 energy + 43 LTM + 19 security + 21 drive correlations + 23 drive pressure + 18 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 21 superego critique + 15 limbic hijack + 13 semantic repetition detection + 10 enable observer + 30 loop guard) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -328,7 +328,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 pytest tests/test_enable_observer.py -v
 ```
 
-Tests verify the `enable_observer` configuration flag introduced in v2.9.0 (PR #207):
+Tests verify the `enable_observer` configuration flag introduced in v3.0.0 (PR #207):
 
 - ✅ **Default is True** — `Config.enable_observer` defaults to `True`
 - ✅ **False accepted** — `Config.enable_observer=False` passes validation without error
@@ -343,7 +343,7 @@ Tests verify the `enable_observer` configuration flag introduced in v2.9.0 (PR #
 
 ---
 
-### 🔁 Loop Guard Tests (22 tests)
+### 🔁 Loop Guard Tests (30 tests)
 
 ```bash
 pytest tests/test_loop_guard.py -v
@@ -376,7 +376,7 @@ Tests verify `DialogueLoopDetector`, `PhraseBanList`, `DialogueRewriter`, `Topic
 
 ---
 
-### 🔁 Semantic Repetition Detection Tests (12 tests + 1 skipped)
+### 🔁 Semantic Repetition Detection Tests (13 tests, 1 skipped)
 
 ```bash
 pytest tests/test_detect_repetition_semantic.py -v
@@ -401,7 +401,7 @@ Tests verify the semantic similarity layer added to `InteractiveFixy._detect_rep
 
 ---
 
-### 🌐 Web Research Module Tests (176 tests)
+### 🌐 Web Research Module Tests (181 tests)
 
 The web research modules include unit tests for all components:
 
@@ -435,3 +435,157 @@ Tests cover:
 - ✅ **Branch-level debug logging** — seed/dialogue/Fixy-reason branches each log source type, trigger, and preview; query-build branch logs correctly
 
 All network calls in tests are mocked — no real HTTP requests are made.
+
+---
+
+### 🌐 Web Tool Tests (18 tests)
+
+```bash
+pytest tests/test_web_tool.py -v
+```
+
+Tests verify `entelgia/web_tool.py` — the DuckDuckGo search and page-fetch layer:
+
+- ✅ **`clear_failed_urls`** — resets the module-level failed-URL blacklist
+- ✅ **`_clean_text`** — collapses multiple blank lines; strips leading/trailing whitespace
+- ✅ **`fetch_page_text` — blacklist skip** — URLs in `_failed_urls` return empty result without a network call
+- ✅ **`fetch_page_text` — 403 blacklisting** — HTTP 403 response adds URL to blacklist
+- ✅ **`fetch_page_text` — 404 blacklisting** — HTTP 404 response adds URL to blacklist
+- ✅ **`fetch_page_text` — result keys** — returned dict always contains `url`, `title`, `text`
+- ✅ **`fetch_page_text` — network error** — `RequestException` returns empty result without crash
+- ✅ **`fetch_page_text` — text_limit respected** — extracted text truncated to requested limit
+- ✅ **`web_search` — network error** — returns empty list on `RequestException`
+- ✅ **`web_search` — HTTP error** — returns list (possibly empty) on HTTP error
+- ✅ **`web_search` — max_results** — never returns more entries than requested
+- ✅ **`search_and_fetch` — result structure** — returns dict with `query` and `sources`
+- ✅ **`search_and_fetch` — empty search** — empty search results yield empty sources list
+- ✅ **`search_and_fetch` — source keys** — each source has `title`, `url`, `snippet`, `text`
+
+---
+
+### 🧰 Context Manager Tests (30 tests)
+
+```bash
+pytest tests/test_context_manager.py -v
+```
+
+Tests verify `entelgia/context_manager.py` — the prompt-assembly and memory-integration layer:
+
+- ✅ **`_safe_ltm_content`** — returns only the `content` field; all internal fields stripped
+- ✅ **`_safe_stm_text`** — returns only the `text` field; all internal STM fields stripped
+- ✅ **`build_enriched_context` — non-empty output** — always returns a non-empty string
+- ✅ **`build_enriched_context` — agent name** — agent name appears in prompt
+- ✅ **`build_enriched_context` — seed** — user seed topic injected into prompt
+- ✅ **`build_enriched_context` — persona** — persona string appears in prompt
+- ✅ **`build_enriched_context` — LTM content** — LTM memory content appears in prompt
+- ✅ **`build_enriched_context` — STM text** — STM text appears in prompt
+- ✅ **`build_enriched_context` — internal LTM fields hidden** — `signature_hex`, `expires_at`, etc. never appear
+- ✅ **`build_enriched_context` — web_context injection** — research context injected when provided
+- ✅ **`build_enriched_context` — topic_style injection** — `STYLE INSTRUCTION` block present when style is set
+- ✅ **`build_enriched_context` — empty lists** — works correctly with empty STM and LTM
+- ✅ **`_prioritize_memories` — higher importance ranked first** — most important memory leads
+- ✅ **`_prioritize_memories` — limit respected** — never returns more than requested
+- ✅ **`EnhancedMemoryIntegration.retrieve_relevant_memories`** — relevant memories surface; limit respected; empty input returns empty list
+
+---
+
+### 🔬 Ablation Study Tests (27 tests)
+
+```bash
+pytest tests/test_ablation_study.py -v
+```
+
+Tests verify `entelgia/ablation_study.py` — the four-condition ablation framework:
+
+- ✅ **`AblationCondition` enum** — all four conditions (`BASELINE`, `DIALOGUE_ENGINE`, `FIXY`, `DREAM`) defined with correct labels
+- ✅ **`run_condition` — returns list** — each condition produces a list of `{"role", "text"}` dicts
+- ✅ **`run_condition` — turns count** — exact number of turns simulated matches the `turns` parameter
+- ✅ **`run_condition` — deterministic** — same seed always produces identical dialogue
+- ✅ **`run_condition` — seed variation** — different seeds produce different dialogues
+- ✅ **`run_ablation` — all conditions present** — result dict contains an entry for every condition
+- ✅ **`run_ablation` — metrics structure** — each entry contains `metrics` (dict) and `circularity_series` (list)
+- ✅ **`run_ablation` — metric keys** — `circularity_rate` and `progress_rate` present in every metrics dict
+- ✅ **`run_ablation` — numeric values** — all metric values are `int` or `float`
+- ✅ **`run_ablation` — deterministic** — same seed yields identical results across calls
+- ✅ **`print_results_table` — no exception** — runs without error on valid results
+- ✅ **`print_results_table` — non-empty output** — produces visible tabular text
+- ✅ **`print_results_table` — condition names** — `Baseline` and `Fixy` appear in the output
+
+---
+
+### 🎨 Topic Style Tests (39 tests)
+
+```bash
+pytest tests/test_topic_style.py -v
+```
+
+Tests verify `entelgia/topic_style.py` — the topic-aware style selection system introduced in v3.0.0:
+
+- ✅ **`TOPIC_STYLE` dict** — all seven production clusters mapped to a style
+- ✅ **`get_style_for_cluster`** — returns correct style for each cluster
+- ✅ **`get_style_for_topic`** — maps individual topics to their cluster style
+- ✅ **`build_style_instruction`** — generates per-role style instructions (Socrates, Athena, Fixy)
+- ✅ **Unknown cluster/topic fallback** — returns default style without error
+
+---
+
+### ⚓ Topic Anchors Tests (59 tests)
+
+```bash
+pytest tests/test_topic_anchors.py -v
+```
+
+Tests verify the `TOPIC_ANCHORS` dict and `_contains_any` / `_validate_topic_compliance` helpers:
+
+- ✅ **All 56 topics have anchor lists** — no topic in `TOPIC_CLUSTERS` missing from `TOPIC_ANCHORS`
+- ✅ **Non-empty anchor lists** — every anchor list contains at least one keyword
+- ✅ **String keywords** — all anchor keywords are non-empty strings
+- ✅ **AI alignment anchors** — required concept terms present
+- ✅ **Risk and decision-making anchors** — broad vocabulary included to prevent false-positive topic mismatch
+- ✅ **`_contains_any` case-insensitive** — matching works regardless of case
+- ✅ **`_validate_topic_compliance`** — correctly classifies compliant and non-compliant responses
+
+---
+
+### ✍️ Revise Draft Tests (32 tests)
+
+```bash
+pytest tests/test_revise_draft.py -v
+```
+
+Tests verify `revise_draft`, `_split_sentences`, and `_sentence_overlap` in `Entelgia_production_meta.py`:
+
+- ✅ **`_split_sentences`** — correctly splits on `.`, `!`, `?` boundaries
+- ✅ **`_sentence_overlap`** — Jaccard word overlap between sentence pairs
+- ✅ **`revise_draft` — no revision needed** — unique sentences returned unchanged
+- ✅ **`revise_draft` — repeated sentence removed** — duplicate removed from draft
+- ✅ **`revise_draft` — empty input** — handles empty string without crash
+
+---
+
+### 🌱 Seed Topic Clusters Tests (12 tests)
+
+```bash
+pytest tests/test_seed_topic_clusters.py -v
+```
+
+Tests verify `TOPIC_CLUSTERS` structure and `SeedGenerator` behaviour:
+
+- ✅ **Cluster structure** — all clusters non-empty and contain unique topic strings
+- ✅ **`SeedGenerator.generate_seed`** — returns non-empty string for every known topic
+- ✅ **Unknown topic fallback** — graceful handling of topic not in any cluster
+
+---
+
+## Running All Tests
+
+```bash
+# Run the full suite
+pytest tests/ -v
+
+# Run with coverage report
+pytest tests/ --cov=. --cov-report=term
+
+# Run a single suite
+pytest tests/test_long_term_memory.py -v
+```
