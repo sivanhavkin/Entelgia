@@ -3217,10 +3217,11 @@ class Agent:
         # ── Topic Anchors: require engagement with topic-specific concepts ──────
         _topic_anchors = TOPIC_ANCHORS.get(_current_topic, [])
         if _current_topic and _topic_anchors:
-            prompt += f"\nCURRENT TOPIC: {_current_topic}\n"
             prompt += (
-                "Your response must explicitly engage with at least one of the "
-                f"following concepts: {', '.join(_topic_anchors)}.\n"
+                f"\n\nTopic constraint:\n"
+                f"The active topic is: {_current_topic}.\n"
+                "Your response must stay within this topic.\n"
+                f"Use at least one of these concepts naturally: {', '.join(_topic_anchors)}.\n"
             )
 
         # ── Forbidden Carryover: block concepts from the previous topic ──────────
@@ -3256,12 +3257,12 @@ class Agent:
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
+        # Extract topic from seed (used for memory selection and topic anchors)
+        topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
+        topic = topic_match.group(1).strip() if topic_match else ""
+
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
-            # Extract topic from seed
-            topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-            topic = topic_match.group(1) if topic_match else ""
-
             ltm = self.memory_integration.retrieve_relevant_memories(
                 agent_name=self.name,
                 current_topic=topic,
@@ -3335,6 +3336,22 @@ class Agent:
             web_context=web_context,
             topic_style=self.topic_style,
         )
+
+        # ── Topic Anchors: inject topic constraint before generation ──────────
+        _topic_anchors_enh = TOPIC_ANCHORS.get(topic, [])
+        if topic and _topic_anchors_enh:
+            topic_constraint = (
+                f"\n\nTopic constraint:\n"
+                f"The active topic is: {topic}.\n"
+                "Your response must stay within this topic.\n"
+                f"Use at least one of these concepts naturally: {', '.join(_topic_anchors_enh)}.\n"
+            )
+            if "\nRespond now:\n" in prompt:
+                prompt = prompt.replace(
+                    "\nRespond now:\n", topic_constraint + "\nRespond now:\n"
+                )
+            else:
+                prompt += topic_constraint
 
         return prompt
 

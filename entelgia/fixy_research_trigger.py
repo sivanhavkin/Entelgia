@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 # Number of turns a trigger must be absent before it can fire again
 _COOLDOWN_TURNS: int = 5
 
+# Global search cooldown – prevents any search for _GLOBAL_SEARCH_COOLDOWN_TURNS
+# turns after the last successful search, regardless of query or trigger keyword.
+_GLOBAL_SEARCH_COOLDOWN_TURNS: int = 5
+_last_global_search_turn: Optional[int] = None
+
 # Monotonically increasing call counter – incremented on every
 # fixy_should_search() invocation.
 _trigger_turn_counter: int = 0
@@ -158,6 +163,24 @@ _FIXY_RESEARCH_REASONS: frozenset = frozenset(
 # Number of recent dialogue turns to inspect
 _DIALOG_TAIL_WINDOW: int = 4
 
+# ---------------------------------------------------------------------------
+# Weak trigger word blacklist
+# ---------------------------------------------------------------------------
+
+# Functional/non-conceptual words that should not alone trigger a web search.
+# These words are too common and non-specific to justify external research.
+_WEAK_TRIGGER_WORDS: frozenset = frozenset(
+    {
+        "current",
+        "recent",
+        "today",
+        "web",
+        "internet",
+        "update",
+        "latest",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -190,7 +213,7 @@ def find_trigger(text: str) -> Optional[str]:
     # --- keyword detection (whole-word, case-insensitive) ---
     for m in re.finditer(r"\b[a-zA-Z\-]+\b", text_lower):
         word = m.group()
-        if word in _TRIGGER_KEYWORDS:
+        if word in _TRIGGER_KEYWORDS and word not in _WEAK_TRIGGER_WORDS:
             score = _KEYWORD_SCORE + (1 if word in _HIGH_VALUE_KEYWORDS else 0)
             candidates.append((score, m.start(), word))
 
@@ -212,8 +235,9 @@ def clear_trigger_cooldown() -> None:
 
     Intended for use in tests to avoid cross-test cooldown interference.
     """
-    global _trigger_turn_counter
+    global _trigger_turn_counter, _last_global_search_turn
     _trigger_turn_counter = 0
+    _last_global_search_turn = None
     _recent_triggers.clear()
     _recent_queries.clear()
 
@@ -277,9 +301,21 @@ def fixy_should_search(
     -------
     ``True`` if a web search should be performed, ``False`` otherwise.
     """
-    global _trigger_turn_counter
+    global _trigger_turn_counter, _last_global_search_turn
     _trigger_turn_counter += 1
     current_turn = _trigger_turn_counter
+
+    # Global cooldown: block any search for _GLOBAL_SEARCH_COOLDOWN_TURNS turns
+    # after the last successful search, regardless of query or trigger keyword.
+    if _last_global_search_turn is not None:
+        if current_turn - _last_global_search_turn < _GLOBAL_SEARCH_COOLDOWN_TURNS:
+            logger.info(
+                "global cooldown active: skipping web search "
+                "(last search turn %d, current %d)",
+                _last_global_search_turn,
+                current_turn,
+            )
+            return False
 
     # Determine the key used for per-query cooldown tracking.
     # When the caller provides a pre-built sanitized query, use that so
@@ -319,6 +355,7 @@ def fixy_should_search(
         else:
             _recent_triggers[trigger] = current_turn
             _recent_queries[_cooldown_key] = current_turn
+            _last_global_search_turn = current_turn
             logger.info("web search triggered by keyword: %r", trigger)
             return True
 
@@ -349,6 +386,7 @@ def fixy_should_search(
                     continue
                 _recent_triggers[trigger] = current_turn
                 _recent_queries[_cooldown_key] = current_turn
+                _last_global_search_turn = current_turn
                 logger.info("web search triggered by keyword: %r", trigger)
                 return True
 
@@ -359,6 +397,7 @@ def fixy_should_search(
     )
     if fixy_reason and fixy_reason in _FIXY_RESEARCH_REASONS:
         _recent_queries[_cooldown_key] = current_turn
+        _last_global_search_turn = current_turn
         logger.info("web search triggered by fixy_reason: %r", fixy_reason)
         return True
 
