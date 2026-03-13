@@ -1268,6 +1268,131 @@ def _trim_to_word_limit(text: str, max_words: int) -> str:
     return truncated
 
 
+# ── Generic filler phrases that LLMs often produce but add no substance ──────
+_FILLER_PATTERNS: List[re.Pattern] = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"it is important to note that[,:]?\s*",
+        r"it is worth (noting|mentioning) that[,:]?\s*",
+        r"it should be noted that[,:]?\s*",
+        r"it can be argued that[,:]?\s*",
+        r"needless to say[,:]?\s*",
+        r"as (we can see|i mentioned)[,:]?\s*",
+        r"in (other words|conclusion|summary)[,:]?\s*",
+        r"to summarize[,:]?\s*",
+        r"first(ly)?[,:]?\s*",
+        r"second(ly)?[,:]?\s*",
+        r"third(ly)?[,:]?\s*",
+        r"finally[,:]?\s*",
+        r"furthermore[,:]?\s*",
+        r"moreover[,:]?\s*",
+        r"in addition[,:]?\s*",
+        r"last but not least[,:]?\s*",
+    ]
+]
+
+# Minimum word count below which revision is skipped (very short responses kept as-is)
+_MIN_WORDS_FOR_REVISION: int = 3
+# Word-overlap ratio at or above which two sentences are considered near-duplicates
+_DUPLICATE_THRESHOLD: float = 0.70
+# Hard cap on sentences per revised response (2–4 range as per spec)
+_MAX_REVISED_SENTENCES: int = 4
+
+# ── Agent-specific voice guard patterns ──────────────────────────────────────
+# Each entry: (compiled pattern to detect voice violation, replacement string)
+_VOICE_GUARDS: Dict[str, List[Tuple[re.Pattern, str]]] = {
+    "Socrates": [
+        # Socrates should probe, not assert conclusions
+        (re.compile(r"^(therefore|thus|hence|clearly|obviously)[,\s]", re.IGNORECASE), ""),
+    ],
+    "Athena": [
+        # Athena should synthesize, not just list facts
+        (re.compile(r"^(fact:|fact\s*\d+:)", re.IGNORECASE), ""),
+    ],
+    "Fixy": [
+        # Fixy should be direct; strip hedge starters
+        (re.compile(r"^(perhaps|maybe|one could argue)[,\s]", re.IGNORECASE), ""),
+    ],
+}
+
+# ── Sentence tokeniser ───────────────────────────────────────────────────────
+
+def _split_sentences(text: str) -> List[str]:
+    """Split *text* into sentences at [.!?] boundaries."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [s.strip() for s in parts if s.strip()]
+
+
+def _sentence_overlap(a: str, b: str) -> float:
+    """Return a simple word-overlap ratio between two sentences (0..1)."""
+    wa = set(a.lower().split())
+    wb = set(b.lower().split())
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / max(len(wa), len(wb))
+
+
+def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
+    """Post-generation revision layer applied to every agent response.
+
+    Applies rule-based cleanup without any additional LLM calls:
+
+    1. Strip generic academic filler phrases.
+    2. Remove duplicate / near-duplicate sentences (overlap ≥ _DUPLICATE_THRESHOLD).
+    3. Apply agent-specific voice guards (leading word pattern fixes).
+    4. Enforce a _MAX_REVISED_SENTENCES maximum; trim longer drafts at sentence boundary.
+
+    The function is intentionally deterministic and cheap so it never
+    introduces latency or cascading LLM usage.
+
+    Args:
+        text: The post-processed (but not yet revised) agent output.
+        agent_name: Name of the speaking agent (Socrates / Athena / Fixy).
+        topic: Active dialogue topic string (reserved for future use).
+
+    Returns:
+        Revised text string, or *text* unchanged if it is blank / too short.
+    """
+    if not text or len(text.split()) < _MIN_WORDS_FOR_REVISION:
+        return text
+
+    # 1. Strip filler from the whole text first
+    revised = text
+    for pat in _FILLER_PATTERNS:
+        revised = pat.sub("", revised)
+    revised = revised.strip()
+
+    # 2. Split into sentences and remove near-duplicates
+    sentences = _split_sentences(revised)
+    deduped: List[str] = []
+    for s in sentences:
+        if not any(_sentence_overlap(s, kept) >= _DUPLICATE_THRESHOLD for kept in deduped):
+            deduped.append(s)
+
+    # 3. Apply agent-specific voice guards to each sentence
+    guards = _VOICE_GUARDS.get(agent_name, [])
+    fixed: List[str] = []
+    for s in deduped:
+        for pat, repl in guards:
+            s = pat.sub(repl, s, count=1)
+        s = s.strip()
+        if s:
+            fixed.append(s)
+
+    # 4. Enforce sentence-count maximum (keep 2–4 strong sentences)
+    if len(fixed) > _MAX_REVISED_SENTENCES:
+        fixed = fixed[:_MAX_REVISED_SENTENCES]
+
+    if not fixed:
+        return text  # fallback: return original if revision produced nothing
+
+    result = " ".join(fixed)
+    # Ensure the result ends with sentence-ending punctuation
+    if result and result[-1] not in ".!?":
+        result += "."
+    return result
+
+
 def _is_question_resolved(text: str) -> bool:
     """Return True if *text* contains a clear resolution to an open question.
 
@@ -2265,6 +2390,9 @@ class Agent:
             slip_cooldown_turns=cfg.slip_cooldown_turns if cfg is not None else 10,
             dedup_window=cfg.slip_dedup_window if cfg is not None else 10,
         )
+        # Raw draft storage — populated each turn for debug logging only;
+        # never stored in long-term memory.
+        self._last_raw_draft: str = ""
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -2981,6 +3109,16 @@ class Agent:
         # Update last-topic tracker so the next turn can inject forbidden carryover
         if _active_topic:
             self._last_topic = _active_topic
+
+        # ── Post-generation revision layer ────────────────────────────────────────
+        # Store the raw draft for debug inspection only; it must NOT be displayed
+        # or stored in long-term memory.  Only the revised text is returned.
+        self._last_raw_draft = out
+        logger.debug(
+            "[%s] raw_draft: %s", self.name, out[:200] + ("…" if len(out) > 200 else "")
+        )
+        out = revise_draft(out, self.name, topic=_active_topic or "")
+        # ─────────────────────────────────────────────────────────────────────────
 
         return out
 
