@@ -332,145 +332,7 @@ Fixy must NOT:
 
 ---
 
-## 9) Evaluation Signals (What We Measure)
-
-### Minimal signals
-
-* **Loop Rate**: repetition patterns per 100 turns
-* **Fixy Frequency**: interventions per 50 turns
-* **Topic Drift**: loss of topic continuity
-* **Novelty Ratio**: new concepts introduced per N turns
-* **Conflict Index**: internal conflict trend (if implemented)
-
-### Interpretation
-
-* High loop rate + high Fixy frequency → seed policy needs tuning
-* High drift + low novelty → context too thin
-* Low Fixy frequency + rising conflict → intervention threshold too high
-
----
-
-## 10) Reproducibility & Debugging
-
-### Run determinism
-
-* Not guaranteed (LLM stochasticity)
-* For experiments: fix temperature and seed ordering
-
-### Logging (recommended)
-
-* turn index, speaker, topic
-* seed strategy used
-* enhanced/legacy mode flag
-* Fixy intervention reason
-
----
-
-## 11) Quick Mental Model Diagram
-
-```text
-Topic ───────────────► SeedStrategy ───────────► Prompt
-   │                      ▲                        │
-   │                      │                        ▼
-   └──► DialogueEngine ───┴─► SpeakerSelect ───► LLM Generate
-              │                                      │
-              ├──► allow_fixy? / fixy_prob           ▼
-              │                                 Turn Output
-              ▼                                      │
-   InteractiveFixy ◄──────── dialog_history ─────────┘
-              │
-              ▼
-        Intervention (optional)
-
-Memory:
-STM/LTM ──► EnhancedMemoryIntegration ─► ContextManager prompt enrichment
-```
-
----
-
-## 12) What Counts as Working in Entelgia
-
-A session is considered working when:
-
-* dialogue does not collapse into mechanical alternation (enhanced)
-* strategies rotate and create new angles
-* Fixy remains sparse but meaningful
-* memory surfaces relevant prior context
-* agents maintain distinct voices over time
-
----
-
-## Appendix: Config Expectations (Example)
-
-All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.py`.
-
-### LLM / Session
-
-* `ollama_url` — Ollama API endpoint (default: `http://localhost:11434/api/generate`)
-* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `phi3:latest`)
-* `max_turns` — Maximum dialogue turns (default: `200`)
-* `timeout_minutes` — Session wall-clock timeout in minutes (default: `30`)
-* `llm_timeout` — Per-request LLM timeout in seconds (default: `300`)
-* `llm_max_retries` — Retry attempts on LLM failure (default: `3`)
-* `seed_topic` — Opening topic when none is provided (default: `"what would you like to talk about?"`)
-* `cache_size` — LRU response cache capacity (default: `5000`)
-* `emotion_cache_ttl` — Emotion cache time-to-live in seconds (default: `3600`)
-* `show_pronoun` — Include agent pronouns in output (default: `False`)
-* `show_meta` — Print meta-state after each turn (default: `False`)
-* `enable_observer` — Include Fixy as speaker and need-based intervener (env: `ENTELGIA_ENABLE_OBSERVER`; default: `True`). When `False`, Fixy is entirely excluded — no speaker turns, no interventions, no `InteractiveFixy` instance.
-
-### Memory
-
-* `data_dir` — Base directory for all persisted data (default: `entelgia_data`)
-* `db_path` — SQLite database path (default: `entelgia_data/entelgia_memory.sqlite`)
-* `csv_log_path` — CSV dialogue log path (default: `entelgia_data/entelgia_log.csv`)
-* `gexf_path` — GEXF graph export path (default: `entelgia_data/entelgia_graph.gexf`)
-* `metrics_path` — JSON metrics output path (default: `entelgia_data/metrics.json`)
-* `sessions_dir` — Directory for persisted session files (default: `entelgia_data/sessions`)
-* `version_dir` — Directory for version snapshots (default: `entelgia_data/versions`)
-* `stm_max_entries` — Short-term memory capacity (default: `10000`)
-* `stm_trim_batch` — Entries pruned per trim pass (default: `500`)
-* `dream_every_n_turns` — Turns between dream-cycle consolidation passes (default: `7`)
-* `promote_importance_threshold` — Min importance score to promote to LTM (default: `0.72`)
-* `promote_emotion_threshold` — Min emotion score to promote to LTM (default: `0.65`)
-* `store_raw_stm` — Store un-redacted text in STM (default: `False`)
-* `store_raw_subconscious_ltm` — Store un-redacted text in subconscious LTM (default: `False`)
-* `enable_auto_patch` — Enable automatic self-patching (default: `False`)
-* `allow_write_self_file` — Allow the agent to write to its own source file (default: `False`)
-
-### Forgetting Policy
-
-* `forgetting_enabled` — Master switch; `False` disables all TTL expiry (default: `True`)
-* `forgetting_episodic_ttl` — Subconscious/episodic layer TTL in seconds (default: `604800` — 7 days)
-* `forgetting_semantic_ttl` — Conscious/semantic layer TTL in seconds (default: `7776000` — 90 days)
-* `forgetting_autobio_ttl` — Autobiographical layer TTL in seconds (default: `31536000` — 365 days)
-
-### Affective Routing
-
-* `affective_emotion_weight` — Weight of `emotion_intensity` vs `importance` in `ltm_search_affective` score (default: `0.4`)
-
-### FreudianSlip (v2.9.0)
-
-* `slip_probability` — Per-turn probability a slip fires (env: `ENTELGIA_SLIP_PROBABILITY`; default: `0.05`)
-* `slip_cooldown_turns` — Minimum turns between two successful slips (env: `ENTELGIA_SLIP_COOLDOWN`; default: `10`)
-* `slip_dedup_window` — Number of recent slip hashes remembered to suppress identical repeats (env: `ENTELGIA_SLIP_DEDUP_WINDOW`; default: `10`)
-
-### Energy & Drive (v2.5.0+)
-
-* `energy_safety_threshold` — Energy floor that triggers a dream cycle (default: `35.0`)
-* `energy_drain_min` / `energy_drain_max` — Per-step energy drain range (default: `8.0` / `15.0`)
-* `self_replicate_every_n_turns` — Turns between self-replication keyword scans (default: `10`)
-* `drive_mean_reversion_rate` — Rate at which drives revert toward 5.0 each turn (default: `0.04`)
-* `drive_oscillation_range` — ±random noise added to drive values per turn (default: `0.15`)
-
-**Limbic hijack constants** (module-level, not `Config` fields):
-
-* `LIMBIC_HIJACK_SUPEREGO_MULTIPLIER = 0.3` — fraction of SuperEgo strength applied during hijack
-* `LIMBIC_HIJACK_MAX_TURNS = 3` — auto-exit after this many consecutive non-re-triggered turns
-
----
-
-## 13) Energy & Dream Cycles (v2.5.0)
+## 9) Energy & Dream Cycles (v2.5.0)
 
 ### Overview
 
@@ -510,7 +372,7 @@ Monitors `energy_level` against `safety_threshold`.
 
 ---
 
-## 14) Personal Long-Term Memory System (v2.5.0)
+## 10) Personal Long-Term Memory System (v2.5.0)
 
 ### DefenseMechanism
 
@@ -548,7 +410,7 @@ Every `self_replicate_every_n_turns` turns (default 10), scans the 50 most-recen
 
 ---
 
-## 15) DrivePressure (v2.6.0)
+## 11) DrivePressure (v2.6.0)
 
 ### Overview
 
@@ -594,7 +456,7 @@ Stagnation is measured by `_topic_signature(text)` (MD5-based content fingerprin
 
 ---
 
-## 16) Limbic Hijack State (v2.7.0)
+## 12) Limbic Hijack State (v2.7.0)
 
 ### Overview
 
@@ -659,7 +521,7 @@ PRs should preserve: internal-state governance, meta-observer policy, and reprod
 
 ---
 
-## 16) Web Research Module (v2.8.0)
+## 13) Web Research Module (v2.8.0)
 
 ### Overview
 
@@ -767,7 +629,7 @@ id, timestamp, query, url, summary, credibility_score
 
 ---
 
-## 17) Dialogue Loop Guard (v2.9.0)
+## 14) Dialogue Loop Guard (v2.9.0)
 
 ### Overview
 
@@ -830,7 +692,7 @@ TOPIC_CLUSTERS: Dict[str, List[str]] = {
 
 ---
 
-## 18) Topic-Aware Style System — Layer 2 (v2.9.0)
+## 15) Topic-Aware Style System — Layer 2 (v2.9.0)
 
 ### Overview
 
@@ -868,7 +730,7 @@ Layer 2 is enforced via the mandatory control block appended by `build_style_ins
 
 `_CLUSTER_ALIAS` maps production-file cluster names to the names used by `loop_guard.TOPIC_CLUSTERS`, allowing both systems to share a unified vocabulary without circular imports.
 
-## 19) Topic Anchors & Forbidden Carryover (v2.9.0+)
+## 16) Topic Anchors & Forbidden Carryover (v2.9.0+)
 
 ### Purpose
 
@@ -1032,7 +894,7 @@ which caused the system to repeat the same narrow set of topics indefinitely.
 
 ---
 
-## 20) Post-Generation Revision Layer — `revise_draft()` (v2.9.1)
+## 17) Post-Generation Revision Layer — `revise_draft()` (v2.9.1)
 
 ### Overview
 
@@ -1117,3 +979,143 @@ return out
 ```
 
 This block is the final step in `speak()`, after all other output transformations (superego rewrite, topic-anchor validation, drive-pressure word-cap, etc.).
+
+---
+
+## 18) Evaluation Signals (What We Measure)
+
+### Minimal signals
+
+* **Loop Rate**: repetition patterns per 100 turns
+* **Fixy Frequency**: interventions per 50 turns
+* **Topic Drift**: loss of topic continuity
+* **Novelty Ratio**: new concepts introduced per N turns
+* **Conflict Index**: internal conflict trend (if implemented)
+
+### Interpretation
+
+* High loop rate + high Fixy frequency → seed policy needs tuning
+* High drift + low novelty → context too thin
+* Low Fixy frequency + rising conflict → intervention threshold too high
+
+---
+
+## 19) Reproducibility & Debugging
+
+### Run determinism
+
+* Not guaranteed (LLM stochasticity)
+* For experiments: fix temperature and seed ordering
+
+### Logging (recommended)
+
+* turn index, speaker, topic
+* seed strategy used
+* enhanced/legacy mode flag
+* Fixy intervention reason
+
+---
+
+## 20) Quick Mental Model Diagram
+
+```text
+Topic ───────────────► SeedStrategy ───────────► Prompt
+   │                      ▲                        │
+   │                      │                        ▼
+   └──► DialogueEngine ───┴─► SpeakerSelect ───► LLM Generate
+              │                                      │
+              ├──► allow_fixy? / fixy_prob           ▼
+              │                                 Turn Output
+              ▼                                      │
+   InteractiveFixy ◄──────── dialog_history ─────────┘
+              │
+              ▼
+        Intervention (optional)
+
+Memory:
+STM/LTM ──► EnhancedMemoryIntegration ─► ContextManager prompt enrichment
+```
+
+---
+
+## 21) What Counts as Working in Entelgia
+
+A session is considered working when:
+
+* dialogue does not collapse into mechanical alternation (enhanced)
+* strategies rotate and create new angles
+* Fixy remains sparse but meaningful
+* memory surfaces relevant prior context
+* agents maintain distinct voices over time
+
+---
+
+## Appendix: Config Expectations (Example)
+
+All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.py`.
+
+### LLM / Session
+
+* `ollama_url` — Ollama API endpoint (default: `http://localhost:11434/api/generate`)
+* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `phi3:latest`)
+* `max_turns` — Maximum dialogue turns (default: `200`)
+* `timeout_minutes` — Session wall-clock timeout in minutes (default: `30`)
+* `llm_timeout` — Per-request LLM timeout in seconds (default: `300`)
+* `llm_max_retries` — Retry attempts on LLM failure (default: `3`)
+* `seed_topic` — Opening topic when none is provided (default: `"what would you like to talk about?"`)
+* `cache_size` — LRU response cache capacity (default: `5000`)
+* `emotion_cache_ttl` — Emotion cache time-to-live in seconds (default: `3600`)
+* `show_pronoun` — Include agent pronouns in output (default: `False`)
+* `show_meta` — Print meta-state after each turn (default: `False`)
+* `enable_observer` — Include Fixy as speaker and need-based intervener (env: `ENTELGIA_ENABLE_OBSERVER`; default: `True`). When `False`, Fixy is entirely excluded — no speaker turns, no interventions, no `InteractiveFixy` instance.
+
+### Memory
+
+* `data_dir` — Base directory for all persisted data (default: `entelgia_data`)
+* `db_path` — SQLite database path (default: `entelgia_data/entelgia_memory.sqlite`)
+* `csv_log_path` — CSV dialogue log path (default: `entelgia_data/entelgia_log.csv`)
+* `gexf_path` — GEXF graph export path (default: `entelgia_data/entelgia_graph.gexf`)
+* `metrics_path` — JSON metrics output path (default: `entelgia_data/metrics.json`)
+* `sessions_dir` — Directory for persisted session files (default: `entelgia_data/sessions`)
+* `version_dir` — Directory for version snapshots (default: `entelgia_data/versions`)
+* `stm_max_entries` — Short-term memory capacity (default: `10000`)
+* `stm_trim_batch` — Entries pruned per trim pass (default: `500`)
+* `dream_every_n_turns` — Turns between dream-cycle consolidation passes (default: `7`)
+* `promote_importance_threshold` — Min importance score to promote to LTM (default: `0.72`)
+* `promote_emotion_threshold` — Min emotion score to promote to LTM (default: `0.65`)
+* `store_raw_stm` — Store un-redacted text in STM (default: `False`)
+* `store_raw_subconscious_ltm` — Store un-redacted text in subconscious LTM (default: `False`)
+* `enable_auto_patch` — Enable automatic self-patching (default: `False`)
+* `allow_write_self_file` — Allow the agent to write to its own source file (default: `False`)
+
+### Forgetting Policy
+
+* `forgetting_enabled` — Master switch; `False` disables all TTL expiry (default: `True`)
+* `forgetting_episodic_ttl` — Subconscious/episodic layer TTL in seconds (default: `604800` — 7 days)
+* `forgetting_semantic_ttl` — Conscious/semantic layer TTL in seconds (default: `7776000` — 90 days)
+* `forgetting_autobio_ttl` — Autobiographical layer TTL in seconds (default: `31536000` — 365 days)
+
+### Affective Routing
+
+* `affective_emotion_weight` — Weight of `emotion_intensity` vs `importance` in `ltm_search_affective` score (default: `0.4`)
+
+### FreudianSlip (v2.9.0)
+
+* `slip_probability` — Per-turn probability a slip fires (env: `ENTELGIA_SLIP_PROBABILITY`; default: `0.05`)
+* `slip_cooldown_turns` — Minimum turns between two successful slips (env: `ENTELGIA_SLIP_COOLDOWN`; default: `10`)
+* `slip_dedup_window` — Number of recent slip hashes remembered to suppress identical repeats (env: `ENTELGIA_SLIP_DEDUP_WINDOW`; default: `10`)
+
+### Energy & Drive (v2.5.0+)
+
+* `energy_safety_threshold` — Energy floor that triggers a dream cycle (default: `35.0`)
+* `energy_drain_min` / `energy_drain_max` — Per-step energy drain range (default: `8.0` / `15.0`)
+* `self_replicate_every_n_turns` — Turns between self-replication keyword scans (default: `10`)
+* `drive_mean_reversion_rate` — Rate at which drives revert toward 5.0 each turn (default: `0.04`)
+* `drive_oscillation_range` — ±random noise added to drive values per turn (default: `0.15`)
+
+**Limbic hijack constants** (module-level, not `Config` fields):
+
+* `LIMBIC_HIJACK_SUPEREGO_MULTIPLIER = 0.3` — fraction of SuperEgo strength applied during hijack
+* `LIMBIC_HIJACK_MAX_TURNS = 3` — auto-exit after this many consecutive non-re-triggered turns
+
+---
