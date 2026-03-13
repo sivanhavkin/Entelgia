@@ -98,10 +98,11 @@ External knowledge pipeline triggered by Fixy:
 3. **Generate seed** (instruction + strategy)
 4. **Build prompt** (enhanced or legacy)
 5. **LLM generates response**
-6. **Log + print**
-7. **Update memory + drives**
-8. **Fixy intervention** (need-based or scheduled)
-9. **Dream/Reflection cycle** (if enabled)
+6. **Post-generation revision** (`revise_draft()`)
+7. **Log + print**
+8. **Update memory + drives**
+9. **Fixy intervention** (need-based or scheduled)
+10. **Dream/Reflection cycle** (if enabled)
 
 ### Pseudocode
 ```python
@@ -116,12 +117,16 @@ while session_active:
 
     prompt = speaker.build_prompt(seed, dialog_history)  # enhanced or legacy
 
-    out = LLM.generate(model=speaker.model, prompt=prompt)
+    raw_draft = LLM.generate(model=speaker.model, prompt=prompt)
+    speaker._last_raw_draft = raw_draft        # debug only — never stored in LTM
+    logger.debug("[%s] raw_draft: %s", speaker.name, raw_draft[:200])
+
+    out = revise_draft(raw_draft, speaker.name, topic=topic)  # revision layer
 
     dialog_history.append({"role": speaker.name, "text": out})
     log_turn(speaker.name, out, topic)
 
-    speaker.store_turn(out, topic)               # memory write
+    speaker.store_turn(out, topic)               # memory write (revised text only)
     speaker.update_drives_after_turn(...)        # state update
 
     maybe_fixy_intervene(dialog_history, turn)
@@ -1024,3 +1029,91 @@ call to `_build_compact_prompt` and as the `prev_topic` argument to
 `TOPIC_CLUSTERS` clusters** (56 topics, deduped), starting from the configured
 seed topic.  Previously the rotation was restricted to `TOPIC_CYCLE` (9 topics),
 which caused the system to repeat the same narrow set of topics indefinitely.
+
+---
+
+## 20) Post-Generation Revision Layer — `revise_draft()` (v2.9.1)
+
+### Overview
+
+Every agent response passes through a **post-generation revision layer** before it is displayed or stored.  The raw LLM draft is never shown directly; only the revised output is returned from `Agent.speak()`.
+
+```
+LLM draft  →  post-process  →  revise_draft()  →  display / memory
+```
+
+The revision layer is **rule-based and deterministic** — no additional LLM call is made.  It is cheap, fast, and has no latency impact on the dialogue loop.
+
+---
+
+### Revision Steps (applied in order)
+
+| Step | What it does |
+|---|---|
+| 1. Filler removal | Strips 16 boilerplate patterns (e.g. `"It is important to note that"`, `"Furthermore,"`, `"In conclusion,"`) |
+| 2. Deduplication | Splits the text into sentences; removes any sentence whose word-overlap with an already-kept sentence is ≥ `_DUPLICATE_THRESHOLD` (0.70) |
+| 3. Voice guards | Applies per-agent leading-word rules (see table below) |
+| 4. Sentence cap | Keeps at most `_MAX_REVISED_SENTENCES` (4) sentences |
+| 5. Punctuation fix | Appends `.` if the final character is not `.`, `!`, or `?` |
+
+If revision would produce an empty string (edge case), the original text is returned unchanged (safe fallback).
+
+---
+
+### Agent-Specific Voice Guards
+
+| Agent | Rule | Rationale |
+|---|---|---|
+| **Socrates** | Strip leading `therefore / thus / hence / clearly / obviously` | Socrates probes; he should not assert conclusions |
+| **Athena** | Strip leading `Fact:` / `Fact N:` labels | Athena synthesises; she should not list bare facts |
+| **Fixy** | Strip leading `perhaps / maybe / one could argue` | Fixy speaks directly; hedging openers undermine his diagnostic voice |
+
+---
+
+### Module-Level Constants
+
+| Constant | Value | Description |
+|---|---|---|
+| `_MIN_WORDS_FOR_REVISION` | `3` | Responses shorter than this are returned unchanged |
+| `_DUPLICATE_THRESHOLD` | `0.70` | Word-overlap ratio at or above which a sentence is treated as a near-duplicate |
+| `_MAX_REVISED_SENTENCES` | `4` | Hard cap on sentences per revised response |
+
+---
+
+### Raw Draft Handling
+
+- `Agent._last_raw_draft: str` — stores the pre-revision text for debug inspection only.  It is populated every turn inside `speak()` and logged at `DEBUG` level.
+- The raw draft is **never stored in long-term memory**.  `store_turn()` is called by `MainScript` after `speak()` returns, so it always receives the revised (not raw) text.
+- Raw draft is **never printed** to the console or API output.
+
+---
+
+### Helper Functions
+
+```python
+def _split_sentences(text: str) -> List[str]:
+    """Split text into sentences at [.!?] boundaries."""
+
+def _sentence_overlap(a: str, b: str) -> float:
+    """Word-overlap ratio between two sentences (0..1).
+    Used to identify near-duplicate sentences for deduplication."""
+
+def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
+    """Post-generation revision layer applied to every agent response.
+    Returns the revised text, or the original if revision produces nothing."""
+```
+
+---
+
+### Integration Point in `speak()`
+
+```python
+# ── Post-generation revision layer ──────────────────────────────
+self._last_raw_draft = out
+logger.debug("[%s] raw_draft: %s", self.name, out[:200] + ("…" if len(out) > 200 else ""))
+out = revise_draft(out, self.name, topic=_active_topic or "")
+# ────────────────────────────────────────────────────────────────
+return out
+```
+
+This block is the final step in `speak()`, after all other output transformations (superego rewrite, topic-anchor validation, drive-pressure word-cap, etc.).
