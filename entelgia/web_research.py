@@ -1213,7 +1213,7 @@ def maybe_add_web_context(
                 stored_count,
             )
 
-        context = build_research_context(bundle, scored)
+        context = build_research_context(bundle, scored, active_topic=topic or "")
 
         if topic and context:
             _topic_research_cache.add(topic)

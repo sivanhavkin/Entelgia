@@ -239,8 +239,9 @@ class TestBuildCompactPromptTopicAnchors:
         with patch.object(_meta, "CFG", cfg):
             prompt = agent._build_compact_prompt(seed, [])
 
-        assert "CURRENT TOPIC: AI alignment" in prompt
-        assert "must explicitly engage with at least one" in prompt
+        assert "Topic constraint:" in prompt
+        assert "The active topic is: AI alignment." in prompt
+        assert "must stay within this topic" in prompt
         assert "corrigibility" in prompt
         assert "reward hacking" in prompt
 
@@ -251,8 +252,8 @@ class TestBuildCompactPromptTopicAnchors:
         with patch.object(_meta, "CFG", cfg):
             prompt = agent._build_compact_prompt(seed, [])
 
-        assert "CURRENT TOPIC:" not in prompt
-        assert "must explicitly engage" not in prompt
+        assert "Topic constraint:" not in prompt
+        assert "The active topic is:" not in prompt
 
     def test_no_anchor_requirement_when_no_topic_in_seed(self):
         cfg = Config()
@@ -261,8 +262,8 @@ class TestBuildCompactPromptTopicAnchors:
         with patch.object(_meta, "CFG", cfg):
             prompt = agent._build_compact_prompt(seed, [])
 
-        assert "CURRENT TOPIC:" not in prompt
-        assert "must explicitly engage" not in prompt
+        assert "Topic constraint:" not in prompt
+        assert "The active topic is:" not in prompt
 
     def test_forbidden_carryover_injected_on_topic_change(self):
         cfg = Config()

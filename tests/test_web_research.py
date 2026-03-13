@@ -43,7 +43,7 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("Tell me about recent research on climate") is True
 
     def test_trigger_on_news(self):
-        assert fixy_should_search("What is the current news?") is True
+        assert fixy_should_search("What is the current research on this?") is True
 
     def test_trigger_on_find(self):
         assert fixy_should_search("Find paper on quantum computing") is True
@@ -52,7 +52,7 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("search for new studies") is True
 
     def test_trigger_on_today(self):
-        assert fixy_should_search("What happened today in AI?") is True
+        assert fixy_should_search("What AI studies were published recently?") is True
 
     def test_trigger_on_paper(self):
         assert fixy_should_search("Find me a paper on memory") is True
@@ -70,7 +70,7 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("cats and dogs love play time") is False
 
     def test_case_insensitive(self):
-        assert fixy_should_search("LATEST developments in robotics") is True
+        assert fixy_should_search("RESEARCH on modern robotics") is True
 
     def test_word_boundary_matching(self):
         # "searches" contains "search" as a substring but as a different word form
@@ -176,7 +176,7 @@ class TestFixyResearchTrigger:
         import logging
 
         with caplog.at_level(logging.INFO, logger="entelgia.fixy_research_trigger"):
-            fixy_should_search("Find the latest AI news")
+            fixy_should_search("Find the AI research on this topic")
         assert any("web search triggered by keyword:" in m for m in caplog.messages)
 
     def test_logs_trigger_keyword_on_dialogue_match(self, caplog):
@@ -215,10 +215,10 @@ class TestFindTrigger:
         assert result == "research"
 
     def test_returns_first_keyword_in_sentence(self):
-        # "recent" appears at position 0, before "sources" at position 7;
-        # position wins over alphabetical order ("sources" > "recent" alphabetically).
-        result = find_trigger("recent sources on some topic")
-        assert result == "recent"
+        # "sources" appears at position 0, before "references" at position 8;
+        # both score equally (score 1) so position wins.
+        result = find_trigger("sources and references on some topic")
+        assert result == "sources"
 
     def test_phrase_takes_priority_over_single_keyword(self):
         # "latest research" is a phrase; "latest" is also a standalone keyword
@@ -226,15 +226,16 @@ class TestFindTrigger:
         assert result == "latest research"
 
     def test_case_insensitive_keyword(self):
-        result = find_trigger("LATEST developments in robotics")
-        assert result == "latest"
+        result = find_trigger("RESEARCH on modern robotics")
+        assert result == "research"
 
     def test_returns_keyword_from_dialogue_prose(self):
-        # "latest" appears before "sources" in the text, so "latest" is returned.
+        # "research" (score 2) appears before "sources" (score 1) and also beats
+        # it on score, so "research" is returned.
         result = find_trigger(
-            "Athena, I think we need to check the latest sources on this."
+            "Athena, I think we need to check the research sources on this."
         )
-        assert result == "latest"
+        assert result == "research"
 
     def test_returns_none_for_agent_name_alone(self):
         # Agent names like "Athena" must not be trigger words
@@ -1372,30 +1373,38 @@ class TestTriggerCooldown:
     """Tests for the per-trigger cooldown in fixy_should_search."""
 
     def test_first_occurrence_triggers_search(self):
-        assert fixy_should_search("latest AI news") is True
+        assert fixy_should_search("new research paper") is True
 
     def test_same_trigger_within_cooldown_window_does_not_trigger(self):
         # First call fires the trigger
-        assert fixy_should_search("latest news") is True
+        assert fixy_should_search("research paper") is True
         # Subsequent calls within the cooldown window are suppressed
         for _ in range(5):
-            assert fixy_should_search("latest news") is False
+            assert fixy_should_search("research paper") is False
 
     def test_trigger_allowed_after_cooldown_expires(self):
         from entelgia import fixy_research_trigger as frt
 
-        assert fixy_should_search("latest news") is True
-        # Simulate cooldown expiry by winding the turn counter forward
-        frt._trigger_turn_counter += frt._COOLDOWN_TURNS
-        assert fixy_should_search("latest news") is True
+        assert fixy_should_search("research paper") is True
+        # Simulate both per-trigger and global cooldown expiry by winding the
+        # turn counter forward by the larger of the two windows.
+        frt._trigger_turn_counter += max(
+            frt._COOLDOWN_TURNS, frt._GLOBAL_SEARCH_COOLDOWN_TURNS
+        )
+        assert fixy_should_search("research paper") is True
 
     def test_different_triggers_are_independent(self):
-        # "latest" fires, then "recent" fires independently (no cross-keyword cooldown)
-        assert fixy_should_search("latest news") is True
-        assert fixy_should_search("recent study") is True
+        from entelgia import fixy_research_trigger as frt
+
+        # "arxiv" fires, then after the global cooldown expires a different
+        # trigger fires independently (no cross-keyword per-trigger cooldown).
+        assert fixy_should_search("arxiv paper") is True
+        # Advance past the global cooldown window so the next search is allowed.
+        frt._trigger_turn_counter += frt._GLOBAL_SEARCH_COOLDOWN_TURNS
+        assert fixy_should_search("new research paper") is True
 
     def test_cooldown_applies_to_dialogue_triggers(self):
-        # Fire "current" from dialogue
+        # Fire "current evidence" (a trigger phrase) from dialogue
         dialog = [
             {"role": "system", "text": "Start."},
             {"role": "Athena", "text": "We need current evidence."},
@@ -1407,10 +1416,120 @@ class TestTriggerCooldown:
     def test_clear_cooldown_resets_state(self):
         from entelgia.fixy_research_trigger import clear_trigger_cooldown
 
-        assert fixy_should_search("latest news") is True
-        assert fixy_should_search("latest news") is False
+        assert fixy_should_search("research paper") is True
+        assert fixy_should_search("research paper") is False
         clear_trigger_cooldown()
-        assert fixy_should_search("latest news") is True
+        assert fixy_should_search("research paper") is True
+
+
+# ---------------------------------------------------------------------------
+# Global cooldown
+# ---------------------------------------------------------------------------
+
+
+class TestGlobalCooldown:
+    """Tests for the global cooldown in fixy_should_search."""
+
+    def test_global_cooldown_blocks_search_after_first_trigger(self):
+        from entelgia import fixy_research_trigger as frt
+
+        # First search fires successfully
+        assert fixy_should_search("research paper") is True
+        # Immediately after, different trigger is still blocked by global cooldown
+        assert fixy_should_search("arxiv paper") is False
+
+    def test_global_cooldown_expires_after_n_turns(self):
+        from entelgia import fixy_research_trigger as frt
+
+        assert fixy_should_search("research paper") is True
+        # Advance exactly _GLOBAL_SEARCH_COOLDOWN_TURNS turns
+        frt._trigger_turn_counter += frt._GLOBAL_SEARCH_COOLDOWN_TURNS
+        # Search is now allowed again
+        assert fixy_should_search("arxiv paper") is True
+
+    def test_global_cooldown_blocked_within_window(self):
+        from entelgia import fixy_research_trigger as frt
+
+        assert fixy_should_search("research paper") is True
+        # Advance by less than the global cooldown window so the next call
+        # is still within the blocked window (turn gap will be < _GLOBAL_SEARCH_COOLDOWN_TURNS).
+        frt._trigger_turn_counter += frt._GLOBAL_SEARCH_COOLDOWN_TURNS - 2
+        # Still blocked
+        assert fixy_should_search("arxiv paper") is False
+
+    def test_clear_cooldown_resets_global_state(self):
+        from entelgia import fixy_research_trigger as frt
+        from entelgia.fixy_research_trigger import clear_trigger_cooldown
+
+        assert fixy_should_search("research paper") is True
+        # Would normally be blocked
+        assert fixy_should_search("arxiv paper") is False
+        # After reset, global cooldown is gone
+        clear_trigger_cooldown()
+        assert frt._last_global_search_turn is None
+        assert fixy_should_search("arxiv paper") is True
+
+    def test_global_cooldown_applies_to_fixy_reason_trigger(self):
+        from entelgia import fixy_research_trigger as frt
+
+        # Trigger once via fixy_reason
+        assert (
+            fixy_should_search(
+                "neutral",
+                fixy_reason="external_verification_needed",
+            )
+            is True
+        )
+        # A keyword-based trigger is blocked by global cooldown
+        assert fixy_should_search("research paper") is False
+
+    def test_global_cooldown_constant_is_five(self):
+        from entelgia import fixy_research_trigger as frt
+
+        assert frt._GLOBAL_SEARCH_COOLDOWN_TURNS == 5
+
+
+# ---------------------------------------------------------------------------
+# Weak trigger word blacklist
+# ---------------------------------------------------------------------------
+
+
+class TestWeakTriggerWords:
+    """Tests for the weak trigger word blacklist in find_trigger."""
+
+    def test_weak_keywords_alone_do_not_trigger(self):
+        from entelgia.fixy_research_trigger import find_trigger
+
+        for word in ("current", "recent", "today", "web", "internet", "update", "latest"):
+            assert find_trigger(word) is None, f"Expected None for weak word: {word!r}"
+
+    def test_weak_keyword_in_sentence_does_not_trigger(self):
+        from entelgia.fixy_research_trigger import find_trigger
+
+        # None of these standalone weak words should trigger a search
+        assert find_trigger("what is the latest?") is None
+        assert find_trigger("is this current?") is None
+        assert find_trigger("any recent updates?") is None
+
+    def test_trigger_phrase_containing_weak_word_still_triggers(self):
+        from entelgia.fixy_research_trigger import find_trigger
+
+        # "latest research" is a phrase in _TRIGGER_PHRASES – it should trigger
+        # even though "latest" alone is weak.
+        assert find_trigger("latest research on climate") == "latest research"
+
+    def test_strong_keyword_not_in_blacklist_still_triggers(self):
+        from entelgia.fixy_research_trigger import find_trigger
+
+        # "arxiv", "research", "epistemology" are strong keywords
+        assert find_trigger("arxiv paper") == "arxiv"
+        assert find_trigger("check the research") is not None
+
+    def test_fixy_should_search_rejects_weak_keyword_only(self):
+        # "latest" alone should no longer trigger a search
+        assert fixy_should_search("the latest") is False
+        assert fixy_should_search("web") is False
+        assert fixy_should_search("current") is False
 
 
 # ---------------------------------------------------------------------------
@@ -1914,7 +2033,7 @@ class TestBranchLevelDebugLogging:
         import logging
 
         # Seed contains the trigger keyword; dialogue turns are neutral.
-        seed = "Tell me about the latest developments in quantum computing."
+        seed = "Tell me about the research on quantum computing."
         dialog = [
             {"role": "system", "text": "Welcome to our debate."},
             {"role": "Socrates", "text": "I am curious about your perspective."},
@@ -1924,7 +2043,7 @@ class TestBranchLevelDebugLogging:
         with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
             result = fixy_should_search(seed, dialog_tail=dialog)
 
-        assert result is True, "Trigger should fire because seed contains 'latest'"
+        assert result is True, "Trigger should fire because seed contains 'research'"
 
         debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
 
@@ -2007,33 +2126,38 @@ class TestQueryCooldown:
 
     def test_same_query_within_cooldown_is_suppressed(self):
         """Same seed_text within cooldown window must not trigger twice."""
-        assert fixy_should_search("latest AI research") is True
-        assert fixy_should_search("latest AI research") is False
+        assert fixy_should_search("AI research paper") is True
+        assert fixy_should_search("AI research paper") is False
 
     def test_different_queries_are_independent(self):
-        """Two different seed texts with the same trigger word should each fire once."""
-        assert fixy_should_search("latest AI research") is True
+        """Two different seed texts with different trigger keywords each fire once,
+        once the global cooldown is no longer active between them."""
+        from entelgia import fixy_research_trigger as frt
+
+        assert fixy_should_search("AI research paper") is True
+        # Advance past the global cooldown window before trying the second query
+        frt._trigger_turn_counter += frt._GLOBAL_SEARCH_COOLDOWN_TURNS
         # Different query text – per-query cooldown should not block this
-        assert fixy_should_search("latest quantum computing") is True
+        assert fixy_should_search("quantum computing arxiv") is True
 
     def test_query_cooldown_expires(self):
         """Per-query cooldown must expire after _COOLDOWN_TURNS turns."""
         from entelgia import fixy_research_trigger as frt
 
-        assert fixy_should_search("latest AI research") is True
-        assert fixy_should_search("latest AI research") is False
-        # Advance the turn counter past the cooldown window
-        frt._trigger_turn_counter += frt._COOLDOWN_TURNS
-        assert fixy_should_search("latest AI research") is True
+        assert fixy_should_search("AI research paper") is True
+        assert fixy_should_search("AI research paper") is False
+        # Advance the turn counter past both the per-query and global cooldown windows
+        frt._trigger_turn_counter += max(frt._COOLDOWN_TURNS, frt._GLOBAL_SEARCH_COOLDOWN_TURNS)
+        assert fixy_should_search("AI research paper") is True
 
     def test_clear_cooldown_resets_query_state(self):
         """clear_trigger_cooldown must also clear per-query state."""
         from entelgia.fixy_research_trigger import clear_trigger_cooldown
 
-        assert fixy_should_search("latest AI research") is True
-        assert fixy_should_search("latest AI research") is False
+        assert fixy_should_search("AI research paper") is True
+        assert fixy_should_search("AI research paper") is False
         clear_trigger_cooldown()
-        assert fixy_should_search("latest AI research") is True
+        assert fixy_should_search("AI research paper") is True
 
 
 class TestSanitizedQueryCooldown:
@@ -2057,6 +2181,8 @@ class TestSanitizedQueryCooldown:
 
     def test_different_sanitized_queries_are_independent(self):
         """Different query_cooldown_key values must not share a cooldown slot."""
+        from entelgia import fixy_research_trigger as frt
+
         query_key1 = "self-awareness emerges ourselves lens identity truth"
         query_key2 = "credibility bias epistemic justification sources"
         # Use different seeds with different trigger keywords so per-trigger
@@ -2065,6 +2191,8 @@ class TestSanitizedQueryCooldown:
         seed2 = "TOPIC: sourcing — credibility of evidence matters for research"
 
         assert fixy_should_search(seed1, query_cooldown_key=query_key1) is True
+        # Advance past global cooldown so the second search is not blocked
+        frt._trigger_turn_counter += frt._GLOBAL_SEARCH_COOLDOWN_TURNS
         # Different query key → must be allowed through (per-query cooldown is independent)
         assert fixy_should_search(seed2, query_cooldown_key=query_key2) is True
 
@@ -2078,13 +2206,13 @@ class TestSanitizedQueryCooldown:
 
         assert fixy_should_search(seed1, query_cooldown_key=query_key) is True
         assert fixy_should_search(seed2, query_cooldown_key=query_key) is False
-        # Advance past cooldown window
-        frt._trigger_turn_counter += frt._COOLDOWN_TURNS
+        # Advance past both per-query and global cooldown windows
+        frt._trigger_turn_counter += max(frt._COOLDOWN_TURNS, frt._GLOBAL_SEARCH_COOLDOWN_TURNS)
         assert fixy_should_search(seed2, query_cooldown_key=query_key) is True
 
     def test_no_query_cooldown_key_falls_back_to_seed_text(self):
         """Without query_cooldown_key, per-query cooldown still uses seed_text as before."""
-        seed = "latest AI research"
+        seed = "AI research paper"
         assert fixy_should_search(seed) is True
         assert fixy_should_search(seed) is False
 

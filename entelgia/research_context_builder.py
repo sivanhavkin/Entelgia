@@ -77,6 +77,7 @@ def build_research_context(
     bundle: Dict[str, Any],
     scored_sources: List[Dict[str, Any]],
     max_sources: int = MAX_SOURCES,
+    active_topic: str = "",
 ) -> str:
     """Format a research bundle as an LLM-ready context block.
 
@@ -90,6 +91,10 @@ def build_research_context(
         ``url`` and ``credibility_score``, sorted descending by score.
     max_sources:
         Maximum number of sources to include (default 3).
+    active_topic:
+        Optional current dialogue topic string.  When provided, the context
+        block is prefixed with a framing sentence that reminds the LLM to use
+        the external information only when it directly supports the topic.
 
     Returns
     -------
@@ -126,4 +131,11 @@ def build_research_context(
         lines.append(f"  Summary Text: {summary}")
         lines.append("")
 
-    return "\n".join(lines).rstrip()
+    context = "\n".join(lines).rstrip()
+    if active_topic and context:
+        context = (
+            f"External information related to topic '{active_topic}'. "
+            "Use only if it helps address the topic directly.\n\n"
+            + context
+        )
+    return context

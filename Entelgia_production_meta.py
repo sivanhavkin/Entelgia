@@ -3111,6 +3111,12 @@ class Agent:
         drain = min(drain, CFG.energy_drain_max * 2.0)
         self.energy_level = max(0.0, self.energy_level - drain)
 
+    @staticmethod
+    def _extract_topic_from_seed(seed: str) -> str:
+        """Return the topic label from a structured seed string, or '' if absent."""
+        m = re.search(r"TOPIC:\s*([^\n]+)", seed)
+        return m.group(1).strip() if m else ""
+
     def _build_compact_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
@@ -3127,8 +3133,7 @@ class Agent:
         stm_tail = max(3, min(12, int(3 + ego / 2)))
 
         # Extract current topic from seed for topic gating
-        _topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-        _current_topic = _topic_match.group(1).strip() if _topic_match else ""
+        _current_topic = self._extract_topic_from_seed(user_seed)
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -3217,10 +3222,11 @@ class Agent:
         # ── Topic Anchors: require engagement with topic-specific concepts ──────
         _topic_anchors = TOPIC_ANCHORS.get(_current_topic, [])
         if _current_topic and _topic_anchors:
-            prompt += f"\nCURRENT TOPIC: {_current_topic}\n"
             prompt += (
-                "Your response must explicitly engage with at least one of the "
-                f"following concepts: {', '.join(_topic_anchors)}.\n"
+                f"\n\nTopic constraint:\n"
+                f"The active topic is: {_current_topic}.\n"
+                "Your response must stay within this topic.\n"
+                f"Use at least one of these concepts naturally: {', '.join(_topic_anchors)}.\n"
             )
 
         # ── Forbidden Carryover: block concepts from the previous topic ──────────
@@ -3256,12 +3262,11 @@ class Agent:
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
+        # Extract topic from seed (used for memory selection and topic anchors)
+        topic = self._extract_topic_from_seed(user_seed)
+
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
-            # Extract topic from seed
-            topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-            topic = topic_match.group(1) if topic_match else ""
-
             ltm = self.memory_integration.retrieve_relevant_memories(
                 agent_name=self.name,
                 current_topic=topic,
@@ -3335,6 +3340,22 @@ class Agent:
             web_context=web_context,
             topic_style=self.topic_style,
         )
+
+        # ── Topic Anchors: inject topic constraint before generation ──────────
+        _topic_anchors_enh = TOPIC_ANCHORS.get(topic, [])
+        if topic and _topic_anchors_enh:
+            topic_constraint = (
+                f"\n\nTopic constraint:\n"
+                f"The active topic is: {topic}.\n"
+                "Your response must stay within this topic.\n"
+                f"Use at least one of these concepts naturally: {', '.join(_topic_anchors_enh)}.\n"
+            )
+            if "\nRespond now:\n" in prompt:
+                prompt = prompt.replace(
+                    "\nRespond now:\n", topic_constraint + "\nRespond now:\n"
+                )
+            else:
+                prompt += topic_constraint
 
         return prompt
 
