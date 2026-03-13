@@ -584,7 +584,7 @@ pytest tests/ -v
 | Version | Status | Notes |
 |---------|--------|-------|
 | **v3.0.0** | ✅ **Latest** | current |
-| **v2.8.1** | ✅ **Stable** | previous stable release |
+| **v2.8.1** | ⚠️ Superseded |  Use v3.0.0 instead |
 | **v2.8.0** | ⚠️ Superseded | Use v3.0.0 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
