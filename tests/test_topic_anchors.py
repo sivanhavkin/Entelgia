@@ -40,7 +40,6 @@ from Entelgia_production_meta import (
     _validate_topic_compliance,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
@@ -106,9 +105,7 @@ class TestTopicAnchors:
     def test_every_topic_cluster_topic_has_anchors(self):
         """Every topic in TOPIC_CLUSTERS must appear in TOPIC_ANCHORS."""
         all_cluster_topics = {
-            topic
-            for topics in TOPIC_CLUSTERS.values()
-            for topic in topics
+            topic for topics in TOPIC_CLUSTERS.values() for topic in topics
         }
         missing = all_cluster_topics - set(TOPIC_ANCHORS.keys())
         assert not missing, f"Missing TOPIC_ANCHORS entries for: {missing}"
@@ -122,9 +119,9 @@ class TestTopicAnchors:
         """All anchor keywords must be non-empty strings."""
         for topic, anchors in TOPIC_ANCHORS.items():
             for kw in anchors:
-                assert isinstance(kw, str) and kw.strip(), (
-                    f"Invalid anchor keyword {kw!r} in topic {topic!r}"
-                )
+                assert (
+                    isinstance(kw, str) and kw.strip()
+                ), f"Invalid anchor keyword {kw!r} in topic {topic!r}"
 
     def test_ai_alignment_anchors_match_spec(self):
         """AI alignment anchors must include the exact terms from the problem spec."""
@@ -139,9 +136,9 @@ class TestTopicAnchors:
             "human intent",
         }
         actual = set(TOPIC_ANCHORS.get("AI alignment", []))
-        assert required.issubset(actual), (
-            f"AI alignment anchors missing required terms: {required - actual}"
-        )
+        assert required.issubset(
+            actual
+        ), f"AI alignment anchors missing required terms: {required - actual}"
 
     def test_risk_and_decision_making_anchors_include_broad_terms(self):
         """Risk and decision making anchors must include broader vocabulary
@@ -155,13 +152,14 @@ class TestTopicAnchors:
             "reliability",
         }
         actual = set(TOPIC_ANCHORS.get("Risk and decision making", []))
-        assert required.issubset(actual), (
-            f"Risk and decision making anchors missing broad terms: {required - actual}"
-        )
+        assert required.issubset(
+            actual
+        ), f"Risk and decision making anchors missing broad terms: {required - actual}"
 
     def test_risk_and_decision_making_anchors_match_autonomous_vehicle_response(self):
         """A response about autonomous vehicle design risk tradeoffs must match
-        the Risk and decision making anchors (regression for TOPIC-MISMATCH false positive)."""
+        the Risk and decision making anchors (regression for TOPIC-MISMATCH false positive).
+        """
         av_response = (
             "In analyzing the design of autonomous vehicles, I observe a tradeoff between "
             "robust architectural redundancy and real-time monitoring capabilities. While "
@@ -173,9 +171,9 @@ class TestTopicAnchors:
             "excessive cost or market disruption."
         )
         anchors = TOPIC_ANCHORS.get("Risk and decision making", [])
-        assert _contains_any(av_response, anchors), (
-            "Autonomous vehicle risk-tradeoff response should match Risk and decision making anchors"
-        )
+        assert _contains_any(
+            av_response, anchors
+        ), "Autonomous vehicle risk-tradeoff response should match Risk and decision making anchors"
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +274,9 @@ class TestBuildCompactPromptTopicAnchors:
         assert "Do NOT reuse concepts from previous discussions" in prompt
         # Autonomous systems anchors should appear as forbidden
         for concept in TOPIC_ANCHORS["Autonomous systems"]:
-            assert concept in prompt, f"Expected forbidden concept {concept!r} in prompt"
+            assert (
+                concept in prompt
+            ), f"Expected forbidden concept {concept!r} in prompt"
 
     def test_no_forbidden_carryover_when_topic_unchanged(self):
         cfg = Config()
@@ -323,7 +323,9 @@ class TestTopicMismatchPersistWarning:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        persist_msgs = [r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message]
+        persist_msgs = [
+            r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message
+        ]
         assert persist_msgs, (
             "Expected [TOPIC-MISMATCH-PERSIST] warning when regenerated response "
             "also lacks required topic anchors"
@@ -343,7 +345,9 @@ class TestTopicMismatchPersistWarning:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        persist_msgs = [r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message]
+        persist_msgs = [
+            r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message
+        ]
         assert not persist_msgs, (
             "Expected no [TOPIC-MISMATCH-PERSIST] warning when regenerated "
             "response satisfies topic anchors"
@@ -373,7 +377,9 @@ class TestTopicHardRecovery:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        recovery_msgs = [r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message]
+        recovery_msgs = [
+            r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message
+        ]
         assert recovery_msgs, (
             "Expected [TOPIC-HARD-RECOVERY] warning when both initial and "
             "regenerated responses lack required topic anchors"
@@ -413,20 +419,22 @@ class TestTopicHardRecovery:
         """The output returned by speak() after hard recovery must be the
         response from the third (strict) LLM call, not the second generic one."""
         agent = _make_agent()
-        hard_recovery_text = "Corrigibility ensures AI systems remain correctable by humans."
+        hard_recovery_text = (
+            "Corrigibility ensures AI systems remain correctable by humans."
+        )
         agent.llm.generate.side_effect = [
             "Redundancy and real-time monitoring prevent failures.",  # initial
             "Redundancy and real-time monitoring prevent failures.",  # regen
-            hard_recovery_text,                                       # hard recovery
+            hard_recovery_text,  # hard recovery
         ]
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
             with patch.object(_meta, "CFG", Config()):
                 result = agent.speak(seed, self._PRIOR_TURN)
 
-        assert hard_recovery_text in result, (
-            "Expected the hard-recovery response to be used as the final output"
-        )
+        assert (
+            hard_recovery_text in result
+        ), "Expected the hard-recovery response to be used as the final output"
 
     def test_no_hard_recovery_when_regen_succeeds(self, caplog):
         """[TOPIC-HARD-RECOVERY] must NOT be logged when the regenerated
@@ -441,7 +449,9 @@ class TestTopicHardRecovery:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        recovery_msgs = [r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message]
+        recovery_msgs = [
+            r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message
+        ]
         assert not recovery_msgs, (
             "Expected no [TOPIC-HARD-RECOVERY] when the regenerated response "
             "satisfies the anchor check"
@@ -466,9 +476,9 @@ class TestTopicHardRecovery:
         hard_prompt = captured_prompts[2]
         expected_anchors = TOPIC_ANCHORS["AI alignment"][:5]
         for anchor in expected_anchors:
-            assert anchor in hard_prompt, (
-                f"Expected anchor {anchor!r} in hard-recovery prompt"
-            )
+            assert (
+                anchor in hard_prompt
+            ), f"Expected anchor {anchor!r} in hard-recovery prompt"
 
 
 # ---------------------------------------------------------------------------
@@ -521,9 +531,9 @@ class TestTopicMismatchFirstTurn:
         persist_msgs = [
             r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message
         ]
-        assert not persist_msgs, (
-            "Expected no [TOPIC-MISMATCH-PERSIST] warning on the agent's first turn"
-        )
+        assert (
+            not persist_msgs
+        ), "Expected no [TOPIC-MISMATCH-PERSIST] warning on the agent's first turn"
 
     def test_validation_runs_from_second_turn_onwards(self, caplog):
         """[TOPIC-MISMATCH] warning IS emitted once the agent has a prior turn."""
@@ -635,9 +645,9 @@ class TestValidateTopicCompliance:
         result = _validate_topic_compliance(
             text, "AI alignment", prev_topic="Autonomous systems"
         )
-        assert result, (
-            "Expected compliance pass when current-topic anchors are not fewer than prev-topic"
-        )
+        assert (
+            result
+        ), "Expected compliance pass when current-topic anchors are not fewer than prev-topic"
 
     def test_layer2_skipped_when_prev_topic_empty(self):
         """Layer 2: carryover check is skipped when prev_topic is empty."""
@@ -675,27 +685,23 @@ class TestTopicFallbackTemplates:
 
     def test_every_key_has_non_empty_string(self):
         for topic, text in TOPIC_FALLBACK_TEMPLATES.items():
-            assert isinstance(text, str) and text.strip(), (
-                f"Empty fallback template for topic {topic!r}"
-            )
+            assert (
+                isinstance(text, str) and text.strip()
+            ), f"Empty fallback template for topic {topic!r}"
 
     def test_every_fallback_passes_compliance(self):
         """Every fallback template must pass _validate_topic_compliance for its own topic."""
         for topic, text in TOPIC_FALLBACK_TEMPLATES.items():
             if TOPIC_ANCHORS.get(topic):
-                assert _validate_topic_compliance(text, topic), (
-                    f"Fallback template for {topic!r} does not pass its own topic compliance check"
-                )
+                assert _validate_topic_compliance(
+                    text, topic
+                ), f"Fallback template for {topic!r} does not pass its own topic compliance check"
 
     def test_all_topic_clusters_topics_covered(self):
         """Every topic in TOPIC_CLUSTERS should have a fallback template."""
-        all_cluster_topics = {
-            t for topics in TOPIC_CLUSTERS.values() for t in topics
-        }
+        all_cluster_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
         missing = all_cluster_topics - set(TOPIC_FALLBACK_TEMPLATES.keys())
-        assert not missing, (
-            f"Missing TOPIC_FALLBACK_TEMPLATES entries for: {missing}"
-        )
+        assert not missing, f"Missing TOPIC_FALLBACK_TEMPLATES entries for: {missing}"
 
 
 # ---------------------------------------------------------------------------
@@ -720,10 +726,12 @@ class TestTopicFallbackPipeline:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        fallback_msgs = [r.message for r in caplog.records if "TOPIC-FALLBACK" in r.message]
-        assert fallback_msgs, (
-            "Expected [TOPIC-FALLBACK] warning when hard recovery also fails"
-        )
+        fallback_msgs = [
+            r.message for r in caplog.records if "TOPIC-FALLBACK" in r.message
+        ]
+        assert (
+            fallback_msgs
+        ), "Expected [TOPIC-FALLBACK] warning when hard recovery also fails"
 
     def test_fallback_template_used_as_output(self, caplog):
         """The final output after total failure must be the fallback template."""
@@ -755,13 +763,15 @@ class TestTopicFallbackPipeline:
             with patch.object(_meta, "CFG", Config()):
                 result = agent.speak(seed, self._PRIOR_TURN)
 
-        fallback_msgs = [r.message for r in caplog.records if "TOPIC-FALLBACK" in r.message]
-        assert not fallback_msgs, (
-            "Expected no [TOPIC-FALLBACK] when hard recovery response passes validation"
-        )
-        assert "Corrigibility" in result, (
-            "Expected hard-recovery response to be used when it passes validation"
-        )
+        fallback_msgs = [
+            r.message for r in caplog.records if "TOPIC-FALLBACK" in r.message
+        ]
+        assert (
+            not fallback_msgs
+        ), "Expected no [TOPIC-FALLBACK] when hard recovery response passes validation"
+        assert (
+            "Corrigibility" in result
+        ), "Expected hard-recovery response to be used when it passes validation"
 
     def test_generic_fallback_for_unknown_topic(self, caplog):
         """When topic has no template entry, a generic fallback sentence is used."""
@@ -774,14 +784,15 @@ class TestTopicFallbackPipeline:
         seed = f"TOPIC: {fake_topic}\nDiscuss."
         # Remove from TOPIC_FALLBACK_TEMPLATES temporarily to test generic fallback
         import Entelgia_production_meta as _meta_module
+
         original = _meta_module.TOPIC_FALLBACK_TEMPLATES.pop(fake_topic, None)
         try:
             with caplog.at_level(logging.WARNING, logger="entelgia"):
                 with patch.object(_meta, "CFG", Config()):
                     result = agent.speak(seed, self._PRIOR_TURN)
-            assert fake_topic in result, (
-                "Expected the generic fallback to mention the topic name"
-            )
+            assert (
+                fake_topic in result
+            ), "Expected the generic fallback to mention the topic name"
         finally:
             if original is not None:
                 _meta_module.TOPIC_FALLBACK_TEMPLATES[fake_topic] = original
@@ -814,12 +825,12 @@ class TestHardRecoveryPromptEnhancements:
 
         assert len(captured_prompts) >= 3, "Expected at least 3 LLM calls"
         hard_prompt = captured_prompts[2]
-        assert "empirical evidence suggests" in hard_prompt, (
-            "Expected 'empirical evidence suggests' in hard-recovery forbidden list"
-        )
-        assert "holistic view" in hard_prompt, (
-            "Expected 'holistic view' in hard-recovery forbidden list"
-        )
+        assert (
+            "empirical evidence suggests" in hard_prompt
+        ), "Expected 'empirical evidence suggests' in hard-recovery forbidden list"
+        assert (
+            "holistic view" in hard_prompt
+        ), "Expected 'holistic view' in hard-recovery forbidden list"
 
     def test_hard_recovery_requires_two_anchors(self, caplog):
         """Hard recovery prompt must say 'at least two' topic anchors, not 'at least one'."""
@@ -838,9 +849,9 @@ class TestHardRecoveryPromptEnhancements:
 
         assert len(captured_prompts) >= 3
         hard_prompt = captured_prompts[2]
-        assert "at least two" in hard_prompt, (
-            "Expected hard-recovery prompt to require 'at least two' topic anchors"
-        )
+        assert (
+            "at least two" in hard_prompt
+        ), "Expected hard-recovery prompt to require 'at least two' topic anchors"
 
 
 # ---------------------------------------------------------------------------
@@ -853,19 +864,15 @@ class TestTopicPoolCoverage:
 
     def test_topic_cycle_is_subset_of_topic_clusters(self):
         """Every topic in TOPIC_CYCLE must appear in TOPIC_CLUSTERS."""
-        all_cluster_topics = {
-            t for topics in TOPIC_CLUSTERS.values() for t in topics
-        }
+        all_cluster_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
         missing = set(TOPIC_CYCLE) - all_cluster_topics
-        assert not missing, (
-            f"TOPIC_CYCLE entries not found in TOPIC_CLUSTERS: {missing}"
-        )
+        assert (
+            not missing
+        ), f"TOPIC_CYCLE entries not found in TOPIC_CLUSTERS: {missing}"
 
     def test_topic_clusters_has_more_topics_than_topic_cycle(self):
         """TOPIC_CLUSTERS must have significantly more topics than TOPIC_CYCLE."""
-        all_cluster_topics = {
-            t for topics in TOPIC_CLUSTERS.values() for t in topics
-        }
+        all_cluster_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
         assert len(all_cluster_topics) > len(TOPIC_CYCLE), (
             "TOPIC_CLUSTERS should define more topics than TOPIC_CYCLE; "
             f"got {len(all_cluster_topics)} vs {len(TOPIC_CYCLE)}"
@@ -873,11 +880,8 @@ class TestTopicPoolCoverage:
 
     def test_all_topic_clusters_topics_have_anchors(self):
         """Every topic in TOPIC_CLUSTERS must have a TOPIC_ANCHORS entry."""
-        all_cluster_topics = {
-            t for topics in TOPIC_CLUSTERS.values() for t in topics
-        }
+        all_cluster_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
         missing_anchors = all_cluster_topics - set(TOPIC_ANCHORS.keys())
-        assert not missing_anchors, (
-            f"Topics in TOPIC_CLUSTERS missing TOPIC_ANCHORS entries: {missing_anchors}"
-        )
-
+        assert (
+            not missing_anchors
+        ), f"Topics in TOPIC_CLUSTERS missing TOPIC_ANCHORS entries: {missing_anchors}"
