@@ -244,7 +244,7 @@ class TestRawDraftAttribute:
             LanguageCore,
         )
 
-        cfg = Config()
+        cfg = Config(web_research_enabled=False)
         llm = MagicMock()
         # revise_draft may differ from raw if filler is present
         raw = "It is important to note that reality is constructed. Furthermore, it shifts."
