@@ -599,14 +599,43 @@ See [Contributing.md](Contributing.md) for guidelines on:
 
 ### What is the testing strategy?
 
-Entelgia has comprehensive test coverage:
-- **5 enhanced dialogue tests**: Speaker selection, seed variety, context enrichment, Fixy interventions, persona formatting
-- **19 memory security tests**: Signature creation, validation, security properties
-- **CI/CD pipeline**: Automated quality checks on every commit
+Entelgia has comprehensive test coverage across **721 tests** (720 passed, 1 skipped) in **23 suites**:
 
-Run tests:
+| Suite | Tests |
+|---|---|
+| `test_web_research.py` | 181 |
+| `test_topic_anchors.py` | 59 |
+| `test_dialogue_metrics.py` | 58 |
+| `test_long_term_memory.py` | 43 |
+| `test_topic_style.py` | 39 |
+| `test_energy_regulation.py` | 35 |
+| `test_revise_draft.py` | 32 |
+| `test_context_manager.py` | 30 |
+| `test_loop_guard.py` | 30 |
+| `test_ablation_study.py` | 27 |
+| `test_drive_pressure.py` | 23 |
+| `test_drive_correlations.py` | 21 |
+| `test_superego_critique.py` | 21 |
+| `test_memory_security.py` | 19 |
+| `test_web_tool.py` | 18 |
+| `test_behavioral_rules.py` | 18 |
+| `test_limbic_hijack.py` | 15 |
+| `test_detect_repetition_semantic.py` | 13 |
+| `test_seed_topic_clusters.py` | 12 |
+| `test_enable_observer.py` | 10 |
+| `test_enhanced_dialogue.py` | 11 |
+| `test_memory_signing_migration.py` | 5 |
+| `test_demo_dialogue.py` | 1 |
+
+- **CI/CD pipeline**: Automated quality, security, and build checks on every commit
+
+Run all tests:
 ```bash
-python tests/test_enhanced_dialogue.py
+pytest tests/ -v
+```
+
+Run a specific suite:
+```bash
 pytest tests/test_memory_security.py -v
 ```
 
@@ -623,16 +652,30 @@ pytest tests/test_memory_security.py -v
 
 ```
 Entelgia/
-├── Entelgia_production_meta.py    # Main system file
+├── Entelgia_production_meta.py    # Main system file (Socrates, Athena, Fixy agents)
+├── Entelgia_production_meta_200t.py  # 200-turn production variant
 ├── entelgia/                       # Enhanced dialogue package
-│   ├── dialogue_engine.py
-│   ├── enhanced_personas.py
-│   ├── context_manager.py
-│   └── fixy_interactive.py
+│   ├── __init__.py
+│   ├── ablation_study.py          # 4-condition reproducible ablation study
+│   ├── context_manager.py         # Smart context enrichment + memory integration
+│   ├── dialogue_engine.py         # Dynamic speaker selection + seed strategies
+│   ├── dialogue_metrics.py        # Circularity, progress, intervention utility
+│   ├── energy_regulation.py       # Dream cycle + energy / hallucination regulation
+│   ├── enhanced_personas.py       # Rich persona definitions (Socrates, Athena, Fixy)
+│   ├── fixy_interactive.py        # Fixy need-based intervention + repetition detection
+│   ├── fixy_research_trigger.py   # Keyword-based search trigger detection
+│   ├── long_term_memory.py        # DefenseMechanism, FreudianSlip, SelfReplication
+│   ├── loop_guard.py              # DialogueLoopDetector, PhraseBanList, DialogueRewriter
+│   ├── memory_security.py         # HMAC-SHA256 memory signing helpers
+│   ├── research_context_builder.py  # Format research bundle as LLM context
+│   ├── source_evaluator.py        # Heuristic credibility scoring for web sources
+│   ├── topic_style.py             # Topic-cluster → reasoning style mapping
+│   ├── web_research.py            # maybe_add_web_context integration + memory storage
+│   └── web_tool.py                # DuckDuckGo search + BeautifulSoup page extraction
 ├── docs/                           # Documentation
-├── tests/                          # Test suite
-├── install.py                      # Automated installer
-├── demo_enhanced_dialogue.py       # Quick demo
+├── tests/                          # Test suite (721 tests in 23 suites)
+├── scripts/                        # Utility scripts (install, validate, demo)
+├── Assets/                         # Images, logos, and media
 └── README.md                       # Main documentation
 ```
 

@@ -894,7 +894,7 @@ which caused the system to repeat the same narrow set of topics indefinitely.
 
 ---
 
-## 17) Post-Generation Revision Layer — `revise_draft()` (v2.9.1)
+## 17) Post-Generation Revision Layer — `revise_draft()` (v2.9.0)
 
 ### Overview
 
