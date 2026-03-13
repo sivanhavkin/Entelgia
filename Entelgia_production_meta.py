@@ -1411,9 +1411,15 @@ class Config:
     """Global configuration object with validation."""
 
     ollama_url: str = "http://localhost:11434/api/generate"
-    model_socrates: str = "phi3:latest"
-    model_athena: str = "phi3:latest"
-    model_fixy: str = "phi3:latest"
+    model_socrates: str = field(
+        default_factory=lambda: os.environ.get("MODEL_SOCRATES", "phi3:latest")
+    )
+    model_athena: str = field(
+        default_factory=lambda: os.environ.get("MODEL_ATHENA", "phi3:latest")
+    )
+    model_fixy: str = field(
+        default_factory=lambda: os.environ.get("MODEL_FIXY", "")
+    )
     data_dir: str = "entelgia_data"
     db_path: str = "entelgia_data/entelgia_memory.sqlite"
     csv_log_path: str = "entelgia_data/entelgia_log.csv"
@@ -1485,6 +1491,8 @@ class Config:
         child loggers that have not been given an explicit level, because they
         propagate records up to the root.
         """
+        if not self.model_fixy:
+            self.model_fixy = self.model_socrates
         if self.cache_size < 100:
             raise ValueError("cache_size must be >= 100")
         if self.max_turns < 1:
