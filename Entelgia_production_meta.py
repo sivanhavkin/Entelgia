@@ -495,7 +495,8 @@ _TOPIC_RELEVANCE_MIN_HITS: int = 1
 def _topic_relevance_score(text: str, anchors: list[str]) -> int:
     """Return the count of distinct anchor terms found in *text* (case-insensitive)."""
     text_lower = text.lower()
-    return sum(1 for anchor in anchors if anchor.lower() in text_lower)
+    anchors_lower = [a.lower() for a in anchors]
+    return sum(1 for anchor in anchors_lower if anchor in text_lower)
 
 
 def _validate_topic_compliance(text: str, topic: str, prev_topic: str = "") -> bool:
@@ -2779,7 +2780,9 @@ class Agent:
         _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
         _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
         _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
-        if own_texts and _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
+        if own_texts and _active_topic and _active_anchors and not _validate_topic_compliance(
+            out, _active_topic, prev_topic=self._last_topic
+        ):
             logger.warning(
                 "[TOPIC-MISMATCH] agent=%s topic=%r response did not contain required topic anchors – regenerating",
                 self.name,
@@ -2792,7 +2795,7 @@ class Agent:
                 or out
             )
             out = validate_output(_regen_response)
-            if _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
+            if not _validate_topic_compliance(out, _active_topic, prev_topic=self._last_topic):
                 logger.warning(
                     "[TOPIC-MISMATCH-PERSIST] agent=%s topic=%r regenerated response also did not contain required topic anchors",
                     self.name,
@@ -2805,15 +2808,22 @@ class Agent:
                     "underlying assumptions",
                     "ethical considerations",
                     "flexible systems",
+                    "empirical evidence suggests",
+                    "holistic view",
                 )
                 _hard_prompt = (
                     f"STRICT TOPIC ENFORCEMENT\n"
                     f"Current topic: {_active_topic}\n"
-                    f"Required topic anchors (use at least one): {', '.join(_hard_anchors)}\n"
+                    f"Required topic anchors (use at least two): {', '.join(_hard_anchors)}\n"
                     f"You MUST make one concrete claim directly about this topic.\n"
                     f"Do NOT use generic abstractions such as: "
                     f"{', '.join(_forbidden_abstractions)}.\n"
                     f"Respond in 2-4 sentences only.\n"
+                )
+                logger.warning(
+                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r forcing strict anchor prompt – short mode",
+                    self.name,
+                    _active_topic,
                 )
                 _hard_response = (
                     self.llm.generate(
@@ -2821,12 +2831,20 @@ class Agent:
                     )
                     or out
                 )
-                out = validate_output(_hard_response)
-                logger.warning(
-                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r forcing strict anchor prompt – short mode",
-                    self.name,
-                    _active_topic,
-                )
+                _hard_out = validate_output(_hard_response)
+                if _validate_topic_compliance(_hard_out, _active_topic, prev_topic=self._last_topic):
+                    out = _hard_out
+                else:
+                    # ── Fallback: use topic-safe template when all recovery fails ─
+                    logger.warning(
+                        "[TOPIC-FALLBACK] agent=%s topic=%r hard recovery also failed – using topic-safe fallback template",
+                        self.name,
+                        _active_topic,
+                    )
+                    out = TOPIC_FALLBACK_TEMPLATES.get(
+                        _active_topic,
+                        f"This question touches directly on {_active_topic}.",
+                    )
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
@@ -3992,11 +4010,22 @@ class MainScript:
             _seed_cluster,
             first_topic,
         )
-        if first_topic in TOPIC_CYCLE:
-            idx = TOPIC_CYCLE.index(first_topic)
-            topic_list = TOPIC_CYCLE[idx:] + TOPIC_CYCLE[:idx]
+        # Build the full topic pool from all TOPIC_CLUSTERS topics (deduped, order-preserving).
+        # Previously this used only the 9-entry TOPIC_CYCLE, which prevented the system from
+        # ever discussing the broader set of 56 defined topics.
+        _seen_topics: set[str] = set()
+        _all_topics: list[str] = []
+        for _cluster_topics in TOPIC_CLUSTERS.values():
+            for _t in _cluster_topics:
+                if _t not in _seen_topics:
+                    _seen_topics.add(_t)
+                    _all_topics.append(_t)
+
+        if first_topic in _all_topics:
+            idx = _all_topics.index(first_topic)
+            topic_list = _all_topics[idx:] + _all_topics[:idx]
         else:
-            topic_list = [first_topic] + TOPIC_CYCLE[:]
+            topic_list = [first_topic] + _all_topics
         topicman = TopicManager(topic_list, rotate_every_rounds=1, shuffle=False)
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
@@ -4212,6 +4241,29 @@ class MainScript:
                     intervention = self.interactive_fixy.generate_intervention(
                         self.dialog, reason, mode=fixy_mode
                     )
+                    # Apply same topic compliance validation as Socrates/Athena
+                    _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
+                    if topic_label and TOPIC_ANCHORS.get(topic_label) and not _validate_topic_compliance(
+                        intervention, topic_label, prev_topic=_fixy_prev_topic
+                    ):
+                        logger.warning(
+                            "[TOPIC-MISMATCH] agent=Fixy topic=%r intervention did not match topic – regenerating",
+                            topic_label,
+                        )
+                        intervention = self.interactive_fixy.generate_intervention(
+                            self.dialog, reason, mode=fixy_mode
+                        )
+                        if not _validate_topic_compliance(
+                            intervention, topic_label, prev_topic=_fixy_prev_topic
+                        ):
+                            logger.warning(
+                                "[TOPIC-FALLBACK] agent=Fixy topic=%r intervention still off-topic – using fallback",
+                                topic_label,
+                            )
+                            intervention = TOPIC_FALLBACK_TEMPLATES.get(
+                                topic_label,
+                                f"Let us stay focused on {topic_label}.",
+                            )
                     self.dialog.append({"role": "Fixy", "text": intervention})
                     self.fixy_agent.store_turn(
                         intervention, topic_label, source="reflection"

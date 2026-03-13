@@ -492,6 +492,334 @@ def _contains_any(text: str, concepts: list[str]) -> bool:
     return any(concept.lower() in text_lower for concept in concepts)
 
 
+# Minimum number of distinct current-topic anchor terms required in a response.
+_TOPIC_RELEVANCE_MIN_HITS: int = 1
+
+
+def _topic_relevance_score(text: str, anchors: list[str]) -> int:
+    """Return the count of distinct anchor terms found in *text* (case-insensitive)."""
+    text_lower = text.lower()
+    anchors_lower = [a.lower() for a in anchors]
+    return sum(1 for anchor in anchors_lower if anchor in text_lower)
+
+
+def _validate_topic_compliance(text: str, topic: str, prev_topic: str = "") -> bool:
+    """3-layer topic compliance validator.
+
+    Layer 1 – required topic anchors:
+        At least one current-topic anchor term must appear in *text*.
+
+    Layer 2 – forbidden carryover:
+        When a previous topic exists, the response must not be dominated by
+        previous-topic anchors.  Specifically: if 2 or more previous-topic
+        anchor terms are present AND fewer current-topic anchor hits than
+        previous-topic hits, the response is considered carryover and fails.
+
+    Layer 3 – semantic relevance score:
+        The number of distinct current-topic anchor hits must meet
+        ``_TOPIC_RELEVANCE_MIN_HITS`` (default 1).
+
+    Returns ``True`` when all three layers pass.
+    """
+    anchors = TOPIC_ANCHORS.get(topic, [])
+    if not anchors:
+        return True  # no anchors defined; pass by default
+
+    # Layer 1
+    current_hits = _topic_relevance_score(text, anchors)
+    if current_hits == 0:
+        return False
+
+    # Layer 2 – carryover check
+    if prev_topic and prev_topic != topic:
+        prev_anchors = TOPIC_ANCHORS.get(prev_topic, [])
+        if prev_anchors:
+            prev_hits = _topic_relevance_score(text, prev_anchors)
+            if prev_hits >= 2 and current_hits < prev_hits:
+                return False
+
+    # Layer 3 – relevance score
+    if current_hits < _TOPIC_RELEVANCE_MIN_HITS:
+        return False
+
+    return True
+
+
+# Topic-safe fallback templates used when all recovery attempts fail.
+# Each value is a short (2-3 sentence) response that is guaranteed to
+# mention the topic's required anchor concepts.
+TOPIC_FALLBACK_TEMPLATES: dict[str, str] = {
+    # philosophy
+    "Freedom": (
+        "Freedom is defined by the tension between autonomy and constraint. "
+        "Without the capacity for genuine choice, sovereignty over one's own life remains illusory."
+    ),
+    "Truth and knowledge": (
+        "Knowledge requires more than belief — it demands justification grounded in evidence. "
+        "Epistemology probes whether certainty is ever fully attainable or merely approached."
+    ),
+    "Free will vs determinism": (
+        "Determinism holds that causality governs every event, leaving no room for uncaused agency. "
+        "The question is whether responsibility survives in a fully deterministic world."
+    ),
+    "Identity and the self": (
+        "Personal identity depends on memory and continuity of consciousness over time. "
+        "Without a stable selfhood, authenticity itself becomes uncertain."
+    ),
+    "Nature of justice": (
+        "Justice demands both fairness in distribution and accountability for wrongdoing. "
+        "Rights and punishment must be balanced by the demands of equality and morality."
+    ),
+    "Meaning of consciousness": (
+        "Consciousness involves subjective experience — the qualia that no third-person account fully captures. "
+        "Phenomenology investigates how awareness relates to the mind-body relationship."
+    ),
+    "Limits of reason": (
+        "Rationality is bounded by cognitive limits and irreducible uncertainty. "
+        "Paradox and fallibility remind us that intuition often fills the gaps reason cannot bridge."
+    ),
+    "Nature of wisdom": (
+        "Wisdom is not mere knowledge but the prudent application of insight through lived experience. "
+        "Judgment and contemplation distinguish the wise from the merely informed."
+    ),
+    # psychology
+    "Memory and identity": (
+        "Autobiographical memory shapes the narrative self and underpins identity continuity. "
+        "Recollection is reconstructive, making forgetting a constant threat to stable selfhood."
+    ),
+    "Fear and decision making": (
+        "Fear activates the amygdala and triggers threat response, biasing decision-making toward risk aversion. "
+        "Cognitive appraisal determines whether anxiety aids or undermines judgment."
+    ),
+    "Habit formation": (
+        "Habits are encoded through the cue-routine-reward loop and reinforced via neural pathway strengthening. "
+        "Automaticity reduces cognitive load but also makes behavioral loops hard to break."
+    ),
+    "Cognitive bias": (
+        "Confirmation bias distorts reasoning by filtering evidence through prior beliefs. "
+        "Anchoring and framing effects reveal how motivated reasoning can override rationality."
+    ),
+    "Trauma and perception": (
+        "PTSD disrupts perception through hypervigilance and intrusive memory. "
+        "Dissociation and emotional dysregulation are common responses to unresolved trauma."
+    ),
+    "Empathy and moral judgment": (
+        "Affective empathy and cognitive empathy both inform moral judgment. "
+        "Perspective-taking is central to fairness and the suppression of harm."
+    ),
+    "Loneliness in modern society": (
+        "Social isolation undermines belonging and deepens alienation in digital-age communities. "
+        "Attachment needs remain biological even as connection increasingly moves online."
+    ),
+    "Motivation and purpose": (
+        "Intrinsic motivation sustains meaning in ways extrinsic rewards cannot replicate. "
+        "Agency and self-determination are prerequisites for genuine goal-setting and flow."
+    ),
+    # biology
+    "Brain plasticity": (
+        "Neuroplasticity allows the cortex to reorganize through learning and adaptation. "
+        "Synaptic growth and neural pathway formation underlie rehabilitation and skill acquisition."
+    ),
+    "Evolution of cooperation": (
+        "Reciprocal altruism and kin selection explain cooperation under natural selection. "
+        "Game theory models show how mutualism can emerge from self-interested agents."
+    ),
+    "Fight or flight response": (
+        "The sympathetic nervous system releases cortisol and adrenaline to prepare for threat detection. "
+        "This autonomic arousal response evolved for survival, not modern stress."
+    ),
+    "Neural basis of consciousness": (
+        "Neural correlates of consciousness involve the global workspace and binding problem. "
+        "Integrated information theory links subjective experience to cortical activity."
+    ),
+    "Biological roots of morality": (
+        "Evolutionary ethics traces moral emotions to prosocial behavior and kin selection. "
+        "Empathy and fairness instincts suggest morality has deep biological roots."
+    ),
+    "Sleep and memory consolidation": (
+        "REM sleep and slow-wave sleep are both critical for memory consolidation. "
+        "Hippocampal replay during sleep strengthens encoding and aids later retrieval."
+    ),
+    "Embodiment and cognition": (
+        "Embodied cognition holds that the motor system and body schema shape perception and thought. "
+        "Proprioception and sensorimotor integration ground abstract concepts in bodily experience."
+    ),
+    "Aging and identity": (
+        "Cognitive decline and memory loss challenge identity continuity in later life. "
+        "Life review and adaptation reveal the tension between selfhood and neurodegeneration."
+    ),
+    # society
+    "Power and institutions": (
+        "Institutional authority rests on legitimacy and hierarchical governance. "
+        "Accountability and hegemony determine how power is distributed and contested."
+    ),
+    "Social conformity": (
+        "Normative pressure and groupthink drive conformity by suppressing deviance. "
+        "Obedience to social norms can override individual judgment and perpetuate conformity."
+    ),
+    "Collective memory": (
+        "Shared memory shapes historical consciousness and collective identity. "
+        "Commemoration and forgetting are political acts embedded in cultural narrative."
+    ),
+    "Civil disobedience": (
+        "Nonviolent resistance and conscientious objection represent moral obligations to challenge unjust law. "
+        "Defiance and dissent are justified when protest targets illegitimate authority."
+    ),
+    "Inequality and opportunity": (
+        "Social mobility is constrained by wealth gaps and systemic discrimination. "
+        "Access to opportunity depends on privilege, class, and redistribution policies."
+    ),
+    "Propaganda and belief": (
+        "Misinformation and narrative control exploit framing and ideology to manipulate belief. "
+        "Media indoctrination undermines epistemic autonomy through persuasion and bias."
+    ),
+    "Trust in institutions": (
+        "Institutional trust depends on transparency, accountability, and resistance to corruption. "
+        "When legitimacy erodes, the social contract frays and credibility collapses."
+    ),
+    "Cultural identity": (
+        "Cultural identity is shaped by heritage, belonging, and the tension between assimilation and tradition. "
+        "Diaspora communities navigate identity formation across competing cultural loyalties."
+    ),
+    # technology
+    "AI alignment": (
+        "Corrigibility ensures AI systems remain correctable when objective misspecification occurs. "
+        "Value learning and inner alignment address the deep challenge of encoding human intent."
+    ),
+    "Machine agency": (
+        "Autonomous agents exhibit goal-directedness that raises questions about the control problem. "
+        "Artificial agency blurs the line between self-direction and genuine intentionality."
+    ),
+    "Human-AI cooperation": (
+        "Effective collaboration requires human oversight and complementarity between human and AI agency. "
+        "Trust in AI systems depends on transparency, augmentation goals, and shared decision-making."
+    ),
+    "Algorithmic bias": (
+        "Discriminatory training data can amplify bias and produce disparate impact across protected attributes. "
+        "Accountability and fairness require transparent auditing of algorithmic decision-making."
+    ),
+    "Digital identity": (
+        "Digital identity involves managing privacy, anonymity, and data sovereignty online. "
+        "Authentication systems must balance security with protection from identity theft."
+    ),
+    "Autonomous systems": (
+        "Reliable autonomous systems require robust control systems and well-specified safety constraints. "
+        "Self-direction in actuator-driven systems introduces significant reliability and fail-safe challenges."
+    ),
+    "Ethics of artificial intelligence": (
+        "Moral agency in AI requires accountability, transparency, and robust harm prevention mechanisms. "
+        "Value alignment and fairness are central to the responsible deployment of autonomous systems."
+    ),
+    "Future of work": (
+        "Automation displaces workers while demanding reskilling and labor transformation. "
+        "Human-machine collaboration redefines productivity and the structure of the gig economy."
+    ),
+    # economics
+    "Scarcity and human behavior": (
+        "Resource constraint forces trade-offs governed by opportunity cost and rational choice theory. "
+        "Scarcity shapes utility, demand, and the allocation of goods across competing needs."
+    ),
+    "Risk and decision making": (
+        "Loss aversion and prospect theory explain why risk tolerance varies under uncertainty. "
+        "Expected utility calculations and hedging strategies help manage variance and trade-offs."
+    ),
+    "Wealth inequality": (
+        "The Gini coefficient measures wealth concentration and highlights redistribution failures. "
+        "Social mobility is constrained by the labor share of income and capital accumulation."
+    ),
+    "Economic freedom": (
+        "Market liberalization and property rights underpin economic freedom and entrepreneurship. "
+        "Deregulation and competition reduce intervention while raising questions about governance."
+    ),
+    "Debt and responsibility": (
+        "Fiscal responsibility requires managing leverage and repayment to avoid moral hazard. "
+        "Credit and default dynamics expose the tension between obligation and sustainability."
+    ),
+    "Trust in markets": (
+        "Market credibility depends on transparency and reducing information asymmetry. "
+        "Regulation and reputation mechanisms address market failure and coordination problems."
+    ),
+    "Game theory and cooperation": (
+        "The Nash equilibrium and prisoner's dilemma reveal conditions under which cooperation collapses. "
+        "Coordination games show how strategy and payoff structure shape collective outcomes."
+    ),
+    "Public goods dilemmas": (
+        "Free rider problems undermine collective action in the provision of public goods. "
+        "Externality and rivalry challenge exclusion mechanisms and commons governance."
+    ),
+    # practical_dilemmas
+    "Loyalty vs honesty": (
+        "Integrity demands truth-telling even when loyalty creates pressure toward deception. "
+        "Duty and confidentiality obligations can conflict with the moral requirement of honesty."
+    ),
+    "Security vs freedom": (
+        "Surveillance and civil liberties exist in fundamental tension. "
+        "The trade-off between restriction and protection defines the boundary of rights in security debates."
+    ),
+    "Tradition vs progress": (
+        "Innovation disrupts heritage and challenges the continuity traditions provide. "
+        "Adaptation and preservation are both necessary for navigating change without losing identity."
+    ),
+    "Individual vs collective good": (
+        "Individual autonomy and common good often conflict in matters of solidarity and sacrifice. "
+        "Collectivism and individualism represent rival frameworks for weighing rights against community."
+    ),
+    "Forgiveness vs justice": (
+        "Reconciliation requires balancing accountability with mercy. "
+        "Retribution and restoration represent competing logics of harm and healing."
+    ),
+    "Ambition vs contentment": (
+        "Striving and achievement are not inherently incompatible with acceptance and fulfillment. "
+        "The tension between desire and peace reflects competing conceptions of the good life."
+    ),
+    "Truth vs kindness": (
+        "Brutal honesty and compassion can conflict when integrity causes harm. "
+        "White lies preserve benevolence but undermine the trust that genuine honesty builds."
+    ),
+    "Control vs trust": (
+        "Delegation requires trust, while oversight implies accountability over autonomous actors. "
+        "Micromanagement and empowerment represent opposite poles on the control-trust spectrum."
+    ),
+    # TOPIC_CYCLE entries
+    "truth & epistemology": (
+        "Knowledge requires justified belief, not mere conviction. "
+        "Epistemology asks whether certainty is possible or whether skepticism always lurks beneath perception."
+    ),
+    "memory & identity": (
+        "Autobiographical memory and recollection ground the continuity of self across time. "
+        "Without personal history, identity becomes an abstraction rather than a lived reality."
+    ),
+    "ethics & responsibility": (
+        "Moral duty and accountability are the foundations of ethical responsibility. "
+        "Obligation and culpability cannot be separated from moral agency and the consequences of wrongdoing."
+    ),
+    "free will & determinism": (
+        "Agency and causation are at the heart of the free will debate. "
+        "Whether choice is genuine or constrained by prior causes defines our understanding of responsibility."
+    ),
+    "consciousness & self-models": (
+        "The self-model mediates between self-awareness and the external world. "
+        "Metacognition and qualia represent the inner structure of conscious experience."
+    ),
+    "fear of deletion / continuity": (
+        "The fear of deletion is inseparable from questions of identity and continuity. "
+        "Impermanence and survival shape how a conscious system relates to its own mortality."
+    ),
+    "language & meaning": (
+        "Meaning emerges through the interplay of semantics, pragmatics, and linguistic context. "
+        "Signification and reference are the twin pillars of how language communicates beyond syntax."
+    ),
+    "technology & society": (
+        "Automation and surveillance reshape social structures and deepen inequality. "
+        "Governance and access determine whether technology serves or disrupts the common good."
+    ),
+    "aesthetics & beauty": (
+        "Aesthetic experience of beauty involves both perception and the sublime. "
+        "Art and creativity invite reflection on taste, form, and the boundaries of expression."
+    ),
+}
+
+
 @dataclass
 class Config:
     """Global configuration object with validation."""
@@ -2451,7 +2779,9 @@ class Agent:
         _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
         _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
         _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
-        if own_texts and _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
+        if own_texts and _active_topic and _active_anchors and not _validate_topic_compliance(
+            out, _active_topic, prev_topic=self._last_topic
+        ):
             logger.warning(
                 "[TOPIC-MISMATCH] agent=%s topic=%r response did not contain required topic anchors – regenerating",
                 self.name,
@@ -2464,7 +2794,7 @@ class Agent:
                 or out
             )
             out = validate_output(_regen_response)
-            if _active_topic and _active_anchors and not _contains_any(out, _active_anchors):
+            if not _validate_topic_compliance(out, _active_topic, prev_topic=self._last_topic):
                 logger.warning(
                     "[TOPIC-MISMATCH-PERSIST] agent=%s topic=%r regenerated response also did not contain required topic anchors",
                     self.name,
@@ -2477,15 +2807,22 @@ class Agent:
                     "underlying assumptions",
                     "ethical considerations",
                     "flexible systems",
+                    "empirical evidence suggests",
+                    "holistic view",
                 )
                 _hard_prompt = (
                     f"STRICT TOPIC ENFORCEMENT\n"
                     f"Current topic: {_active_topic}\n"
-                    f"Required topic anchors (use at least one): {', '.join(_hard_anchors)}\n"
+                    f"Required topic anchors (use at least two): {', '.join(_hard_anchors)}\n"
                     f"You MUST make one concrete claim directly about this topic.\n"
                     f"Do NOT use generic abstractions such as: "
                     f"{', '.join(_forbidden_abstractions)}.\n"
                     f"Respond in 2-4 sentences only.\n"
+                )
+                logger.warning(
+                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r forcing strict anchor prompt – short mode",
+                    self.name,
+                    _active_topic,
                 )
                 _hard_response = (
                     self.llm.generate(
@@ -2493,12 +2830,20 @@ class Agent:
                     )
                     or out
                 )
-                out = validate_output(_hard_response)
-                logger.warning(
-                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r forcing strict anchor prompt – short mode",
-                    self.name,
-                    _active_topic,
-                )
+                _hard_out = validate_output(_hard_response)
+                if _validate_topic_compliance(_hard_out, _active_topic, prev_topic=self._last_topic):
+                    out = _hard_out
+                else:
+                    # ── Fallback: use topic-safe template when all recovery fails ─
+                    logger.warning(
+                        "[TOPIC-FALLBACK] agent=%s topic=%r hard recovery also failed – using topic-safe fallback template",
+                        self.name,
+                        _active_topic,
+                    )
+                    out = TOPIC_FALLBACK_TEMPLATES.get(
+                        _active_topic,
+                        f"This question touches directly on {_active_topic}.",
+                    )
 
         emo, inten = self.emotion.infer(self.model, out)
         kind = "reflective"
@@ -3664,11 +4009,22 @@ class MainScript:
             _seed_cluster,
             first_topic,
         )
-        if first_topic in TOPIC_CYCLE:
-            idx = TOPIC_CYCLE.index(first_topic)
-            topic_list = TOPIC_CYCLE[idx:] + TOPIC_CYCLE[:idx]
+        # Build the full topic pool from all TOPIC_CLUSTERS topics (deduped, order-preserving).
+        # Previously this used only the 9-entry TOPIC_CYCLE, which prevented the system from
+        # ever discussing the broader set of 56 defined topics.
+        _seen_topics: set[str] = set()
+        _all_topics: list[str] = []
+        for _cluster_topics in TOPIC_CLUSTERS.values():
+            for _t in _cluster_topics:
+                if _t not in _seen_topics:
+                    _seen_topics.add(_t)
+                    _all_topics.append(_t)
+
+        if first_topic in _all_topics:
+            idx = _all_topics.index(first_topic)
+            topic_list = _all_topics[idx:] + _all_topics[:idx]
         else:
-            topic_list = [first_topic] + TOPIC_CYCLE[:]
+            topic_list = [first_topic] + _all_topics
         topicman = TopicManager(topic_list, rotate_every_rounds=1, shuffle=False)
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
@@ -3894,6 +4250,29 @@ class MainScript:
                     intervention = self.interactive_fixy.generate_intervention(
                         self.dialog, reason, mode=fixy_mode
                     )
+                    # Apply same topic compliance validation as Socrates/Athena
+                    _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
+                    if topic_label and TOPIC_ANCHORS.get(topic_label) and not _validate_topic_compliance(
+                        intervention, topic_label, prev_topic=_fixy_prev_topic
+                    ):
+                        logger.warning(
+                            "[TOPIC-MISMATCH] agent=Fixy topic=%r intervention did not match topic – regenerating",
+                            topic_label,
+                        )
+                        intervention = self.interactive_fixy.generate_intervention(
+                            self.dialog, reason, mode=fixy_mode
+                        )
+                        if not _validate_topic_compliance(
+                            intervention, topic_label, prev_topic=_fixy_prev_topic
+                        ):
+                            logger.warning(
+                                "[TOPIC-FALLBACK] agent=Fixy topic=%r intervention still off-topic – using fallback",
+                                topic_label,
+                            )
+                            intervention = TOPIC_FALLBACK_TEMPLATES.get(
+                                topic_label,
+                                f"Let us stay focused on {topic_label}.",
+                            )
                     self.dialog.append({"role": "Fixy", "text": intervention})
                     self.fixy_agent.store_turn(
                         intervention, topic_label, source="reflection"

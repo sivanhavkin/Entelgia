@@ -863,7 +863,7 @@ Layer 2 is enforced via the mandatory control block appended by `build_style_ins
 
 `_CLUSTER_ALIAS` maps production-file cluster names to the names used by `loop_guard.TOPIC_CLUSTERS`, allowing both systems to share a unified vocabulary without circular imports.
 
-## 19) Topic Anchors & Forbidden Carryover (v2.9.0)
+## 19) Topic Anchors & Forbidden Carryover (v2.9.0+)
 
 ### Purpose
 
@@ -886,6 +886,12 @@ Example:
 ]
 ```
 
+### TOPIC_FALLBACK_TEMPLATES
+
+`TOPIC_FALLBACK_TEMPLATES: dict[str, str]` maps every topic to a short (2–3 sentence)
+fallback response that is guaranteed to pass `_validate_topic_compliance`.  These
+templates are used as a last resort when all LLM recovery attempts fail.
+
 ### Prompt Injection (in `_build_compact_prompt`)
 
 When the current topic is found in `TOPIC_ANCHORS`, two blocks are injected:
@@ -904,37 +910,92 @@ When the current topic is found in `TOPIC_ANCHORS`, two blocks are injected:
    self-direction, automation, control systems, …
    ```
 
-### Topic Match Validation (in `Agent.speak`)
+### 3-Layer Topic Compliance Validator (`_validate_topic_compliance`)
 
-After the LLM returns a response, `_contains_any(response, anchors)` checks whether
-at least one anchor concept appears.  If the check fails and anchors exist:
+Responses are validated through three sequential layers before being displayed:
 
-1. `[TOPIC-MISMATCH]` is logged at WARNING level:
-   ```
-   [TOPIC-MISMATCH] agent=Socrates topic='AI alignment'
-   response did not contain required topic anchors – regenerating
-   ```
-2. The response is regenerated once with the same prompt and temperature.
-3. If the regenerated response **also** fails the anchor check, a second WARNING is
-   logged and the generic response is **not** used:
-   ```
-   [TOPIC-MISMATCH-PERSIST] agent=Socrates topic='AI alignment'
-   regenerated response also did not contain required topic anchors
-   ```
-4. **Hard recovery** — a third, stricter prompt is built and the LLM is called again
-   in short mode.  The hard-recovery prompt contains:
-   - The current topic
-   - 3-5 required topic anchors from `TOPIC_ANCHORS`
-   - A mandatory concrete-claim instruction
-   - Explicit ban on generic abstractions: `balanced approach`,
-     `underlying assumptions`, `ethical considerations`, `flexible systems`
-   - An instruction to respond in 2-4 sentences only
-5. A WARNING is logged at the end of hard recovery:
-   ```
-   [TOPIC-HARD-RECOVERY] agent=Socrates topic='AI alignment'
-   forcing strict anchor prompt – short mode
-   ```
-   The output of the hard-recovery call replaces the second generic response.
+```python
+def _validate_topic_compliance(text: str, topic: str, prev_topic: str = "") -> bool:
+```
+
+**Layer 1 – required topic anchors**  
+At least one current-topic anchor term from `TOPIC_ANCHORS` must appear in the
+response (case-insensitive).  Fails immediately if none are found.
+
+**Layer 2 – forbidden carryover**  
+When `prev_topic` is set and differs from `topic`, the validator counts how many
+previous-topic anchor terms appear in the response.  If 2 or more previous-topic
+terms are found **and** they outnumber the current-topic hits, the response is
+classified as carryover and fails.
+
+**Layer 3 – semantic relevance score**  
+The distinct count of current-topic anchor hits must meet
+`_TOPIC_RELEVANCE_MIN_HITS` (default: 1).
+
+Returns `True` only when all three layers pass.
+
+### Topic Match Validation Pipeline (in `Agent.speak`)
+
+After the LLM returns a response, `_validate_topic_compliance` is applied.
+The full pipeline guarantees **only a topic-compliant response is displayed**:
+
+```
+candidate = generate(prompt)
+
+if not _validate_topic_compliance(candidate, topic, prev_topic):
+    log [TOPIC-MISMATCH]
+    candidate = regenerate(prompt)
+
+    if not _validate_topic_compliance(candidate, topic, prev_topic):
+        log [TOPIC-MISMATCH-PERSIST]
+        log [TOPIC-HARD-RECOVERY]
+        candidate = generate(hard_recovery_prompt)
+
+        if _validate_topic_compliance(candidate, topic, prev_topic):
+            display(candidate)
+        else:
+            log [TOPIC-FALLBACK]
+            display(TOPIC_FALLBACK_TEMPLATES[topic])
+    else:
+        display(candidate)
+else:
+    display(candidate)
+```
+
+**Hard recovery prompt** contains:
+- The current topic
+- 3–5 required topic anchors from `TOPIC_ANCHORS`
+- A mandatory concrete-claim instruction
+- Explicit ban on generic filler: `balanced approach`, `underlying assumptions`,
+  `ethical considerations`, `flexible systems`, `empirical evidence suggests`,
+  `holistic view`
+- An instruction to respond in 2–4 sentences only
+- A requirement to use **at least two** topic anchors (stricter than the normal
+  requirement of at least one)
+
+**Log events:**
+
+| Tag | Meaning |
+|-----|---------|
+| `[TOPIC-MISMATCH]` | First candidate failed; regenerating |
+| `[TOPIC-MISMATCH-PERSIST]` | Regenerated response also failed; hard recovery triggered |
+| `[TOPIC-HARD-RECOVERY]` | Hard recovery prompt built and sent to LLM |
+| `[TOPIC-FALLBACK]` | Hard recovery also failed; using template fallback |
+
+Validation is **skipped on the agent's first turn** (`own_texts` is empty) to
+avoid false positives before the agent has engaged with the topic.
+
+### Fixy Topic Validation
+
+The interactive Fixy intervention path in `MainScript.run()` applies the same
+`_validate_topic_compliance` validator to every intervention before it is added
+to the dialogue:
+
+1. If the intervention fails, it is regenerated once.
+2. If it still fails, `[TOPIC-FALLBACK]` is logged and
+   `TOPIC_FALLBACK_TEMPLATES[topic]` is used instead.
+
+This ensures Fixy cannot carry over stale topic content between topic transitions.
 
 ### `_contains_any` helper
 
@@ -943,8 +1004,23 @@ def _contains_any(text: str, concepts: list[str]) -> bool:
     """Return True if text contains at least one concept (case-insensitive)."""
 ```
 
+### `_topic_relevance_score` helper
+
+```python
+def _topic_relevance_score(text: str, anchors: list[str]) -> int:
+    """Return the count of distinct anchor terms found in text (case-insensitive)."""
+```
+
 ### `_last_topic` tracking
 
 `Agent._last_topic: str` persists the most recent active topic across turns.  It is
 set at the end of `Agent.speak()` to enable forbidden-carryover injection in the next
-call to `_build_compact_prompt`.
+call to `_build_compact_prompt` and as the `prev_topic` argument to
+`_validate_topic_compliance`.
+
+### Topic Pool (topic rotation fix)
+
+`MainScript.run()` builds the topic rotation list from **all topics in all
+`TOPIC_CLUSTERS` clusters** (56 topics, deduped), starting from the configured
+seed topic.  Previously the rotation was restricted to `TOPIC_CYCLE` (9 topics),
+which caused the system to repeat the same narrow set of topics indefinitely.

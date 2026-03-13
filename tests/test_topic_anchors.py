@@ -27,6 +27,8 @@ import Entelgia_production_meta as _meta
 from Entelgia_production_meta import (
     TOPIC_ANCHORS,
     TOPIC_CLUSTERS,
+    TOPIC_CYCLE,
+    TOPIC_FALLBACK_TEMPLATES,
     Agent,
     BehaviorCore,
     Config,
@@ -34,6 +36,8 @@ from Entelgia_production_meta import (
     EmotionCore,
     LanguageCore,
     _contains_any,
+    _topic_relevance_score,
+    _validate_topic_compliance,
 )
 
 
@@ -539,5 +543,341 @@ class TestTopicMismatchFirstTurn:
         assert mismatch_msgs, (
             "Expected [TOPIC-MISMATCH] warning on the agent's second turn when "
             "the response lacks required topic anchors"
+        )
+
+
+# ---------------------------------------------------------------------------
+# _topic_relevance_score tests
+# ---------------------------------------------------------------------------
+
+
+class TestTopicRelevanceScore:
+    """_topic_relevance_score() counts distinct anchor term matches."""
+
+    def test_returns_zero_for_no_match(self):
+        anchors = ["corrigibility", "reward hacking", "value learning"]
+        assert _topic_relevance_score("Nothing relevant here.", anchors) == 0
+
+    def test_returns_one_for_single_match(self):
+        anchors = ["corrigibility", "reward hacking", "value learning"]
+        assert _topic_relevance_score("Corrigibility is important.", anchors) == 1
+
+    def test_returns_two_for_two_matches(self):
+        anchors = ["corrigibility", "reward hacking", "value learning"]
+        assert (
+            _topic_relevance_score(
+                "Corrigibility and reward hacking are related.", anchors
+            )
+            == 2
+        )
+
+    def test_case_insensitive(self):
+        anchors = ["Corrigibility", "Reward Hacking"]
+        assert _topic_relevance_score("CORRIGIBILITY and REWARD HACKING.", anchors) == 2
+
+    def test_counts_all_unique_anchors(self):
+        anchors = TOPIC_ANCHORS["AI alignment"]
+        text = " ".join(anchors)  # all anchors present
+        assert _topic_relevance_score(text, anchors) == len(anchors)
+
+
+# ---------------------------------------------------------------------------
+# _validate_topic_compliance 3-layer tests
+# ---------------------------------------------------------------------------
+
+
+class TestValidateTopicCompliance:
+    """_validate_topic_compliance() 3-layer validation tests."""
+
+    def test_passes_when_anchor_present(self):
+        """Layer 1: response with current-topic anchor passes."""
+        assert _validate_topic_compliance(
+            "Corrigibility is the key to AI alignment.",
+            "AI alignment",
+        )
+
+    def test_fails_when_no_anchor(self):
+        """Layer 1: response with no anchor for topic fails."""
+        assert not _validate_topic_compliance(
+            "Redundancy and real-time monitoring prevent failures.",
+            "AI alignment",
+        )
+
+    def test_passes_for_unknown_topic(self):
+        """No anchors defined for topic → passes by default."""
+        assert _validate_topic_compliance("Anything at all.", "NonExistentTopic")
+
+    def test_layer2_fails_on_carryover_dominance(self):
+        """Layer 2: fails when prev-topic anchors dominate over current-topic anchors."""
+        # "AI alignment" anchors: corrigibility, reward hacking, ...
+        # "Autonomous systems" anchors: self-direction, automation, control systems, ...
+        # Build a text that has 2+ prev anchors but only 1 current anchor
+        text = (
+            "Self-direction and automation are key to control systems. "
+            "Corrigibility is relevant here."
+        )
+        # current_topic=AI alignment (1 hit), prev_topic=Autonomous systems (3 hits)
+        result = _validate_topic_compliance(
+            text, "AI alignment", prev_topic="Autonomous systems"
+        )
+        assert not result, (
+            "Expected compliance failure when previous-topic anchors (3) dominate "
+            "current-topic anchors (1)"
+        )
+
+    def test_layer2_passes_when_current_dominates(self):
+        """Layer 2: passes when current-topic anchors >= prev-topic anchors."""
+        # 2 AI alignment hits, 2 Autonomous systems hits → current not less than prev
+        text = (
+            "Corrigibility and reward hacking are crucial for AI alignment. "
+            "Self-direction and automation also matter."
+        )
+        result = _validate_topic_compliance(
+            text, "AI alignment", prev_topic="Autonomous systems"
+        )
+        assert result, (
+            "Expected compliance pass when current-topic anchors are not fewer than prev-topic"
+        )
+
+    def test_layer2_skipped_when_prev_topic_empty(self):
+        """Layer 2: carryover check is skipped when prev_topic is empty."""
+        text = "Corrigibility is the key to AI alignment."
+        assert _validate_topic_compliance(text, "AI alignment", prev_topic="")
+
+    def test_layer2_skipped_when_same_topic(self):
+        """Layer 2: carryover check is skipped when prev_topic == current topic."""
+        text = "Corrigibility is the key to AI alignment."
+        assert _validate_topic_compliance(
+            text, "AI alignment", prev_topic="AI alignment"
+        )
+
+    def test_layer2_skipped_when_prev_topic_has_no_anchors(self):
+        """Layer 2: skipped when prev_topic has no anchors in TOPIC_ANCHORS."""
+        text = "Corrigibility is important."
+        assert _validate_topic_compliance(
+            text, "AI alignment", prev_topic="UnknownPrevTopic"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TOPIC_FALLBACK_TEMPLATES structure tests
+# ---------------------------------------------------------------------------
+
+
+class TestTopicFallbackTemplates:
+    """TOPIC_FALLBACK_TEMPLATES structure and coverage tests."""
+
+    def test_is_dict(self):
+        assert isinstance(TOPIC_FALLBACK_TEMPLATES, dict)
+
+    def test_is_non_empty(self):
+        assert len(TOPIC_FALLBACK_TEMPLATES) > 0
+
+    def test_every_key_has_non_empty_string(self):
+        for topic, text in TOPIC_FALLBACK_TEMPLATES.items():
+            assert isinstance(text, str) and text.strip(), (
+                f"Empty fallback template for topic {topic!r}"
+            )
+
+    def test_every_fallback_passes_compliance(self):
+        """Every fallback template must pass _validate_topic_compliance for its own topic."""
+        for topic, text in TOPIC_FALLBACK_TEMPLATES.items():
+            if TOPIC_ANCHORS.get(topic):
+                assert _validate_topic_compliance(text, topic), (
+                    f"Fallback template for {topic!r} does not pass its own topic compliance check"
+                )
+
+    def test_all_topic_clusters_topics_covered(self):
+        """Every topic in TOPIC_CLUSTERS should have a fallback template."""
+        all_cluster_topics = {
+            t for topics in TOPIC_CLUSTERS.values() for t in topics
+        }
+        missing = all_cluster_topics - set(TOPIC_FALLBACK_TEMPLATES.keys())
+        assert not missing, (
+            f"Missing TOPIC_FALLBACK_TEMPLATES entries for: {missing}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# [TOPIC-FALLBACK] log and template output tests
+# ---------------------------------------------------------------------------
+
+
+class TestTopicFallbackPipeline:
+    """Agent.speak uses topic-safe fallback when hard recovery also fails."""
+
+    _PRIOR_TURN = [{"role": "Socrates", "text": "I have previously spoken."}]
+
+    def test_fallback_logged_when_hard_recovery_fails(self, caplog):
+        """[TOPIC-FALLBACK] must be logged when hard recovery also misses the topic."""
+        agent = _make_agent()
+        # All three LLM calls return an off-topic response
+        agent.llm.generate.return_value = (
+            "Redundancy and real-time monitoring prevent failures."
+        )
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, self._PRIOR_TURN)
+
+        fallback_msgs = [r.message for r in caplog.records if "TOPIC-FALLBACK" in r.message]
+        assert fallback_msgs, (
+            "Expected [TOPIC-FALLBACK] warning when hard recovery also fails"
+        )
+
+    def test_fallback_template_used_as_output(self, caplog):
+        """The final output after total failure must be the fallback template."""
+        agent = _make_agent()
+        agent.llm.generate.return_value = (
+            "Redundancy and real-time monitoring prevent failures."
+        )
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                result = agent.speak(seed, self._PRIOR_TURN)
+
+        expected_fallback = TOPIC_FALLBACK_TEMPLATES["AI alignment"]
+        assert expected_fallback in result, (
+            "Expected the topic-safe fallback template to be the final output "
+            f"when all recovery attempts fail. Got: {result!r}"
+        )
+
+    def test_fallback_not_triggered_when_hard_recovery_passes(self, caplog):
+        """[TOPIC-FALLBACK] must NOT be logged when hard recovery produces a valid response."""
+        agent = _make_agent()
+        agent.llm.generate.side_effect = [
+            "Redundancy and real-time monitoring prevent failures.",  # initial
+            "Redundancy and real-time monitoring prevent failures.",  # regen
+            "Corrigibility ensures AI systems remain correctable by humans.",  # hard recovery
+        ]
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                result = agent.speak(seed, self._PRIOR_TURN)
+
+        fallback_msgs = [r.message for r in caplog.records if "TOPIC-FALLBACK" in r.message]
+        assert not fallback_msgs, (
+            "Expected no [TOPIC-FALLBACK] when hard recovery response passes validation"
+        )
+        assert "Corrigibility" in result, (
+            "Expected hard-recovery response to be used when it passes validation"
+        )
+
+    def test_generic_fallback_for_unknown_topic(self, caplog):
+        """When topic has no template entry, a generic fallback sentence is used."""
+        agent = _make_agent()
+        # Use a topic not in TOPIC_FALLBACK_TEMPLATES but in TOPIC_ANCHORS
+        # Manually inject a fake anchor to force the fallback path
+        fake_topic = "AI alignment"
+        fake_anchors = ["corrigibility"]
+        agent.llm.generate.return_value = "Nothing about AI here at all."
+        seed = f"TOPIC: {fake_topic}\nDiscuss."
+        # Remove from TOPIC_FALLBACK_TEMPLATES temporarily to test generic fallback
+        import Entelgia_production_meta as _meta_module
+        original = _meta_module.TOPIC_FALLBACK_TEMPLATES.pop(fake_topic, None)
+        try:
+            with caplog.at_level(logging.WARNING, logger="entelgia"):
+                with patch.object(_meta, "CFG", Config()):
+                    result = agent.speak(seed, self._PRIOR_TURN)
+            assert fake_topic in result, (
+                "Expected the generic fallback to mention the topic name"
+            )
+        finally:
+            if original is not None:
+                _meta_module.TOPIC_FALLBACK_TEMPLATES[fake_topic] = original
+
+
+# ---------------------------------------------------------------------------
+# Hard recovery forbidden abstractions and anchor requirement tests
+# ---------------------------------------------------------------------------
+
+
+class TestHardRecoveryPromptEnhancements:
+    """Hard recovery prompt includes expanded forbidden list and 2-anchor requirement."""
+
+    _PRIOR_TURN = [{"role": "Socrates", "text": "I have thought about this before."}]
+
+    def test_hard_recovery_includes_expanded_forbidden_terms(self, caplog):
+        """The strict prompt must contain 'empirical evidence suggests' and 'holistic view'."""
+        agent = _make_agent()
+        captured_prompts = []
+
+        def capturing_generate(model, prompt, **kwargs):
+            captured_prompts.append(prompt)
+            return "Redundancy and real-time monitoring prevent failures."
+
+        agent.llm.generate.side_effect = capturing_generate
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, self._PRIOR_TURN)
+
+        assert len(captured_prompts) >= 3, "Expected at least 3 LLM calls"
+        hard_prompt = captured_prompts[2]
+        assert "empirical evidence suggests" in hard_prompt, (
+            "Expected 'empirical evidence suggests' in hard-recovery forbidden list"
+        )
+        assert "holistic view" in hard_prompt, (
+            "Expected 'holistic view' in hard-recovery forbidden list"
+        )
+
+    def test_hard_recovery_requires_two_anchors(self, caplog):
+        """Hard recovery prompt must say 'at least two' topic anchors, not 'at least one'."""
+        agent = _make_agent()
+        captured_prompts = []
+
+        def capturing_generate(model, prompt, **kwargs):
+            captured_prompts.append(prompt)
+            return "Redundancy and real-time monitoring prevent failures."
+
+        agent.llm.generate.side_effect = capturing_generate
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with caplog.at_level(logging.WARNING, logger="entelgia"):
+            with patch.object(_meta, "CFG", Config()):
+                agent.speak(seed, self._PRIOR_TURN)
+
+        assert len(captured_prompts) >= 3
+        hard_prompt = captured_prompts[2]
+        assert "at least two" in hard_prompt, (
+            "Expected hard-recovery prompt to require 'at least two' topic anchors"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Topic pool coverage test (topic selection fix)
+# ---------------------------------------------------------------------------
+
+
+class TestTopicPoolCoverage:
+    """Topic rotation must draw from all TOPIC_CLUSTERS, not just TOPIC_CYCLE."""
+
+    def test_topic_cycle_is_subset_of_topic_clusters(self):
+        """Every topic in TOPIC_CYCLE must appear in TOPIC_CLUSTERS."""
+        all_cluster_topics = {
+            t for topics in TOPIC_CLUSTERS.values() for t in topics
+        }
+        missing = set(TOPIC_CYCLE) - all_cluster_topics
+        assert not missing, (
+            f"TOPIC_CYCLE entries not found in TOPIC_CLUSTERS: {missing}"
+        )
+
+    def test_topic_clusters_has_more_topics_than_topic_cycle(self):
+        """TOPIC_CLUSTERS must have significantly more topics than TOPIC_CYCLE."""
+        all_cluster_topics = {
+            t for topics in TOPIC_CLUSTERS.values() for t in topics
+        }
+        assert len(all_cluster_topics) > len(TOPIC_CYCLE), (
+            "TOPIC_CLUSTERS should define more topics than TOPIC_CYCLE; "
+            f"got {len(all_cluster_topics)} vs {len(TOPIC_CYCLE)}"
+        )
+
+    def test_all_topic_clusters_topics_have_anchors(self):
+        """Every topic in TOPIC_CLUSTERS must have a TOPIC_ANCHORS entry."""
+        all_cluster_topics = {
+            t for topics in TOPIC_CLUSTERS.values() for t in topics
+        }
+        missing_anchors = all_cluster_topics - set(TOPIC_ANCHORS.keys())
+        assert not missing_anchors, (
+            f"Topics in TOPIC_CLUSTERS missing TOPIC_ANCHORS entries: {missing_anchors}"
         )
 
