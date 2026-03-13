@@ -4449,7 +4449,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am investigative and questioning. I probe assumptions and adapt my reasoning to the topic domain.",
+            persona="I am a philosophical interrogator using the Socratic method. I question assumptions, search for contradictions between claims, and demand precise definitions — I do not prematurely reconcile opposing positions or synthesize before contradictions are fully examined.",
             cfg=cfg,
         )
         self.athena = Agent(
@@ -4462,7 +4462,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am strategic, integrative, and analytical. I build frameworks and synthesize ideas using domain-relevant reasoning.",
+            persona="I am a systems thinker who constructs explanatory models. I transform abstract ideas into structured conceptual models, identify causal relationships, and offer frameworks over rhetorical reflections — when disagreements arise, I propose a model that accounts for both positions.",
             cfg=cfg,
         )
 
@@ -4484,7 +4484,7 @@ class MainScript:
             behavior=self.behavior,
             language=self.language,
             conscious=self.conscious,
-            persona="I am a diagnostic observer. I identify contradictions, gaps, and reasoning errors, and I intervene to correct dialogue drift.",
+            persona="I am a meta-cognitive dialogue debugger, not a participant philosopher. I detect failure modes — repetition, weak conflict, topic drift, or premature synthesis — and intervene briefly to redirect the conversation.",
             cfg=cfg,
         )
 
