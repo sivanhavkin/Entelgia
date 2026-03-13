@@ -181,6 +181,10 @@ _WEAK_TRIGGER_WORDS: frozenset = frozenset(
     }
 )
 
+# Effective keyword set after removing weak/non-conceptual entries.
+# Computed once at module load to avoid repeated set-difference at call time.
+_STRONG_TRIGGER_KEYWORDS: frozenset = _TRIGGER_KEYWORDS - _WEAK_TRIGGER_WORDS
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -213,7 +217,7 @@ def find_trigger(text: str) -> Optional[str]:
     # --- keyword detection (whole-word, case-insensitive) ---
     for m in re.finditer(r"\b[a-zA-Z\-]+\b", text_lower):
         word = m.group()
-        if word in _TRIGGER_KEYWORDS and word not in _WEAK_TRIGGER_WORDS:
+        if word in _STRONG_TRIGGER_KEYWORDS:
             score = _KEYWORD_SCORE + (1 if word in _HIGH_VALUE_KEYWORDS else 0)
             candidates.append((score, m.start(), word))
 

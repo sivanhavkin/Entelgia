@@ -3111,6 +3111,12 @@ class Agent:
         drain = min(drain, CFG.energy_drain_max * 2.0)
         self.energy_level = max(0.0, self.energy_level - drain)
 
+    @staticmethod
+    def _extract_topic_from_seed(seed: str) -> str:
+        """Return the topic label from a structured seed string, or '' if absent."""
+        m = re.search(r"TOPIC:\s*([^\n]+)", seed)
+        return m.group(1).strip() if m else ""
+
     def _build_compact_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
@@ -3127,8 +3133,7 @@ class Agent:
         stm_tail = max(3, min(12, int(3 + ego / 2)))
 
         # Extract current topic from seed for topic gating
-        _topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-        _current_topic = _topic_match.group(1).strip() if _topic_match else ""
+        _current_topic = self._extract_topic_from_seed(user_seed)
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -3258,8 +3263,7 @@ class Agent:
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
         # Extract topic from seed (used for memory selection and topic anchors)
-        topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-        topic = topic_match.group(1).strip() if topic_match else ""
+        topic = self._extract_topic_from_seed(user_seed)
 
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
