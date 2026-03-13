@@ -5090,7 +5090,7 @@ class MainScript:
                 print(Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL)
                 break
 
-            if self.turn_index % 2 == 0:
+            if self.turn_index % 5 == 0:
                 topicman.advance_round()
                 # Update topic_style for all agents to match the advanced topic
                 _adv_topic = topicman.current()
