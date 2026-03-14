@@ -4633,11 +4633,12 @@ class MainScript:
             dim
             + f"  Emotion: {agent._last_emotion} ({agent._last_emotion_intensity:.2f})"
             + f"  Kind: {agent._last_response_kind}"
+            + f"  Dissent: {profile['dissent_level']}"
             + reset
         )
         print(
             dim
-            + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
+            + f"  Style: {profile['style']}"
             + reset
         )
         drive_combo = profile.get("drive_combo", "")
