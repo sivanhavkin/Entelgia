@@ -157,20 +157,38 @@ def format_persona_for_prompt(
     description = persona_dict["description"]
     thinking_style = persona_dict["thinking_style"]
 
-    # Determine dominant drive
-    id_str = drives.get("id_strength", 5.0)
-    ego_str = drives.get("ego_strength", 5.0)
-    sup_str = drives.get("superego_strength", 5.0)
+    id_str = float(drives.get("id_strength", 5.0))
+    ego_str = float(drives.get("ego_strength", 5.0))
+    sup_str = float(drives.get("superego_strength", 5.0))
 
-    dominant = "ego"
-    if id_str > ego_str and id_str > sup_str:
-        dominant = "id"
-    elif sup_str > ego_str and sup_str > id_str:
-        dominant = "superego"
+    # Determine the compound drive combination using the same 8-position scheme
+    # as debate_profile(): a drive is "elevated" when clearly above the neutral default.
+    _HIGH = 6.5
+    id_high = id_str >= _HIGH
+    ego_high = ego_str >= _HIGH
+    sup_high = sup_str >= _HIGH
+    high_count = sum([id_high, ego_high, sup_high])
 
-    # Get drive-specific influence
+    if high_count == 3:
+        combo_key = "balanced_high"
+    elif id_high and sup_high:
+        combo_key = "high_id_superego"
+    elif id_high and ego_high:
+        combo_key = "high_id_ego"
+    elif ego_high and sup_high:
+        combo_key = "high_ego_superego"
+    elif id_high:
+        combo_key = "high_id"
+    elif sup_high:
+        combo_key = "high_superego"
+    elif ego_high:
+        combo_key = "high_ego"
+    else:
+        combo_key = "balanced"
+
+    # Get drive-specific influence from persona schema
     drives_influence = persona_dict.get("drives_influence", {})
-    drive_modifier = drives_influence.get(f"high_{dominant}", "Balanced approach")
+    drive_modifier = drives_influence.get(combo_key, "Balanced approach")
 
     # Build persona prompt
     prompt = f"{description}\n"
