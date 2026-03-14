@@ -135,7 +135,6 @@ def build_research_context(
     if active_topic and context:
         context = (
             f"External information related to topic '{active_topic}'. "
-            "Use only if it helps address the topic directly.\n\n"
-            + context
+            "Use only if it helps address the topic directly.\n\n" + context
         )
     return context

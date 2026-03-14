@@ -1500,7 +1500,15 @@ class TestWeakTriggerWords:
     def test_weak_keywords_alone_do_not_trigger(self):
         from entelgia.fixy_research_trigger import find_trigger
 
-        for word in ("current", "recent", "today", "web", "internet", "update", "latest"):
+        for word in (
+            "current",
+            "recent",
+            "today",
+            "web",
+            "internet",
+            "update",
+            "latest",
+        ):
             assert find_trigger(word) is None, f"Expected None for weak word: {word!r}"
 
     def test_weak_keyword_in_sentence_does_not_trigger(self):
@@ -2147,7 +2155,9 @@ class TestQueryCooldown:
         assert fixy_should_search("AI research paper") is True
         assert fixy_should_search("AI research paper") is False
         # Advance the turn counter past both the per-query and global cooldown windows
-        frt._trigger_turn_counter += max(frt._COOLDOWN_TURNS, frt._GLOBAL_SEARCH_COOLDOWN_TURNS)
+        frt._trigger_turn_counter += max(
+            frt._COOLDOWN_TURNS, frt._GLOBAL_SEARCH_COOLDOWN_TURNS
+        )
         assert fixy_should_search("AI research paper") is True
 
     def test_clear_cooldown_resets_query_state(self):
@@ -2207,7 +2217,9 @@ class TestSanitizedQueryCooldown:
         assert fixy_should_search(seed1, query_cooldown_key=query_key) is True
         assert fixy_should_search(seed2, query_cooldown_key=query_key) is False
         # Advance past both per-query and global cooldown windows
-        frt._trigger_turn_counter += max(frt._COOLDOWN_TURNS, frt._GLOBAL_SEARCH_COOLDOWN_TURNS)
+        frt._trigger_turn_counter += max(
+            frt._COOLDOWN_TURNS, frt._GLOBAL_SEARCH_COOLDOWN_TURNS
+        )
         assert fixy_should_search(seed2, query_cooldown_key=query_key) is True
 
     def test_no_query_cooldown_key_falls_back_to_seed_text(self):
