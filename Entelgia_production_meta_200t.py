@@ -3171,11 +3171,13 @@ class Agent:
         # Socrates' superego is biased toward 6.5 by the same principle.
         # When a drive reaches an extreme (>= 8.5 or <= 1.5), an extra reversion boost is
         # applied so it gradually re-equilibrates over several turns rather than stagnating.
-        _ATHENA_ID_TARGET = 6.5      # Athena's id drifts toward this preferred level
-        _SOCRATES_SUP_TARGET = 6.5   # Socrates' superego drifts toward this preferred level
-        _EXTREME_HIGH = 8.5          # drives above this threshold revert faster
-        _EXTREME_LOW = 1.5           # drives below this threshold revert faster
-        _EXTREME_BOOST = 0.06        # extra reversion rate applied at extremes
+        _ATHENA_ID_TARGET = 6.5  # Athena's id drifts toward this preferred level
+        _SOCRATES_SUP_TARGET = (
+            6.5  # Socrates' superego drifts toward this preferred level
+        )
+        _EXTREME_HIGH = 8.5  # drives above this threshold revert faster
+        _EXTREME_LOW = 1.5  # drives below this threshold revert faster
+        _EXTREME_BOOST = 0.06  # extra reversion rate applied at extremes
         _osc = CFG.drive_oscillation_range
         _ide_target = _ATHENA_ID_TARGET if self.name == "Athena" else 5.0
         _sup_target = _SOCRATES_SUP_TARGET if self.name == "Socrates" else 5.0
@@ -3583,8 +3585,14 @@ class Agent:
             superego_strength=_sup_for_critique,
             conflict=self.conflict_index(),
             enabled=getattr(_cfg, "superego_critique_enabled", True),
-            dominance_margin=0.2 if _sup_extreme else getattr(_cfg, "superego_dominance_margin", 0.5),
-            conflict_min=1.0 if _sup_extreme else getattr(_cfg, "superego_critique_conflict_min", 2.0),
+            dominance_margin=(
+                0.2 if _sup_extreme else getattr(_cfg, "superego_dominance_margin", 0.5)
+            ),
+            conflict_min=(
+                1.0
+                if _sup_extreme
+                else getattr(_cfg, "superego_critique_conflict_min", 2.0)
+            ),
         )
         self._last_superego_rewrite = _critique.should_apply
         self._last_critique_reason = _critique.reason
@@ -4708,11 +4716,7 @@ class MainScript:
             + f"  Dissent: {profile['dissent_level']}"
             + reset
         )
-        print(
-            dim
-            + f"  Style: {profile['style']}"
-            + reset
-        )
+        print(dim + f"  Style: {profile['style']}" + reset)
         drive_combo = profile.get("drive_combo", "")
         topic_tone = profile.get("topic_tone", "")
         combo_line = f"  Drive combo: {drive_combo}"
@@ -5136,7 +5140,7 @@ class MainScript:
                     # v2.9.0: Fixy selects disruption mode based on detected loop type
                     fixy_mode = self.interactive_fixy.get_fixy_mode(reason)
                     intervention = self.interactive_fixy.generate_intervention(
-                        self.dialog, reason, mode=fixy_mode
+                        self.dialog, reason, mode=fixy_mode, current_topic=topic_label
                     )
                     # Apply same topic compliance validation as Socrates/Athena
                     _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
@@ -5152,7 +5156,10 @@ class MainScript:
                             topic_label,
                         )
                         intervention = self.interactive_fixy.generate_intervention(
-                            self.dialog, reason, mode=fixy_mode
+                            self.dialog,
+                            reason,
+                            mode=fixy_mode,
+                            current_topic=topic_label,
                         )
                         if not _validate_topic_compliance(
                             intervention, topic_label, prev_topic=_fixy_prev_topic

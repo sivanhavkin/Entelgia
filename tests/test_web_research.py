@@ -75,7 +75,8 @@ class TestFixyResearchTrigger:
     def test_word_boundary_matching(self):
         # "searches" contains "search" as a substring but as a different word form
         # The function uses whole-word extraction via re.findall([a-z]+)
-        assert fixy_should_search("web searches for truth") is True
+        # Use "research" (a strong trigger) rather than "truth" (now demoted to weak)
+        assert fixy_should_search("web searches for research") is True
 
     def test_trigger_on_trend(self):
         assert fixy_should_search("What is the current trend?") is True
@@ -2180,10 +2181,10 @@ class TestSanitizedQueryCooldown:
 
     def test_same_sanitized_query_different_seed_text_is_suppressed(self):
         """Different seed_text values with identical query_cooldown_key must share cooldown."""
-        query_key = "self-awareness emerges ourselves lens identity truth"
-        # Both seeds contain trigger keyword "truth" but the seeds differ
-        seed1 = "TOPIC: Freedom — what is the truth about authentic living?"
-        seed2 = "TOPIC: truth & epistemology — how does truth shape identity?"
+        query_key = "self-awareness emerges ourselves lens identity research"
+        # Both seeds contain a strong trigger keyword ("research" / "evidence") but the seeds differ
+        seed1 = "TOPIC: Freedom — recent research on authentic living?"
+        seed2 = "TOPIC: research & epistemology — how does evidence shape identity?"
 
         assert fixy_should_search(seed1, query_cooldown_key=query_key) is True
         # Same sanitized query key within cooldown window → must be suppressed
@@ -2193,11 +2194,11 @@ class TestSanitizedQueryCooldown:
         """Different query_cooldown_key values must not share a cooldown slot."""
         from entelgia import fixy_research_trigger as frt
 
-        query_key1 = "self-awareness emerges ourselves lens identity truth"
+        query_key1 = "self-awareness emerges ourselves lens identity research"
         query_key2 = "credibility bias epistemic justification sources"
         # Use different seeds with different trigger keywords so per-trigger
         # cooldown does not block the second call
-        seed1 = "TOPIC: Freedom — what is the truth about authentic living?"
+        seed1 = "TOPIC: Freedom — recent research on authentic living?"
         seed2 = "TOPIC: sourcing — credibility of evidence matters for research"
 
         assert fixy_should_search(seed1, query_cooldown_key=query_key1) is True
@@ -2210,9 +2211,9 @@ class TestSanitizedQueryCooldown:
         """Per-sanitized-query cooldown must expire after _COOLDOWN_TURNS turns."""
         from entelgia import fixy_research_trigger as frt
 
-        query_key = "self-awareness emerges ourselves lens identity truth"
-        seed1 = "TOPIC: Freedom — what is the truth about authentic living?"
-        seed2 = "TOPIC: truth & epistemology — how does truth shape identity?"
+        query_key = "self-awareness emerges ourselves lens identity research"
+        seed1 = "TOPIC: Freedom — recent research on authentic living?"
+        seed2 = "TOPIC: research & epistemology — how does evidence shape identity?"
 
         assert fixy_should_search(seed1, query_cooldown_key=query_key) is True
         assert fixy_should_search(seed2, query_cooldown_key=query_key) is False
