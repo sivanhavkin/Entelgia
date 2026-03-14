@@ -780,5 +780,168 @@ class TestSuperEgoConsecutiveStreakLimit:
             assert agent_sup._superego_streak_suppressed is False
 
 
+# ---------------------------------------------------------------------------
+# 9. Extreme superego tightened thresholds
+# ---------------------------------------------------------------------------
+
+
+class TestSuperegoCritiqueAtExtreme:
+    """
+    At extreme superego (>= 8.5 for Socrates) the critique call uses:
+      - dominance_margin = 0.2  (vs normal 0.5)
+      - conflict_min    = 1.0  (vs normal 2.0)
+    This allows the internal governor to fire even when superego only narrowly
+    dominates or conflict is below the normal minimum.
+    """
+
+    def test_tight_margin_fires_when_superego_barely_dominant(self):
+        """sup=8.5, ego=8.3: gap=0.2 meets extreme margin=0.2 → fires."""
+        # With normal margin=0.5: 8.5 < 8.3+0.5=8.8 → no fire
+        # With extreme margin=0.2: 8.5 >= 8.3+0.2=8.5 → fires
+        dec = _decision(
+            id_strength=5.5,
+            ego_strength=8.3,
+            superego_strength=8.5,
+            conflict=3.0,
+            dominance_margin=0.2,
+            conflict_min=1.0,
+        )
+        _print_table(
+            ["id", "ego", "sup", "conflict", "margin", "should_apply", "reason"],
+            [["5.5", "8.3", "8.5", "3.0", "0.2", str(dec.should_apply), dec.reason]],
+            title="test_tight_margin_fires_when_superego_barely_dominant",
+        )
+        assert dec.should_apply is True, (
+            f"Tight margin (0.2) should allow critique at sup=8.5, ego=8.3; "
+            f"got reason={dec.reason}"
+        )
+
+    def test_normal_margin_suppresses_barely_dominant_superego(self):
+        """Same drives but normal margin=0.5: 8.5 < 8.3+0.5=8.8 → no fire."""
+        dec = _decision(
+            id_strength=5.5,
+            ego_strength=8.3,
+            superego_strength=8.5,
+            conflict=3.0,
+            dominance_margin=0.5,
+            conflict_min=2.0,
+        )
+        _print_table(
+            ["id", "ego", "sup", "conflict", "margin", "should_apply", "reason"],
+            [["5.5", "8.3", "8.5", "3.0", "0.5", str(dec.should_apply), dec.reason]],
+            title="test_normal_margin_suppresses_barely_dominant_superego",
+        )
+        assert dec.should_apply is False, (
+            f"Normal margin (0.5) should suppress barely-dominant superego; "
+            f"got reason={dec.reason}"
+        )
+
+    def test_low_conflict_fires_with_extreme_conflict_min(self):
+        """conflict=1.5 fires when conflict_min=1.0 (extreme) but sup is clearly dominant."""
+        dec = _decision(
+            id_strength=5.0,
+            ego_strength=8.5,
+            superego_strength=9.2,
+            conflict=1.5,
+            dominance_margin=0.2,
+            conflict_min=1.0,
+        )
+        _print_table(
+            ["id", "ego", "sup", "conflict", "conflict_min", "should_apply", "reason"],
+            [["5.0", "8.5", "9.2", "1.5", "1.0", str(dec.should_apply), dec.reason]],
+            title="test_low_conflict_fires_with_extreme_conflict_min",
+        )
+        assert dec.should_apply is True, (
+            f"Extreme conflict_min (1.0) should allow critique at conflict=1.5; "
+            f"got reason={dec.reason}"
+        )
+
+    def test_normal_conflict_min_suppresses_low_conflict(self):
+        """Same drives but normal conflict_min=2.0: conflict=1.5 < 2.0 → no fire."""
+        dec = _decision(
+            id_strength=5.0,
+            ego_strength=8.5,
+            superego_strength=9.2,
+            conflict=1.5,
+            dominance_margin=0.2,
+            conflict_min=2.0,
+        )
+        _print_table(
+            ["id", "ego", "sup", "conflict", "conflict_min", "should_apply", "reason"],
+            [["5.0", "8.5", "9.2", "1.5", "2.0", str(dec.should_apply), dec.reason]],
+            title="test_normal_conflict_min_suppresses_low_conflict",
+        )
+        assert dec.should_apply is False, (
+            f"Normal conflict_min (2.0) should suppress critique at conflict=1.5; "
+            f"got reason={dec.reason}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 10. Socrates anxiety emotion during superego critique
+# ---------------------------------------------------------------------------
+
+
+class TestSocratesAnxietyDuringCritique:
+    """When Socrates' superego critique fires, _last_emotion must be 'fear'
+    and the critique prompt must include the anxious-tone instruction."""
+
+    def test_socrates_last_emotion_is_fear_when_critique_fires(self):
+        """After speak() with superego-dominant drives, _last_emotion='fear'."""
+        agent, cfg = _make_agent(ego_dominant=False)  # superego dominant
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent._last_superego_rewrite is True, (
+            "Superego critique must have fired for this test to be valid"
+        )
+        assert agent._last_emotion == "fear", (
+            f"Expected _last_emotion='fear' when Socrates critique fires; "
+            f"got '{agent._last_emotion}'"
+        )
+        assert agent._last_emotion_intensity >= 0.8, (
+            f"Expected intensity >= 0.8 during Socrates critique; "
+            f"got {agent._last_emotion_intensity}"
+        )
+
+    def test_socrates_emotion_not_fear_when_critique_does_not_fire(self):
+        """When critique does not fire, the emotion is taken from inference (not forced)."""
+        agent, cfg = _make_agent(ego_dominant=True)  # ego dominant, no critique
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent._last_superego_rewrite is False, (
+            "Critique must NOT have fired for this test to be valid"
+        )
+        # Emotion comes from inference mock ("neutral"), not forced to "fear"
+        assert agent._last_emotion == "neutral", (
+            f"Expected _last_emotion='neutral' when critique does not fire; "
+            f"got '{agent._last_emotion}'"
+        )
+
+    def test_critique_prompt_for_socrates_mentions_anxious_tone(self):
+        """The critique LLM call for Socrates must include the anxious-tone instruction."""
+        agent, cfg = _make_agent(ego_dominant=False)
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        # Inspect all generate() calls to find the critique prompt
+        all_calls = agent.llm.generate.call_args_list
+        critique_prompts = [
+            call.args[1] if call.args and len(call.args) > 1 else call.kwargs.get("prompt", "")
+            for call in all_calls
+        ]
+        anxiety_in_critique = any(
+            "anxious" in p.lower() or "nervous" in p.lower()
+            for p in critique_prompts
+        )
+        assert anxiety_in_critique, (
+            "At least one LLM call to Socrates' critique prompt must mention 'anxious' or 'nervous'"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

@@ -76,6 +76,7 @@ class _DriveStub:
         ego_strength: float,
         superego_strength: float,
         self_awareness: float = 0.55,
+        name: str = "",
     ):
         self.drives = {
             "id_strength": id_strength,
@@ -84,6 +85,7 @@ class _DriveStub:
             "self_awareness": self_awareness,
         }
         self.energy_level: float = 100.0
+        self.name: str = name
 
     # -- helpers identical to production code --
 
@@ -151,10 +153,27 @@ class _DriveStub:
         # proportionally to how far they've drifted, plus a random oscillation so they
         # can move in either direction.  This prevents either drive from stagnating at
         # an extreme level and ensures changes ripple into the ego balance every turn.
-        ide += 0.04 * (5.0 - ide) + random.uniform(-0.15, 0.15)
-        sup += 0.04 * (5.0 - sup) + random.uniform(-0.15, 0.15)
+        # Fluidity: per-agent biased reversion with extreme rebalancing.
+        # Mirror of the production logic in Agent.update_drives_after_turn().
+        _ATHENA_ID_TARGET = 6.5
+        _SOCRATES_SUP_TARGET = 6.5
+        _EXTREME_HIGH = 8.5
+        _EXTREME_LOW = 1.5
+        _EXTREME_BOOST = 0.06
+        _ide_target = _ATHENA_ID_TARGET if self.name == "Athena" else 5.0
+        _sup_target = _SOCRATES_SUP_TARGET if self.name == "Socrates" else 5.0
+        _ide_rate = 0.04 + (_EXTREME_BOOST if (ide >= _EXTREME_HIGH or ide <= _EXTREME_LOW) else 0.0)
+        _sup_rate = 0.04 + (_EXTREME_BOOST if (sup >= _EXTREME_HIGH or sup <= _EXTREME_LOW) else 0.0)
+        ide += _ide_rate * (_ide_target - ide) + random.uniform(-0.15, 0.15)
+        sup += _sup_rate * (_sup_target - sup) + random.uniform(-0.15, 0.15)
         ide = max(0.0, min(10.0, ide))
         sup = max(0.0, min(10.0, sup))
+
+        # Ego drain at the expense of the biased drive.
+        if self.name == "Athena":
+            ego = max(0.0, ego - 0.03 * max(0.0, ide - 5.0) / 5.0)
+        elif self.name == "Socrates":
+            ego = max(0.0, ego - 0.03 * max(0.0, sup - 5.0) / 5.0)
 
         self.drives = {
             "id_strength": ide,
@@ -598,6 +617,158 @@ class TestEnergyDrainConflictCorrelation:
             assert (
                 drain_val <= cap + 1e-9
             ), f"Drain {drain_val:.2f} exceeded cap of {cap}"
+
+
+# ---------------------------------------------------------------------------
+# Tests: Agent-specific biased id/superego reversion (Athena id, Socrates superego)
+# ---------------------------------------------------------------------------
+
+
+class TestAgentBiasedDriveReversion:
+    """
+    Athena's id drifts toward 6.5 (biased above neutral) at ego's expense.
+    Socrates' superego drifts toward 6.5 at ego's expense.
+    At extremes (>= 8.5 or <= 1.5) reversion is boosted for faster re-equilibration.
+    """
+
+    def test_athena_id_drifts_above_neutral_over_turns(self):
+        """Starting from balanced drives, Athena's id should trend above 5.0."""
+        random.seed(0)
+        athena = _DriveStub(5.0, 5.0, 5.0, name="Athena")
+        for _ in range(50):
+            athena.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=0)
+        ide_final = float(athena.drives["id_strength"])
+        _print_table(
+            ["Agent", "id after 50 turns", "Expected > 5.0"],
+            [["Athena", f"{ide_final:.4f}", "yes"]],
+            title="test_athena_id_drifts_above_neutral_over_turns",
+        )
+        assert ide_final > 5.0, (
+            f"Athena's id should trend above neutral; got {ide_final:.4f}"
+        )
+
+    def test_socrates_superego_drifts_above_neutral_over_turns(self):
+        """Starting from balanced drives, Socrates' superego should trend above 5.0."""
+        random.seed(0)
+        socrates = _DriveStub(5.0, 5.0, 5.0, name="Socrates")
+        for _ in range(50):
+            socrates.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=0)
+        sup_final = float(socrates.drives["superego_strength"])
+        _print_table(
+            ["Agent", "superego after 50 turns", "Expected > 5.0"],
+            [["Socrates", f"{sup_final:.4f}", "yes"]],
+            title="test_socrates_superego_drifts_above_neutral_over_turns",
+        )
+        assert sup_final > 5.0, (
+            f"Socrates' superego should trend above neutral; got {sup_final:.4f}"
+        )
+
+    def test_generic_agent_id_stays_near_neutral(self):
+        """A nameless agent's id should stay near 5.0 (no bias)."""
+        random.seed(0)
+        generic = _DriveStub(5.0, 5.0, 5.0, name="")
+        for _ in range(50):
+            generic.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=0)
+        ide_final = float(generic.drives["id_strength"])
+        _print_table(
+            ["Agent", "id after 50 turns", "Expected ≈ 5.0"],
+            [["generic", f"{ide_final:.4f}", "~5.0"]],
+            title="test_generic_agent_id_stays_near_neutral",
+        )
+        # No bias: id should not consistently drift far above 5.0
+        assert ide_final < 7.0, (
+            f"Generic agent's id should stay near neutral; got {ide_final:.4f}"
+        )
+
+    def test_athena_id_bias_drains_ego(self):
+        """Athena's ego should be lower than a generic agent's ego after many turns."""
+        random.seed(0)
+        athena = _DriveStub(7.0, 5.0, 5.0, name="Athena")
+        generic = _DriveStub(7.0, 5.0, 5.0, name="")
+        for _ in range(30):
+            athena.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=0)
+            generic.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=0)
+        ego_athena = float(athena.drives["ego_strength"])
+        ego_generic = float(generic.drives["ego_strength"])
+        _print_table(
+            ["Agent", "ego after 30 turns (id=7 start)"],
+            [["Athena", f"{ego_athena:.4f}"], ["generic", f"{ego_generic:.4f}"]],
+            title="test_athena_id_bias_drains_ego",
+        )
+        assert ego_athena < ego_generic, (
+            f"Athena's ego ({ego_athena:.4f}) should be lower than generic ({ego_generic:.4f}) "
+            "due to id bias drain"
+        )
+
+    def test_socrates_superego_bias_drains_ego(self):
+        """Socrates' ego should be lower than a generic agent's ego after many turns."""
+        random.seed(0)
+        socrates = _DriveStub(5.0, 5.0, 7.0, name="Socrates")
+        generic = _DriveStub(5.0, 5.0, 7.0, name="")
+        for _ in range(30):
+            socrates.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=0)
+            generic.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=0)
+        ego_socrates = float(socrates.drives["ego_strength"])
+        ego_generic = float(generic.drives["ego_strength"])
+        _print_table(
+            ["Agent", "ego after 30 turns (sup=7 start)"],
+            [["Socrates", f"{ego_socrates:.4f}"], ["generic", f"{ego_generic:.4f}"]],
+            title="test_socrates_superego_bias_drains_ego",
+        )
+        assert ego_socrates < ego_generic, (
+            f"Socrates' ego ({ego_socrates:.4f}) should be lower than generic ({ego_generic:.4f}) "
+            "due to superego bias drain"
+        )
+
+    def test_athena_id_extreme_high_reverts_faster(self):
+        """Athena's id starting at an extreme high should converge back faster than normal."""
+        random.seed(42)
+        athena_extreme = _DriveStub(9.5, 5.0, 5.0, name="Athena")
+        athena_normal = _DriveStub(7.0, 5.0, 5.0, name="Athena")
+        for _ in range(10):
+            athena_extreme.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
+            athena_normal.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
+        ide_extreme = float(athena_extreme.drives["id_strength"])
+        ide_normal = float(athena_normal.drives["id_strength"])
+        distance_extreme = abs(ide_extreme - 9.5)  # how far it moved from start
+        distance_normal = abs(ide_normal - 7.0)
+        _print_table(
+            ["Scenario", "start id", "id after 10 turns", "distance moved"],
+            [
+                ["extreme (9.5)", "9.5", f"{ide_extreme:.4f}", f"{distance_extreme:.4f}"],
+                ["normal  (7.0)", "7.0", f"{ide_normal:.4f}", f"{distance_normal:.4f}"],
+            ],
+            title="test_athena_id_extreme_high_reverts_faster",
+        )
+        assert distance_extreme > distance_normal, (
+            f"Extreme id (start=9.5) should move more ({distance_extreme:.4f}) than "
+            f"normal id (start=7.0, moved={distance_normal:.4f}) due to boost"
+        )
+
+    def test_socrates_superego_extreme_low_reverts_faster(self):
+        """Socrates' superego at extreme low should revert toward target faster than normal."""
+        random.seed(42)
+        socrates_extreme = _DriveStub(5.0, 5.0, 0.5, name="Socrates")
+        socrates_normal = _DriveStub(5.0, 5.0, 3.0, name="Socrates")
+        for _ in range(10):
+            socrates_extreme.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
+            socrates_normal.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
+        sup_extreme = float(socrates_extreme.drives["superego_strength"])
+        sup_normal = float(socrates_normal.drives["superego_strength"])
+        distance_extreme = abs(sup_extreme - 0.5)
+        distance_normal = abs(sup_normal - 3.0)
+        _print_table(
+            ["Scenario", "start sup", "sup after 10 turns", "distance moved"],
+            [
+                ["extreme (0.5)", "0.5", f"{sup_extreme:.4f}", f"{distance_extreme:.4f}"],
+                ["normal  (3.0)", "3.0", f"{sup_normal:.4f}", f"{distance_normal:.4f}"],
+            ],
+            title="test_socrates_superego_extreme_low_reverts_faster",
+        )
+        assert distance_extreme > distance_normal, (
+            f"Extreme superego (start=0.5) should move more ({distance_extreme:.4f}) than "
+            f"normal superego (start=3.0, moved={distance_normal:.4f}) due to boost"
+        )
 
 
 if __name__ == "__main__":

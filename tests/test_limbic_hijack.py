@@ -159,6 +159,43 @@ class TestLimbicHijackActivation:
 
 
 # ---------------------------------------------------------------------------
+# 2b. Extreme id threshold lowering
+# ---------------------------------------------------------------------------
+
+
+class TestLimbicHijackExtremeId:
+    """At extreme id (>= 8.5) the emotion intensity threshold drops from 0.7 to 0.5."""
+
+    def test_activates_with_moderate_intensity_at_extreme_id(self):
+        """id >= 8.5, intensity 0.6 (above 0.5 but below 0.7) → hijack fires."""
+        # id=9.0, ego=5.0, sup=5.0 → conflict = |9-5|+|5-5| = 4.0 > 0.6
+        agent, cfg = _make_agent(id_strength=9.0, emotion_intensity=0.6)
+        agent._last_emotion_intensity = 0.6
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent.limbic_hijack is True, (
+            "Extreme id (9.0) with intensity 0.6 should trigger hijack "
+            "(threshold lowered to 0.5 at extreme id >= 8.5)"
+        )
+
+    def test_no_activation_with_moderate_intensity_at_normal_id(self):
+        """id < 8.5, intensity 0.6 → hijack does NOT fire (standard threshold 0.7)."""
+        # id=8.0, ego=5.0, sup=5.0 → conflict = 3.0 > 0.6, but intensity 0.6 < 0.7
+        agent, cfg = _make_agent(id_strength=8.0, emotion_intensity=0.6)
+        agent._last_emotion_intensity = 0.6
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent.limbic_hijack is False, (
+            "Normal id (8.0) with intensity 0.6 should NOT trigger hijack "
+            "(standard threshold 0.7 still applies below extreme)"
+        )
+
+
+# ---------------------------------------------------------------------------
 # 3. Exit conditions
 # ---------------------------------------------------------------------------
 
@@ -228,6 +265,59 @@ class TestLimbicHijackResponseKind:
 
         assert agent.limbic_hijack is True
         assert agent._last_response_kind == "impulsive"
+
+
+# ---------------------------------------------------------------------------
+# 4b. Athena limbic hijack — anger emotion and harsh behavioral rule
+# ---------------------------------------------------------------------------
+
+
+class TestAthenaLimbicHijackAnger:
+    """During Athena's limbic hijack her emotion is forced to 'anger' and the
+    behavioral rule instructs harsh language."""
+
+    def test_athena_last_emotion_is_anger_during_hijack(self):
+        """After speak(), _last_emotion must be 'anger' when Athena is in hijack."""
+        agent, cfg = _make_agent(
+            id_strength=9.0,
+            emotion_intensity=0.8,
+        )
+        # Change agent name to Athena for this test
+        agent.name = "Athena"
+        agent._last_emotion_intensity = 0.8
+
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("What is justice?", [])
+
+        assert agent.limbic_hijack is True, "Athena should be in limbic hijack"
+        assert agent._last_emotion == "anger", (
+            f"Expected _last_emotion='anger' during Athena hijack, got '{agent._last_emotion}'"
+        )
+        assert agent._last_emotion_intensity >= 0.8, (
+            f"Expected intensity >= 0.8 during Athena hijack, got {agent._last_emotion_intensity}"
+        )
+
+    def test_athena_behavioral_rule_contains_anger_instruction(self):
+        """The behavioral rule injected when Athena is in hijack must mention anger."""
+        agent, cfg = _make_agent(id_strength=9.0, emotion_intensity=0.8)
+        agent.name = "Athena"
+        agent.limbic_hijack = True  # pre-activate
+
+        rule = agent._behavioral_rule_instruction()
+        assert "anger" in rule.lower(), (
+            f"Expected anger instruction in rule; got: {rule}"
+        )
+
+    def test_non_athena_agent_does_not_get_anger_rule(self):
+        """Socrates in limbic hijack must NOT get the Athena anger rule."""
+        agent, cfg = _make_agent(id_strength=9.0, emotion_intensity=0.8)
+        # agent.name is already "Socrates" from _make_agent
+        agent.limbic_hijack = True
+
+        rule = agent._behavioral_rule_instruction()
+        assert "anger" not in rule.lower(), (
+            "Athena anger rule must not fire for Socrates"
+        )
 
 
 # ---------------------------------------------------------------------------
