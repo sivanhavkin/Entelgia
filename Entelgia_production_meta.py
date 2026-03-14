@@ -117,7 +117,8 @@ try:
         FreudianSlip,
         SelfReplication,
     )
-    from entelgia.web_research import maybe_add_web_context
+    from entelgia.web_research import maybe_add_web_context, clear_research_caches
+    from entelgia.fixy_research_trigger import clear_trigger_cooldown
 
     # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
     from entelgia.loop_guard import (
@@ -186,6 +187,12 @@ except ImportError:
 
         def format_replication(self, memory):
             return ""
+
+    def clear_trigger_cooldown() -> None:  # type: ignore[no-redef]
+        pass
+
+    def clear_research_caches() -> None:  # type: ignore[no-redef]
+        pass
 
 
 # Optional: FastAPI for REST API
@@ -4896,6 +4903,15 @@ class MainScript:
 
     def run(self):
         """Main execution loop (timeout configurable in minutes)."""
+        # Reset module-level search/cooldown state so that a new session always
+        # starts with a clean slate, regardless of how many sessions have already
+        # run in the same Python process.
+        clear_trigger_cooldown()
+        clear_research_caches()
+        logger.info(
+            "Session %s: research cooldown and cache state reset for new chat.",
+            self.session_id,
+        )
         # Build topic cycle starting from the configured seed_topic so the
         # active topic always matches the opening seed text.
         first_topic = self.cfg.seed_topic
