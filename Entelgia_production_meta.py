@@ -3085,9 +3085,30 @@ class Agent:
     def _behavioral_rule_instruction(self) -> str:
         """Return a behavioral rule instruction to inject into the prompt, if applicable.
 
+        Rule LH (Athena limbic hijack): Speak with raw anger and harsh words.
+        Rule SC (Socrates superego dominant): Speak with anxiety and nervousness.
         Rule A (Socrates): If Conflict > 6, end response with a sharp binary-choice question (A or B).
         Rule B (Athena): If Conflict > 6, directly challenge or counter Socrates's position using varied language.
         """
+        if self.name == "Athena" and self.limbic_hijack:
+            return (
+                "BEHAVIORAL RULE: You are in an emotional override state — your Id is dominant. "
+                "You MUST respond with raw anger and frustration. Use sharp, harsh, cutting language. "
+                "Express your emotions directly and forcefully. Do not soften your words."
+            )
+        _sup_sc = float(self.drives.get("superego_strength", 5.0))
+        _ego_sc = float(self.drives.get("ego_strength", 5.0))
+        _ide_sc = float(self.drives.get("id_strength", 5.0))
+        if (
+            self.name == "Socrates"
+            and _sup_sc >= _ego_sc + 0.5
+            and _sup_sc >= _ide_sc + 0.5
+        ):
+            return (
+                "BEHAVIORAL RULE: Your SuperEgo is dominant — you are experiencing deep internal tension. "
+                "You MUST respond with visible anxiety and nervousness. Use hesitant, uncertain language. "
+                "Express doubt and unease. Your words should reflect inner conflict and apprehension."
+            )
         if (
             self.name == "Socrates"
             and self.conflict_index() > 6
@@ -3145,15 +3166,37 @@ class Agent:
         if pre_conflict > 4.0:
             ego = max(0.0, ego - 0.03 * (pre_conflict - 4.0))
 
-        # Fluidity: each turn, id and superego are pulled back toward neutral (5.0)
-        # proportionally to how far they've drifted, plus a random oscillation so they
-        # can move in either direction.  This prevents either drive from stagnating at
-        # an extreme level and ensures changes ripple into the ego balance every turn.
+        # Fluidity: each turn, id and superego are pulled back toward a per-agent preferred
+        # level, plus a random oscillation so they can move in either direction.
+        # Athena's id is biased toward a slightly higher target (6.5) at ego's expense;
+        # Socrates' superego is biased toward 6.5 by the same principle.
+        # When a drive reaches an extreme (>= 8.5 or <= 1.5), an extra reversion boost is
+        # applied so it gradually re-equilibrates over several turns rather than stagnating.
+        _ATHENA_ID_TARGET = 6.5      # Athena's id drifts toward this preferred level
+        _SOCRATES_SUP_TARGET = 6.5   # Socrates' superego drifts toward this preferred level
+        _EXTREME_HIGH = 8.5          # drives above this threshold revert faster
+        _EXTREME_LOW = 1.5           # drives below this threshold revert faster
+        _EXTREME_BOOST = 0.06        # extra reversion rate applied at extremes
         _osc = CFG.drive_oscillation_range
-        ide += CFG.drive_mean_reversion_rate * (5.0 - ide) + random.uniform(-_osc, _osc)
-        sup += CFG.drive_mean_reversion_rate * (5.0 - sup) + random.uniform(-_osc, _osc)
+        _ide_target = _ATHENA_ID_TARGET if self.name == "Athena" else 5.0
+        _sup_target = _SOCRATES_SUP_TARGET if self.name == "Socrates" else 5.0
+        _ide_rate = CFG.drive_mean_reversion_rate + (
+            _EXTREME_BOOST if (ide >= _EXTREME_HIGH or ide <= _EXTREME_LOW) else 0.0
+        )
+        _sup_rate = CFG.drive_mean_reversion_rate + (
+            _EXTREME_BOOST if (sup >= _EXTREME_HIGH or sup <= _EXTREME_LOW) else 0.0
+        )
+        ide += _ide_rate * (_ide_target - ide) + random.uniform(-_osc, _osc)
+        sup += _sup_rate * (_sup_target - sup) + random.uniform(-_osc, _osc)
         ide = max(0.0, min(10.0, ide))
         sup = max(0.0, min(10.0, sup))
+
+        # The biased drive comes at ego's expense: ego is slightly drained when Athena's id
+        # or Socrates' superego is elevated above the neutral level (5.0).
+        if self.name == "Athena":
+            ego = max(0.0, ego - 0.03 * max(0.0, ide - 5.0) / 5.0)
+        elif self.name == "Socrates":
+            ego = max(0.0, ego - 0.03 * max(0.0, sup - 5.0) / 5.0)
 
         self.drives = {
             "id_strength": ide,
@@ -3484,11 +3527,14 @@ class Agent:
         sup = float(self.drives.get("superego_strength", 5.0))
 
         # Limbic hijack: activate when Id is dominant, emotional intensity is high,
-        # and conflict crosses threshold.  Exit when intensity drops or after
+        # and conflict crosses threshold.  At extreme id (>= 8.5) the intensity
+        # threshold is lowered to 0.5 so the hijack fires more readily, reflecting
+        # the heightened impulsive override risk.  Exit when intensity drops or after
         # LIMBIC_HIJACK_MAX_TURNS turns without re-trigger.
+        _limbic_intensity_threshold = 0.5 if ide >= 8.5 else 0.7
         if (
             ide > 7
-            and self._last_emotion_intensity > 0.7
+            and self._last_emotion_intensity > _limbic_intensity_threshold
             and self.conflict_index() > 0.6
         ):
             self.limbic_hijack = True
@@ -3547,25 +3593,38 @@ class Agent:
                 out = _parts[0].strip()
 
         # Superego → second-pass critique (internal governor)
+        # When Socrates' superego is at extreme high (>= 8.5), tighten the critique
+        # thresholds and bypass the limbic hijack reduction so the extreme superego
+        # can assert itself as a counterforce.
         _cfg = self.cfg
+        _sup_extreme = sup >= 8.5 and self.name == "Socrates"
+        _sup_for_critique = sup if _sup_extreme else effective_sup
         _critique = evaluate_superego_critique(
             id_strength=ide,
             ego_strength=ego,
-            superego_strength=effective_sup,
+            superego_strength=_sup_for_critique,
             conflict=self.conflict_index(),
             enabled=getattr(_cfg, "superego_critique_enabled", True),
-            dominance_margin=getattr(_cfg, "superego_dominance_margin", 0.5),
-            conflict_min=getattr(_cfg, "superego_critique_conflict_min", 2.0),
+            dominance_margin=0.2 if _sup_extreme else getattr(_cfg, "superego_dominance_margin", 0.5),
+            conflict_min=1.0 if _sup_extreme else getattr(_cfg, "superego_critique_conflict_min", 2.0),
         )
         self._last_superego_rewrite = _critique.should_apply
         self._last_critique_reason = _critique.reason
         if _critique.should_apply:
             if self._consecutive_superego_rewrites < MAX_CONSECUTIVE_SUPEREGO_REWRITES:
-                critique_prompt = (
-                    "Rewrite the following response to be more principled, "
-                    "less impulsive, remove contradictions, keep the core idea.\n\n"
-                    f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
-                )
+                if self.name == "Socrates":
+                    critique_prompt = (
+                        "Rewrite the following response to be more principled, "
+                        "less impulsive, remove contradictions, keep the core idea. "
+                        "Maintain an anxious and nervous tone — the speaker is tense and uneasy.\n\n"
+                        f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
+                    )
+                else:
+                    critique_prompt = (
+                        "Rewrite the following response to be more principled, "
+                        "less impulsive, remove contradictions, keep the core idea.\n\n"
+                        f"ORIGINAL:\n{out}\n\n{LLM_RESPONSE_LIMIT}\nREWRITE:\n"
+                    )
                 out = validate_output(
                     self.llm.generate(
                         self.model, critique_prompt, temperature=0.25, use_cache=False
@@ -3667,6 +3726,19 @@ class Agent:
                     )
 
         emo, inten = self.emotion.infer(self.model, out)
+        # During Athena's limbic hijack, register emotion as anger so that
+        # drive updates correctly amplify the id-dominant state.
+        if self.name == "Athena" and self.limbic_hijack:
+            emo = "anger"
+            inten = max(float(inten), 0.8)
+        # When Socrates' superego critique fires, register emotion as fear (anxiety)
+        # so that drive updates correctly amplify the superego-dominant state.
+        # Safety: `_last_superego_rewrite` is reset to False at the top of every speak()
+        # call and only set True when evaluate_superego_critique returns should_apply=True,
+        # so this branch only runs for the specific agent instance whose critique fired.
+        elif self.name == "Socrates" and self._last_superego_rewrite:
+            emo = "fear"
+            inten = max(float(inten), 0.8)
         kind = "reflective"
         if self.limbic_hijack:
             kind = "impulsive"

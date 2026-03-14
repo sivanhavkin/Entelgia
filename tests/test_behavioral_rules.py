@@ -31,6 +31,7 @@ class _StubAgent:
         id_strength: float,
         ego_strength: float,
         superego_strength: float,
+        limbic_hijack: bool = False,
     ):
         self.name = name
         self.drives = {
@@ -38,6 +39,7 @@ class _StubAgent:
             "ego_strength": ego_strength,
             "superego_strength": superego_strength,
         }
+        self.limbic_hijack = limbic_hijack
 
     # Copy of the real conflict_index() logic
     def conflict_index(self) -> float:
@@ -56,6 +58,25 @@ class _StubAgent:
 
     # The method under test – identical to the production implementation
     def _behavioral_rule_instruction(self) -> str:
+        if self.name == "Athena" and self.limbic_hijack:
+            return (
+                "BEHAVIORAL RULE: You are in an emotional override state — your Id is dominant. "
+                "You MUST respond with raw anger and frustration. Use sharp, harsh, cutting language. "
+                "Express your emotions directly and forcefully. Do not soften your words."
+            )
+        _sup_sc = float(self.drives.get("superego_strength", 5.0))
+        _ego_sc = float(self.drives.get("ego_strength", 5.0))
+        _ide_sc = float(self.drives.get("id_strength", 5.0))
+        if (
+            self.name == "Socrates"
+            and _sup_sc >= _ego_sc + 0.5
+            and _sup_sc >= _ide_sc + 0.5
+        ):
+            return (
+                "BEHAVIORAL RULE: Your SuperEgo is dominant — you are experiencing deep internal tension. "
+                "You MUST respond with visible anxiety and nervousness. Use hesitant, uncertain language. "
+                "Express doubt and unease. Your words should reflect inner conflict and apprehension."
+            )
         if (
             self.name == "Socrates"
             and self.conflict_index() > 6
@@ -540,6 +561,241 @@ class TestPromptInjection:
             title="test_no_rule_leaves_prompt_unchanged",
         )
         assert result == dummy_prompt
+
+
+# ---------------------------------------------------------------------------
+# Rule LH: Athena limbic hijack → angry/harsh response rule
+# ---------------------------------------------------------------------------
+
+
+def _athena_with_hijack(id_strength: float = 9.0) -> _StubAgent:
+    """Build an Athena stub with limbic_hijack=True."""
+    return _StubAgent(
+        name="Athena",
+        id_strength=id_strength,
+        ego_strength=5.0,
+        superego_strength=5.0,
+        limbic_hijack=True,
+    )
+
+
+class TestRuleLHAthenaLimbicHijack:
+    """Rule LH: When Athena is in limbic hijack, the anger/harsh rule fires unconditionally."""
+
+    def test_anger_rule_fires_when_athena_in_hijack(self):
+        """limbic_hijack=True → anger rule returned regardless of conflict or random."""
+        agent = _athena_with_hijack()
+        rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["Agent", "limbic_hijack", "rule (truncated)", "expected 'anger' keyword"],
+            [["Athena", "True", rule[:60] + "..." if len(rule) > 60 else rule, str("anger" in rule.lower())]],
+            title="test_anger_rule_fires_when_athena_in_hijack",
+        )
+        assert rule != "", "Expected a non-empty rule when Athena is in limbic hijack"
+        assert "anger" in rule.lower(), (
+            f"Expected 'anger' in rule; got: {rule}"
+        )
+
+    def test_anger_rule_mentions_harsh_language(self):
+        """The rule must instruct harsh/cutting language."""
+        agent = _athena_with_hijack()
+        rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["rule", "contains 'harsh'?"],
+            [[rule[:80] + "..." if len(rule) > 80 else rule, str("harsh" in rule.lower())]],
+            title="test_anger_rule_mentions_harsh_language",
+        )
+        assert "harsh" in rule.lower(), (
+            f"Expected 'harsh' in anger rule; got: {rule}"
+        )
+
+    def test_anger_rule_takes_priority_over_conflict_rule(self):
+        """Even at high conflict (> 6), limbic hijack rule wins over Rule B."""
+        # Set conflict > 6: id=9, ego=2, sup=5 → |9-2|+|5-2|=7+3=10
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=9.0,
+            ego_strength=2.0,
+            superego_strength=5.0,
+            limbic_hijack=True,
+        )
+        with patch("random.random", return_value=0.1):  # random gate would pass Rule B
+            rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["conflict_index", "limbic_hijack", "rule (truncated)"],
+            [[f"{agent.conflict_index():.1f}", "True", rule[:60] + "..." if len(rule) > 60 else rule]],
+            title="test_anger_rule_takes_priority_over_conflict_rule",
+        )
+        assert "anger" in rule.lower(), (
+            "Limbic hijack anger rule must take priority over Rule B even at high conflict"
+        )
+        assert "challenge" not in rule.lower(), (
+            "Rule B (challenge) must NOT be returned when limbic hijack is active"
+        )
+
+    def test_no_anger_rule_when_hijack_inactive(self):
+        """Without limbic hijack, Athena follows normal Rule B or returns empty."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.9):  # random gate blocks Rule B
+            rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["limbic_hijack", "conflict_index", "rule"],
+            [["False", f"{agent.conflict_index():.1f}", repr(rule)]],
+            title="test_no_anger_rule_when_hijack_inactive",
+        )
+        assert "anger" not in rule.lower(), (
+            "Anger rule must NOT fire when limbic_hijack is False"
+        )
+
+    def test_socrates_hijack_does_not_trigger_athena_rule(self):
+        """Limbic hijack on Socrates must not emit the Athena anger rule."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=9.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=True,
+        )
+        rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["Agent", "limbic_hijack", "rule (truncated)"],
+            [["Socrates", "True", (rule[:60] + "..." if len(rule) > 60 else rule) if rule else "(empty)"]],
+            title="test_socrates_hijack_does_not_trigger_athena_rule",
+        )
+        assert "anger" not in rule.lower(), (
+            "Athena anger rule must NOT fire for Socrates"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rule SC: Socrates superego dominant → anxiety/nervousness rule
+# ---------------------------------------------------------------------------
+
+
+def _socrates_superego_dominant(sup: float = 7.0) -> _StubAgent:
+    """Build a Socrates stub with superego dominant (sup > ego+0.5 and sup > id+0.5)."""
+    return _StubAgent(
+        name="Socrates",
+        id_strength=5.0,
+        ego_strength=sup - 1.0,  # ensure sup >= ego + 0.5 by a comfortable margin
+        superego_strength=sup,
+        limbic_hijack=False,
+    )
+
+
+class TestRuleSCSocratesAnxiety:
+    """Rule SC: When Socrates' superego dominates (>= ego+0.5 and >= id+0.5) the
+    anxiety/nervousness rule fires unconditionally (no random gate)."""
+
+    def test_anxiety_rule_fires_when_superego_dominant(self):
+        """sup >= ego+0.5 and sup >= id+0.5 → anxiety rule returned."""
+        # sup=7.5, ego=5.0, id=5.0 → sup-ego=2.5 ≥ 0.5, sup-id=2.5 ≥ 0.5
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=7.5,
+        )
+        rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["Agent", "sup", "ego", "id", "rule (truncated)", "contains 'anxiety'?"],
+            [["Socrates", "7.5", "5.0", "5.0", rule[:60] + "..." if len(rule) > 60 else rule, str("anxiety" in rule.lower())]],
+            title="test_anxiety_rule_fires_when_superego_dominant",
+        )
+        assert rule != "", "Expected non-empty rule when Socrates superego dominates"
+        assert "anxiety" in rule.lower(), (
+            f"Expected 'anxiety' in rule; got: {rule}"
+        )
+
+    def test_anxiety_rule_mentions_nervousness(self):
+        """The rule must instruct nervous/hesitant language."""
+        agent = _socrates_superego_dominant(sup=8.0)
+        rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["rule", "contains 'nervous'?"],
+            [[rule[:80] + "..." if len(rule) > 80 else rule, str("nervous" in rule.lower())]],
+            title="test_anxiety_rule_mentions_nervousness",
+        )
+        assert "nervous" in rule.lower(), (
+            f"Expected 'nervous' in anxiety rule; got: {rule}"
+        )
+
+    def test_anxiety_rule_fires_without_random_gate(self):
+        """Rule SC fires regardless of random value (no random gate)."""
+        agent = _socrates_superego_dominant(sup=7.0)
+        with patch("random.random", return_value=0.99):  # would block Rule A
+            rule = agent._behavioral_rule_instruction()
+        assert "anxiety" in rule.lower(), (
+            "Anxiety rule must fire regardless of random gate"
+        )
+
+    def test_no_anxiety_rule_when_superego_not_dominant(self):
+        """When superego does not dominate, anxiety rule must not fire."""
+        # sup=5.5, ego=5.5, id=5.5 → sup-ego=0 < 0.5 → no Rule SC
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=5.5,
+            ego_strength=5.5,
+            superego_strength=5.5,
+        )
+        with patch("random.random", return_value=0.99):  # block Rule A too
+            rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["sup", "ego", "id", "rule"],
+            [["5.5", "5.5", "5.5", repr(rule)]],
+            title="test_no_anxiety_rule_when_superego_not_dominant",
+        )
+        assert "anxiety" not in rule.lower(), (
+            "Anxiety rule must NOT fire when superego is not dominant"
+        )
+
+    def test_anxiety_rule_takes_priority_over_rule_a(self):
+        """Rule SC (anxiety) takes priority over Rule A (binary question) for Socrates."""
+        # Both conditions met: sup dominant AND conflict > 6
+        # sup=8, ego=5, id=5 → sup-ego=3 ≥ 0.5; conflict=|5-5|+|8-5|=3 (< 6, so Rule A won't fire anyway)
+        # Use sup=8, ego=3, id=3 → conflict=|3-3|+|8-3|=5, still <6 — let's go higher
+        # sup=9, ego=3, id=3 → conflict=|3-3|+|9-3|=6 — at boundary
+        # sup=9.5, ego=2, id=3 → conflict=|3-2|+|9.5-2|=1+7.5=8.5>6, sup>=ego+0.5, sup>=id+0.5
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=3.0,
+            ego_strength=2.0,
+            superego_strength=9.5,
+        )
+        with patch("random.random", return_value=0.1):  # random gate would pass Rule A
+            rule = agent._behavioral_rule_instruction()
+        _print_table(
+            ["conflict_index", "sup", "ego", "id", "rule (truncated)"],
+            [[f"{agent.conflict_index():.1f}", "9.5", "2.0", "3.0", rule[:60] + "..." if len(rule) > 60 else rule]],
+            title="test_anxiety_rule_takes_priority_over_rule_a",
+        )
+        assert "anxiety" in rule.lower(), (
+            "Rule SC (anxiety) must take priority over Rule A for Socrates"
+        )
+        assert "binary" not in rule.lower() and "options" not in rule.lower(), (
+            "Rule A (binary question) must NOT be returned when Rule SC applies"
+        )
+
+    def test_athena_superego_dominant_does_not_trigger_anxiety_rule(self):
+        """Superego dominant on Athena must NOT emit the Socrates anxiety rule."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=9.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "anxiety" not in rule.lower(), (
+            "Socrates anxiety rule must NOT fire for Athena"
+        )
 
 
 if __name__ == "__main__":
