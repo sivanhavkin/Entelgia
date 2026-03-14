@@ -3000,26 +3000,85 @@ class Agent:
         return abs(ide - ego) + abs(sup - ego)
 
     def debate_profile(self) -> Dict[str, Any]:
-        """Get debate style based on drives."""
+        """Get debate style based on drives, using agent-specific persona baseline.
+
+        Considers the combined state of all three drives (Id, Ego, SuperEgo) to
+        produce one of eight compound positions rather than only the single
+        dominant drive.  The current topic tone is also included in the profile.
+        """
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
         sup = float(self.drives.get("superego_strength", 5.0))
         dissent = min(10.0, max(0.0, (ide * 0.45) + (sup * 0.45) - (ego * 0.25)))
 
-        if ide >= sup and ide >= ego:
-            style = "provocative, desire-driven"
+        # A drive is "elevated" when it is clearly above the neutral default.
+        _HIGH = 6.5
+        id_high = ide >= _HIGH
+        ego_high = ego >= _HIGH
+        sup_high = sup >= _HIGH
+        high_count = sum([id_high, ego_high, sup_high])
+
+        # Map the combination of elevated drives to one of 8 named positions.
+        if high_count == 3:
+            combo_key = "balanced_high"
+            opening = "Multi-angle challenge. Test assumptions from every dimension."
+        elif id_high and sup_high:
+            combo_key = "high_id_superego"
+            opening = "Bold moral challenge. Push on ethical contradictions."
+        elif id_high and ego_high:
+            combo_key = "high_id_ego"
+            opening = "Forceful yet measured counterpoint."
+        elif ego_high and sup_high:
+            combo_key = "high_ego_superego"
+            opening = "Principled and balanced objection."
+        elif id_high:
+            combo_key = "high_id"
             opening = "Bold counterpoint. Push forward."
-        elif sup >= ide and sup >= ego:
-            style = "principled, rule-focused"
+        elif sup_high:
+            combo_key = "high_superego"
             opening = "Principled objection or logical inconsistency."
-        else:
-            style = "integrative, Socratic"
+        elif ego_high:
+            combo_key = "high_ego"
             opening = "Precise counterpoint, then synthesis."
+        else:
+            combo_key = "balanced"
+            opening = "Calibrated inquiry. Steady, balanced engagement."
+
+        # Generic fallbacks for each combo key (used when no persona_dict).
+        _GENERIC: Dict[str, str] = {
+            "high_id": "provocative, desire-driven",
+            "high_superego": "principled, rule-focused",
+            "high_ego": "integrative, Socratic",
+            "high_id_superego": "provocative and principled, morally charged",
+            "high_id_ego": "provocative yet measured, controlled assertiveness",
+            "high_ego_superego": "principled and balanced, structured discipline",
+            "balanced_high": "fully engaged, multi-dimensional critical mode",
+            "balanced": "calibrated, steady inquiry",
+        }
+        generic_style = _GENERIC.get(combo_key, "integrative, Socratic")
+
+        # Use agent-specific persona baseline style from drives_influence when available.
+        persona_dict = getattr(self, "persona_dict", None)
+        if persona_dict:
+            drives_influence = persona_dict.get("drives_influence", {})
+            style = drives_influence.get(combo_key, generic_style)
+        else:
+            style = generic_style
+
+        # Extract the active topic cluster from the injected topic_style string.
+        topic_tone = ""
+        raw_topic_style = getattr(self, "topic_style", "")
+        if raw_topic_style:
+            m = re.search(r"Topic cluster:\s*(\S+)", raw_topic_style)
+            if m:
+                topic_tone = m.group(1)
 
         return {
             "dissent_level": round(dissent, 2),
             "style": style,
             "opening_rule": opening,
+            "drive_combo": combo_key,
+            "topic_tone": topic_tone,
         }
 
     def _behavioral_rule_instruction(self) -> str:
@@ -4581,6 +4640,12 @@ class MainScript:
             + f"  Style: {profile['style']}  Dissent: {profile['dissent_level']}"
             + reset
         )
+        drive_combo = profile.get("drive_combo", "")
+        topic_tone = profile.get("topic_tone", "")
+        combo_line = f"  Drive combo: {drive_combo}"
+        if topic_tone:
+            combo_line += f"  Topic tone: {topic_tone}"
+        print(dim + combo_line + reset)
         if getattr(agent, "limbic_hijack", False):
             rewrite_tag = "  [META] Limbic hijack engaged — emotional override active"
         elif getattr(agent, "_superego_streak_suppressed", False):

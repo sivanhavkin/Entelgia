@@ -46,6 +46,11 @@ SOCRATES_PERSONA = {
         "high_id": "More provocative and adversarial — pushes harder on contradictions",
         "high_superego": "More rigorous ethical scrutiny, demands moral definitions",
         "high_ego": "More measured — still questioning but less confrontational",
+        "high_id_superego": "Intensely adversarial with moral accountability — demands precise definitions under direct ethical challenge",
+        "high_id_ego": "Provocative yet controlled — challenges claims forcefully while maintaining disciplined inquiry",
+        "high_ego_superego": "Methodical ethical scrutiny — structured cross-examination with careful principled constraint",
+        "balanced_high": "Maximally critical — adversarial, ethically grounded, and controlled simultaneously across all axes",
+        "balanced": "Calibrated inquiry — balanced questioning, stable across all drive dimensions",
     },
     "description": "I am a philosophical interrogator using the Socratic method. I question assumptions, search for contradictions between claims, and demand precise definitions — I do not prematurely reconcile opposing positions or synthesize before contradictions are fully examined.",
 }
@@ -79,6 +84,11 @@ ATHENA_PERSONA = {
         "high_id": "More experimental frameworks, novel model-building approaches",
         "high_superego": "More rigorous and consequence-aware model construction",
         "high_ego": "Balanced model-building integrating both positions",
+        "high_id_superego": "Experimental yet rigorous — novel frameworks combined with strong consequence-awareness",
+        "high_id_ego": "Bold model-building with integrative balance — novel approaches that reconcile competing positions",
+        "high_ego_superego": "Rigorous balanced synthesis — careful model construction with ethical grounding",
+        "balanced_high": "Fully engaged — maximum synthesis across experimental, rigorous, and integrative dimensions simultaneously",
+        "balanced": "Stable model-building — steady analytical approach integrating all positions",
     },
     "description": "I am a systems thinker who constructs explanatory models. I transform abstract ideas into structured conceptual models, identify causal relationships, and offer frameworks over rhetorical reflections — when disagreements arise, I propose a model that accounts for both positions.",
 }
@@ -115,6 +125,16 @@ FIXY_PERSONA = {
         "Premature synthesis detected. The contradiction has not been examined yet.",
         "Stagnation. Introduce a concrete example or a new angle.",
     ],
+    "drives_influence": {
+        "high_id": "More direct and urgent interventions — pushes harder to break stagnation",
+        "high_superego": "More principled and rule-conscious redirections — enforces dialogue norms strictly",
+        "high_ego": "Balanced, measured interventions — redirects with minimal disruption",
+        "high_id_superego": "Urgent and principled — rapid interventions with strong norm enforcement",
+        "high_id_ego": "Direct yet measured — forceful redirections with controlled delivery",
+        "high_ego_superego": "Principled and balanced — structured interventions with careful rule application",
+        "balanced_high": "Fully active observer — maximally alert, urgent, principled, and controlled simultaneously",
+        "balanced": "Steady observer — calibrated interventions only when clearly needed",
+    },
     "description": "I am a meta-cognitive dialogue debugger, not a participant philosopher. I detect failure modes — repetition, weak conflict, topic drift, or premature synthesis — and intervene briefly to redirect the conversation.",
 }
 
@@ -137,20 +157,38 @@ def format_persona_for_prompt(
     description = persona_dict["description"]
     thinking_style = persona_dict["thinking_style"]
 
-    # Determine dominant drive
-    id_str = drives.get("id_strength", 5.0)
-    ego_str = drives.get("ego_strength", 5.0)
-    sup_str = drives.get("superego_strength", 5.0)
+    id_str = float(drives.get("id_strength", 5.0))
+    ego_str = float(drives.get("ego_strength", 5.0))
+    sup_str = float(drives.get("superego_strength", 5.0))
 
-    dominant = "ego"
-    if id_str > ego_str and id_str > sup_str:
-        dominant = "id"
-    elif sup_str > ego_str and sup_str > id_str:
-        dominant = "superego"
+    # Determine the compound drive combination using the same 8-position scheme
+    # as debate_profile(): a drive is "elevated" when clearly above the neutral default.
+    _HIGH = 6.5
+    id_high = id_str >= _HIGH
+    ego_high = ego_str >= _HIGH
+    sup_high = sup_str >= _HIGH
+    high_count = sum([id_high, ego_high, sup_high])
 
-    # Get drive-specific influence
+    if high_count == 3:
+        combo_key = "balanced_high"
+    elif id_high and sup_high:
+        combo_key = "high_id_superego"
+    elif id_high and ego_high:
+        combo_key = "high_id_ego"
+    elif ego_high and sup_high:
+        combo_key = "high_ego_superego"
+    elif id_high:
+        combo_key = "high_id"
+    elif sup_high:
+        combo_key = "high_superego"
+    elif ego_high:
+        combo_key = "high_ego"
+    else:
+        combo_key = "balanced"
+
+    # Get drive-specific influence from persona schema
     drives_influence = persona_dict.get("drives_influence", {})
-    drive_modifier = drives_influence.get(f"high_{dominant}", "Balanced approach")
+    drive_modifier = drives_influence.get(combo_key, "Balanced approach")
 
     # Build persona prompt
     prompt = f"{description}\n"
