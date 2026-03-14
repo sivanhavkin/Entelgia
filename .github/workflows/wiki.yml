@@ -1,0 +1,126 @@
+name: 📖 Wiki Sync
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  # ============================================
+  # Job 1: Sync Wiki Pages
+  # ============================================
+  sync-wiki:
+    name: 📖 Sync Wiki Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    # ── Step 1: Checkout repository ──
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    # ── Step 2: Clone the wiki ──
+    - name: 📥 Clone wiki repository
+      run: |
+        git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" wiki
+      continue-on-error: false
+
+    # ── Step 3: Copy documentation files to wiki ──
+    - name: 📄 Copy documentation to wiki
+      run: |
+        # Ensure wiki directory exists and is valid
+        if [ ! -d wiki ]; then
+          echo "❌ Wiki directory not found — wiki clone may have failed."
+          exit 1
+        fi
+
+        # Helper: copy only if source file exists
+        copy_if_exists() {
+          local src="$1"
+          local dst="$2"
+          if [ -f "$src" ]; then
+            cp "$src" "$dst"
+            echo "✅ Copied: $src → $dst"
+          else
+            echo "⚠️  Skipped (not found): $src"
+          fi
+        }
+
+        # Root-level documentation
+        copy_if_exists README.md          wiki/Home.md
+        copy_if_exists ARCHITECTURE.md    wiki/Architecture.md
+        copy_if_exists ROADMAP.md         wiki/Roadmap.md
+        copy_if_exists Changelog.md       wiki/Changelog.md
+        copy_if_exists Contributing.md    wiki/Contributing.md
+        copy_if_exists CODE_OF_CONDUCT.md wiki/Code-of-Conduct.md
+        copy_if_exists FAQ.md             wiki/FAQ.md
+        copy_if_exists TROUBLESHOOTING.md wiki/Troubleshooting.md
+        copy_if_exists SPEC.md            wiki/Specification.md
+        copy_if_exists whitepaper.md      wiki/Whitepaper.md
+        copy_if_exists SECURITY.md        wiki/Security.md
+        copy_if_exists Contributors.md    wiki/Contributors.md
+
+        # docs/ subdirectory
+        mkdir -p wiki/docs
+        copy_if_exists docs/entelgia_demo.md     wiki/docs/Demo.md
+        copy_if_exists docs/ecosystem.md         wiki/docs/Ecosystem.md
+        copy_if_exists docs/memory_security.md   wiki/docs/Memory-Security.md
+        copy_if_exists docs/PRONOUN_FEATURE.md   wiki/docs/Pronoun-Feature.md
+        copy_if_exists docs/research1.md         wiki/docs/Research.md
+        copy_if_exists docs/api/README.md        wiki/docs/API.md
+
+        # Assets branding docs
+        copy_if_exists Assets/BRANDING.md wiki/Branding.md
+
+    # ── Step 4: Commit and push changes ──
+    - name: 📤 Commit and push wiki changes
+      run: |
+        cd wiki
+        git config user.name  "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add -A
+        if git diff --cached --quiet; then
+          echo "✅ No wiki changes to commit."
+        else
+          git commit -m "📖 Sync wiki from main repository @ ${{ github.sha }}"
+          git push
+          echo "✅ Wiki updated successfully."
+        fi
+
+    # ── Step 5: Summary ──
+    - name: 📋 Summary
+      if: always()
+      run: |
+        echo "# 📖 Wiki Sync Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Triggered by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📄 Synced Pages" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Source File | Wiki Page |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------------|-----------|" >> $GITHUB_STEP_SUMMARY
+        echo "| README.md | Home |" >> $GITHUB_STEP_SUMMARY
+        echo "| ARCHITECTURE.md | Architecture |" >> $GITHUB_STEP_SUMMARY
+        echo "| ROADMAP.md | Roadmap |" >> $GITHUB_STEP_SUMMARY
+        echo "| Changelog.md | Changelog |" >> $GITHUB_STEP_SUMMARY
+        echo "| Contributing.md | Contributing |" >> $GITHUB_STEP_SUMMARY
+        echo "| CODE_OF_CONDUCT.md | Code-of-Conduct |" >> $GITHUB_STEP_SUMMARY
+        echo "| FAQ.md | FAQ |" >> $GITHUB_STEP_SUMMARY
+        echo "| TROUBLESHOOTING.md | Troubleshooting |" >> $GITHUB_STEP_SUMMARY
+        echo "| SPEC.md | Specification |" >> $GITHUB_STEP_SUMMARY
+        echo "| whitepaper.md | Whitepaper |" >> $GITHUB_STEP_SUMMARY
+        echo "| SECURITY.md | Security |" >> $GITHUB_STEP_SUMMARY
+        echo "| Contributors.md | Contributors |" >> $GITHUB_STEP_SUMMARY
+        echo "| Assets/BRANDING.md | Branding |" >> $GITHUB_STEP_SUMMARY
+        echo "| docs/entelgia_demo.md | docs/Demo |" >> $GITHUB_STEP_SUMMARY
+        echo "| docs/ecosystem.md | docs/Ecosystem |" >> $GITHUB_STEP_SUMMARY
+        echo "| docs/memory_security.md | docs/Memory-Security |" >> $GITHUB_STEP_SUMMARY
+        echo "| docs/PRONOUN_FEATURE.md | docs/Pronoun-Feature |" >> $GITHUB_STEP_SUMMARY
+        echo "| docs/research1.md | docs/Research |" >> $GITHUB_STEP_SUMMARY
+        echo "| docs/api/README.md | docs/API |" >> $GITHUB_STEP_SUMMARY
