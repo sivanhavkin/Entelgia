@@ -3000,21 +3000,32 @@ class Agent:
         return abs(ide - ego) + abs(sup - ego)
 
     def debate_profile(self) -> Dict[str, Any]:
-        """Get debate style based on drives."""
+        """Get debate style based on drives, using agent-specific persona baseline."""
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
         sup = float(self.drives.get("superego_strength", 5.0))
         dissent = min(10.0, max(0.0, (ide * 0.45) + (sup * 0.45) - (ego * 0.25)))
 
         if ide >= sup and ide >= ego:
-            style = "provocative, desire-driven"
+            dominant = "id"
+            generic_style = "provocative, desire-driven"
             opening = "Bold counterpoint. Push forward."
         elif sup >= ide and sup >= ego:
-            style = "principled, rule-focused"
+            dominant = "superego"
+            generic_style = "principled, rule-focused"
             opening = "Principled objection or logical inconsistency."
         else:
-            style = "integrative, Socratic"
+            dominant = "ego"
+            generic_style = "integrative, Socratic"
             opening = "Precise counterpoint, then synthesis."
+
+        # Use agent-specific persona baseline style from drives_influence when available
+        persona_dict = getattr(self, "persona_dict", None)
+        if persona_dict:
+            drives_influence = persona_dict.get("drives_influence", {})
+            style = drives_influence.get(f"high_{dominant}", generic_style)
+        else:
+            style = generic_style
 
         return {
             "dissent_level": round(dissent, 2),
