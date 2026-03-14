@@ -893,9 +893,9 @@ class TestSocratesAnxietyDuringCritique:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("What is justice?", [])
 
-        assert agent._last_superego_rewrite is True, (
-            "Superego critique must have fired for this test to be valid"
-        )
+        assert (
+            agent._last_superego_rewrite is True
+        ), "Superego critique must have fired for this test to be valid"
         assert agent._last_emotion == "fear", (
             f"Expected _last_emotion='fear' when Socrates critique fires; "
             f"got '{agent._last_emotion}'"
@@ -912,9 +912,9 @@ class TestSocratesAnxietyDuringCritique:
         with patch.object(_meta, "CFG", cfg):
             agent.speak("What is justice?", [])
 
-        assert agent._last_superego_rewrite is False, (
-            "Critique must NOT have fired for this test to be valid"
-        )
+        assert (
+            agent._last_superego_rewrite is False
+        ), "Critique must NOT have fired for this test to be valid"
         # Emotion comes from inference mock ("neutral"), not forced to "fear"
         assert agent._last_emotion == "neutral", (
             f"Expected _last_emotion='neutral' when critique does not fire; "
@@ -931,16 +931,19 @@ class TestSocratesAnxietyDuringCritique:
         # Inspect all generate() calls to find the critique prompt
         all_calls = agent.llm.generate.call_args_list
         critique_prompts = [
-            call.args[1] if call.args and len(call.args) > 1 else call.kwargs.get("prompt", "")
+            (
+                call.args[1]
+                if call.args and len(call.args) > 1
+                else call.kwargs.get("prompt", "")
+            )
             for call in all_calls
         ]
         anxiety_in_critique = any(
-            "anxious" in p.lower() or "nervous" in p.lower()
-            for p in critique_prompts
+            "anxious" in p.lower() or "nervous" in p.lower() for p in critique_prompts
         )
-        assert anxiety_in_critique, (
-            "At least one LLM call to Socrates' critique prompt must mention 'anxious' or 'nervous'"
-        )
+        assert (
+            anxiety_in_critique
+        ), "At least one LLM call to Socrates' critique prompt must mention 'anxious' or 'nervous'"
 
 
 if __name__ == "__main__":

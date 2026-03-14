@@ -290,12 +290,12 @@ class TestAthenaLimbicHijackAnger:
             agent.speak("What is justice?", [])
 
         assert agent.limbic_hijack is True, "Athena should be in limbic hijack"
-        assert agent._last_emotion == "anger", (
-            f"Expected _last_emotion='anger' during Athena hijack, got '{agent._last_emotion}'"
-        )
-        assert agent._last_emotion_intensity >= 0.8, (
-            f"Expected intensity >= 0.8 during Athena hijack, got {agent._last_emotion_intensity}"
-        )
+        assert (
+            agent._last_emotion == "anger"
+        ), f"Expected _last_emotion='anger' during Athena hijack, got '{agent._last_emotion}'"
+        assert (
+            agent._last_emotion_intensity >= 0.8
+        ), f"Expected intensity >= 0.8 during Athena hijack, got {agent._last_emotion_intensity}"
 
     def test_athena_behavioral_rule_contains_anger_instruction(self):
         """The behavioral rule injected when Athena is in hijack must mention anger."""
@@ -304,9 +304,9 @@ class TestAthenaLimbicHijackAnger:
         agent.limbic_hijack = True  # pre-activate
 
         rule = agent._behavioral_rule_instruction()
-        assert "anger" in rule.lower(), (
-            f"Expected anger instruction in rule; got: {rule}"
-        )
+        assert (
+            "anger" in rule.lower()
+        ), f"Expected anger instruction in rule; got: {rule}"
 
     def test_non_athena_agent_does_not_get_anger_rule(self):
         """Socrates in limbic hijack must NOT get the Athena anger rule."""
@@ -315,9 +315,9 @@ class TestAthenaLimbicHijackAnger:
         agent.limbic_hijack = True
 
         rule = agent._behavioral_rule_instruction()
-        assert "anger" not in rule.lower(), (
-            "Athena anger rule must not fire for Socrates"
-        )
+        assert (
+            "anger" not in rule.lower()
+        ), "Athena anger rule must not fire for Socrates"
 
 
 # ---------------------------------------------------------------------------

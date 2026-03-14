@@ -162,8 +162,12 @@ class _DriveStub:
         _EXTREME_BOOST = 0.06
         _ide_target = _ATHENA_ID_TARGET if self.name == "Athena" else 5.0
         _sup_target = _SOCRATES_SUP_TARGET if self.name == "Socrates" else 5.0
-        _ide_rate = 0.04 + (_EXTREME_BOOST if (ide >= _EXTREME_HIGH or ide <= _EXTREME_LOW) else 0.0)
-        _sup_rate = 0.04 + (_EXTREME_BOOST if (sup >= _EXTREME_HIGH or sup <= _EXTREME_LOW) else 0.0)
+        _ide_rate = 0.04 + (
+            _EXTREME_BOOST if (ide >= _EXTREME_HIGH or ide <= _EXTREME_LOW) else 0.0
+        )
+        _sup_rate = 0.04 + (
+            _EXTREME_BOOST if (sup >= _EXTREME_HIGH or sup <= _EXTREME_LOW) else 0.0
+        )
         ide += _ide_rate * (_ide_target - ide) + random.uniform(-0.15, 0.15)
         sup += _sup_rate * (_sup_target - sup) + random.uniform(-0.15, 0.15)
         ide = max(0.0, min(10.0, ide))
@@ -643,9 +647,9 @@ class TestAgentBiasedDriveReversion:
             [["Athena", f"{ide_final:.4f}", "yes"]],
             title="test_athena_id_drifts_above_neutral_over_turns",
         )
-        assert ide_final > 5.0, (
-            f"Athena's id should trend above neutral; got {ide_final:.4f}"
-        )
+        assert (
+            ide_final > 5.0
+        ), f"Athena's id should trend above neutral; got {ide_final:.4f}"
 
     def test_socrates_superego_drifts_above_neutral_over_turns(self):
         """Starting from balanced drives, Socrates' superego should trend above 5.0."""
@@ -659,9 +663,9 @@ class TestAgentBiasedDriveReversion:
             [["Socrates", f"{sup_final:.4f}", "yes"]],
             title="test_socrates_superego_drifts_above_neutral_over_turns",
         )
-        assert sup_final > 5.0, (
-            f"Socrates' superego should trend above neutral; got {sup_final:.4f}"
-        )
+        assert (
+            sup_final > 5.0
+        ), f"Socrates' superego should trend above neutral; got {sup_final:.4f}"
 
     def test_generic_agent_id_stays_near_neutral(self):
         """A nameless agent's id should stay near 5.0 (no bias)."""
@@ -676,9 +680,9 @@ class TestAgentBiasedDriveReversion:
             title="test_generic_agent_id_stays_near_neutral",
         )
         # No bias: id should not consistently drift far above 5.0
-        assert ide_final < 7.0, (
-            f"Generic agent's id should stay near neutral; got {ide_final:.4f}"
-        )
+        assert (
+            ide_final < 7.0
+        ), f"Generic agent's id should stay near neutral; got {ide_final:.4f}"
 
     def test_athena_id_bias_drains_ego(self):
         """Athena's ego should be lower than a generic agent's ego after many turns."""
@@ -726,8 +730,12 @@ class TestAgentBiasedDriveReversion:
         athena_extreme = _DriveStub(9.5, 5.0, 5.0, name="Athena")
         athena_normal = _DriveStub(7.0, 5.0, 5.0, name="Athena")
         for _ in range(10):
-            athena_extreme.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
-            athena_normal.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
+            athena_extreme.update_drives_after_turn(
+                "reflective", "neutral", 0.5, rng_seed=42
+            )
+            athena_normal.update_drives_after_turn(
+                "reflective", "neutral", 0.5, rng_seed=42
+            )
         ide_extreme = float(athena_extreme.drives["id_strength"])
         ide_normal = float(athena_normal.drives["id_strength"])
         distance_extreme = abs(ide_extreme - 9.5)  # how far it moved from start
@@ -735,7 +743,12 @@ class TestAgentBiasedDriveReversion:
         _print_table(
             ["Scenario", "start id", "id after 10 turns", "distance moved"],
             [
-                ["extreme (9.5)", "9.5", f"{ide_extreme:.4f}", f"{distance_extreme:.4f}"],
+                [
+                    "extreme (9.5)",
+                    "9.5",
+                    f"{ide_extreme:.4f}",
+                    f"{distance_extreme:.4f}",
+                ],
                 ["normal  (7.0)", "7.0", f"{ide_normal:.4f}", f"{distance_normal:.4f}"],
             ],
             title="test_athena_id_extreme_high_reverts_faster",
@@ -751,8 +764,12 @@ class TestAgentBiasedDriveReversion:
         socrates_extreme = _DriveStub(5.0, 5.0, 0.5, name="Socrates")
         socrates_normal = _DriveStub(5.0, 5.0, 3.0, name="Socrates")
         for _ in range(10):
-            socrates_extreme.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
-            socrates_normal.update_drives_after_turn("reflective", "neutral", 0.5, rng_seed=42)
+            socrates_extreme.update_drives_after_turn(
+                "reflective", "neutral", 0.5, rng_seed=42
+            )
+            socrates_normal.update_drives_after_turn(
+                "reflective", "neutral", 0.5, rng_seed=42
+            )
         sup_extreme = float(socrates_extreme.drives["superego_strength"])
         sup_normal = float(socrates_normal.drives["superego_strength"])
         distance_extreme = abs(sup_extreme - 0.5)
@@ -760,7 +777,12 @@ class TestAgentBiasedDriveReversion:
         _print_table(
             ["Scenario", "start sup", "sup after 10 turns", "distance moved"],
             [
-                ["extreme (0.5)", "0.5", f"{sup_extreme:.4f}", f"{distance_extreme:.4f}"],
+                [
+                    "extreme (0.5)",
+                    "0.5",
+                    f"{sup_extreme:.4f}",
+                    f"{distance_extreme:.4f}",
+                ],
                 ["normal  (3.0)", "3.0", f"{sup_normal:.4f}", f"{distance_normal:.4f}"],
             ],
             title="test_socrates_superego_extreme_low_reverts_faster",

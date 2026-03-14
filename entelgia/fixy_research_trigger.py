@@ -169,6 +169,8 @@ _DIALOG_TAIL_WINDOW: int = 4
 
 # Functional/non-conceptual words that should not alone trigger a web search.
 # These words are too common and non-specific to justify external research.
+# "truth" and "reasoning" are fundamental philosophical vocabulary used in
+# almost every dialogue turn; they must not fire a search in isolation.
 _WEAK_TRIGGER_WORDS: frozenset = frozenset(
     {
         "current",
@@ -178,6 +180,8 @@ _WEAK_TRIGGER_WORDS: frozenset = frozenset(
         "internet",
         "update",
         "latest",
+        "truth",
+        "reasoning",
     }
 )
 

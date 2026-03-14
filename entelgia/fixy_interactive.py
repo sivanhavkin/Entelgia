@@ -12,6 +12,7 @@ defaulting to generic mediation / synthesis language.
 
 import re
 import logging
+from collections import deque
 from typing import Dict, List, Tuple, Any, Optional
 
 # LLM Response Length Instruction
@@ -95,6 +96,11 @@ _FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION: str = (
 _ROTATION_TRIGGER_REASONS: frozenset = frozenset(
     {"loop_repetition", "fixy_mediation_loop", "circular_reasoning"}
 )
+
+# Number of recent Fixy intervention texts to retain for deduplication.
+# The prompt instructs the LLM not to repeat the same framings or examples
+# used in the last _INTERVENTION_DEDUP_WINDOW interventions.
+_INTERVENTION_DEDUP_WINDOW: int = 4
 
 # Mode-specific prompt templates
 # {context} is replaced with the last 6 turns of dialogue
@@ -340,6 +346,12 @@ class InteractiveFixy:
         # Counter for rotating through loop-breaking modes so Fixy never
         # repeats the same breaking strategy in consecutive interventions.
         self._loop_break_rotation: int = 0
+        # Deque of recent intervention texts for deduplication; keeps the last
+        # _INTERVENTION_DEDUP_WINDOW entries so the prompt can instruct the
+        # LLM to avoid repeating the same examples or framings.
+        self._recent_interventions: deque[str] = deque(
+            maxlen=_INTERVENTION_DEDUP_WINDOW
+        )
 
         # Lazy import to avoid circular dependency (loop_guard → no imports from fixy)
         try:
@@ -451,6 +463,7 @@ class InteractiveFixy:
         dialog: List[Dict[str, str]],
         reason: str,
         mode: Optional[str] = None,
+        current_topic: Optional[str] = None,
     ) -> str:
         """
         Generate contextual intervention using the appropriate Fixy mode.
@@ -459,10 +472,16 @@ class InteractiveFixy:
         disruptive mode (CONTRADICT, CONCRETIZE, etc.) instead of the
         default mediating style, ensuring it does not reinforce loops.
 
+        v3.0.0: Accepts *current_topic* to anchor the intervention to the
+        active dialogue topic, reducing TOPIC-MISMATCH failures.  Also
+        tracks recent intervention texts to avoid repeating the same
+        examples or framings across consecutive calls.
+
         Args:
             dialog: Dialogue history
             reason: Reason for intervention
             mode: Override FixyMode (optional; auto-selected from reason if omitted)
+            current_topic: Active topic label (optional; included in prompt when provided)
 
         Returns:
             Intervention text
@@ -501,8 +520,32 @@ class InteractiveFixy:
                 reason, _MODE_PROMPTS[FixyMode.MEDIATE]
             )
 
+        # Build topic anchor instruction when a topic is active
+        topic_instruction = ""
+        if current_topic:
+            topic_instruction = (
+                f"ACTIVE TOPIC: {current_topic}. "
+                f"Your intervention MUST be directly relevant to this topic. "
+                f"Do NOT drift to unrelated domains or generic examples.\n"
+            )
+
+        # Build deduplication instruction from recent intervention history
+        dedup_instruction = ""
+        if self._recent_interventions:
+            prior_examples = "; ".join(
+                f'"{t[:80]}..."' if len(t) > 80 else f'"{t}"'
+                for t in self._recent_interventions
+            )
+            dedup_instruction = (
+                f"AVOID REPETITION: Do NOT reuse the framing, examples, or scenarios "
+                f"from your previous interventions: {prior_examples}. "
+                f"Use a completely different angle.\n"
+            )
+
         full_prompt = (
             f"{prompt_template}\n\n"
+            f"{topic_instruction}"
+            f"{dedup_instruction}"
             f"RECENT DIALOGUE:\n{context}\n\n"
             f"Respond in 1-2 sentences only. Be direct and concrete.\n"
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
@@ -513,11 +556,15 @@ class InteractiveFixy:
             self.model, full_prompt, temperature=0.4, use_cache=False
         )
 
-        return (
+        result = (
             intervention.strip()
             if intervention
             else "I notice we might benefit from a fresh perspective here."
         )
+
+        # Track this intervention for future deduplication
+        self._recent_interventions.append(result)
+        return result
 
     def _build_intervention_context(
         self, dialog: List[Dict[str, str]], reason: str
