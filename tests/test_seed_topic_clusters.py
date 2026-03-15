@@ -127,3 +127,7 @@ class TestConfigSeedTopic:
         """Multiple Config() instances should not always share the same seed_topic."""
         topics = {Config().seed_topic for _ in range(30)}
         assert len(topics) >= 1  # At minimum always valid; diversity is probabilistic
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

@@ -309,3 +309,7 @@ class TestRawDraftAttribute:
             result = agent.speak("What is truth?", [])
         # The raw draft (with filler) should be different from the revised output
         assert agent._last_raw_draft != result
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

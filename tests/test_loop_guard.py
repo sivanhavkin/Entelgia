@@ -10,6 +10,8 @@ TopicManager.force_cluster_pivot, and FixyMode/AgentMode integration.
 import sys
 import os
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from entelgia.loop_guard import (
@@ -650,3 +652,7 @@ def test_detect_two_conditions_gate_passes_with_signals_a_and_c():
     assert (
         LOOP_REPETITION in modes
     ), f"Expected loop_repetition with Signals A+C active; got {modes}"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])
