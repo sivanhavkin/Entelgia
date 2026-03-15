@@ -677,4 +677,4 @@ def test_internal_field_constants_are_complete():
 if __name__ == "__main__":
     import pytest
 
-    pytest.main([__file__, "-v", "-s"])
+    pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])

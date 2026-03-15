@@ -655,4 +655,4 @@ def test_detect_two_conditions_gate_passes_with_signals_a_and_c():
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
+    pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
