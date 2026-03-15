@@ -10,12 +10,18 @@ Conditions
 ----------
 BASELINE         — Fixed round-robin turn-taking, no Fixy, no dream cycle,
                    no LTM prioritisation.
-DIALOGUE_ENGINE  — Adds dynamic speaker selection and varied seed strategies
-                   from :mod:`entelgia.dialogue_engine`.
-FIXY             — Adds Fixy need-based interventions from
-                   :mod:`entelgia.fixy_interactive` on top of the baseline.
-DREAM            — Adds dream-cycle / energy consolidation from
-                   :mod:`entelgia.energy_regulation` on top of the baseline.
+DIALOGUE_ENGINE  — Uses the actual :class:`~entelgia.dialogue_engine.DialogueEngine`
+                   for dynamic speaker selection (``select_next_speaker`` +
+                   ``should_allow_fixy``) with varied seed strategies.
+FIXY             — Uses the actual :class:`~entelgia.fixy_interactive.InteractiveFixy`
+                   ``should_intervene`` / ``get_fixy_mode`` API (backed by
+                   ``DialogueLoopDetector``) to decide *when* and *how*
+                   Fixy intervenes — need-based, not on a fixed schedule.
+DREAM            — Uses the actual :class:`~entelgia.energy_regulation.EntelgiaAgent`
+                   energy tracking and dream-cycle consolidation.
+
+All three non-baseline conditions exercise the real current module code, so
+changes to those modules are reflected in the ablation results.
 
 Outputs
 -------
@@ -116,6 +122,24 @@ _TOPIC_POOLS: Dict[str, List[str]] = {
 _AGENTS = ["Socrates", "Athena"]
 
 
+class _MockAgent:
+    """Minimal agent stub for use with DialogueEngine speaker selection.
+
+    Provides the ``name`` attribute and ``conflict_index()`` method that
+    :class:`~entelgia.dialogue_engine.DialogueEngine` relies on, without
+    requiring a live LLM or memory backend.
+    """
+
+    # Neutral conflict level (mid-point of the 0–10 scale used by DialogueEngine).
+    _NEUTRAL_CONFLICT_INDEX: float = 5.0
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def conflict_index(self) -> float:  # pragma: no cover
+        return self._NEUTRAL_CONFLICT_INDEX
+
+
 def _pick(pool: List[str], rng: random.Random) -> str:
     return rng.choice(pool)
 
@@ -141,15 +165,47 @@ def _simulate_baseline(turns: int, rng: random.Random) -> List[Dict[str, str]]:
 
 
 def _simulate_dialogue_engine(turns: int, rng: random.Random) -> List[Dict[str, str]]:
-    """Dynamic speaker selection + evolving topic pool (mirrors DialogueEngine behaviour)."""
-    dialog: List[Dict[str, str]] = []
+    """Dynamic speaker selection using the actual DialogueEngine module.
+
+    Uses :meth:`~entelgia.dialogue_engine.DialogueEngine.select_next_speaker`
+    and :meth:`~entelgia.dialogue_engine.DialogueEngine.should_allow_fixy` so
+    that changes to the engine are reflected in ablation results.
+
+    .. note::
+        Not thread-safe: seeds the global :mod:`random` state so that
+        ``DialogueEngine``'s internal ``random.choices`` / ``random.uniform``
+        calls are reproducible.  Ablation conditions must run sequentially
+        (the same restriction applies to :func:`_simulate_dream`).
+    """
+    # Seed global random so DialogueEngine's internal random calls are
+    # reproducible for a given rng state (same caveat as _simulate_dream).
+    random.seed(rng.randint(0, 2 ** 31))
+    engine = DialogueEngine()
     pool = _TOPIC_POOLS["evolving"]
-    # Use an expanding pool index so topics genuinely shift
+    dialog: List[Dict[str, str]] = []
+
+    # Include Fixy in the agent roster so DialogueEngine can schedule her.
+    main_agents = [_MockAgent("Socrates"), _MockAgent("Athena")]
+    fixy_agent = _MockAgent("Fixy")
+    all_agents: List[_MockAgent] = main_agents + [fixy_agent]
+    current_speaker: _MockAgent = main_agents[0]
+
     for i in range(turns):
-        role = _AGENTS[i % 2] if i < 4 else rng.choice(_AGENTS)
-        # Topic rotates through the pool, then loops
-        text = pool[i % len(pool)]
-        dialog.append({"role": role, "text": text})
+        if current_speaker.name == "Fixy":
+            text = _pick(_FIXY_INTERVENTIONS, rng)
+        else:
+            text = pool[i % len(pool)]
+        dialog.append({"role": current_speaker.name, "text": text})
+
+        allow_fixy, fixy_prob, _ = engine.should_allow_fixy(dialog, i)
+        current_speaker = engine.select_next_speaker(
+            current_speaker,
+            dialog,
+            all_agents,
+            allow_fixy=allow_fixy,
+            fixy_probability=fixy_prob,
+        )
+
     return dialog
 
 
@@ -168,28 +224,36 @@ _FIXY_INTERVENTIONS = [
 
 
 def _simulate_fixy(turns: int, rng: random.Random) -> List[Dict[str, str]]:
-    """Baseline repetition but with Fixy interventions every 6 turns."""
+    """Baseline with Fixy interventions driven by the actual InteractiveFixy API.
+
+    Uses :meth:`~entelgia.fixy_interactive.InteractiveFixy.should_intervene`
+    (backed by :class:`~entelgia.loop_guard.DialogueLoopDetector`) to decide
+    *when* Fixy intervenes and
+    :meth:`~entelgia.fixy_interactive.InteractiveFixy.get_fixy_mode` to decide
+    *how* — need-based detection, not a fixed schedule.
+
+    ``InteractiveFixy`` is initialised with a ``None`` LLM stub because
+    ``should_intervene`` and ``get_fixy_mode`` are pure-Python and do not call
+    the language model.
+    """
+    fixy_checker = InteractiveFixy(None, "ablation-stub")
     dialog: List[Dict[str, str]] = []
-    base_idx = 0  # index into the underlying baseline sequence
 
     while len(dialog) < turns:
-        # Fixy intervenes every 6 baseline turns starting at turn 5
-        if base_idx >= 5 and base_idx % 6 == 5:
+        i = len(dialog)
+        role = _AGENTS[i % 2]
+        text = _pick(_TOPIC_POOLS["repetitive"], rng)
+        dialog.append({"role": role, "text": text})
+
+        should, reason = fixy_checker.should_intervene(dialog, i)
+        if should and len(dialog) < turns:
             text = _pick(_FIXY_INTERVENTIONS, rng)
             dialog.append({"role": "Fixy", "text": text})
-            # After Fixy: inject up to 2 turns of evolving content
-            for j in range(2):
-                if len(dialog) < turns:
-                    role = _AGENTS[j % 2]
-                    text = _pick(_TOPIC_POOLS["evolving"], rng)
-                    dialog.append({"role": role, "text": text})
-        else:
-            # Normal repetitive turn
-            role = _AGENTS[base_idx % 2]
-            text = _pick(_TOPIC_POOLS["repetitive"], rng)
-            dialog.append({"role": role, "text": text})
-
-        base_idx += 1
+            # After Fixy: inject up to 2 turns of evolving content to break the loop
+            for j in range(min(2, turns - len(dialog))):
+                role = _AGENTS[j % 2]
+                text = _pick(_TOPIC_POOLS["evolving"], rng)
+                dialog.append({"role": role, "text": text})
 
     return dialog[:turns]
 
