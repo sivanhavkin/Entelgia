@@ -275,3 +275,7 @@ class TestDetectRepetitionCombinedScore:
             result = fixy._detect_repetition(turns)
 
         assert result is True
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])

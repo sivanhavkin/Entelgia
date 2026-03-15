@@ -886,3 +886,7 @@ class TestTopicPoolCoverage:
         assert (
             not missing_anchors
         ), f"Topics in TOPIC_CLUSTERS missing TOPIC_ANCHORS entries: {missing_anchors}"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])

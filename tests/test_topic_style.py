@@ -442,3 +442,7 @@ class TestTopicTonePolicyCompleteness:
                 assert (
                     "theatrical" in policy["forbidden_registers"]
                 ), f"Cluster '{cluster}' should forbid 'theatrical' register"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])

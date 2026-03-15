@@ -2386,3 +2386,7 @@ class TestFailedUrlBlacklist:
         _failed_urls.add("https://example.com/x")
         clear_failed_urls()
         assert len(_failed_urls) == 0
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
