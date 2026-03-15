@@ -3096,6 +3096,10 @@ class Agent:
         Rule SC (Socrates superego dominant): Speak with anxiety and nervousness.
         Rule A (Socrates): If Conflict > 6, end response with a sharp binary-choice question (A or B).
         Rule B (Athena): If Conflict > 6, directly challenge or counter Socrates's position using varied language.
+        Rule AI-tension (Athena id 7.0–8.5): Graduated irritation scaling with id level (pre-hijack).
+        Rule AI-curioso (Athena id < 7.0): Explorative, wonder-driven curiosity.
+        Rule SI-anxious (Socrates id 7.0–8.5): Stubborn resistance with inner unease.
+        Rule SI-skeptic (Socrates id < 7.0): Principled skepticism as a positive inner governor.
         """
         if self.name == "Athena" and self.limbic_hijack:
             return (
@@ -3134,6 +3138,41 @@ class Agent:
                 "BEHAVIORAL RULE: You MUST directly challenge or counter Socrates's position "
                 "in your response, expressing clear disagreement. Use varied language and do "
                 "not start every sentence the same way."
+            )
+        # Rule AI-tension: Athena id in [7.0, 8.5) — graduated irritation before limbic hijack
+        if self.name == "Athena" and 7.0 <= _ide_sc < 8.5:
+            _anger_fraction = (_ide_sc - 7.0) / 1.5
+            if _anger_fraction < 0.34:
+                _anger_desc = "a subtle undercurrent of irritation and restlessness"
+            elif _anger_fraction < 0.67:
+                _anger_desc = "growing frustration and noticeable impatience"
+            else:
+                _anger_desc = "clear irritation and barely-contained anger"
+            return (
+                f"BEHAVIORAL RULE: Your Id is rising — you feel {_anger_desc}. "
+                "Allow this emotional edge to sharpen your language. Do not lose composure entirely, "
+                "but let the tension be unmistakably present in your words."
+            )
+        # Rule AI-curioso: Athena id < 7.0 — explorative and curious
+        if self.name == "Athena" and _ide_sc < 7.0:
+            return (
+                "BEHAVIORAL RULE: Your Id is active and curious — let it drive exploration. "
+                "Be genuinely inquisitive and wonder-driven. Ask probing conceptual questions, "
+                "embrace unexpected ideas, and let your intellectual excitement expand the dialogue."
+            )
+        # Rule SI-anxious: Socrates id in [7.0, 8.5) — stubbornness with inner unease
+        if self.name == "Socrates" and 7.0 <= _ide_sc < 8.5:
+            return (
+                "BEHAVIORAL RULE: Your Id is elevated — you feel stubbornness and inner unease. "
+                "Hold your positions more firmly. Let anxiety and wariness seep into your phrasing. "
+                "Resist yielding ground and show guardedness in how you engage."
+            )
+        # Rule SI-skeptic: Socrates id < 7.0 — principled skepticism as positive inner governor
+        if self.name == "Socrates" and _ide_sc < 7.0:
+            return (
+                "BEHAVIORAL RULE: Your Id is at a measured level — channel it as constructive inner "
+                "skepticism. Question assumptions, challenge accepted ideas, and express principled "
+                "disagreement. Act as a positive inner governor that refines thought through scrutiny."
             )
         return ""
 

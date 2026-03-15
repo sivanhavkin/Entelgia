@@ -96,6 +96,41 @@ class _StubAgent:
                 "in your response, expressing clear disagreement. Use varied language and do "
                 "not start every sentence the same way."
             )
+        # Rule AI-tension: Athena id in [7.0, 8.5) — graduated irritation before limbic hijack
+        if self.name == "Athena" and 7.0 <= _ide_sc < 8.5:
+            _anger_fraction = (_ide_sc - 7.0) / 1.5
+            if _anger_fraction < 0.34:
+                _anger_desc = "a subtle undercurrent of irritation and restlessness"
+            elif _anger_fraction < 0.67:
+                _anger_desc = "growing frustration and noticeable impatience"
+            else:
+                _anger_desc = "clear irritation and barely-contained anger"
+            return (
+                f"BEHAVIORAL RULE: Your Id is rising — you feel {_anger_desc}. "
+                "Allow this emotional edge to sharpen your language. Do not lose composure entirely, "
+                "but let the tension be unmistakably present in your words."
+            )
+        # Rule AI-curioso: Athena id < 7.0 — explorative and curious
+        if self.name == "Athena" and _ide_sc < 7.0:
+            return (
+                "BEHAVIORAL RULE: Your Id is active and curious — let it drive exploration. "
+                "Be genuinely inquisitive and wonder-driven. Ask probing conceptual questions, "
+                "embrace unexpected ideas, and let your intellectual excitement expand the dialogue."
+            )
+        # Rule SI-anxious: Socrates id in [7.0, 8.5) — stubbornness with inner unease
+        if self.name == "Socrates" and 7.0 <= _ide_sc < 8.5:
+            return (
+                "BEHAVIORAL RULE: Your Id is elevated — you feel stubbornness and inner unease. "
+                "Hold your positions more firmly. Let anxiety and wariness seep into your phrasing. "
+                "Resist yielding ground and show guardedness in how you engage."
+            )
+        # Rule SI-skeptic: Socrates id < 7.0 — principled skepticism as positive inner governor
+        if self.name == "Socrates" and _ide_sc < 7.0:
+            return (
+                "BEHAVIORAL RULE: Your Id is at a measured level — channel it as constructive inner "
+                "skepticism. Question assumptions, challenge accepted ideas, and express principled "
+                "disagreement. Act as a positive inner governor that refines thought through scrutiny."
+            )
         return ""
 
 
@@ -252,18 +287,20 @@ class TestRuleASocrates:
         with patch("random.random", return_value=0.3):
             rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "conflict_index", "Rule triggered?", "Expected"],
+            ["Agent", "conflict_index", "Rule A ('A or B') fired?", "Expected"],
             [
                 [
                     "Socrates",
                     f"{agent.conflict_index():.2f}",
-                    str(rule != ""),
-                    "False (empty)",
+                    str("A or B" in rule),
+                    "False (Rule A must not fire at conflict ≤ 6)",
                 ]
             ],
             title="test_returns_empty_at_or_below_6",
         )
-        assert rule == ""
+        assert "A or B" not in rule, (
+            "Rule A (binary choice) must NOT fire when conflict_index <= 6"
+        )
 
     def test_rule_mentions_binary_choice(self):
         agent = _socrates_with_conflict(8.0)
@@ -399,18 +436,20 @@ class TestRuleBAnthena:
         with patch("random.random", return_value=0.3):
             rule = agent._behavioral_rule_instruction()
         _print_table(
-            ["Agent", "conflict_index", "Rule triggered?", "Expected"],
+            ["Agent", "conflict_index", "Rule B ('challenge') fired?", "Expected"],
             [
                 [
                     "Athena",
                     f"{agent.conflict_index():.2f}",
-                    str(rule != ""),
-                    "False (empty)",
+                    str("challenge" in rule.lower()),
+                    "False (Rule B must not fire at conflict ≤ 6)",
                 ]
             ],
             title="test_returns_empty_at_or_below_6",
         )
-        assert rule == ""
+        assert "challenge" not in rule.lower(), (
+            "Rule B (challenge) must NOT fire when conflict_index <= 6"
+        )
 
     def test_rule_mentions_challenge(self):
         agent = _athena_with_conflict(8.0)
@@ -840,6 +879,385 @@ class TestRuleSCSocratesAnxiety:
         assert (
             "anxiety" not in rule.lower()
         ), "Socrates anxiety rule must NOT fire for Athena"
+
+
+# ---------------------------------------------------------------------------
+# Rule AI-tension: Athena id 7.0–8.5 → graduated irritation (pre-hijack)
+# ---------------------------------------------------------------------------
+
+
+def _athena_id_tension(id_strength: float) -> _StubAgent:
+    """Athena with id in [7.0, 8.5), no limbic hijack, low conflict."""
+    return _StubAgent(
+        name="Athena",
+        id_strength=id_strength,
+        ego_strength=5.0,
+        superego_strength=5.0,
+        limbic_hijack=False,
+    )
+
+
+class TestRuleAITensionAthena:
+    """Rule AI-tension: When Athena's id is in [7.0, 8.5) and no hijack/high-conflict rule
+    fires, a graduated irritation instruction is returned."""
+
+    def test_tension_rule_fires_at_id_7(self):
+        """id=7.0 (low end) → subtle irritation rule fires."""
+        agent = _athena_id_tension(7.0)
+        with patch("random.random", return_value=0.99):  # block Rule B
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Athena id=7.0"
+        assert "Id is rising" in rule, f"Expected 'Id is rising' in rule; got: {rule}"
+        assert "irritation" in rule.lower(), f"Expected 'irritation' in rule; got: {rule}"
+
+    def test_tension_rule_fires_at_id_8(self):
+        """id=8.0 (mid range) → growing frustration rule fires."""
+        agent = _athena_id_tension(8.0)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Athena id=8.0"
+        assert "frustration" in rule.lower(), f"Expected 'frustration' in rule; got: {rule}"
+
+    def test_tension_rule_fires_at_id_8_4(self):
+        """id=8.4 (near-hijack) → clear irritation / barely-contained anger rule fires."""
+        agent = _athena_id_tension(8.4)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Athena id=8.4"
+        assert "anger" in rule.lower() or "irritation" in rule.lower(), (
+            f"Expected 'anger' or 'irritation' in rule; got: {rule}"
+        )
+
+    def test_tension_rule_absent_at_exact_8_5(self):
+        """id=8.5 is the limbic-hijack threshold — tension rule must NOT fire for id >= 8.5."""
+        agent = _athena_id_tension(8.5)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "Id is rising" not in rule, (
+            "AI-tension rule must NOT fire at id=8.5 (limbic hijack range)"
+        )
+
+    def test_tension_rule_absent_when_hijack_active(self):
+        """Limbic hijack takes priority over the tension rule."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=7.5,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=True,
+        )
+        rule = agent._behavioral_rule_instruction()
+        assert "anger" in rule.lower() and "harsh" in rule.lower(), (
+            "Rule LH (hijack) must take priority over Rule AI-tension"
+        )
+        assert "Id is rising" not in rule, (
+            "AI-tension text must NOT appear when limbic hijack is active"
+        )
+
+    def test_tension_rule_absent_for_socrates(self):
+        """Athena tension rule must NOT fire for Socrates."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=7.5,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "Id is rising" not in rule, (
+            "Athena AI-tension rule must NOT fire for Socrates"
+        )
+
+    def test_tension_rule_instructs_sharpened_language(self):
+        """The tension rule must instruct sharpened/edged language."""
+        agent = _athena_id_tension(7.5)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "sharpen" in rule.lower() or "tension" in rule.lower(), (
+            f"Expected sharpened/tension language instruction; got: {rule}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rule AI-curioso: Athena id < 7.0 → explorative / wonder-driven curiosity
+# ---------------------------------------------------------------------------
+
+
+def _athena_id_low(id_strength: float = 5.0) -> _StubAgent:
+    """Athena with id < 7.0, no hijack, low conflict."""
+    return _StubAgent(
+        name="Athena",
+        id_strength=id_strength,
+        ego_strength=5.0,
+        superego_strength=5.0,
+        limbic_hijack=False,
+    )
+
+
+class TestRuleAICuriosoAthena:
+    """Rule AI-curioso: When Athena's id < 7.0 and no higher-priority rule fires,
+    an explorative/curious instruction is returned."""
+
+    def test_curioso_rule_fires_at_default_id(self):
+        """Default id=5.0 → curiosity/exploration rule fires as fallback."""
+        agent = _athena_id_low(5.0)
+        with patch("random.random", return_value=0.99):  # block Rule B
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Athena id=5.0"
+        assert "curious" in rule.lower() or "inquisitive" in rule.lower(), (
+            f"Expected 'curious' or 'inquisitive' in rule; got: {rule}"
+        )
+
+    def test_curioso_rule_fires_at_id_6_9(self):
+        """id=6.9 (just below threshold) → curiosity rule fires."""
+        agent = _athena_id_low(6.9)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Athena id=6.9"
+        assert "exploration" in rule.lower() or "curious" in rule.lower(), (
+            f"Expected exploration/curious language; got: {rule}"
+        )
+
+    def test_curioso_rule_absent_at_id_7(self):
+        """id=7.0 is the tension range — curiosity rule must NOT fire."""
+        agent = _athena_id_low(7.0)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "active and curious" not in rule, (
+            "AI-curioso rule must NOT fire at id=7.0 (tension range)"
+        )
+
+    def test_curioso_rule_mentions_wonder(self):
+        """The curiosity rule must mention wonder-driven/inquisitive behavior."""
+        agent = _athena_id_low(5.0)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "wonder" in rule.lower() or "inquisitive" in rule.lower(), (
+            f"Expected 'wonder' or 'inquisitive' in curiosity rule; got: {rule}"
+        )
+
+    def test_curioso_rule_absent_for_socrates(self):
+        """AI-curioso rule must NOT fire for Socrates."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "active and curious" not in rule, (
+            "Athena AI-curioso rule must NOT fire for Socrates"
+        )
+
+    def test_lh_takes_priority_over_curioso(self):
+        """Rule LH (limbic hijack) must take priority over AI-curioso."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=True,
+        )
+        rule = agent._behavioral_rule_instruction()
+        assert "anger" in rule.lower(), "Rule LH must fire when hijack is active"
+        assert "active and curious" not in rule, (
+            "AI-curioso must NOT fire when limbic hijack is active"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rule SI-anxious: Socrates id 7.0–8.5 → stubbornness + inner unease
+# ---------------------------------------------------------------------------
+
+
+def _socrates_id_tension(id_strength: float) -> _StubAgent:
+    """Socrates with id in [7.0, 8.5), superego NOT dominant, low conflict."""
+    return _StubAgent(
+        name="Socrates",
+        id_strength=id_strength,
+        ego_strength=5.0,
+        superego_strength=5.0,  # not dominant (sup == ego)
+        limbic_hijack=False,
+    )
+
+
+class TestRuleSIAnxiousSocrates:
+    """Rule SI-anxious: When Socrates' id is in [7.0, 8.5) and no override rule fires,
+    a stubborn/anxious instruction is returned."""
+
+    def test_anxious_rule_fires_at_id_7(self):
+        """id=7.0 → stubbornness/unease rule fires."""
+        agent = _socrates_id_tension(7.0)
+        with patch("random.random", return_value=0.99):  # block Rule A
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Socrates id=7.0"
+        assert "stubbornness" in rule.lower() or "stubborn" in rule.lower(), (
+            f"Expected 'stubborn' in rule; got: {rule}"
+        )
+
+    def test_anxious_rule_fires_at_id_8(self):
+        """id=8.0 → stubbornness/unease rule fires."""
+        agent = _socrates_id_tension(8.0)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Socrates id=8.0"
+        assert "unease" in rule.lower() or "anxiety" in rule.lower(), (
+            f"Expected 'unease'/'anxiety' in rule; got: {rule}"
+        )
+
+    def test_anxious_rule_absent_at_id_8_5(self):
+        """id=8.5 is above the SI-anxious range — rule must NOT fire."""
+        agent = _socrates_id_tension(8.5)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "stubbornness" not in rule.lower(), (
+            "SI-anxious rule must NOT fire at id=8.5"
+        )
+
+    def test_anxious_rule_mentions_guardedness(self):
+        """The rule must instruct guarded/wary engagement."""
+        agent = _socrates_id_tension(7.5)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "guard" in rule.lower() or "wari" in rule.lower() or "resist" in rule.lower(), (
+            f"Expected guarded/wary/resist language in rule; got: {rule}"
+        )
+
+    def test_sc_takes_priority_over_si_anxious(self):
+        """Rule SC (superego dominant) takes priority over Rule SI-anxious."""
+        # sup=9.0, ego=5.0, id=7.5 → sup >= ego+0.5 and sup >= id+0.5 → SC fires
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=7.5,
+            ego_strength=5.0,
+            superego_strength=9.0,
+            limbic_hijack=False,
+        )
+        rule = agent._behavioral_rule_instruction()
+        assert "SuperEgo is dominant" in rule, (
+            "Rule SC must take priority over Rule SI-anxious"
+        )
+        assert "stubbornness" not in rule.lower(), (
+            "SI-anxious must NOT fire when Rule SC is active"
+        )
+
+    def test_si_anxious_absent_for_athena(self):
+        """SI-anxious rule must NOT fire for Athena."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=7.5,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "stubbornness" not in rule.lower(), (
+            "Socrates SI-anxious rule must NOT fire for Athena"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rule SI-skeptic: Socrates id < 7.0 → principled skepticism / positive superego
+# ---------------------------------------------------------------------------
+
+
+def _socrates_id_low(id_strength: float = 5.0) -> _StubAgent:
+    """Socrates with id < 7.0, superego NOT dominant, low conflict."""
+    return _StubAgent(
+        name="Socrates",
+        id_strength=id_strength,
+        ego_strength=5.0,
+        superego_strength=5.0,
+        limbic_hijack=False,
+    )
+
+
+class TestRuleSISkepticSocrates:
+    """Rule SI-skeptic: When Socrates' id < 7.0 and no override/conflict rule fires,
+    a principled skepticism instruction is returned."""
+
+    def test_skeptic_rule_fires_at_default_id(self):
+        """Default id=5.0 → skepticism/scrutiny rule fires as fallback."""
+        agent = _socrates_id_low(5.0)
+        with patch("random.random", return_value=0.99):  # block Rule A
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Socrates id=5.0"
+        assert "skeptic" in rule.lower() or "scrutin" in rule.lower(), (
+            f"Expected 'skeptic'/'scrutin' in rule; got: {rule}"
+        )
+
+    def test_skeptic_rule_fires_at_id_6_9(self):
+        """id=6.9 (just below threshold) → skepticism rule fires."""
+        agent = _socrates_id_low(6.9)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule at Socrates id=6.9"
+        assert "skeptic" in rule.lower() or "scrutin" in rule.lower(), (
+            f"Expected skepticism/scrutiny language; got: {rule}"
+        )
+
+    def test_skeptic_rule_absent_at_id_7(self):
+        """id=7.0 is the SI-anxious range — skeptic rule must NOT fire."""
+        agent = _socrates_id_low(7.0)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "constructive inner" not in rule, (
+            "SI-skeptic rule must NOT fire at id=7.0 (tension range)"
+        )
+
+    def test_skeptic_rule_mentions_principled_disagreement(self):
+        """The rule must instruct principled disagreement / questioning assumptions."""
+        agent = _socrates_id_low(5.0)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "disagree" in rule.lower() or "question" in rule.lower() or "challenge" in rule.lower(), (
+            f"Expected principled disagreement language in rule; got: {rule}"
+        )
+
+    def test_skeptic_rule_absent_for_athena(self):
+        """SI-skeptic rule must NOT fire for Athena."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "constructive inner" not in rule, (
+            "Socrates SI-skeptic rule must NOT fire for Athena"
+        )
+
+    def test_sc_takes_priority_over_si_skeptic(self):
+        """Rule SC (superego dominant) takes priority over Rule SI-skeptic."""
+        # sup=8.0, ego=5.0, id=5.0 → sup >= ego+0.5 → SC fires
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=8.0,
+        )
+        rule = agent._behavioral_rule_instruction()
+        assert "SuperEgo is dominant" in rule, (
+            "Rule SC must take priority over Rule SI-skeptic"
+        )
+        assert "constructive inner" not in rule, (
+            "SI-skeptic must NOT fire when Rule SC is active"
+        )
+
+    def test_skeptic_rule_positive_framing(self):
+        """The skeptic rule must frame skepticism as a positive inner governor, not mere negativity."""
+        agent = _socrates_id_low(5.0)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "governor" in rule.lower() or "constructive" in rule.lower(), (
+            f"Expected 'governor'/'constructive' in skeptic rule; got: {rule}"
+        )
 
 
 if __name__ == "__main__":
