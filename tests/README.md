@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **721 tests** (720 passed, 1 skipped) in 23 suites:
+Entelgia ships with comprehensive test coverage across **749 tests** (749 passed, 0 skipped) in 23 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -89,7 +89,7 @@ Tests assert that:
 
 ---
 
-### 🔗 Drive Correlation Tests (21 tests)
+### 🔗 Drive Correlation Tests (28 tests)
 
 ```bash
 pytest tests/test_drive_correlations.py -v
@@ -104,6 +104,13 @@ Tests verify the coherent Freudian drive correlations added in PR #92:
 - ✅ **Temperature conflict component** — conflict component always positive
 - ✅ **Energy drain scaling** — conflict adds to base drain
 - ✅ **Energy drain cap** — drain never exceeds `2 × energy_drain_max`
+- ✅ **Athena id drifts above neutral** — Athena's `id_strength` gravitates toward 6.5 over multiple turns
+- ✅ **Socrates superego drifts above neutral** — Socrates' `superego_strength` gravitates toward 6.5 over multiple turns
+- ✅ **Generic agent stays near neutral** — agents without a bias target revert toward 5.0
+- ✅ **Athena id bias drains ego** — elevated Athena Id above 5.0 reduces `ego_strength`
+- ✅ **Socrates superego bias drains ego** — elevated Socrates SuperEgo above 5.0 reduces `ego_strength`
+- ✅ **Athena id extreme high reverts faster** — id ≥ 8.5 triggers extra reversion boost
+- ✅ **Socrates superego extreme low reverts faster** — superego ≤ 1.5 triggers extra reversion boost
 
 ---
 
@@ -123,7 +130,7 @@ Tests verify the DrivePressure urgency/tension system:
 
 ---
 
-### 🛡️ Behavioral Rules Tests (18 tests)
+### 🛡️ Behavioral Rules Tests (29 tests)
 
 ```bash
 pytest tests/test_behavioral_rules.py -v
@@ -136,6 +143,17 @@ Tests verify drive-triggered behavioral rules for Socrates and Athena:
 - ✅ **Non-speaker exemption** — rule never fires for an agent that does not own the rule
 - ✅ **Rule content** — correct keywords injected (`binary choice`, challenge/counter phrasing)
 - ✅ **Prompt injection** — rule text inserted before "Respond now" in agent prompt
+- ✅ **Rule LH — Athena limbic hijack anger** — fires when Athena is in active limbic hijack state
+- ✅ **Rule LH content** — mentions harsh language and emotional override
+- ✅ **Rule LH takes priority over Rule B** — anger rule wins even when conflict > 6
+- ✅ **Rule LH absent when hijack off** — no anger rule when `limbic_hijack=False`
+- ✅ **Socrates hijack does not trigger Rule LH** — anger rule is Athena-only
+- ✅ **Rule SC — Socrates anxiety** — fires when Socrates' SuperEgo is dominant over Id and Ego by ≥ 0.5
+- ✅ **Rule SC content** — mentions nervousness and hesitant language
+- ✅ **Rule SC fires without random gate** — unconditional when condition met
+- ✅ **Rule SC absent when SuperEgo not dominant** — silent below threshold
+- ✅ **Rule SC takes priority over Rule A** — anxiety rule wins over binary-choice question rule
+- ✅ **Athena SuperEgo-dominant does not trigger Rule SC** — anxiety rule is Socrates-only
 
 ---
 
@@ -191,7 +209,7 @@ Tests verify the structural and metric properties of the canonical 10-turn demo 
 
 ---
 
-### 🧬 SuperEgo Critique Tests (21 tests)
+### 🧬 SuperEgo Critique Tests (28 tests)
 
 ```bash
 pytest tests/test_superego_critique.py -v
@@ -206,10 +224,17 @@ Tests verify the `evaluate_superego_critique()` function and the `Agent.speak()`
 - ✅ **CritiqueDecision dataclass** — fields (`should_apply`, `reason`, `critic`) correct
 - ✅ **Stale-state regression** — `_last_superego_rewrite` and `_last_critique_reason` are reset each turn
 - ✅ **Consecutive-streak limit** — rewrite suppressed after 2 consecutive critique turns; counter resets after a non-critique turn
+- ✅ **Tight margin fires at extreme SuperEgo** — `dominance_margin=0.2` allows barely-dominant extreme SuperEgo to fire
+- ✅ **Normal margin suppresses barely-dominant SuperEgo** — default `dominance_margin=0.5` prevents barely-dominant case
+- ✅ **Low conflict fires with extreme conflict_min** — `conflict_min=1.0` allows low-conflict extreme SuperEgo critique
+- ✅ **Normal conflict_min suppresses low conflict** — default `conflict_min=2.0` blocks low-conflict critique
+- ✅ **Socrates last emotion is fear when critique fires** — `_last_emotion` set to `"fear"` during critique
+- ✅ **Socrates emotion not fear when critique does not fire** — emotion unchanged when critique skipped
+- ✅ **Critique prompt for Socrates mentions anxious tone** — rewrite instruction explicitly requests anxious, nervous tone
 
 ---
 
-### 🧠 Limbic Hijack Tests (15 tests)
+### 🧠 Limbic Hijack Tests (20 tests)
 
 ```bash
 pytest tests/test_limbic_hijack.py -v
@@ -221,10 +246,15 @@ Tests verify the limbic hijack mechanism introduced in v2.7.0:
 - ✅ **No activation (id too low)** — `id ≤ 7` → hijack stays off
 - ✅ **No activation (intensity too low)** — `emotion_intensity ≤ 0.7` → hijack stays off
 - ✅ **No activation (conflict too low)** — `conflict_index() ≤ 0.6` → hijack stays off
+- ✅ **Extreme id lowers intensity threshold** — at `id_strength >= 8.5`, intensity threshold drops from 0.7 to 0.5
+- ✅ **No activation at normal id with moderate intensity** — moderate intensity only triggers hijack when id is extreme
 - ✅ **Intensity-drop exit** — `emotion_intensity < 0.4` → hijack deactivates
 - ✅ **Turn-cap exit** — reaches `LIMBIC_HIJACK_MAX_TURNS` → hijack deactivates
 - ✅ **Counter increments while active** — `_limbic_hijack_turns` increases each non-exit turn
 - ✅ **Impulsive response kind** — `_last_response_kind == "impulsive"` during hijack
+- ✅ **Athena last emotion is anger** — `_last_emotion` set to `"anger"` during Athena's limbic hijack
+- ✅ **Athena behavioral rule contains anger instruction** — injected rule text references raw anger
+- ✅ **Non-Athena agent does not get anger rule** — Rule LH is Athena-only
 - ✅ **Meta: limbic hijack message** — shown when `limbic_hijack=True`
 - ✅ **Meta: superego message** — shown when `_last_superego_rewrite=True` and no hijack
 - ✅ **Meta: no message when neither active** — silent when both flags are off
@@ -311,7 +341,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 721 total tests (181 web research + 30 web tool + 30 context manager + 27 ablation study + 59 topic anchors + 39 topic style + 32 revise draft + 12 seed topic clusters + 11 dialogue + 35 energy + 43 LTM + 19 security + 21 drive correlations + 23 drive pressure + 18 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 21 superego critique + 15 limbic hijack + 13 semantic repetition detection + 10 enable observer + 30 loop guard) |
+| **Unit Tests** | `pytest` | Runs 749 total tests (192 web research + 18 web tool + 30 context manager + 27 ablation study + 59 topic anchors + 39 topic style + 32 revise draft + 12 seed topic clusters + 11 dialogue + 35 energy + 43 LTM + 19 security + 28 drive correlations + 23 drive pressure + 29 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 28 superego critique + 20 limbic hijack + 10 enable observer + 30 loop guard) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -401,7 +431,7 @@ Tests verify the semantic similarity layer added to `InteractiveFixy._detect_rep
 
 ---
 
-### 🌐 Web Research Module Tests (181 tests)
+### 🌐 Web Research Module Tests (192 tests)
 
 The web research modules include unit tests for all components:
 
