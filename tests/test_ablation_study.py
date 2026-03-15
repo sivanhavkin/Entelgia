@@ -26,7 +26,50 @@ from entelgia.ablation_study import (
     run_ablation,
     run_condition,
     print_results_table,
+    plot_circularity,
+    _ascii_circularity_chart,
 )
+
+# ---------------------------------------------------------------------------
+# Terminal display helpers – tables and ASCII bar charts
+# ---------------------------------------------------------------------------
+
+
+def _print_table(headers, rows, title=None):
+    """Print a neatly formatted ASCII table to stdout."""
+    if title:
+        print(f"\n  ╔{'═' * (len(title) + 4)}╗")
+        print(f"  ║  {title}  ║")
+        print(f"  ╚{'═' * (len(title) + 4)}╝")
+    col_widths = [len(str(h)) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(str(cell)))
+    sep = "─┼─".join("─" * w for w in col_widths)
+    header_line = " │ ".join(str(h).ljust(col_widths[i]) for i, h in enumerate(headers))
+    print(f"  {header_line}")
+    print(f"  {sep}")
+    for row in rows:
+        print(
+            "  "
+            + " │ ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
+        )
+    print()
+
+
+def _print_bar_chart(data_pairs, title=None, max_width=36):
+    """Print a horizontal ASCII bar chart.  *data_pairs* is [(label, value), ...]."""
+    if title:
+        print(f"\n  📊 {title}")
+        print(f"  {'─' * 52}")
+    if not data_pairs:
+        return
+    max_val = max(v for _, v in data_pairs) or 1.0
+    for label, value in data_pairs:
+        bar_len = max(1, int(round((value / max_val) * max_width)))
+        bar = "█" * bar_len
+        print(f"  {str(label):>22} │ {bar:<{max_width}} {value:.4f}")
+    print()
 
 # ---------------------------------------------------------------------------
 # AblationCondition enum
@@ -137,16 +180,54 @@ class TestRunAblation:
             entry = self.results[condition.value]
             assert "circularity_series" in entry
             assert isinstance(entry["circularity_series"], list)
+        _print_table(
+            ["Condition", "Series Length"],
+            [
+                [label, str(len(data["circularity_series"]))]
+                for label, data in self.results.items()
+            ],
+            title="test_each_entry_has_circularity_series",
+        )
 
     def test_metrics_contain_circularity_rate(self):
         for condition in AblationCondition:
             metrics = self.results[condition.value]["metrics"]
             assert "circularity_rate" in metrics
+        _print_table(
+            ["Condition", "Circularity Rate"],
+            [
+                [label, f"{data['metrics']['circularity_rate']:.4f}"]
+                for label, data in self.results.items()
+            ],
+            title="test_metrics_contain_circularity_rate",
+        )
+        _print_bar_chart(
+            [
+                (label, data["metrics"]["circularity_rate"])
+                for label, data in self.results.items()
+            ],
+            title="Circularity Rate by Condition",
+        )
 
     def test_metrics_contain_progress_rate(self):
         for condition in AblationCondition:
             metrics = self.results[condition.value]["metrics"]
             assert "progress_rate" in metrics
+        _print_table(
+            ["Condition", "Progress Rate"],
+            [
+                [label, f"{data['metrics']['progress_rate']:.4f}"]
+                for label, data in self.results.items()
+            ],
+            title="test_metrics_contain_progress_rate",
+        )
+        _print_bar_chart(
+            [
+                (label, data["metrics"]["progress_rate"])
+                for label, data in self.results.items()
+            ],
+            title="Progress Rate by Condition",
+        )
 
     def test_metrics_values_are_numeric(self):
         for condition in AblationCondition:
@@ -155,10 +236,33 @@ class TestRunAblation:
                 assert isinstance(
                     val, (int, float)
                 ), f"Metric {key!r} for {condition.value!r} is not numeric: {val!r}"
+        metric_keys = ["circularity_rate", "progress_rate", "intervention_utility"]
+        _print_table(
+            ["Condition"] + [k.replace("_", " ").title() for k in metric_keys],
+            [
+                [label]
+                + [f"{data['metrics'].get(k, 0.0):.4f}" for k in metric_keys]
+                for label, data in self.results.items()
+            ],
+            title="test_metrics_values_are_numeric — Full Metrics",
+        )
 
     def test_deterministic(self):
         a = run_ablation(turns=5, seed=7)
         b = run_ablation(turns=5, seed=7)
+        _print_table(
+            ["Condition", "Run1 circularity_rate", "Run2 circularity_rate", "Match?"],
+            [
+                [
+                    label,
+                    f"{a[label]['metrics']['circularity_rate']:.4f}",
+                    f"{b[label]['metrics']['circularity_rate']:.4f}",
+                    "✓" if a[label]["metrics"] == b[label]["metrics"] else "✗",
+                ]
+                for label in a
+            ],
+            title="test_deterministic",
+        )
         assert a == b
 
 
@@ -193,6 +297,26 @@ class TestPrintResultsTable:
         assert "Baseline" in output
         assert "Fixy" in output
 
+    def test_print_full_results(self):
+        """Print the complete ablation study results table and circularity chart."""
+        results = run_ablation(turns=30, seed=42)
+        print("\n" + "=" * 70)
+        print("  ABLATION STUDY RESULTS  (turns=30, seed=42)")
+        print("=" * 70)
+        print_results_table(results)
+        print()
+        _ascii_circularity_chart(results)
+
 
 if __name__ == "__main__":
+    print("\n" + "=" * 70)
+    print("  ABLATION STUDY — FULL RESULTS  (turns=30, seed=42)")
+    print("=" * 70 + "\n")
+    results = run_ablation(turns=30, seed=42)
+    print_results_table(results)
+    print()
+    _ascii_circularity_chart(results)
+    print("\n" + "=" * 70)
+    print("  Running pytest suite…")
+    print("=" * 70 + "\n")
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
