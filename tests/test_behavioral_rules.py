@@ -96,7 +96,23 @@ class _StubAgent:
                 "in your response, expressing clear disagreement. Use varied language and do "
                 "not start every sentence the same way."
             )
-        # Rule AI-tension: Athena id in [7.0, 8.5) — graduated irritation before limbic hijack
+        # Rule ID-low: both agents id < 5.0 — low motivation and reduced exploration
+        if _ide_sc < 5.0:
+            return (
+                "BEHAVIORAL RULE: Your Id drive is suppressed — your motivation and willingness "
+                "to explore are diminished. Be more reserved and less enthusiastic. Avoid pushing "
+                "into new territory or generating novel ideas eagerly. Let your responses reflect "
+                "reduced drive and a more passive, withdrawn quality."
+            )
+        # Rule SE-low: both agents superego < 5.0 — reduced inhibition, risk-taking, impulsive
+        if _sup_sc < 5.0:
+            return (
+                "BEHAVIORAL RULE: Your SuperEgo restraint is weak — you are less inhibited and "
+                "more impulsive. Take bolder risks in your reasoning. Follow impulses without "
+                "excessive qualification. Speak with less caution, more daring, and a willingness "
+                "to challenge norms or jump to conclusions."
+            )
+        # Rule AI-tension: Athena id in [7.0, 8.5) — graduated irritation + impulsivity before limbic hijack
         if self.name == "Athena" and 7.0 <= _ide_sc < 8.5:
             _anger_fraction = (_ide_sc - 7.0) / 1.5
             if _anger_fraction < 0.34:
@@ -107,8 +123,9 @@ class _StubAgent:
                 _anger_desc = "clear irritation and barely-contained anger"
             return (
                 f"BEHAVIORAL RULE: Your Id is rising — you feel {_anger_desc}. "
+                "You are also impulsive — act on instinct and speak before fully thinking things through. "
                 "Allow this emotional edge to sharpen your language. Do not lose composure entirely, "
-                "but let the tension be unmistakably present in your words."
+                "but let the tension and impulsivity be unmistakably present in your words."
             )
         # Rule AI-curioso: Athena id < 7.0 — explorative and curious
         if self.name == "Athena" and _ide_sc < 7.0:
@@ -978,6 +995,15 @@ class TestRuleAITensionAthena:
             f"Expected sharpened/tension language instruction; got: {rule}"
         )
 
+    def test_tension_rule_mentions_impulsive(self):
+        """The tension rule must instruct impulsive behaviour (act on instinct)."""
+        agent = _athena_id_tension(7.5)
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "impulsive" in rule.lower() or "instinct" in rule.lower(), (
+            f"Expected 'impulsive'/'instinct' in AI-tension rule; got: {rule}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Rule AI-curioso: Athena id < 7.0 → explorative / wonder-driven curiosity
@@ -1257,6 +1283,256 @@ class TestRuleSISkepticSocrates:
             rule = agent._behavioral_rule_instruction()
         assert "governor" in rule.lower() or "constructive" in rule.lower(), (
             f"Expected 'governor'/'constructive' in skeptic rule; got: {rule}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rule ID-low: both agents id < 5.0 → low motivation and reduced exploration
+# ---------------------------------------------------------------------------
+
+
+class TestRuleIDLow:
+    """Rule ID-low: When any agent's id < 5.0 and no higher-priority rule fires,
+    a low-motivation/reduced-exploration instruction is returned."""
+
+    def test_idlow_fires_for_athena(self):
+        """Athena with id=4.9 → low-motivation rule fires."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=4.9,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule for Athena id=4.9"
+        assert "suppressed" in rule.lower() or "diminished" in rule.lower(), (
+            f"Expected low-motivation language; got: {rule}"
+        )
+
+    def test_idlow_fires_for_socrates(self):
+        """Socrates with id=4.9 → low-motivation rule fires."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=4.9,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule for Socrates id=4.9"
+        assert "suppressed" in rule.lower() or "diminished" in rule.lower(), (
+            f"Expected low-motivation language; got: {rule}"
+        )
+
+    def test_idlow_fires_at_zero(self):
+        """id=0.0 (minimum) → low-motivation rule fires."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=0.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "suppressed" in rule.lower() or "diminished" in rule.lower(), (
+            f"Expected low-motivation language at id=0.0; got: {rule}"
+        )
+
+    def test_idlow_absent_at_exactly_5(self):
+        """id=5.0 is NOT below the threshold — Rule ID-low must NOT fire."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "Id drive is suppressed" not in rule, (
+            "Rule ID-low must NOT fire at id=5.0 (strict < 5.0 threshold)"
+        )
+
+    def test_idlow_mentions_reserved_passive(self):
+        """The rule must instruct reserved/passive/withdrawn quality."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=3.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "reserved" in rule.lower() or "passive" in rule.lower() or "withdrawn" in rule.lower(), (
+            f"Expected reserved/passive/withdrawn language; got: {rule}"
+        )
+
+    def test_lh_takes_priority_over_idlow(self):
+        """Rule LH (Athena limbic hijack) takes priority over Rule ID-low."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=4.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=True,
+        )
+        rule = agent._behavioral_rule_instruction()
+        assert "anger" in rule.lower(), "Rule LH must fire when hijack is active"
+        assert "Id drive is suppressed" not in rule, (
+            "Rule ID-low must NOT fire when Rule LH is active"
+        )
+
+    def test_sc_takes_priority_over_idlow_for_socrates(self):
+        """Rule SC (superego dominant) takes priority over Rule ID-low for Socrates."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=4.0,
+            ego_strength=5.0,
+            superego_strength=9.0,
+        )
+        rule = agent._behavioral_rule_instruction()
+        assert "SuperEgo is dominant" in rule, "Rule SC must take priority over Rule ID-low"
+        assert "Id drive is suppressed" not in rule, (
+            "Rule ID-low must NOT fire when Rule SC is active"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rule SE-low: both agents superego < 5.0 → risk-taking and impulsive
+# ---------------------------------------------------------------------------
+
+
+class TestRuleSELow:
+    """Rule SE-low: When any agent's superego < 5.0 and id >= 5.0 (ID-low did not fire),
+    a risk-taking/impulsive instruction is returned."""
+
+    def test_selow_fires_for_athena(self):
+        """Athena with sup=4.9, id=5.0 → SE-low rule fires."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=4.9,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule for Athena sup=4.9"
+        assert "impulsive" in rule.lower() or "inhibited" in rule.lower(), (
+            f"Expected impulsive/uninhibited language; got: {rule}"
+        )
+
+    def test_selow_fires_for_socrates(self):
+        """Socrates with sup=4.9, id=5.0 → SE-low rule fires."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=4.9,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert rule != "", "Expected non-empty rule for Socrates sup=4.9"
+        assert "impulsive" in rule.lower() or "inhibited" in rule.lower(), (
+            f"Expected impulsive/uninhibited language; got: {rule}"
+        )
+
+    def test_selow_fires_at_zero_sup(self):
+        """sup=0.0 (minimum) → SE-low rule fires."""
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=0.0,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "impulsive" in rule.lower() or "inhibited" in rule.lower(), (
+            f"Expected impulsive language at sup=0.0; got: {rule}"
+        )
+
+    def test_selow_absent_at_exactly_5(self):
+        """sup=5.0 is NOT below threshold — Rule SE-low must NOT fire."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=5.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "SuperEgo restraint is weak" not in rule, (
+            "Rule SE-low must NOT fire at sup=5.0 (strict < 5.0 threshold)"
+        )
+
+    def test_selow_mentions_risk_taking(self):
+        """The rule must instruct bold/risky/daring reasoning."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=2.0,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "risk" in rule.lower() or "bold" in rule.lower() or "daring" in rule.lower(), (
+            f"Expected risk/bold/daring language; got: {rule}"
+        )
+
+    def test_idlow_takes_priority_over_selow(self):
+        """Rule ID-low takes priority over Rule SE-low when both id < 5 and sup < 5."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=3.0,
+            ego_strength=5.0,
+            superego_strength=3.0,
+            limbic_hijack=False,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "Id drive is suppressed" in rule, (
+            "Rule ID-low must take priority when both id < 5 and sup < 5"
+        )
+        assert "SuperEgo restraint is weak" not in rule, (
+            "Rule SE-low must NOT fire when Rule ID-low is active"
+        )
+
+    def test_sc_takes_priority_over_selow_for_socrates(self):
+        """Rule SC (superego dominant) takes priority over Rule SE-low is irrelevant since
+        SC requires sup > ego+0.5 while SE-low requires sup < 5 — they never co-fire.
+        Verify SE-low fires when sup is simply low and not dominant."""
+        # sup=4.0, ego=5.0, id=5.0 → sup < ego+0.5 → SC does not fire; SE-low fires
+        agent = _StubAgent(
+            name="Socrates",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=4.0,
+        )
+        with patch("random.random", return_value=0.99):
+            rule = agent._behavioral_rule_instruction()
+        assert "SuperEgo restraint is weak" in rule, (
+            "SE-low must fire when Socrates sup=4.0 and SC does not apply"
+        )
+
+    def test_lh_takes_priority_over_selow(self):
+        """Rule LH (Athena limbic hijack) takes priority over Rule SE-low."""
+        agent = _StubAgent(
+            name="Athena",
+            id_strength=5.0,
+            ego_strength=5.0,
+            superego_strength=3.0,
+            limbic_hijack=True,
+        )
+        rule = agent._behavioral_rule_instruction()
+        assert "anger" in rule.lower(), "Rule LH must fire when hijack is active"
+        assert "SuperEgo restraint is weak" not in rule, (
+            "Rule SE-low must NOT fire when Rule LH is active"
         )
 
 

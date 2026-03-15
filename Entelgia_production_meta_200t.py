@@ -3095,10 +3095,12 @@ class Agent:
         Rule SC (Socrates superego dominant): Speak with anxiety and nervousness.
         Rule A (Socrates): If Conflict > 6, end response with a sharp binary-choice question (A or B).
         Rule B (Athena): If Conflict > 6, directly challenge or counter Socrates's position using varied language.
-        Rule AI-tension (Athena id 7.0–8.5): Graduated irritation scaling with id level (pre-hijack).
+        Rule AI-tension (Athena id 7.0–8.5): Graduated irritation + impulsivity scaling with id level (pre-hijack).
         Rule AI-curioso (Athena id < 7.0): Explorative, wonder-driven curiosity.
         Rule SI-anxious (Socrates id 7.0–8.5): Stubborn resistance with inner unease.
         Rule SI-skeptic (Socrates id < 7.0): Principled skepticism as a positive inner governor.
+        Rule ID-low (both agents id < 5.0): Low motivation and reduced exploration.
+        Rule SE-low (both agents superego < 5.0): Reduced inhibition, risk-taking, impulsive.
         """
         if self.name == "Athena" and self.limbic_hijack:
             return (
@@ -3138,7 +3140,23 @@ class Agent:
                 "in your response, expressing clear disagreement. Use varied language and do "
                 "not start every sentence the same way."
             )
-        # Rule AI-tension: Athena id in [7.0, 8.5) — graduated irritation before limbic hijack
+        # Rule ID-low: both agents id < 5.0 — low motivation and reduced exploration
+        if _ide_sc < 5.0:
+            return (
+                "BEHAVIORAL RULE: Your Id drive is suppressed — your motivation and willingness "
+                "to explore are diminished. Be more reserved and less enthusiastic. Avoid pushing "
+                "into new territory or generating novel ideas eagerly. Let your responses reflect "
+                "reduced drive and a more passive, withdrawn quality."
+            )
+        # Rule SE-low: both agents superego < 5.0 — reduced inhibition, risk-taking, impulsive
+        if _sup_sc < 5.0:
+            return (
+                "BEHAVIORAL RULE: Your SuperEgo restraint is weak — you are less inhibited and "
+                "more impulsive. Take bolder risks in your reasoning. Follow impulses without "
+                "excessive qualification. Speak with less caution, more daring, and a willingness "
+                "to challenge norms or jump to conclusions."
+            )
+        # Rule AI-tension: Athena id in [7.0, 8.5) — graduated irritation + impulsivity before limbic hijack
         if self.name == "Athena" and 7.0 <= _ide_sc < 8.5:
             _anger_fraction = (_ide_sc - 7.0) / 1.5
             if _anger_fraction < 0.34:
@@ -3149,8 +3167,9 @@ class Agent:
                 _anger_desc = "clear irritation and barely-contained anger"
             return (
                 f"BEHAVIORAL RULE: Your Id is rising — you feel {_anger_desc}. "
+                "You are also impulsive — act on instinct and speak before fully thinking things through. "
                 "Allow this emotional edge to sharpen your language. Do not lose composure entirely, "
-                "but let the tension be unmistakably present in your words."
+                "but let the tension and impulsivity be unmistakably present in your words."
             )
         # Rule AI-curioso: Athena id < 7.0 — explorative and curious
         if self.name == "Athena" and _ide_sc < 7.0:
