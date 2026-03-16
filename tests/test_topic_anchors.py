@@ -304,16 +304,21 @@ class TestBuildCompactPromptTopicAnchors:
 
 
 class TestTopicMismatchPersistWarning:
-    """Agent.speak emits [TOPIC-MISMATCH-PERSIST] when regenerated response
-    also fails the anchor check."""
+    """Agent.speak applies graded topic compliance and logs [TOPIC-HARD-RECOVERY]
+    or [TOPIC-SOFT-REANCHOR] when the initial response is off-topic.
+
+    Note: The old [TOPIC-MISMATCH-PERSIST] log entry is replaced by the graded
+    enforcement ladder introduced in v3.0.0.
+    """
 
     # A prior turn for Socrates is required so the validation is not skipped
     # (it is intentionally skipped on the first turn — see TestTopicMismatchFirstTurn).
     _PRIOR_TURN = [{"role": "Socrates", "text": "I have thought about this before."}]
 
     def test_persist_warning_logged_when_regen_also_fails(self, caplog):
-        """If both the initial and regenerated responses miss the anchors,
-        a [TOPIC-MISMATCH-PERSIST] warning must be emitted."""
+        """If the initial response is severely off-topic (score < 0.50), a
+        [TOPIC-HARD-RECOVERY] warning must be emitted (the old [TOPIC-MISMATCH-PERSIST]
+        is superseded by the graded enforcement flow)."""
         agent = _make_agent()
         # Both calls return a response with no anchor for 'AI alignment'
         agent.llm.generate.return_value = (
@@ -324,34 +329,31 @@ class TestTopicMismatchPersistWarning:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        persist_msgs = [
-            r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message
+        recovery_msgs = [
+            r.message for r in caplog.records
+            if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
         ]
-        assert persist_msgs, (
-            "Expected [TOPIC-MISMATCH-PERSIST] warning when regenerated response "
-            "also lacks required topic anchors"
+        assert recovery_msgs, (
+            "Expected [TOPIC-HARD-RECOVERY] or [TOPIC-SOFT-REANCHOR] warning when "
+            "initial response lacks required topic anchors"
         )
 
     def test_no_persist_warning_when_regen_succeeds(self, caplog):
-        """If the regenerated response contains the required anchors,
-        no [TOPIC-MISMATCH-PERSIST] warning must be emitted."""
+        """If the initial response is already accepted, no recovery warning is emitted."""
         agent = _make_agent()
-        # First call misses anchors; second call (regeneration) includes one
-        agent.llm.generate.side_effect = [
-            "Redundancy and real-time monitoring prevent failures.",
-            "Corrigibility is the key concept for AI alignment.",
-        ]
+        # Single call returns a response that IS on-topic
+        agent.llm.generate.return_value = "Corrigibility is the key concept for AI alignment."
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        persist_msgs = [
-            r.message for r in caplog.records if "TOPIC-MISMATCH-PERSIST" in r.message
+        recovery_msgs = [
+            r.message for r in caplog.records
+            if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
         ]
-        assert not persist_msgs, (
-            "Expected no [TOPIC-MISMATCH-PERSIST] warning when regenerated "
-            "response satisfies topic anchors"
+        assert not recovery_msgs, (
+            "Expected no recovery warning when initial response satisfies topic anchors"
         )
 
 
@@ -361,13 +363,14 @@ class TestTopicMismatchPersistWarning:
 
 
 class TestTopicHardRecovery:
-    """Agent.speak applies [TOPIC-HARD-RECOVERY] when both initial and
-    regenerated responses fail the anchor check."""
+    """Agent.speak applies [TOPIC-HARD-RECOVERY] when the initial response scores
+    below the soft re-anchor threshold (< 0.50)."""
 
     _PRIOR_TURN = [{"role": "Socrates", "text": "I have thought about this before."}]
 
     def test_hard_recovery_logged_when_regen_also_fails(self, caplog):
-        """[TOPIC-HARD-RECOVERY] must be logged when both attempts miss anchors."""
+        """[TOPIC-HARD-RECOVERY] must be logged when the initial response is
+        severely off-topic (score < 0.50)."""
         agent = _make_agent()
         # All calls return a generic response with no anchor for 'AI alignment'
         agent.llm.generate.return_value = (
@@ -382,12 +385,12 @@ class TestTopicHardRecovery:
             r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message
         ]
         assert recovery_msgs, (
-            "Expected [TOPIC-HARD-RECOVERY] warning when both initial and "
-            "regenerated responses lack required topic anchors"
+            "Expected [TOPIC-HARD-RECOVERY] warning when initial response is "
+            "severely off-topic (score < 0.50)"
         )
 
     def test_hard_recovery_uses_strict_prompt(self, caplog):
-        """When hard recovery triggers, the LLM must be called a third time
+        """When hard recovery triggers, the LLM must be called a second time
         with a prompt containing the required strict enforcement elements."""
         agent = _make_agent()
         captured_prompts = []
@@ -402,12 +405,12 @@ class TestTopicHardRecovery:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        # Three calls: initial, regen, hard-recovery
-        assert len(captured_prompts) == 3, (
-            f"Expected exactly 3 LLM calls (initial + regen + hard-recovery), "
+        # Two calls: initial (score < 0.50 → hard recovery) + hard-recovery prompt
+        assert len(captured_prompts) == 2, (
+            f"Expected exactly 2 LLM calls (initial + hard-recovery), "
             f"got {len(captured_prompts)}"
         )
-        hard_prompt = captured_prompts[2]
+        hard_prompt = captured_prompts[1]
         assert "STRICT TOPIC ENFORCEMENT" in hard_prompt
         assert "AI alignment" in hard_prompt
         assert "2-4 sentences" in hard_prompt
@@ -418,14 +421,13 @@ class TestTopicHardRecovery:
 
     def test_hard_recovery_output_used(self, caplog):
         """The output returned by speak() after hard recovery must be the
-        response from the third (strict) LLM call, not the second generic one."""
+        response from the second (strict) LLM call."""
         agent = _make_agent()
         hard_recovery_text = (
             "Corrigibility ensures AI systems remain correctable by humans."
         )
         agent.llm.generate.side_effect = [
             "Redundancy and real-time monitoring prevent failures.",  # initial
-            "Redundancy and real-time monitoring prevent failures.",  # regen
             hard_recovery_text,  # hard recovery
         ]
         seed = "TOPIC: AI alignment\nDiscuss."
@@ -437,14 +439,12 @@ class TestTopicHardRecovery:
             hard_recovery_text in result
         ), "Expected the hard-recovery response to be used as the final output"
 
-    def test_no_hard_recovery_when_regen_succeeds(self, caplog):
-        """[TOPIC-HARD-RECOVERY] must NOT be logged when the regenerated
-        response satisfies the anchor check."""
+    def test_no_hard_recovery_when_initial_accepted(self, caplog):
+        """[TOPIC-HARD-RECOVERY] must NOT be logged when the initial response
+        satisfies the topic compliance threshold (score >= 0.70)."""
         agent = _make_agent()
-        agent.llm.generate.side_effect = [
-            "Redundancy and real-time monitoring prevent failures.",
-            "Corrigibility is the key concept for AI alignment.",
-        ]
+        # Directly on-topic: has AI alignment anchor
+        agent.llm.generate.return_value = "Corrigibility is the key concept for AI alignment."
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
             with patch.object(_meta, "CFG", Config()):
@@ -454,13 +454,13 @@ class TestTopicHardRecovery:
             r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message
         ]
         assert not recovery_msgs, (
-            "Expected no [TOPIC-HARD-RECOVERY] when the regenerated response "
-            "satisfies the anchor check"
+            "Expected no [TOPIC-HARD-RECOVERY] when the initial response "
+            "satisfies the topic compliance threshold"
         )
 
     def test_hard_recovery_anchors_slice(self, caplog):
-        """The strict prompt must include 3-5 required topic anchors from
-        TOPIC_ANCHORS (at most 5, i.e. the first slice of the anchor list)."""
+        """The strict prompt must include up to 5 required topic anchors from
+        TOPIC_ANCHORS (i.e. the first slice of the anchor list)."""
         agent = _make_agent()
         captured_prompts = []
 
@@ -474,7 +474,10 @@ class TestTopicHardRecovery:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        hard_prompt = captured_prompts[2]
+        assert len(captured_prompts) == 2, (
+            f"Expected 2 LLM calls; got {len(captured_prompts)}"
+        )
+        hard_prompt = captured_prompts[1]
         expected_anchors = TOPIC_ANCHORS["AI alignment"][:5]
         for anchor in expected_anchors:
             assert (
@@ -537,7 +540,8 @@ class TestTopicMismatchFirstTurn:
         ), "Expected no [TOPIC-MISMATCH-PERSIST] warning on the agent's first turn"
 
     def test_validation_runs_from_second_turn_onwards(self, caplog):
-        """[TOPIC-MISMATCH] warning IS emitted once the agent has a prior turn."""
+        """A recovery warning IS emitted once the agent has a prior turn and the
+        response is off-topic."""
         agent = _make_agent()
         agent.llm.generate.return_value = (
             "Redundancy and real-time monitoring prevent failures."
@@ -548,11 +552,12 @@ class TestTopicMismatchFirstTurn:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, prior_turn)
 
-        mismatch_msgs = [
-            r.message for r in caplog.records if "TOPIC-MISMATCH" in r.message
+        recovery_msgs = [
+            r.message for r in caplog.records
+            if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
         ]
-        assert mismatch_msgs, (
-            "Expected [TOPIC-MISMATCH] warning on the agent's second turn when "
+        assert recovery_msgs, (
+            "Expected a recovery warning on the agent's second turn when "
             "the response lacks required topic anchors"
         )
 
@@ -755,8 +760,7 @@ class TestTopicFallbackPipeline:
         """[TOPIC-FALLBACK] must NOT be logged when hard recovery produces a valid response."""
         agent = _make_agent()
         agent.llm.generate.side_effect = [
-            "Redundancy and real-time monitoring prevent failures.",  # initial
-            "Redundancy and real-time monitoring prevent failures.",  # regen
+            "Redundancy and real-time monitoring prevent failures.",  # initial (score=0.0)
             "Corrigibility ensures AI systems remain correctable by humans.",  # hard recovery
         ]
         seed = "TOPIC: AI alignment\nDiscuss."
@@ -824,8 +828,11 @@ class TestHardRecoveryPromptEnhancements:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        assert len(captured_prompts) >= 3, "Expected at least 3 LLM calls"
-        hard_prompt = captured_prompts[2]
+        # Two calls: initial + hard recovery
+        assert len(captured_prompts) == 2, (
+            f"Expected 2 LLM calls (initial + hard-recovery); got {len(captured_prompts)}"
+        )
+        hard_prompt = captured_prompts[1]
         assert (
             "empirical evidence suggests" in hard_prompt
         ), "Expected 'empirical evidence suggests' in hard-recovery forbidden list"
@@ -848,8 +855,8 @@ class TestHardRecoveryPromptEnhancements:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        assert len(captured_prompts) >= 3
-        hard_prompt = captured_prompts[2]
+        assert len(captured_prompts) == 2
+        hard_prompt = captured_prompts[1]
         assert (
             "at least two" in hard_prompt
         ), "Expected hard-recovery prompt to require 'at least two' topic anchors"

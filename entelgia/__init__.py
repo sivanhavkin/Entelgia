@@ -65,6 +65,12 @@ from .circularity_guard import (
     clear_history as circularity_clear_history,
     get_new_angle_instruction,
 )
+from .topic_enforcer import (
+    compute_topic_compliance_score,
+    build_soft_reanchor_instruction,
+    ACCEPT_THRESHOLD,
+    SOFT_REANCHOR_THRESHOLD,
+)
 
 __all__ = [
     "DialogueEngine",
@@ -117,6 +123,10 @@ __all__ = [
     "circularity_get_agent_history",
     "circularity_clear_history",
     "get_new_angle_instruction",
+    "compute_topic_compliance_score",
+    "build_soft_reanchor_instruction",
+    "ACCEPT_THRESHOLD",
+    "SOFT_REANCHOR_THRESHOLD",
 ]
 
 __version__ = "3.0.0"

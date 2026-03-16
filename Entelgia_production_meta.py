@@ -139,11 +139,36 @@ try:
         add_to_history as _cg_add_to_history,
         get_new_angle_instruction as _cg_new_angle,
     )
+    from entelgia.topic_enforcer import (
+        compute_topic_compliance_score,
+        build_soft_reanchor_instruction,
+        ACCEPT_THRESHOLD as _TOPIC_ACCEPT_THRESHOLD,
+        SOFT_REANCHOR_THRESHOLD as _TOPIC_SOFT_REANCHOR_THRESHOLD,
+    )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
+
+    # Fallback stubs for topic_enforcer when enhanced modules are unavailable.
+    _TOPIC_ACCEPT_THRESHOLD = 0.70
+    _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.50
+
+    def compute_topic_compliance_score(  # type: ignore[no-redef]
+        text, topic, topic_anchors, prev_anchors=None, *, log_agent=""
+    ):
+        """Minimal fallback: delegate to the legacy binary validator."""
+        return {
+            "opening_topic_relevance": 1.0,
+            "full_response_topic_relevance": 1.0,
+            "contamination_penalty": 0.0,
+            "memory_hijack_penalty": 0.0,
+            "score": 1.0,
+        }
+
+    def build_soft_reanchor_instruction(topic, anchors):  # type: ignore[no-redef]
+        return f"\n[RE-ANCHOR] Please begin your response with a sentence about: {topic}.\n"
 
     def get_style_for_topic(topic, topic_clusters):  # type: ignore[no-redef]
         return ("custom", "conceptual and reflective")
@@ -426,6 +451,183 @@ def _pick_random_seed_topic() -> str:
     """Randomly select a seed topic from TOPIC_CLUSTERS."""
     cluster = random.choice(list(TOPIC_CLUSTERS.keys()))
     return random.choice(TOPIC_CLUSTERS[cluster])
+
+
+# ---------------------------------------------------------------------------
+# Topic proposal & selection helpers (Part A & B)
+# ---------------------------------------------------------------------------
+
+
+def propose_next_topic(
+    agent_name: str,
+    current_topic: str,
+    cluster: str,
+    recent_topics: List[str],
+    recent_memory: Optional[List[str]] = None,
+) -> str:
+    """Propose a short next-topic candidate for *agent_name*.
+
+    The proposal is influenced by:
+    - current topic (avoid immediate repetition)
+    - novelty relative to recent_topics (prefer less-visited topics)
+    - memory relevance: topics whose anchor keywords appear in recent_memory
+      are ranked higher, pulling agent reasoning direction into the selection
+
+    The returned topic stays within the current cluster when possible.  If
+    the cluster is exhausted (all topics are recent), the full cluster is
+    used as the fallback pool.
+
+    Parameters
+    ----------
+    agent_name:
+        Name of the proposing agent (used for logging only).
+    current_topic:
+        The topic that is active in the current turn.
+    cluster:
+        The session's current semantic cluster (e.g. "economics").
+    recent_topics:
+        Ordered list of recently visited topics (most recent last).
+    recent_memory:
+        Short snippets of the agent's recent reasoning (STM contents).
+        When provided, topics whose anchor words appear in the snippets
+        receive a higher score and are preferred.
+    """
+    recent_memory = recent_memory or []
+    cluster_topics: List[str] = TOPIC_CLUSTERS.get(cluster, [])
+
+    # Prefer topics inside the cluster that aren't in recent history
+    candidates: List[str] = [
+        t for t in cluster_topics if t != current_topic and t not in recent_topics
+    ]
+    if not candidates:
+        # Fallback: use full cluster minus current topic
+        candidates = [t for t in cluster_topics if t != current_topic]
+    if not candidates:
+        # Last resort: any topic in any cluster
+        candidates = [
+            t
+            for topics in TOPIC_CLUSTERS.values()
+            for t in topics
+            if t != current_topic
+        ]
+    if not candidates:
+        return current_topic
+
+    # Score candidates by memory relevance
+    memory_blob = " ".join(recent_memory).lower()
+
+    def _candidate_score(topic: str) -> float:
+        anchors = TOPIC_ANCHORS.get(topic, [])
+        if not anchors:
+            return 0.0
+        hits = sum(1 for a in anchors if a.lower() in memory_blob)
+        return hits / max(1, len(anchors))
+
+    scored: List[Tuple[float, str]] = [(_candidate_score(t), t) for t in candidates]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    # Pick from the top-3 with a small random element to avoid determinism
+    top_k = scored[: min(3, len(scored))]
+    proposal = random.choice(top_k)[1]
+    logger.debug(
+        "[TOPIC-PROPOSE] agent=%s current=%r cluster=%r proposal=%r",
+        agent_name,
+        current_topic,
+        cluster,
+        proposal,
+    )
+    return proposal
+
+
+def select_next_topic(
+    proposals: List[str],
+    cluster: str,
+    recent_topics: Optional[List[str]] = None,
+    recent_agent_frames: Optional[List[str]] = None,
+) -> str:
+    """Select the best next topic from *proposals* using a scoring formula.
+
+    Score formula::
+
+        score = 0.35 * cluster_fit
+              + 0.25 * novelty
+              + 0.20 * memory_relevance
+              + 0.20 * agent_ownership
+              - loop_penalty
+
+    Parameters
+    ----------
+    proposals:
+        List of candidate topic strings proposed by agents.
+    cluster:
+        The session's current semantic cluster.
+    recent_topics:
+        Ordered list of recently visited topics (most recent last).
+        Topics matching the last 1-3 entries receive a loop penalty.
+    recent_agent_frames:
+        Recent free-text fragments of agent reasoning.  Topics whose
+        anchor keywords appear here receive higher memory_relevance.
+
+    Returns
+    -------
+    The highest-scoring topic string.  Falls back to the first proposal
+    (or an empty string) if the input list is empty.
+    """
+    if not proposals:
+        return ""
+    recent_topics = recent_topics or []
+    recent_agent_frames = recent_agent_frames or []
+
+    cluster_topic_set: set[str] = set(TOPIC_CLUSTERS.get(cluster, []))
+    memory_blob: str = " ".join(recent_agent_frames).lower()
+
+    # The last 3 recent topics incur increasing loop penalties
+    penalty_map: dict[str, float] = {}
+    for i, t in enumerate(reversed(recent_topics[:5])):
+        penalty_map[t] = 0.30 * (1.0 - i * 0.15)
+
+    def _score(topic: str) -> float:
+        # cluster_fit: 1.0 inside cluster, 0.5 outside
+        cluster_fit = 1.0 if topic in cluster_topic_set else 0.5
+
+        # novelty: 1.0 if not recent, 0.0 if most recent
+        if topic == (recent_topics[-1] if recent_topics else None):
+            novelty = 0.0
+        elif topic in recent_topics:
+            novelty = 0.4
+        else:
+            novelty = 1.0
+
+        # memory_relevance: anchor keyword density in recent agent frames
+        anchors = TOPIC_ANCHORS.get(topic, [])
+        if anchors and memory_blob:
+            mem_hits = sum(1 for a in anchors if a.lower() in memory_blob)
+            memory_relevance = min(1.0, mem_hits / max(1, min(3, len(anchors))))
+        else:
+            memory_relevance = 0.0
+
+        # agent_ownership: 1.0 for every proposal since they were all agent-proposed
+        agent_ownership = 1.0
+
+        # loop_penalty from recent repetition map
+        loop_penalty = penalty_map.get(topic, 0.0)
+
+        return (
+            0.35 * cluster_fit
+            + 0.25 * novelty
+            + 0.20 * memory_relevance
+            + 0.20 * agent_ownership
+            - loop_penalty
+        )
+
+    best = max(proposals, key=_score)
+    logger.info(
+        "[TOPIC-SELECT] proposals=%r cluster=%r selected=%r scores=%s",
+        proposals,
+        cluster,
+        best,
+        {t: round(_score(t), 3) for t in proposals},
+    )
+    return best
 
 
 # ============================================
@@ -2217,7 +2419,14 @@ class TopicManager:
     v2.9.0: ``force_cluster_pivot()`` selects a topic from a *different*
     semantic cluster than the current one, so stagnation cannot be escaped
     by cycling through conceptually adjacent labels.
+
+    v3.0.0: Added proposal-aware advancement via ``advance_with_proposals()``.
+    Tracks recent topic history for novelty scoring.  ``set_current()``
+    allows the main loop to position to a scoring-selected topic.
     """
+
+    # Number of past topics to remember for loop-penalty scoring
+    _HISTORY_CAPACITY: int = 10
 
     def __init__(
         self, topics: List[str], rotate_every_rounds: int = 1, shuffle: bool = False
@@ -2230,6 +2439,8 @@ class TopicManager:
         self.i = 0
         self.rounds = 0
         self.rotate_every_rounds = max(1, rotate_every_rounds)
+        # Ordered history of visited topics (oldest first)
+        self._history: List[str] = []
         logger.info(f"TopicManager initialized with {len(self.topics)} topics")
 
     def current(self) -> str:
@@ -2238,12 +2449,91 @@ class TopicManager:
             return "general discussion"
         return self.topics[self.i % len(self.topics)]
 
+    def recent_topics(self, n: int = 5) -> List[str]:
+        """Return the *n* most recently visited topics (oldest first)."""
+        return self._history[-n:]
+
+    def _record_history(self, topic: str) -> None:
+        """Append *topic* to the internal history buffer."""
+        self._history.append(topic)
+        if len(self._history) > self._HISTORY_CAPACITY:
+            self._history = self._history[-self._HISTORY_CAPACITY :]
+
+    def set_current(self, topic: str) -> None:
+        """Set the active topic to *topic* and record it in history.
+
+        If *topic* is already in the topic list the internal pointer is
+        updated accordingly.  Otherwise the topic is appended so it can
+        be returned by ``current()``.
+
+        This is the primary setter used by ``advance_with_proposals()``.
+        """
+        if not topic:
+            return
+        if topic in self.topics:
+            self.i = self.topics.index(topic)
+        else:
+            self.topics.append(topic)
+            self.i = len(self.topics) - 1
+        self._record_history(topic)
+        logger.info("TopicManager: topic set to %r", topic)
+
     def advance_round(self):
-        """Advance to next topic."""
+        """Advance to next topic (sequential rotation fallback)."""
         self.rounds += 1
         if self.rounds % self.rotate_every_rounds == 0 and self.topics:
             self.i = (self.i + 1) % len(self.topics)
+            self._record_history(self.current())
             logger.info(f"Topic advanced to: {self.current()}")
+
+    def advance_with_proposals(
+        self,
+        proposals: List[str],
+        cluster: str,
+        recent_agent_frames: Optional[List[str]] = None,
+    ) -> str:
+        """Select the next topic from agent *proposals* using scoring.
+
+        Replaces the sequential ``advance_round()`` call for normal
+        rotation so that the next topic is chosen based on cluster fit,
+        novelty, and memory relevance rather than a fixed order.
+
+        Parameters
+        ----------
+        proposals:
+            Candidate topics proposed by the dialogue agents.
+        cluster:
+            The session's current semantic cluster label.
+        recent_agent_frames:
+            Recent free-text snippets of agent reasoning for memory
+            relevance scoring.
+
+        Returns
+        -------
+        The selected topic label string.
+        """
+        self.rounds += 1
+        recent = self.recent_topics(n=5)
+        if proposals:
+            next_topic = select_next_topic(
+                proposals,
+                cluster,
+                recent_topics=recent,
+                recent_agent_frames=recent_agent_frames,
+            )
+            self.set_current(next_topic)
+            logger.info(
+                "TopicManager: advance_with_proposals selected %r from %r",
+                next_topic,
+                proposals,
+            )
+            return next_topic
+        # Fallback to sequential advance if no proposals provided
+        if self.topics:
+            self.i = (self.i + 1) % len(self.topics)
+            self._record_history(self.current())
+            logger.info(f"Topic advanced to: {self.current()} (no proposals)")
+        return self.current()
 
     def force_cluster_pivot(self) -> str:
         """Select a topic from a different semantic cluster than the current one.
@@ -3735,43 +4025,93 @@ class Agent:
         else:
             self._consecutive_superego_rewrites = 0
 
-        # ── Topic Anchor Validation: regenerate if response misses required concepts ─
+        # ── Topic Compliance: graded soft enforcement (Parts C, D, E) ────────────
         # Skip on the agent's very first turn (own_texts is empty) to avoid
         # triggering validation before the agent has had any context to engage
         # with the topic — which would produce regeneration warnings before the
         # agent speaks at all.
+        #
+        # Enforcement ladder:
+        #   score >= ACCEPT_THRESHOLD (0.70)               → accept
+        #   SOFT_REANCHOR_THRESHOLD <= score < 0.70        → soft re-anchor + single regen
+        #   score < SOFT_REANCHOR_THRESHOLD (0.50)         → hard recovery
+        #
+        # Opening-dominance rule (Part E):
+        #   The OPENING sentences must be anchored to the SESSION topic.
+        #   Agent-local memory continuity may shape reasoning *after* the opening
+        #   but must not override the session topic in the first sentences.
         _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
         _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
         _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
-        if (
-            own_texts
-            and _active_topic
-            and _active_anchors
-            and not _validate_topic_compliance(
-                out, _active_topic, prev_topic=self._last_topic
+        _prev_anchors_for_score = (
+            TOPIC_ANCHORS.get(self._last_topic, [])
+            if self._last_topic and self._last_topic != _active_topic
+            else []
+        )
+
+        if own_texts and _active_topic and _active_anchors:
+            _compliance = compute_topic_compliance_score(
+                out,
+                _active_topic,
+                _active_anchors,
+                prev_anchors=_prev_anchors_for_score,
+                log_agent=self.name,
             )
-        ):
-            logger.warning(
-                "[TOPIC-MISMATCH] agent=%s topic=%r response did not contain required topic anchors – regenerating",
+            _score = _compliance["score"]
+
+            logger.info(
+                "[TOPIC-COMPLIANCE] agent=%s topic=%r cluster=%r "
+                "opening_rel=%.2f full_rel=%.2f contamination=%.2f hijack=%.2f score=%.2f",
                 self.name,
                 _active_topic,
+                getattr(self, "topic_cluster", ""),
+                _compliance["opening_topic_relevance"],
+                _compliance["full_response_topic_relevance"],
+                _compliance["contamination_penalty"],
+                _compliance["memory_hijack_penalty"],
+                _score,
             )
-            _regen_response = (
-                self.llm.generate(
-                    self.model, prompt, temperature=temperature, use_cache=False
+
+            if _score >= _TOPIC_ACCEPT_THRESHOLD:
+                # ── Accept: response is well-anchored ─────────────────────────
+                logger.debug(
+                    "[TOPIC-ENFORCE] agent=%s topic=%r action=accepted score=%.2f",
+                    self.name,
+                    _active_topic,
+                    _score,
                 )
-                or out
-            )
-            out = validate_output(_regen_response)
-            if not _validate_topic_compliance(
-                out, _active_topic, prev_topic=self._last_topic
-            ):
+
+            elif _score >= _TOPIC_SOFT_REANCHOR_THRESHOLD:
+                # ── Soft re-anchor: mildly contaminated or weakly anchored ─────
                 logger.warning(
-                    "[TOPIC-MISMATCH-PERSIST] agent=%s topic=%r regenerated response also did not contain required topic anchors",
+                    "[TOPIC-SOFT-REANCHOR] agent=%s topic=%r score=%.2f – "
+                    "appending re-anchor instruction and regenerating once",
+                    self.name,
+                    _active_topic,
+                    _score,
+                )
+                _reanchor_instr = build_soft_reanchor_instruction(
+                    _active_topic, _active_anchors
+                )
+                _regen_prompt = prompt + _reanchor_instr
+                _regen_response = (
+                    self.llm.generate(
+                        self.model,
+                        _regen_prompt,
+                        temperature=temperature,
+                        use_cache=False,
+                    )
+                    or out
+                )
+                out = validate_output(_regen_response)
+                logger.info(
+                    "[TOPIC-ENFORCE] agent=%s topic=%r action=soft_reanchor_regen",
                     self.name,
                     _active_topic,
                 )
-                # ── Hard recovery: rebuild prompt with strict topic constraints ─
+
+            else:
+                # ── Hard recovery: severely contaminated or off-topic ──────────
                 _hard_anchors = _active_anchors[:5]
                 _forbidden_abstractions = (
                     "balanced approach",
@@ -3791,9 +4131,11 @@ class Agent:
                     f"Respond in 2-4 sentences only.\n"
                 )
                 logger.warning(
-                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r forcing strict anchor prompt – short mode",
+                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r score=%.2f – "
+                    "forcing strict anchor prompt",
                     self.name,
                     _active_topic,
+                    _score,
                 )
                 _hard_response = (
                     self.llm.generate(
@@ -3805,20 +4147,39 @@ class Agent:
                     or out
                 )
                 _hard_out = validate_output(_hard_response)
-                if _validate_topic_compliance(
-                    _hard_out, _active_topic, prev_topic=self._last_topic
-                ):
+                _hard_compliance = compute_topic_compliance_score(
+                    _hard_out,
+                    _active_topic,
+                    _active_anchors,
+                    prev_anchors=_prev_anchors_for_score,
+                    log_agent=self.name,
+                )
+                if _hard_compliance["score"] >= _TOPIC_SOFT_REANCHOR_THRESHOLD:
                     out = _hard_out
-                else:
-                    # ── Fallback: use topic-safe template when all recovery fails ─
-                    logger.warning(
-                        "[TOPIC-FALLBACK] agent=%s topic=%r hard recovery also failed – using topic-safe fallback template",
+                    logger.info(
+                        "[TOPIC-ENFORCE] agent=%s topic=%r action=hard_recovery_accepted "
+                        "score=%.2f",
                         self.name,
                         _active_topic,
+                        _hard_compliance["score"],
+                    )
+                else:
+                    # ── Fallback: topic-safe template when all recovery fails ───
+                    logger.warning(
+                        "[TOPIC-FALLBACK] agent=%s topic=%r hard recovery also failed "
+                        "(score=%.2f) – using topic-safe fallback template",
+                        self.name,
+                        _active_topic,
+                        _hard_compliance["score"],
                     )
                     out = TOPIC_FALLBACK_TEMPLATES.get(
                         _active_topic,
                         f"This question touches directly on {_active_topic}.",
+                    )
+                    logger.info(
+                        "[TOPIC-ENFORCE] agent=%s topic=%r action=fallback_template",
+                        self.name,
+                        _active_topic,
                     )
 
         emo, inten = self.emotion.infer(self.model, out)
@@ -5291,36 +5652,57 @@ class MainScript:
                     intervention = self.interactive_fixy.generate_intervention(
                         self.dialog, reason, mode=fixy_mode, current_topic=topic_label
                     )
-                    # Apply same topic compliance validation as Socrates/Athena
+                    # Apply graded topic compliance to Fixy interventions
                     _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
-                    if (
-                        topic_label
-                        and TOPIC_ANCHORS.get(topic_label)
-                        and not _validate_topic_compliance(
-                            intervention, topic_label, prev_topic=_fixy_prev_topic
+                    _fixy_anchors = TOPIC_ANCHORS.get(topic_label, [])
+                    if topic_label and _fixy_anchors:
+                        _fixy_prev_anchors = (
+                            TOPIC_ANCHORS.get(_fixy_prev_topic, [])
+                            if _fixy_prev_topic and _fixy_prev_topic != topic_label
+                            else []
                         )
-                    ):
-                        logger.warning(
-                            "[TOPIC-MISMATCH] agent=Fixy topic=%r intervention did not match topic – regenerating",
+                        _fixy_compliance = compute_topic_compliance_score(
+                            intervention,
                             topic_label,
+                            _fixy_anchors,
+                            prev_anchors=_fixy_prev_anchors,
+                            log_agent="Fixy",
                         )
-                        intervention = self.interactive_fixy.generate_intervention(
-                            self.dialog,
-                            reason,
-                            mode=fixy_mode,
-                            current_topic=topic_label,
+                        _fixy_score = _fixy_compliance["score"]
+                        logger.info(
+                            "[TOPIC-COMPLIANCE] agent=Fixy topic=%r score=%.2f",
+                            topic_label,
+                            _fixy_score,
                         )
-                        if not _validate_topic_compliance(
-                            intervention, topic_label, prev_topic=_fixy_prev_topic
-                        ):
+                        if _fixy_score < _TOPIC_ACCEPT_THRESHOLD:
                             logger.warning(
-                                "[TOPIC-FALLBACK] agent=Fixy topic=%r intervention still off-topic – using fallback",
+                                "[TOPIC-MISMATCH] agent=Fixy topic=%r score=%.2f – regenerating",
                                 topic_label,
+                                _fixy_score,
                             )
-                            intervention = TOPIC_FALLBACK_TEMPLATES.get(
+                            intervention = self.interactive_fixy.generate_intervention(
+                                self.dialog,
+                                reason,
+                                mode=fixy_mode,
+                                current_topic=topic_label,
+                            )
+                            _fixy_c2 = compute_topic_compliance_score(
+                                intervention,
                                 topic_label,
-                                f"Let us stay focused on {topic_label}.",
+                                _fixy_anchors,
+                                prev_anchors=_fixy_prev_anchors,
+                                log_agent="Fixy",
                             )
+                            if _fixy_c2["score"] < _TOPIC_SOFT_REANCHOR_THRESHOLD:
+                                logger.warning(
+                                    "[TOPIC-FALLBACK] agent=Fixy topic=%r score=%.2f – using fallback",
+                                    topic_label,
+                                    _fixy_c2["score"],
+                                )
+                                intervention = TOPIC_FALLBACK_TEMPLATES.get(
+                                    topic_label,
+                                    f"Let us stay focused on {topic_label}.",
+                                )
                     self.dialog.append({"role": "Fixy", "text": intervention})
                     self.fixy_agent.store_turn(
                         intervention, topic_label, source="reflection"
@@ -5385,7 +5767,43 @@ class MainScript:
                 break
 
             if self.turn_index % 5 == 0:
-                topicman.advance_round()
+                # Collect agent proposals for the next topic (Part A & B)
+                # Each agent proposes based on their recent memory and the current cluster.
+                _current_cluster = getattr(self.socrates, "topic_cluster", "") or ""
+                _recent_topics = topicman.recent_topics(n=5)
+                _soc_stm = self.socrates.memory.stm_load(self.socrates.name)
+                _ath_stm = self.athena.memory.stm_load(self.athena.name)
+                _soc_mem_texts = [m.get("content", "") for m in _soc_stm[-3:]]
+                _ath_mem_texts = [m.get("content", "") for m in _ath_stm[-3:]]
+                _soc_proposal = propose_next_topic(
+                    "Socrates",
+                    topic_label,
+                    _current_cluster,
+                    _recent_topics,
+                    _soc_mem_texts,
+                )
+                _ath_proposal = propose_next_topic(
+                    "Athena",
+                    topic_label,
+                    _current_cluster,
+                    _recent_topics,
+                    _ath_mem_texts,
+                )
+                _proposals = [_soc_proposal, _ath_proposal]
+                logger.info(
+                    "[TOPIC-PROPOSE] Socrates=%r Athena=%r cluster=%r",
+                    _soc_proposal,
+                    _ath_proposal,
+                    _current_cluster,
+                )
+                # Advance using scoring-based selection instead of sequential rotation
+                _recent_frames = [
+                    t.get("text", "") for t in self.dialog[-6:]
+                    if t.get("role") not in ("seed", "Fixy")
+                ]
+                topicman.advance_with_proposals(
+                    _proposals, _current_cluster, recent_agent_frames=_recent_frames
+                )
                 # Update topic_style for all agents to match the advanced topic
                 _adv_topic = topicman.current()
                 _adv_cluster, _adv_style_str = get_style_for_topic(
@@ -5402,7 +5820,7 @@ class MainScript:
                     _adv_cluster,
                     _adv_topic,
                 )
-                logger.debug("topic_style updated after advance_round → %r", _adv_topic)
+                logger.debug("topic_style updated after advance_with_proposals → %r", _adv_topic)
 
             elapsed = time.time() - self.start_time
             if elapsed >= timeout_seconds:
