@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from entelgia.web_tool import (
     _clean_text,
+    _is_transient_error,
     clear_failed_urls,
     fetch_page_text,
     search_and_fetch,
@@ -50,6 +51,36 @@ def _mock_http_error(status_code: int) -> requests.HTTPError:
     resp.status_code = status_code
     err = requests.HTTPError(response=resp)
     return err
+
+
+# ---------------------------------------------------------------------------
+# _is_transient_error
+# ---------------------------------------------------------------------------
+
+
+class TestIsTransientError:
+    """_is_transient_error must distinguish transient from permanent errors."""
+
+    def test_http_error_is_not_transient(self):
+        exc = requests.HTTPError(response=MagicMock())
+        assert _is_transient_error(exc) is False
+
+    def test_timeout_is_transient(self):
+        exc = requests.Timeout("timed out")
+        assert _is_transient_error(exc) is True
+
+    def test_connection_error_is_transient(self):
+        exc = requests.ConnectionError("connection failed")
+        assert _is_transient_error(exc) is True
+
+    def test_connection_reset_cause_is_transient(self):
+        exc = requests.RequestException("wrapper")
+        exc.__cause__ = ConnectionResetError(10054, "forcibly closed")
+        assert _is_transient_error(exc) is True
+
+    def test_plain_request_exception_is_not_transient(self):
+        exc = requests.RequestException("generic error")
+        assert _is_transient_error(exc) is False
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +187,24 @@ class TestFetchPageText:
         assert result["text"] == ""
         assert result["title"] == ""
 
+    def test_retries_on_transient_error_then_succeeds(self):
+        """fetch_page_text should retry on a transient error and succeed."""
+        url = "https://example.com/flaky"
+        reset_exc = requests.ConnectionError("connection reset")
+        reset_exc.__cause__ = ConnectionResetError(10054, "forcibly closed")
+        html = "<html><head><title>OK</title></head><body><p>text</p></body></html>"
+        ok_response = _mock_response(text=html)
+
+        with (
+            patch("entelgia.web_tool.requests.get") as mock_get,
+            patch("entelgia.web_tool.time.sleep") as mock_sleep,
+        ):
+            mock_get.side_effect = [reset_exc, ok_response]
+            result = fetch_page_text(url)
+
+        assert result["title"] == "OK"
+        mock_sleep.assert_called_once()
+
     def test_text_limit_is_respected(self):
         url = "https://example.com/long"
         long_text = "A" * 10000
@@ -187,6 +236,36 @@ class TestWebSearch:
             mock_post.return_value = mock
             result = web_search("test query")
         assert isinstance(result, list)
+
+    def test_retries_on_connection_reset_then_succeeds(self):
+        """web_search should retry transient ConnectionError and return results."""
+        reset_exc = requests.ConnectionError("connection reset")
+        reset_exc.__cause__ = ConnectionResetError(10054, "forcibly closed")
+        ok_response = _mock_response(text="<html><body></body></html>")
+
+        with (
+            patch("entelgia.web_tool.requests.post") as mock_post,
+            patch("entelgia.web_tool.time.sleep") as mock_sleep,
+        ):
+            mock_post.side_effect = [reset_exc, ok_response]
+            result = web_search("retry test")
+
+        assert isinstance(result, list)
+        mock_sleep.assert_called_once()
+
+    def test_exhausts_retries_on_persistent_transient_error(self):
+        """web_search should return [] after all retries are exhausted."""
+        reset_exc = requests.ConnectionError("connection reset")
+        reset_exc.__cause__ = ConnectionResetError(10054, "forcibly closed")
+
+        with (
+            patch("entelgia.web_tool.requests.post") as mock_post,
+            patch("entelgia.web_tool.time.sleep"),
+        ):
+            mock_post.side_effect = reset_exc
+            result = web_search("persistent failure")
+
+        assert result == []
 
     def test_max_results_respected(self):
         # Build HTML with 10 fake result divs
