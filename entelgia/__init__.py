@@ -53,6 +53,18 @@ from .topic_style import (
     build_style_instruction,
     scrub_rhetorical_openers,
 )
+from .circularity_guard import (
+    CircularityResult,
+    detect_semantic_repetition,
+    detect_structural_templates,
+    detect_cross_topic_contamination,
+    compute_circularity_score,
+    get_dynamic_threshold,
+    add_to_history as circularity_add_to_history,
+    get_agent_history as circularity_get_agent_history,
+    clear_history as circularity_clear_history,
+    get_new_angle_instruction,
+)
 
 __all__ = [
     "DialogueEngine",
@@ -95,6 +107,16 @@ __all__ = [
     "get_style_for_topic",
     "build_style_instruction",
     "scrub_rhetorical_openers",
+    "CircularityResult",
+    "detect_semantic_repetition",
+    "detect_structural_templates",
+    "detect_cross_topic_contamination",
+    "compute_circularity_score",
+    "get_dynamic_threshold",
+    "circularity_add_to_history",
+    "circularity_get_agent_history",
+    "circularity_clear_history",
+    "get_new_angle_instruction",
 ]
 
 __version__ = "3.0.0"
