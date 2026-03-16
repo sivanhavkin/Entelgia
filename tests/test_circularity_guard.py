@@ -162,8 +162,8 @@ class TestDetectSemanticRepetitionEmbeddings:
         assert detected is False
         assert score < cg.SEMANTIC_REPETITION_THRESHOLD
 
-    def test_model_none_falls_back_to_jaccard(self):
-        """When the model cannot be loaded, Jaccard fallback activates."""
+    def test_semantic_path_with_model_failure_falls_back_to_jaccard(self):
+        """When model is None on the semantic path, Jaccard fallback activates."""
         text = "system constraints define the tradeoff optimization"
         history = _make_identical_texts(3, text)
 
@@ -462,14 +462,14 @@ class TestGetNewAngleInstruction:
         assert len(seen) == len(cg._NEW_ANGLE_INSTRUCTIONS)
 
     def test_wraps_around(self):
+        """After exhausting all instructions, the sequence restarts from the beginning."""
         n = len(cg._NEW_ANGLE_INSTRUCTIONS)
-        # Advance past end of list
-        for _ in range(n):
-            cg.get_new_angle_instruction()
-        # Next call should return first instruction again
-        cg._new_angle_index = 0
-        first = cg.get_new_angle_instruction()
-        assert first == cg._NEW_ANGLE_INSTRUCTIONS[0]
+        # Collect one full rotation
+        first_pass = [cg.get_new_angle_instruction() for _ in range(n)]
+        # Collect a second full rotation
+        second_pass = [cg.get_new_angle_instruction() for _ in range(n)]
+        # The two rotations must be identical (wrap-around restored the sequence)
+        assert first_pass == second_pass
 
     def test_index_increments(self):
         cg._new_angle_index = 0

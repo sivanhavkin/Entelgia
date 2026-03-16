@@ -249,8 +249,13 @@ def detect_semantic_repetition(
     previous_texts:
         The agent's recent responses (up to the last ``HISTORY_SIZE``).
     threshold:
-        Cosine-similarity threshold above which repetition is flagged.
-        The Jaccard fallback uses ``JACCARD_REPETITION_THRESHOLD`` instead.
+        Similarity threshold above which repetition is flagged.  Applied to
+        cosine similarity when sentence-transformers is available.  When the
+        Jaccard fallback is used instead, ``JACCARD_REPETITION_THRESHOLD`` is
+        applied unconditionally — the *threshold* parameter does not affect the
+        Jaccard path, because Jaccard and cosine similarity operate on different
+        scales.  Callers that need to adjust Jaccard sensitivity should modify
+        ``JACCARD_REPETITION_THRESHOLD`` directly.
     min_history:
         Minimum number of entries in *previous_texts* required before detection
         can fire.  Defaults to ``MIN_HISTORY_FOR_DETECTION`` (3).  Callers may
