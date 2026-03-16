@@ -6,18 +6,25 @@ Circularity Guard for Entelgia — pre-generation circularity detection.
 
 Detects four circular dialogue failure modes before a response is accepted:
 
-  1. Semantic repetition     — the generated text is too similar to the
-                               agent's recent responses (cosine / Jaccard).
-  2. Structural templates    — repeated rhetorical frames and openings.
+  1. Semantic repetition     — delta-based score measuring how much the new
+                               response exceeds the agent's recent baseline
+                               similarity (cosine / Jaccard).
+  2. Structural templates    — repeated *rhetorical* frames only; technical
+                               vocabulary is tracked separately and does not
+                               strongly affect the structural score.
   3. Cross-topic contamination — banned carryover phrases from previous topics.
-  4. Composite circularity score — weighted combination of the three signals.
+  4. Composite circularity score — weighted combination of the three signals
+                               against an adaptive threshold that grows with
+                               history size.
 
 Public API
 ----------
 detect_semantic_repetition(text, previous_texts) -> (bool, float)
 detect_structural_templates(text)                -> (bool, int)
 detect_cross_topic_contamination(text, topic)    -> (bool, List[str])
-compute_circularity_score(text, agent_name, topic, threshold) -> CircularityResult
+compute_circularity_score(text, agent_name, topic, threshold,
+                          first_turn_after_topic_change)  -> CircularityResult
+get_dynamic_threshold(history_size)              -> float
 
 History management
 ------------------
@@ -46,7 +53,7 @@ logger = logging.getLogger(__name__)
 try:
     from sentence_transformers import SentenceTransformer
     from sklearn.metrics.pairwise import cosine_similarity as _cosine_similarity
-    import numpy as _np  # noqa: F401 — imported so we can type-check
+    import numpy as np  # noqa: F401
 
     _ST_MODEL: Optional[SentenceTransformer] = None
     _SEMANTIC_AVAILABLE = True
@@ -66,20 +73,29 @@ HISTORY_SIZE: int = 10
 #: can fire.  Fewer prior responses are insufficient to establish a repetition pattern.
 MIN_HISTORY_FOR_DETECTION: int = 3
 
-#: Cosine-similarity threshold above which semantic repetition is flagged.
-SEMANTIC_REPETITION_THRESHOLD: float = 0.75
+#: Threshold for the delta-based cosine repetition score.
+#: The delta score is typically in [0, ~0.75], so this is lower than a raw cosine threshold.
+SEMANTIC_REPETITION_THRESHOLD: float = 0.45
 
-#: Jaccard similarity threshold (used when sentence-transformers is absent).
-JACCARD_REPETITION_THRESHOLD: float = 0.55
+#: Threshold for the delta-based Jaccard repetition score.
+JACCARD_REPETITION_THRESHOLD: float = 0.40
 
-#: Number of structural template matches needed to flag a response.
+#: Number of *rhetorical* pattern matches needed to flag structural repetition.
 TEMPLATE_COUNT_THRESHOLD: int = 2
 
-#: Number of contamination phrases needed to flag a response.
+#: Number of contamination phrases needed to flag cross-topic leakage.
 CONTAMINATION_THRESHOLD: int = 1
 
-#: Composite circularity score at or above which a response is considered circular.
+#: Default composite circularity score threshold (used as a fallback constant).
+#: In practice ``compute_circularity_score`` uses ``get_dynamic_threshold()``.
 CIRCULARITY_SCORE_THRESHOLD: float = 0.5
+
+#: Score multiplier applied on the first response turn after a topic change,
+#: providing leniency because framing language naturally overlaps on topic transitions.
+FIRST_TURN_SCORE_FACTOR: float = 0.7
+
+#: Sentence-transformers model name used for semantic similarity.
+_SEMANTIC_MODEL_NAME: str = "all-MiniLM-L6-v2"
 
 # ---------------------------------------------------------------------------
 # Module-level state: per-agent rolling history
@@ -88,20 +104,46 @@ CIRCULARITY_SCORE_THRESHOLD: float = 0.5
 _agent_history: Dict[str, deque] = {}
 
 # ---------------------------------------------------------------------------
-# Structural rhetorical template patterns
+# Rhetorical template patterns — ONLY these affect the structural score.
+# Technical vocabulary (tradeoff, optimization, …) is catalogued separately
+# and intentionally excluded from circularity scoring.
 # ---------------------------------------------------------------------------
 
-_RHETORICAL_TEMPLATES: List[re.Pattern] = [
-    re.compile(r"\blet us\b.{0,30}\b(examine|explore|consider|investigate)\b", re.I),
+_RHETORICAL_PATTERNS: List[re.Pattern] = [
+    # "let us examine / define / scrutinize / explore / consider / investigate"
+    re.compile(
+        r"\blet us\b.{0,30}\b(examine|explore|consider|investigate|define|scrutinize)\b",
+        re.I,
+    ),
+    # "I identify/note/observe/see a critical …"
     re.compile(r"\bi (identify|note|observe|see) a critical\b", re.I),
-    re.compile(r"\bsystem constraint[s]?\b", re.I),
-    re.compile(r"\btradeoff[s]?\b|\btrade-off[s]?\b|\btrade off[s]?\b", re.I),
-    re.compile(r"\boption [ab]\b.{0,60}\boption [ab]\b", re.I | re.S),
-    re.compile(r"\b(on one hand|on the other hand)\b", re.I),
+    # "on one hand / on the other hand / on the one hand"
+    re.compile(r"\b(on one hand|on the other hand|on the one hand)\b", re.I),
+    # "at its/the core"
     re.compile(r"\b(at its core|at the core)\b", re.I),
+    # "the fundamental tension / question / issue / problem"
     re.compile(r"\bthe fundamental (question|tension|issue|problem)\b", re.I),
+    # "we must balance / weigh / consider"
     re.compile(r"\bwe must (balance|weigh|consider)\b", re.I),
+    # "in our scrutiny"
+    re.compile(r"\bin our scrutiny\b", re.I),
+    # "there is/are two / a fundamental / a tension between"
     re.compile(r"\bthere (is|are) (two|2|a tension between|a fundamental)\b", re.I),
+    # Duplicated speaker prefix — e.g. "Fixy: Fixy:"
+    re.compile(r"(\b\w+)\s*:\s*\1\s*:", re.I),
+]
+
+# ---------------------------------------------------------------------------
+# Technical vocabulary — tracked but NOT counted toward structural score.
+# Present here for documentation and potential future analysis only.
+# ---------------------------------------------------------------------------
+
+_TECHNICAL_VOCABULARY: List[re.Pattern] = [
+    re.compile(r"\btradeoff[s]?\b|\btrade-off[s]?\b|\btrade off[s]?\b", re.I),
+    re.compile(r"\barchitecture\b", re.I),
+    re.compile(r"\boptimization\b", re.I),
+    re.compile(r"\bsystem constraint[s]?\b", re.I),
+    re.compile(r"\bfailure mode[s]?\b", re.I),
 ]
 
 # ---------------------------------------------------------------------------
@@ -145,11 +187,23 @@ _CARRYOVER_PHRASES_BY_TOPIC: Dict[str, List[str]] = {
 _GENERIC_CARRYOVER_PHRASES: List[str] = [
     "option a",
     "option b",
+    "scenario a",
+    "scenario b",
     "as discussed previously",
+    "in the previous topic",
     "as we established",
     "as i mentioned",
     "building on what was said",
     "to summarize our findings",
+]
+
+#: Leaked rhetorical template phrases that signal template bleed-over
+#: regardless of topic.
+_LEAKED_TEMPLATE_PHRASES: List[str] = [
+    "forgiveness",
+    "peace and harmony",
+    "our community",
+    "practical dilemma",
 ]
 
 # ---------------------------------------------------------------------------
@@ -178,8 +232,10 @@ def _get_semantic_model() -> Optional["SentenceTransformer"]:
     global _ST_MODEL
     if _ST_MODEL is None:
         try:
-            logger.info("CircularityGuard: loading SentenceTransformer 'all-MiniLM-L6-v2'…")
-            _ST_MODEL = SentenceTransformer("all-MiniLM-L6-v2")  # type: ignore[name-defined]
+            logger.info(
+                "CircularityGuard: loading SentenceTransformer '%s'…", _SEMANTIC_MODEL_NAME
+            )
+            _ST_MODEL = SentenceTransformer(_SEMANTIC_MODEL_NAME)  # type: ignore[name-defined]
             logger.info("CircularityGuard: model loaded.")
         except Exception as exc:  # pragma: no cover
             logger.warning("CircularityGuard: could not load model: %s", exc)
@@ -190,12 +246,28 @@ def _jaccard(a: str, b: str) -> float:
     """Token-level Jaccard similarity between two texts."""
     sa = set(re.findall(r"\w+", a.lower()))
     sb = set(re.findall(r"\w+", b.lower()))
-    if not sa and not sb:
-        return 0.0
     union = sa | sb
     if not union:
         return 0.0
     return len(sa & sb) / len(union)
+
+
+def _delta_score(similarities: List[float]) -> float:
+    """Compute the delta-based repetition score from a list of similarity values.
+
+    Formula: ``max(0.0, max_sim - avg_last_3 * 0.5)``
+
+    The average of the three most-recent similarity values acts as a
+    topic-consistency baseline.  Subtracting half that baseline from the
+    maximum prevents same-topic responses from being over-penalised while
+    still catching genuine circular repetition.
+    """
+    if not similarities:
+        return 0.0
+    max_sim = max(similarities)
+    last_3 = similarities[-3:]
+    avg_last_3 = sum(last_3) / len(last_3)
+    return max(0.0, max_sim - avg_last_3 * 0.5)
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +296,23 @@ def clear_history(agent_name: Optional[str] = None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Adaptive threshold
+# ---------------------------------------------------------------------------
+
+
+def get_dynamic_threshold(history_size: int) -> float:
+    """Return an adaptive circularity threshold based on *history_size*.
+
+    As the agent builds up more history the guard can afford to be stricter
+    because it has more evidence.  The threshold grows linearly from 0.55 at
+    zero turns, capping at 0.70 once history is large.
+
+    Formula: ``min(0.70, 0.55 + 0.01 * history_size)``
+    """
+    return min(0.70, 0.55 + 0.01 * history_size)
+
+
+# ---------------------------------------------------------------------------
 # 1. Semantic repetition detection
 # ---------------------------------------------------------------------------
 
@@ -234,13 +323,21 @@ def detect_semantic_repetition(
     threshold: float = SEMANTIC_REPETITION_THRESHOLD,
     min_history: int = MIN_HISTORY_FOR_DETECTION,
 ) -> Tuple[bool, float]:
-    """Detect whether *text* is semantically too similar to any of *previous_texts*.
+    """Detect whether *text* is semantically too similar to the agent's recent history.
 
-    Returns ``(detected, max_similarity_score)``.
+    Uses a **delta-based** score to reduce false positives on same-topic
+    responses:
 
-    When sentence-transformers is available, uses cosine similarity on
-    ``all-MiniLM-L6-v2`` embeddings.  Falls back to token-level Jaccard
-    similarity when the library is absent or model loading fails.
+    .. code-block:: text
+
+        score = max(0.0, max_similarity - avg_similarity_last_3 * 0.5)
+
+    When sentence-transformers is available the similarities are cosine
+    distances from ``all-MiniLM-L6-v2`` embeddings.  Falls back to
+    token-level Jaccard similarity when the library is absent or model
+    loading fails.
+
+    Returns ``(detected, delta_score)``.
 
     Parameters
     ----------
@@ -249,22 +346,16 @@ def detect_semantic_repetition(
     previous_texts:
         The agent's recent responses (up to the last ``HISTORY_SIZE``).
     threshold:
-        Similarity threshold above which repetition is flagged.  Applied to
-        cosine similarity when sentence-transformers is available.  When the
-        Jaccard fallback is used instead, ``JACCARD_REPETITION_THRESHOLD`` is
-        applied unconditionally — the *threshold* parameter does not affect the
-        Jaccard path, because Jaccard and cosine similarity operate on different
-        scales.  Callers that need to adjust Jaccard sensitivity should modify
-        ``JACCARD_REPETITION_THRESHOLD`` directly.
+        Delta score above which repetition is flagged.  Applied to both the
+        cosine path (default ``SEMANTIC_REPETITION_THRESHOLD``) and the
+        Jaccard fallback (which additionally checks against
+        ``JACCARD_REPETITION_THRESHOLD``).
     min_history:
-        Minimum number of entries in *previous_texts* required before detection
-        can fire.  Defaults to ``MIN_HISTORY_FOR_DETECTION`` (3).  Callers may
-        lower this for testing purposes.
+        Minimum number of entries in *previous_texts* required before
+        detection can fire.  Defaults to ``MIN_HISTORY_FOR_DETECTION`` (3).
     """
     if len(previous_texts) < min_history:
         return False, 0.0
-
-    max_score = 0.0
 
     if _SEMANTIC_AVAILABLE:
         model = _get_semantic_model()
@@ -274,32 +365,53 @@ def detect_semantic_repetition(
                 embeddings = model.encode(all_texts)
                 query_emb = embeddings[-1].reshape(1, -1)
                 prev_embs = embeddings[:-1]
-                sims = _cosine_similarity(query_emb, prev_embs)[0]
-                max_score = float(max(sims))
-                return max_score >= threshold, max_score
+                raw_sims = _cosine_similarity(query_emb, prev_embs)[0]
+                sims = [float(s) for s in raw_sims]
+                delta = _delta_score(sims)
+                logger.debug(
+                    "[CircularityGuard] semantic: max_sim=%.3f avg_last3=%.3f delta=%.3f",
+                    max(sims),
+                    sum(sims[-3:]) / len(sims[-3:]),
+                    delta,
+                )
+                return delta >= threshold, delta
             except Exception as exc:  # pragma: no cover
                 logger.warning("CircularityGuard: semantic encoding failed: %s", exc)
 
     # Jaccard fallback
-    for prev in previous_texts:
-        score = _jaccard(text, prev)
-        if score > max_score:
-            max_score = score
-    return max_score >= JACCARD_REPETITION_THRESHOLD, max_score
+    jaccards = [_jaccard(text, prev) for prev in previous_texts]
+    delta_j = _delta_score(jaccards)
+    logger.debug(
+        "[CircularityGuard] jaccard: max=%.3f avg_last3=%.3f delta=%.3f",
+        max(jaccards),
+        sum(jaccards[-3:]) / len(jaccards[-3:]),
+        delta_j,
+    )
+    return delta_j >= JACCARD_REPETITION_THRESHOLD, delta_j
 
 
 # ---------------------------------------------------------------------------
-# 2. Structural template detection
+# 2. Structural template detection (rhetorical patterns only)
 # ---------------------------------------------------------------------------
 
 
 def detect_structural_templates(text: str) -> Tuple[bool, int]:
-    """Detect repeated rhetorical structural templates in *text*.
+    """Detect repeated *rhetorical* structural templates in *text*.
 
-    Returns ``(detected, match_count)`` where *detected* is ``True`` when
-    *match_count* reaches ``TEMPLATE_COUNT_THRESHOLD``.
+    Only patterns in ``_RHETORICAL_PATTERNS`` are counted.  Technical
+    vocabulary (``_TECHNICAL_VOCABULARY``) is intentionally excluded so that
+    normal on-topic language does not raise false positives.
+
+    Returns ``(detected, rhetorical_match_count)`` where *detected* is
+    ``True`` when *rhetorical_match_count* reaches ``TEMPLATE_COUNT_THRESHOLD``.
     """
-    count = sum(1 for pat in _RHETORICAL_TEMPLATES if pat.search(text))
+    matched: List[str] = []
+    for pat in _RHETORICAL_PATTERNS:
+        if pat.search(text):
+            matched.append(pat.pattern)
+    count = len(matched)
+    if count > 0:
+        logger.debug("[CircularityGuard] rhetorical patterns matched: %s", matched)
     return count >= TEMPLATE_COUNT_THRESHOLD, count
 
 
@@ -313,10 +425,12 @@ def detect_cross_topic_contamination(
     topic: str,
     contamination_threshold: int = CONTAMINATION_THRESHOLD,
 ) -> Tuple[bool, List[str]]:
-    """Detect banned carryover phrases from other topics leaking into *text*.
+    """Detect banned carryover phrases and leaked templates in *text*.
 
-    Checks both the generic carryover list and the topic-specific list for
-    *topic*.
+    Checks three phrase sets in order:
+    1. Generic cross-topic carryover phrases (``_GENERIC_CARRYOVER_PHRASES``).
+    2. Leaked rhetorical template phrases (``_LEAKED_TEMPLATE_PHRASES``).
+    3. Topic-specific banned phrases (``_CARRYOVER_PHRASES_BY_TOPIC[topic]``).
 
     Returns ``(detected, list_of_found_phrases)``.
     """
@@ -327,11 +441,19 @@ def detect_cross_topic_contamination(
         if phrase.lower() in text_lower:
             found.append(phrase)
 
+    for phrase in _LEAKED_TEMPLATE_PHRASES:
+        p_lower = phrase.lower()
+        if p_lower in text_lower and phrase not in found:
+            found.append(phrase)
+
     topic_phrases = _CARRYOVER_PHRASES_BY_TOPIC.get(topic, [])
     for phrase in topic_phrases:
         p_lower = phrase.lower()
         if p_lower in text_lower and phrase not in found:
             found.append(phrase)
+
+    if found:
+        logger.debug("[CircularityGuard] contamination phrases found: %s", found)
 
     return len(found) >= contamination_threshold, found
 
@@ -352,13 +474,16 @@ class CircularityResult:
     """Composite circularity score in ``[0, 1]``."""
 
     semantic_score: float
-    """Raw semantic similarity score (cosine or Jaccard)."""
+    """Delta-based semantic repetition score (cosine or Jaccard delta)."""
 
     template_count: int
     """Number of rhetorical template patterns matched."""
 
     contamination_phrases: List[str]
-    """Carryover phrases detected in the text."""
+    """Carryover / leaked-template phrases detected in the text."""
+
+    threshold: float
+    """The detection threshold used for this check (dynamic or explicit)."""
 
     reasons: List[str] = field(default_factory=list)
     """Human-readable list of triggered detection signals."""
@@ -368,27 +493,35 @@ def compute_circularity_score(
     text: str,
     agent_name: str,
     topic: str = "",
-    threshold: float = CIRCULARITY_SCORE_THRESHOLD,
+    threshold: Optional[float] = None,
+    first_turn_after_topic_change: bool = False,
 ) -> CircularityResult:
     """Compute a composite circularity score for *text* against *agent_name*'s history.
 
     The composite score is a weighted average of three signals:
 
-    * **Semantic repetition** (weight 0.5) — cosine / Jaccard similarity to
-      the agent's recent responses.
-    * **Structural templates** (weight 0.3) — presence of repeated rhetorical
+    * **Semantic repetition** (weight 0.5) — delta-based cosine / Jaccard
+      score against the agent's recent responses.
+    * **Structural templates** (weight 0.3) — presence of repeated *rhetorical*
       frames, capped at 5 matches → 1.0.
     * **Cross-topic contamination** (weight 0.2) — carryover phrase count,
       capped at 5 → 1.0.
 
-    Returns a :class:`CircularityResult` with ``is_circular=True`` when the
-    composite score is at or above *threshold*.
+    The detection threshold is adaptive by default: it increases with history
+    size via :func:`get_dynamic_threshold`.  Pass an explicit *threshold* to
+    override (e.g. ``threshold=0.0`` in tests).
 
-    .. note::
-       Call :func:`add_to_history` **after** the response has been accepted to
-       keep the history current.
+    When *first_turn_after_topic_change* is ``True`` the raw score is
+    multiplied by ``FIRST_TURN_SCORE_FACTOR`` to provide leniency on the
+    first turn of a new topic.
+
+    Returns a :class:`CircularityResult`; call :func:`add_to_history`
+    **after** the response has been accepted to keep the history current.
     """
     history = list(get_agent_history(agent_name))
+    effective_threshold = (
+        threshold if threshold is not None else get_dynamic_threshold(len(history))
+    )
 
     sem_detected, sem_score = detect_semantic_repetition(text, history)
     sem_component = sem_score
@@ -399,7 +532,10 @@ def compute_circularity_score(
     ct_detected, ct_phrases = detect_cross_topic_contamination(text, topic)
     ct_component = min(len(ct_phrases) / 5.0, 1.0)
 
-    score = 0.5 * sem_component + 0.3 * tpl_component + 0.2 * ct_component
+    raw_score = 0.5 * sem_component + 0.3 * tpl_component + 0.2 * ct_component
+
+    # Apply leniency factor on the first turn after a topic change
+    score = raw_score * FIRST_TURN_SCORE_FACTOR if first_turn_after_topic_change else raw_score
 
     reasons: List[str] = []
     if sem_detected:
@@ -409,13 +545,32 @@ def compute_circularity_score(
     if ct_detected:
         reasons.append(f"cross_topic_contamination(phrases={ct_phrases})")
 
-    is_circular = score >= threshold
+    is_circular = score >= effective_threshold
+
+    logger.debug(
+        "[CircularityGuard] agent=%s topic=%r "
+        "sem=%.3f tpl=%.3f ct=%.3f raw=%.3f score=%.3f threshold=%.3f "
+        "first_turn=%s circular=%s",
+        agent_name,
+        topic,
+        sem_component,
+        tpl_component,
+        ct_component,
+        raw_score,
+        score,
+        effective_threshold,
+        first_turn_after_topic_change,
+        is_circular,
+    )
+
     if is_circular:
         logger.info(
-            "[CircularityGuard] agent=%s topic=%r circular score=%.2f reasons=%s",
+            "[CircularityGuard] agent=%s topic=%r circular score=%.2f "
+            "threshold=%.2f reasons=%s",
             agent_name,
             topic,
             score,
+            effective_threshold,
             reasons,
         )
 
@@ -425,6 +580,7 @@ def compute_circularity_score(
         semantic_score=sem_score,
         template_count=tpl_count,
         contamination_phrases=ct_phrases,
+        threshold=effective_threshold,
         reasons=reasons,
     )
 
