@@ -36,6 +36,25 @@ SOFT_REANCHOR_THRESHOLD: float = 0.50
 soft re-anchor instruction and are regenerated once."""
 
 # ---------------------------------------------------------------------------
+# Internal scoring constants
+# ---------------------------------------------------------------------------
+
+# Maximum number of prior-topic anchor hits to normalise against in
+# _contamination_score().  Keeps one highly verbose previous topic from
+# dominating the penalty calculation.
+_MAX_CONTAMINATION_ANCHORS: int = 4
+
+# Weight applied per stale contamination phrase found in the opening.
+# Four phrases at this weight saturate the penalty at 1.0.
+_STALE_PHRASE_PENALTY_WEIGHT: float = 0.25
+
+# When computing memory_hijack, the opening contamination baseline is
+# discounted by this factor before subtracting from full-response
+# contamination.  This prevents double-counting sentences that appear in
+# both the opening and the body.
+_OPENING_CONTAMINATION_DISCOUNT: float = 0.5
+
+# ---------------------------------------------------------------------------
 # Stale contamination phrases
 # ---------------------------------------------------------------------------
 
@@ -94,24 +113,26 @@ def _contamination_score(text: str, prev_anchors: list[str]) -> float:
     """Return a contamination score [0, 1] based on prior-topic anchor density.
 
     A high score means the text contains many concepts from the *previous*
-    topic, which would indicate carryover contamination.
+    topic, which would indicate carryover contamination.  Normalises against
+    ``_MAX_CONTAMINATION_ANCHORS`` to prevent an unusually long prior-topic
+    anchor list from inflating the penalty.
     """
     if not prev_anchors:
         return 0.0
     text_lower = text.lower()
     hits = sum(1 for a in prev_anchors if a.lower() in text_lower)
-    return min(1.0, hits / max(1, min(4, len(prev_anchors))))
+    return min(1.0, hits / max(1, min(_MAX_CONTAMINATION_ANCHORS, len(prev_anchors))))
 
 
 def _stale_phrase_penalty(text: str) -> float:
     """Return a stale-phrase penalty [0, 1] for *text*.
 
-    Each stale contamination phrase found in *text* adds 0.25 to the
-    penalty, capped at 1.0.
+    Each stale contamination phrase found in *text* adds
+    ``_STALE_PHRASE_PENALTY_WEIGHT`` to the penalty, capped at 1.0.
     """
     text_lower = text.lower()
     hits = sum(1 for phrase in _STALE_CONTAMINATION_PHRASES if phrase in text_lower)
-    return min(1.0, hits * 0.25)
+    return min(1.0, hits * _STALE_PHRASE_PENALTY_WEIGHT)
 
 
 # ---------------------------------------------------------------------------
@@ -188,8 +209,12 @@ def compute_topic_compliance_score(
 
     # Memory hijack: prior-topic density across the *full* response that
     # exceeds what would be expected from the opening alone.
+    # The opening contamination is discounted by _OPENING_CONTAMINATION_DISCOUNT
+    # to avoid double-counting sentences present in both opening and body.
     full_contamination = _contamination_score(text, _prev_anchors)
-    memory_hijack = max(0.0, full_contamination - opening_contamination * 0.5)
+    memory_hijack = max(
+        0.0, full_contamination - opening_contamination * _OPENING_CONTAMINATION_DISCOUNT
+    )
 
     score = (
         0.45 * opening_rel

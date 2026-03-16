@@ -525,8 +525,9 @@ def propose_next_topic(
 
     scored: List[Tuple[float, str]] = [(_candidate_score(t), t) for t in candidates]
     scored.sort(key=lambda x: x[0], reverse=True)
-    # Pick from the top-3 with a small random element to avoid determinism
-    top_k = scored[: min(3, len(scored))]
+    # Pick from the top-_PROPOSAL_TOP_K with a small random element to avoid determinism
+    _PROPOSAL_TOP_K: int = 3
+    top_k = scored[: min(_PROPOSAL_TOP_K, len(scored))]
     proposal = random.choice(top_k)[1]
     logger.debug(
         "[TOPIC-PROPOSE] agent=%s current=%r cluster=%r proposal=%r",
@@ -580,10 +581,16 @@ def select_next_topic(
     cluster_topic_set: set[str] = set(TOPIC_CLUSTERS.get(cluster, []))
     memory_blob: str = " ".join(recent_agent_frames).lower()
 
-    # The last 3 recent topics incur increasing loop penalties
+    # Loop penalty constants: base penalty for the most-recent topic, decaying
+    # by _LOOP_PENALTY_DECAY for each position further back in history.
+    _BASE_LOOP_PENALTY: float = 0.30
+    _LOOP_PENALTY_DECAY: float = 0.15
+    # Maximum number of anchor hits to normalise memory relevance against.
+    _MAX_MEMORY_ANCHORS: int = 3
+
     penalty_map: dict[str, float] = {}
     for i, t in enumerate(reversed(recent_topics[:5])):
-        penalty_map[t] = 0.30 * (1.0 - i * 0.15)
+        penalty_map[t] = _BASE_LOOP_PENALTY * (1.0 - i * _LOOP_PENALTY_DECAY)
 
     def _score(topic: str) -> float:
         # cluster_fit: 1.0 inside cluster, 0.5 outside
@@ -601,7 +608,7 @@ def select_next_topic(
         anchors = TOPIC_ANCHORS.get(topic, [])
         if anchors and memory_blob:
             mem_hits = sum(1 for a in anchors if a.lower() in memory_blob)
-            memory_relevance = min(1.0, mem_hits / max(1, min(3, len(anchors))))
+            memory_relevance = min(1.0, mem_hits / max(1, min(_MAX_MEMORY_ANCHORS, len(anchors))))
         else:
             memory_relevance = 0.0
 
@@ -2425,7 +2432,11 @@ class TopicManager:
     allows the main loop to position to a scoring-selected topic.
     """
 
-    # Number of past topics to remember for loop-penalty scoring
+    # Number of past topics to remember for loop-penalty scoring.
+    # Deliberately twice the typical query size of recent_topics(n=5) so the
+    # buffer retains enough history for the loop-penalty map (which looks back
+    # up to 5 turns) while absorbing a few pivot events without truncating
+    # relevant context.
     _HISTORY_CAPACITY: int = 10
 
     def __init__(

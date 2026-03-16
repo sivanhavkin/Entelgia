@@ -477,18 +477,36 @@ class TestAgentContinuityVsSessionTopic:
         )
 
     def test_opening_relevance_weighted_more_than_body(self):
-        """The opening_topic_relevance component should have more weight (0.45)
-        than full_response_topic_relevance (0.35) per the formula."""
+        """The opening_topic_relevance component has more weight (0.45) than
+        full_response_topic_relevance (0.35).  A response whose opening is
+        anchored to the topic scores higher than one whose opening is off-topic
+        even when both responses contain the anchor word somewhere."""
         topic = "Economic freedom"
         anchors = TOPIC_ANCHORS.get(topic, ["market", "trade", "freedom"])
-        # Response 1: anchored opening (has anchor in first sentence)
-        resp1 = f"{anchors[0]} is central to this topic. "
-        # Response 2: opening has no anchor, anchor only in long body
-        resp2 = f"Something generic here. " + " ".join(anchors) + " throughout the text. "
+        if not anchors:
+            pytest.skip(f"No anchors for {topic!r}")
+        anchor = anchors[0]
+
+        # Response 1: anchor in OPENING (first sentence) → opening_rel = 1.0
+        resp1 = f"{anchor.capitalize()} is central to this topic. Nothing else follows."
+        # Response 2: generic opening, anchor only appears after first 2 sentences
+        resp2 = (
+            "Something entirely generic here. "
+            "And another generic statement. "
+            f"Only now does {anchor} appear in the body."
+        )
         r1 = compute_topic_compliance_score(resp1, topic, anchors)
         r2 = compute_topic_compliance_score(resp2, topic, anchors)
-        # r1 must have higher opening relevance since its first sentences are anchored
-        assert r1["opening_topic_relevance"] >= r2["opening_topic_relevance"] or r1["score"] >= 0
+        # r1 opening is anchored → opening_rel = 1.0; r2 opening is not → opening_rel = 0.0
+        assert r1["opening_topic_relevance"] > r2["opening_topic_relevance"], (
+            "Response with anchor in opening should have higher opening_relevance"
+        )
+        # Full-text relevance: both mention the anchor somewhere, but r2 body also includes it
+        # The higher opening weight (0.45 vs 0.35) means r1 overall scores higher
+        assert r1["score"] > r2["score"], (
+            f"Opening-anchored response should have higher overall score. "
+            f"r1={r1['score']:.2f} r2={r2['score']:.2f}"
+        )
 
 
 # ---------------------------------------------------------------------------
