@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -31,6 +32,10 @@ _DEFAULT_TEXT_LIMIT: int = 6000
 _REQUEST_TIMEOUT: int = 10  # seconds
 
 _DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/"
+
+# Retry configuration for transient network errors
+_MAX_RETRIES: int = 3
+_RETRY_BACKOFF_BASE: float = 0.5  # seconds; delay doubles each attempt
 
 _UNWANTED_TAGS = {"script", "style", "nav", "footer", "header", "aside", "noscript"}
 
@@ -54,6 +59,33 @@ def clear_failed_urls() -> None:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _is_transient_error(exc: requests.RequestException) -> bool:
+    """Return True when *exc* represents a transient network condition.
+
+    Transient errors include connection resets, refused connections, broken
+    pipes, and read/connect timeouts.  HTTP errors (4xx/5xx) are *not*
+    transient and should not be retried.
+    """
+    if isinstance(exc, requests.HTTPError):
+        return False
+    cause = exc.__cause__ or exc.__context__
+    if cause is not None:
+        msg = str(cause).lower()
+        transient_indicators = (
+            "connection reset",
+            "connection refused",
+            "broken pipe",
+            "connection aborted",
+            "remote end closed",
+            "forcibly closed",
+        )
+        if any(indicator in msg for indicator in transient_indicators):
+            return True
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
+        return True
+    return False
 
 
 def _get_soup(html: str) -> Any:
@@ -98,16 +130,39 @@ def web_search(
     Returns an empty list on any network or parsing error.
     """
     results: List[Dict[str, str]] = []
-    try:
-        response = requests.post(
-            _DUCKDUCKGO_URL,
-            data={"q": query, "b": "", "kl": ""},
-            headers={"User-Agent": "Mozilla/5.0 (compatible; Entelgia/1.0)"},
-            timeout=_REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        logger.warning("web_search: network error for query %r: %s", query, exc)
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            response = requests.post(
+                _DUCKDUCKGO_URL,
+                data={"q": query, "b": "", "kl": ""},
+                headers={"User-Agent": "Mozilla/5.0 (compatible; Entelgia/1.0)"},
+                timeout=_REQUEST_TIMEOUT,
+            )
+            response.raise_for_status()
+            last_exc = None
+            break
+        except requests.RequestException as exc:
+            last_exc = exc
+            if _is_transient_error(exc) and attempt < _MAX_RETRIES:
+                delay = _RETRY_BACKOFF_BASE * (2 ** (attempt - 1))  # 0.5s, 1.0s, 2.0s
+                logger.warning(
+                    "web_search: transient error for query %r (attempt %d/%d): %s — "
+                    "retrying in %.1fs",
+                    query,
+                    attempt,
+                    _MAX_RETRIES,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+            else:
+                logger.warning(
+                    "web_search: network error for query %r: %s", query, exc
+                )
+                return results
+
+    if last_exc is not None:
         return results
 
     soup = _get_soup(response.text)
@@ -170,27 +225,42 @@ def fetch_page_text(url: str, text_limit: int = _DEFAULT_TEXT_LIMIT) -> Dict[str
     if url in _failed_urls:
         logger.debug("fetch_page_text: skipping blacklisted URL %r", url)
         return result
-    try:
-        response = requests.get(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; Entelgia/1.0)"},
-            timeout=_REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
-    except requests.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code in (403, 404):
-            logger.warning(
-                "fetch_page_text: %d for %r; adding to failed-URL blacklist",
-                exc.response.status_code,
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            response = requests.get(
                 url,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; Entelgia/1.0)"},
+                timeout=_REQUEST_TIMEOUT,
             )
-            _failed_urls.add(url)
-        else:
-            logger.warning("fetch_page_text: failed to fetch %r: %s", url, exc)
-        return result
-    except requests.RequestException as exc:
-        logger.warning("fetch_page_text: failed to fetch %r: %s", url, exc)
-        return result
+            response.raise_for_status()
+            break
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code in (403, 404):
+                logger.warning(
+                    "fetch_page_text: %d for %r; adding to failed-URL blacklist",
+                    exc.response.status_code,
+                    url,
+                )
+                _failed_urls.add(url)
+            else:
+                logger.warning("fetch_page_text: failed to fetch %r: %s", url, exc)
+            return result
+        except requests.RequestException as exc:
+            if _is_transient_error(exc) and attempt < _MAX_RETRIES:
+                delay = _RETRY_BACKOFF_BASE * (2 ** (attempt - 1))  # 0.5s, 1.0s, 2.0s
+                logger.warning(
+                    "fetch_page_text: transient error for %r (attempt %d/%d): %s — "
+                    "retrying in %.1fs",
+                    url,
+                    attempt,
+                    _MAX_RETRIES,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+            else:
+                logger.warning("fetch_page_text: failed to fetch %r: %s", url, exc)
+                return result
 
     soup = _get_soup(response.text)
     if soup is None:
