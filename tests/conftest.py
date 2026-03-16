@@ -19,18 +19,26 @@ def reset_trigger_cooldown():
     ensuring deterministic test results regardless of execution order.
     Also resets the web_research module-level caches and the failed-URL
     blacklist in web_tool for the same reason.
+    Also clears the circularity guard per-agent response history and rotation
+    index so that previous test responses cannot influence circularity detection.
     """
     from entelgia.fixy_research_trigger import clear_trigger_cooldown
     from entelgia.web_research import clear_research_caches
     from entelgia.web_tool import clear_failed_urls
+    from entelgia.circularity_guard import clear_history as _cg_clear_history
+    import entelgia.circularity_guard as _cg
 
     clear_trigger_cooldown()
     clear_research_caches()
     clear_failed_urls()
+    _cg_clear_history()
+    _cg._new_angle_index = 0
     yield
     clear_trigger_cooldown()
     clear_research_caches()
     clear_failed_urls()
+    _cg_clear_history()
+    _cg._new_angle_index = 0
 
 
 @pytest.fixture

@@ -138,6 +138,11 @@ try:
         build_style_instruction,
         scrub_rhetorical_openers,
     )
+    from entelgia.circularity_guard import (
+        compute_circularity_score as _cg_compute,
+        add_to_history as _cg_add_to_history,
+        get_new_angle_instruction as _cg_new_angle,
+    )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -197,6 +202,20 @@ except ImportError:
 
     def clear_research_caches() -> None:  # type: ignore[no-redef]
         pass
+
+    # No-op stubs for circularity guard when entelgia package is absent
+    def _cg_compute(text, agent_name, topic="", threshold=0.5):  # type: ignore[no-redef]
+        class _R:
+            is_circular = False
+            score = 0.0
+            reasons: list = []
+        return _R()
+
+    def _cg_add_to_history(agent_name, text):  # type: ignore[no-redef]
+        pass
+
+    def _cg_new_angle():  # type: ignore[no-redef]
+        return "Approach this from a completely different conceptual direction."
 
 
 # Optional: FastAPI for REST API
@@ -3932,6 +3951,34 @@ class Agent:
         logger.debug(
             "[%s] raw_draft: %s", self.name, out[:200] + ("…" if len(out) > 200 else "")
         )
+
+        # ── Circularity Guard ─────────────────────────────────────────────────────
+        # Check for semantic repetition, structural template reuse, and cross-topic
+        # contamination before accepting the response.  If circularity is detected,
+        # inject a new-angle instruction and regenerate once.
+        _circ = _cg_compute(out, self.name, topic=_active_topic or "")
+        if _circ.is_circular:
+            _new_angle = _cg_new_angle()
+            logger.info(
+                "[CircularityGuard] agent=%s score=%.2f reasons=%s → regenerating",
+                self.name,
+                _circ.score,
+                _circ.reasons,
+            )
+            _circ_prompt = prompt.replace(
+                "\nRespond now:\n",
+                f"\nNEW ANGLE REQUIRED: {_new_angle}\nRespond now:\n",
+            )
+            _circ_raw = (
+                self.llm.generate(
+                    self.model, _circ_prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            out = validate_output(_circ_raw)
+        _cg_add_to_history(self.name, out)
+        # ─────────────────────────────────────────────────────────────────────────
+
         out = revise_draft(out, self.name, topic=_active_topic or "")
         # ─────────────────────────────────────────────────────────────────────────
 
