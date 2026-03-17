@@ -37,6 +37,7 @@ from Entelgia_production_meta_200t import (
     _SkillCache,
     _skill_cache,
     humanize_text,
+    preload_humanizer_skill_md,
 )
 
 # ---------------------------------------------------------------------------
@@ -263,6 +264,43 @@ class TestLoadSkillGuidance:
 
         guidance = _load_skill_humanizer_guidance()
         assert guidance == ""
+
+
+# ---------------------------------------------------------------------------
+# 2b. preload_humanizer_skill_md
+# ---------------------------------------------------------------------------
+
+
+class TestPreloadHumanizerSkillMd:
+    """Verify preload helper populates cache and is safe when file is absent."""
+
+    def test_preload_populates_cache_when_file_exists(self, tmp_path, monkeypatch):
+        """preload_humanizer_skill_md() should fill _skill_cache.extracted_guidance."""
+        skill_file = tmp_path / "SKILL.md"
+        skill_file.write_text(_SAMPLE_SKILL_MD, encoding="utf-8")
+
+        _skill_cache.last_path = None
+        _skill_cache.last_mtime = None
+        _skill_cache.extracted_guidance = ""
+
+        monkeypatch.setattr(_meta200t, "_find_skill_md_path", lambda: skill_file)
+
+        preload_humanizer_skill_md()
+
+        assert "UNIQUE_SKILL_MARKER_123" in _skill_cache.extracted_guidance
+
+    def test_preload_does_not_raise_when_file_missing(self, monkeypatch):
+        """preload_humanizer_skill_md() must not raise even if SKILL.md is absent."""
+        _skill_cache.last_path = None
+        _skill_cache.last_mtime = None
+        _skill_cache.extracted_guidance = ""
+
+        monkeypatch.setattr(_meta200t, "_find_skill_md_path", lambda: None)
+
+        # Should complete without raising any exception
+        preload_humanizer_skill_md()
+
+        assert _skill_cache.extracted_guidance == ""
 
 
 # ---------------------------------------------------------------------------
