@@ -1718,6 +1718,13 @@ class Config:
     forgetting_autobio_ttl: int = 365 * 24 * 3600  # autobiographical → 365 days
     # ── Affective Routing (Feature 2) ──────────────────────────────────────
     affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
+    # ── Humanizer rewrite pass ─────────────────────────────────────────────
+    # Every agent response is rewritten by a second LLM call to reduce
+    # AI-writing artifacts (promotional tone, em-dash overuse, vague filler,
+    # etc.) while preserving meaning and agent voice.  The pass is always ON.
+    # Set humanizer_model to None to reuse each agent's own model.
+    humanizer_model: Optional[str] = None  # None → use the speaking agent's model
+    humanizer_temperature: float = 0.6  # higher → more natural variation in rewrites
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.
@@ -2169,6 +2176,61 @@ def _sentence_overlap(a: str, b: str) -> float:
     if not wa or not wb:
         return 0.0
     return len(wa & wb) / max(len(wa), len(wb))
+
+
+def humanize_text(llm: "LLM", model: str, text: str, *, agent_name: str, temperature: float = 0.6) -> str:
+    """Rewrite *text* to sound less AI-generated while preserving meaning.
+
+    This is an always-on pass applied inside ``Agent.speak()`` after all
+    topic-enforcement and circularity-guard rewrites, and before the
+    deterministic ``revise_draft()`` cleanup.
+
+    Rules enforced by the rewrite prompt (based on SKILL.md guidelines):
+    - Preserve meaning, intent, and agent voice.
+    - Do not add new factual claims, names, sources, or citations.
+    - Keep first-person voice (I / me / my).
+    - Remove AI-writing artifacts: promotional tone, grand significance
+      claims, vague attributions, "-ing" filler clauses,
+      "Additionally/Furthermore", em-dash overuse, forced rule-of-three,
+      generic upbeat conclusions, and chatbot phrases.
+    - Respect the 150-word response limit.
+
+    Failures are caught and the original *text* is returned as a fallback
+    so that a bad humanizer call never crashes the dialogue loop.
+
+    Args:
+        llm: The LLM instance to use for the rewrite call.
+        model: Model name to pass to ``llm.generate``.
+        text: Raw agent response text to humanize.
+        agent_name: Name of the speaking agent (Socrates / Athena / Fixy).
+        temperature: Sampling temperature for the rewrite call (default 0.6).
+
+    Returns:
+        Rewritten text, or *text* unchanged if the text is too short or the
+        rewrite call fails.
+    """
+    if not text or len(text.split()) < 6:
+        return text
+
+    prompt = (
+        "You are a writing editor. Rewrite the following text so it sounds "
+        "like it was written by a thoughtful human, not an AI assistant.\n"
+        "Rules:\n"
+        "- Preserve the exact meaning and the agent's voice and role.\n"
+        "- Do NOT add new facts, names, sources, citations, or claims.\n"
+        "- Keep first-person voice (I / me / my). Do not address the reader directly.\n"
+        "- Remove AI tells: promotional tone, grand-significance claims, vague "
+        "attributions, '-ing' filler opener clauses, 'Additionally', 'Furthermore', "
+        "em-dash overuse, forced rule-of-three lists, generic upbeat closings, and "
+        "chatbot phrases such as 'I hope this helps' or 'Of course!'.\n"
+        "- Output only the rewritten text. No preamble, no commentary.\n"
+        f"{LLM_RESPONSE_LIMIT}\n\n"
+        f"AGENT: {agent_name}\n"
+        f"TEXT:\n{text}\n\n"
+        "REWRITE:\n"
+    )
+    rewritten = llm.generate(model, prompt, temperature=temperature, use_cache=False) or text
+    return validate_output(rewritten)
 
 
 def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
@@ -4365,6 +4427,21 @@ class Agent:
             )
             out = validate_output(_circ_raw)
         _cg_add_to_history(self.name, out)
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Humanizer rewrite pass ────────────────────────────────────────────────
+        # Runs on every response for all agents (Socrates, Athena, Fixy) to reduce
+        # AI-writing artifacts.  This pass runs late — after topic enforcement and
+        # the circularity guard — so we never humanize a draft that will be
+        # discarded.  It runs before revise_draft() so the deterministic cleanup
+        # still applies to the humanized output.
+        _humanizer_model = (getattr(_cfg, "humanizer_model", None) or self.model) if _cfg is not None else self.model
+        _humanizer_temperature = float(getattr(_cfg, "humanizer_temperature", 0.6)) if _cfg is not None else 0.6
+        try:
+            out = humanize_text(self.llm, _humanizer_model, out, agent_name=self.name, temperature=_humanizer_temperature)
+            logger.debug("[Humanizer] agent=%s model=%s temp=%.2f", self.name, _humanizer_model, _humanizer_temperature)
+        except Exception as _hz_err:  # pragma: no cover — network/model failures
+            logger.warning("[Humanizer] pass failed (falling back to original): %s", _hz_err)
         # ─────────────────────────────────────────────────────────────────────────
 
         out = revise_draft(out, self.name, topic=_active_topic or "")
