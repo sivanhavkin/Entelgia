@@ -31,6 +31,7 @@ from Entelgia_production_meta_200t import (
     ConsciousCore,
     EmotionCore,
     LanguageCore,
+    _build_humanizer_prompt_section,
     _extract_humanizer_sections,
     _find_skill_md_path,
     _load_skill_humanizer_guidance,
@@ -481,33 +482,32 @@ class TestHumanizeFailSafe:
 
 
 # ---------------------------------------------------------------------------
-# 7. Agent.speak() does not crash when humanize_text raises
+# 7. Agent.speak() embeds SKILL.md style guidance in the main prompt
 # ---------------------------------------------------------------------------
 
 
-class TestSpeakHumanizerFailSafe:
-    """Agent.speak() must complete normally even when humanize_text raises."""
+class TestSpeakHumanizerPromptInjection:
+    """Agent.speak() must embed humanizer style guidelines into the main prompt.
 
-    def test_speak_survives_humanize_exception(self, monkeypatch):
+    The old two-pass approach (generate → separate humanize_text LLM call) is
+    replaced by injecting _build_humanizer_prompt_section() into the prompt
+    before the single LLM generation call.
+    """
+
+    def test_speak_completes_normally(self, monkeypatch):
+        """speak() must return a non-empty string with no errors."""
         agent, cfg = _make_agent_200t()
-
-        # Make humanize_text raise to simulate a catastrophic failure
-        def _raise_humanizer(*args, **kwargs):
-            raise RuntimeError("boom")
-
-        monkeypatch.setattr(_meta200t, "humanize_text", _raise_humanizer)
 
         with patch.object(_meta200t, "CFG", cfg):
             result = agent.speak(
                 "TOPIC: Philosophy of mind\nRespond now:\n", []
             )
 
-        # The result should still be a non-empty string
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_speak_calls_humanize_text(self, tmp_path, monkeypatch):
-        """Verify humanize_text is actually called during speak()."""
+    def test_speak_prompt_contains_skill_guidance(self, tmp_path, monkeypatch):
+        """The LLM prompt must contain SKILL.md content (injected before generation)."""
         skill_file = tmp_path / "SKILL.md"
         skill_file.write_text(_SAMPLE_SKILL_MD, encoding="utf-8")
 
@@ -518,18 +518,34 @@ class TestSpeakHumanizerFailSafe:
         monkeypatch.setattr(_meta200t, "_find_skill_md_path", lambda: skill_file)
 
         agent, cfg = _make_agent_200t()
+        captured_prompts = []
 
-        humanize_calls = []
+        original_generate = agent.llm.generate.side_effect
 
-        original_humanize = humanize_text
+        def capturing_generate(model, prompt, **kwargs):
+            captured_prompts.append(prompt)
+            return "I think about this carefully."
 
-        def tracking_humanize(text, llm, model, cfg_arg):
-            humanize_calls.append(text)
-            return original_humanize(text, llm, model, cfg_arg)
-
-        monkeypatch.setattr(_meta200t, "humanize_text", tracking_humanize)
+        agent.llm.generate.side_effect = capturing_generate
 
         with patch.object(_meta200t, "CFG", cfg):
             agent.speak("TOPIC: Philosophy of mind\nRespond now:\n", [])
 
-        assert len(humanize_calls) >= 1, "humanize_text should have been called once"
+        assert captured_prompts, "LLM generate must have been called"
+        main_prompt = captured_prompts[0]
+        assert "UNIQUE_SKILL_MARKER_123" in main_prompt, (
+            "Main generation prompt must contain SKILL.md content"
+        )
+
+    def test_speak_only_one_llm_call_per_turn(self, monkeypatch):
+        """speak() must make exactly one LLM call (no second humanizer call)."""
+        monkeypatch.setattr(_meta200t, "_find_skill_md_path", lambda: None)
+
+        agent, cfg = _make_agent_200t()
+
+        with patch.object(_meta200t, "CFG", cfg):
+            agent.speak("TOPIC: Philosophy of mind\nRespond now:\n", [])
+
+        assert agent.llm.generate.call_count == 1, (
+            "speak() should make exactly one LLM call — humanizer is now prompt-injected"
+        )
