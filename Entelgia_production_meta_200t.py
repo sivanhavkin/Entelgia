@@ -2280,6 +2280,18 @@ def _load_skill_humanizer_guidance() -> str:
         return ""
 
 
+def preload_humanizer_skill_md() -> None:
+    """Preload SKILL.md guidance into the module-level cache at startup.
+
+    This avoids first-use disk IO during Agent.speak() while preserving the
+    existing mtime-based hot-reload behavior inside humanize_text().
+    """
+    try:
+        _load_skill_humanizer_guidance()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[Humanizer] preload SKILL.md failed (ignored): %s", exc)
+
+
 _HUMANIZER_FALLBACK_PROMPT = (
     "You are a writing editor. Rewrite the following text to sound natural and "
     "human-written. Remove AI writing patterns: inflated significance, promotional "
@@ -5341,6 +5353,7 @@ class MainScript:
             logger.info("Observer (Fixy) disabled via enable_observer=False")
 
         logger.info(f"MainScript initialized - Session: {self.session_id}")
+        preload_humanizer_skill_md()
 
     def print_agent(self, agent: Agent, text: str):
         """Print agent message with color."""
