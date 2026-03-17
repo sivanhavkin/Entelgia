@@ -2293,18 +2293,28 @@ _HUMANIZER_STYLE_FALLBACK = (
     "Use first-person voice (I/me/my) naturally."
 )
 
+# Maximum characters of SKILL.md guidance injected into each prompt.
+# Keeps the inline style block small to avoid ~4000-token prompt bloat.
+_INLINE_GUIDANCE_MAX_CHARS = 2000
+
 
 def _build_humanizer_prompt_section() -> str:
     """Return a WRITING STYLE block to embed in the main generation prompt.
 
     Uses cached SKILL.md guidance when available; falls back to a compact
     inline rule set.  No disk IO after the first call (mtime-cached).
+    Guidance is truncated to ``_INLINE_GUIDANCE_MAX_CHARS`` to prevent
+    excessive prompt growth.
     """
     guidance = _load_skill_humanizer_guidance()
     if guidance:
+        if len(guidance) > _INLINE_GUIDANCE_MAX_CHARS:
+            truncated = guidance[:_INLINE_GUIDANCE_MAX_CHARS].rsplit(" ", 1)[0]
+        else:
+            truncated = guidance
         return (
             "WRITING STYLE GUIDELINES (apply as you write — do not mention these rules):\n"
-            + guidance
+            + truncated
             + "\n"
         )
     return f"WRITING STYLE: {_HUMANIZER_STYLE_FALLBACK}\n"
