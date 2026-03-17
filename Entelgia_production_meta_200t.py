@@ -247,6 +247,16 @@ except ImportError:
         return "Approach this from a completely different conceptual direction."
 
 
+# Humanizer post-processing (standalone, no enhanced modules required)
+try:
+    from entelgia.humanizer import TextHumanizer, HumanizerConfig
+
+    _HUMANIZER_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _HUMANIZER_AVAILABLE = False
+    TextHumanizer = None  # type: ignore[assignment,misc]
+    HumanizerConfig = None  # type: ignore[assignment,misc]
+
 # Optional: FastAPI for REST API
 try:
     from fastapi import FastAPI, HTTPException
@@ -1721,6 +1731,15 @@ class Config:
     # ── Humanizer rewrite pass ──────────────────────────────────────────────
     humanizer_model: Optional[str] = None  # None → use the agent's own model
     humanizer_temperature: float = 0.6
+    # ── TextHumanizer post-processing pass ─────────────────────────────────
+    humanizer_enabled: bool = True
+    humanizer_aggressive: bool = False
+    humanizer_randomness: float = 0.30
+    show_humanizer_debug: bool = False
+    humanizer_max_sentence_length: int = 26
+    humanizer_split_long_sentences: bool = True
+    humanizer_remove_opening_scaffolds: bool = True
+    humanizer_diversify_agent_voice: bool = True
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.
@@ -1749,6 +1768,9 @@ class Config:
 
 # Global CFG instance
 CFG: Config = None  # type: ignore
+
+# Global shared TextHumanizer instance (initialized from CFG in MainScript.__init__)
+HUMANIZER: Optional["TextHumanizer"] = None
 
 
 @dataclass
@@ -2391,6 +2413,51 @@ def humanize_text(
     except Exception as exc:
         logger.warning("[Humanizer] rewrite failed: %s; returning original", exc)
     return text
+
+
+def should_humanize(text: str) -> bool:
+    """Return True only for free-form dialogue/reflection text.
+
+    Rejects:
+    - Empty or very short text (< 30 characters)
+    - Code blocks (triple backticks)
+    - JSON-like content (starts with ``{`` and ends with ``}``)
+    - Key/value metadata-only content
+    """
+    if not text:
+        return False
+    stripped = text.strip()
+    if len(stripped) < 30:
+        return False
+    if "```" in stripped:
+        return False
+    if stripped.startswith("{") and stripped.endswith("}"):
+        return False
+    # Reject content that looks like a list of key/value metadata lines only
+    lines = [ln for ln in stripped.splitlines() if ln.strip()]
+    if lines and all(":" in ln for ln in lines):
+        return False
+    return True
+
+
+def _build_humanizer_instance(cfg: "Config") -> Optional["TextHumanizer"]:
+    """Create a TextHumanizer instance from the main Config object.
+
+    Returns ``None`` if the humanizer module is unavailable or
+    ``cfg.humanizer_enabled`` is False.
+    """
+    if not _HUMANIZER_AVAILABLE or not cfg.humanizer_enabled:
+        return None
+    h_cfg = HumanizerConfig(
+        enabled=cfg.humanizer_enabled,
+        aggressive=cfg.humanizer_aggressive,
+        randomness=cfg.humanizer_randomness,
+        max_sentence_length=cfg.humanizer_max_sentence_length,
+        split_long_sentences=cfg.humanizer_split_long_sentences,
+        remove_opening_scaffolds=cfg.humanizer_remove_opening_scaffolds,
+        diversify_agent_voice=cfg.humanizer_diversify_agent_voice,
+    )
+    return TextHumanizer(h_cfg)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4605,6 +4672,36 @@ class Agent:
         out = revise_draft(out, self.name, topic=_active_topic or "")
         # ─────────────────────────────────────────────────────────────────────────
 
+        # ── TextHumanizer post-processing ────────────────────────────────────────
+        if HUMANIZER is not None and should_humanize(out):
+            try:
+                _h_result = HUMANIZER.humanize(out, agent_name=self.name)
+                original_text = _h_result.original_text
+                humanized_text = _h_result.humanized_text
+                if _h_result.changed:
+                    logger.info(
+                        "[HUMANIZER] agent=%s flags=%s score_before=%.2f score_after=%.2f",
+                        self.name,
+                        _h_result.flags,
+                        _h_result.score_before,
+                        _h_result.score_after,
+                    )
+                    if CFG is not None and getattr(CFG, "show_humanizer_debug", False):
+                        logger.debug(
+                            "[HUMANIZER DEBUG] agent=%s original=%r humanized=%r",
+                            self.name,
+                            original_text,
+                            humanized_text,
+                        )
+                    out = humanized_text
+            except Exception as _h_exc:
+                logger.warning(
+                    "[HUMANIZER] post-processing failed for agent=%s: %s; using original",
+                    self.name,
+                    _h_exc,
+                )
+        # ─────────────────────────────────────────────────────────────────────────
+
         return out
 
     def store_turn(self, text: str, topic: str, source: str = "stm"):
@@ -5292,6 +5389,7 @@ class MainScript:
 
     def __init__(self, cfg: Config):
         global CFG  # Add this line
+        global HUMANIZER
         CFG = cfg  # Add this line
         ensure_dirs(cfg)
         colorama_init(autoreset=True)
@@ -5308,6 +5406,17 @@ class MainScript:
         self.vtrack = VersionTracker(cfg.version_dir)
         self.session_mgr = SessionManager(cfg.sessions_dir)
         self.async_proc = AsyncProcessor()
+
+        HUMANIZER = _build_humanizer_instance(cfg)
+        if HUMANIZER is not None:
+            logger.info(
+                "[HUMANIZER] initialized: enabled=%s aggressive=%s randomness=%.2f",
+                cfg.humanizer_enabled,
+                cfg.humanizer_aggressive,
+                cfg.humanizer_randomness,
+            )
+        else:
+            logger.info("[HUMANIZER] disabled or unavailable")
 
         self.dialog: List[Dict[str, str]] = []
         self.turn_index = 0
