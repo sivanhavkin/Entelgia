@@ -2278,12 +2278,36 @@ def preload_humanizer_skill_md() -> None:
     """Preload SKILL.md guidance into the module-level cache at startup.
 
     This avoids first-use disk IO during Agent.speak() while preserving the
-    existing mtime-based hot-reload behavior inside humanize_text().
+    existing mtime-based hot-reload behavior inside _build_humanizer_prompt_section().
     """
     try:
         _load_skill_humanizer_guidance()
     except Exception as exc:  # noqa: BLE001
         logger.warning("[Humanizer] preload SKILL.md failed (ignored): %s", exc)
+
+
+_HUMANIZER_STYLE_FALLBACK = (
+    "Write naturally. Avoid AI writing patterns: do not over-emphasize significance, "
+    "avoid promotional language, avoid em dash overuse, avoid vague attributions, "
+    "avoid excessive hedging, avoid rule-of-three lists. "
+    "Use first-person voice (I/me/my) naturally."
+)
+
+
+def _build_humanizer_prompt_section() -> str:
+    """Return a WRITING STYLE block to embed in the main generation prompt.
+
+    Uses cached SKILL.md guidance when available; falls back to a compact
+    inline rule set.  No disk IO after the first call (mtime-cached).
+    """
+    guidance = _load_skill_humanizer_guidance()
+    if guidance:
+        return (
+            "WRITING STYLE GUIDELINES (apply as you write — do not mention these rules):\n"
+            + guidance
+            + "\n"
+        )
+    return f"WRITING STYLE: {_HUMANIZER_STYLE_FALLBACK}\n"
 
 
 _HUMANIZER_FALLBACK_PROMPT = (
@@ -4051,6 +4075,17 @@ class Agent:
 
         prompt = self._build_compact_prompt(seed, dialog_tail)
 
+        # ── Humanizer: embed SKILL.md style guidelines into the main prompt ──────
+        # Single-pass approach: inject writing-style guidelines before the LLM call
+        # instead of running a separate LLM rewrite pass after generation.
+        # The guidance is loaded from the module-level mtime cache — no disk IO
+        # after the first call.
+        _humanizer_section = _build_humanizer_prompt_section()
+        prompt = prompt.replace(
+            "\nRespond now:\n", f"\n{_humanizer_section}\nRespond now:\n"
+        )
+        # ─────────────────────────────────────────────────────────────────────────
+
         # Inject behavioral rule into prompt if applicable
         behavioral_rule = self._behavioral_rule_instruction()
         if behavioral_rule:
@@ -4577,15 +4612,6 @@ class Agent:
             )
             out = validate_output(_circ_raw)
         _cg_add_to_history(self.name, out)
-        # ─────────────────────────────────────────────────────────────────────────
-
-        # ── Humanizer rewrite pass (always-on, derived from SKILL.md) ─────────────
-        try:
-            out = humanize_text(out, self.llm, self.model, self.cfg)
-        except Exception as _h_exc:
-            logger.warning(
-                "[Humanizer] unexpected error: %s; continuing with original", _h_exc
-            )
         # ─────────────────────────────────────────────────────────────────────────
 
         out = revise_draft(out, self.name, topic=_active_topic or "")
