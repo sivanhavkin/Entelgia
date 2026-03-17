@@ -1728,9 +1728,6 @@ class Config:
     forgetting_autobio_ttl: int = 365 * 24 * 3600  # autobiographical → 365 days
     # ── Affective Routing (Feature 2) ──────────────────────────────────────
     affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
-    # ── Humanizer rewrite pass ──────────────────────────────────────────────
-    humanizer_model: Optional[str] = None  # None → use the agent's own model
-    humanizer_temperature: float = 0.6
     # ── TextHumanizer post-processing pass ─────────────────────────────────
     humanizer_enabled: bool = True
     humanizer_aggressive: bool = False
@@ -2197,224 +2194,6 @@ def _sentence_overlap(a: str, b: str) -> float:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Humanizer: SKILL.md-derived rewrite pass
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _find_skill_md_path() -> Optional[Path]:
-    """Walk upward from this script's directory to find SKILL.md (up to 6 levels).
-
-    Returns the first matching :class:`~pathlib.Path` or ``None`` if not found.
-    """
-    current = Path(__file__).resolve().parent
-    for _ in range(7):  # current directory + up to 6 parent directories
-        candidate = current / "SKILL.md"
-        if candidate.is_file():
-            return candidate
-        parent = current.parent
-        if parent == current:  # filesystem root
-            break
-        current = parent
-    return None
-
-
-@dataclass
-class _SkillCache:
-    """Module-level cache for the extracted SKILL.md humanizer guidance."""
-
-    last_path: Optional[Path] = None
-    last_mtime: Optional[float] = None
-    extracted_guidance: str = ""
-
-
-_skill_cache = _SkillCache()
-
-
-def _extract_humanizer_sections(skill_text: str) -> str:
-    """Return the most relevant subset of *skill_text* for prompting.
-
-    Keeps:
-      * Title + "Your Task"
-      * "PERSONALITY AND SOUL"
-      * Pattern lists / rules (all ## sections before "Full Example")
-      * "Process"
-
-    Strips:
-      * YAML frontmatter (``--- … ---``)
-      * ``## Output Format`` section (pipeline-irrelevant multi-step output spec)
-      * ``## Full Example`` and everything after it
-    """
-    import re as _re
-
-    # 1. Strip YAML frontmatter
-    text = _re.sub(r"^---\s*\n.*?\n---\s*\n", "", skill_text, flags=_re.DOTALL)
-
-    # 2. Stop before "## Full Example"
-    m = _re.search(r"^## Full Example", text, _re.MULTILINE)
-    if m:
-        text = text[: m.start()]
-
-    # 3. Remove "## Output Format" section (stop at next ## or end)
-    text = _re.sub(
-        r"^## Output Format.*?(?=^##|\Z)",
-        "",
-        text,
-        flags=_re.MULTILINE | _re.DOTALL,
-    )
-
-    # 4. Collapse excessive blank lines
-    text = _re.sub(r"\n{3,}", "\n\n", text).strip()
-
-    return text
-
-
-def _load_skill_humanizer_guidance() -> str:
-    """Load humanizer guidance from SKILL.md with mtime-based caching.
-
-    Returns:
-        Extracted guidance string, or ``""`` if SKILL.md cannot be read.
-    """
-    skill_path = _find_skill_md_path()
-    if skill_path is None:
-        logger.warning("[Humanizer] SKILL.md not found; using fallback prompt")
-        return ""
-    try:
-        mtime = skill_path.stat().st_mtime
-        if (
-            _skill_cache.last_path == skill_path
-            and _skill_cache.last_mtime == mtime
-            and _skill_cache.extracted_guidance
-        ):
-            return _skill_cache.extracted_guidance
-        raw = skill_path.read_text(encoding="utf-8")
-        guidance = _extract_humanizer_sections(raw)
-        _skill_cache.last_path = skill_path
-        _skill_cache.last_mtime = mtime
-        _skill_cache.extracted_guidance = guidance
-        logger.info(
-            "[Humanizer] Loaded SKILL.md from %s (%d chars extracted)",
-            skill_path,
-            len(guidance),
-        )
-        return guidance
-    except Exception as exc:
-        logger.warning("[Humanizer] Failed to load SKILL.md: %s; using fallback", exc)
-        return ""
-
-
-def preload_humanizer_skill_md() -> None:
-    """Preload SKILL.md guidance into the module-level cache at startup.
-
-    This avoids first-use disk IO during Agent.speak() while preserving the
-    existing mtime-based hot-reload behavior inside _build_humanizer_prompt_section().
-    """
-    try:
-        _load_skill_humanizer_guidance()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("[Humanizer] preload SKILL.md failed (ignored): %s", exc)
-
-
-_HUMANIZER_FALLBACK_PROMPT = (
-    "You are a writing editor. Rewrite the following text to sound natural and "
-    "human-written. Remove AI writing patterns: inflated significance, promotional "
-    "language, em dash overuse, vague attributions, excessive hedging, rule of three. "
-    "Preserve meaning and first-person voice (I/me/my). "
-    "Do not add new facts, names, or citations. "
-    "Output only the rewritten text, no commentary."
-)
-
-_HUMANIZER_STYLE_FALLBACK = (
-    "Write naturally. Avoid AI writing patterns: do not over-emphasize significance, "
-    "avoid promotional language, avoid em dash overuse, avoid vague attributions, "
-    "avoid excessive hedging, avoid rule-of-three lists. "
-    "Use first-person voice (I/me/my) naturally."
-)
-
-# Maximum characters of SKILL.md guidance injected into each prompt.
-# Keeps the inline style block small to avoid ~4000-token prompt bloat.
-_INLINE_GUIDANCE_MAX_CHARS = 2000
-
-
-def _build_humanizer_prompt_section() -> str:
-    """Return a WRITING STYLE block to embed in the main generation prompt.
-
-    Uses cached SKILL.md guidance when available; falls back to a compact
-    inline rule set.  No disk IO after the first call (mtime-cached).
-    Guidance is truncated to ``_INLINE_GUIDANCE_MAX_CHARS`` to prevent
-    excessive prompt growth.
-    """
-    guidance = _load_skill_humanizer_guidance()
-    if guidance:
-        if len(guidance) > _INLINE_GUIDANCE_MAX_CHARS:
-            truncated = guidance[:_INLINE_GUIDANCE_MAX_CHARS].rsplit(" ", 1)[0]
-        else:
-            truncated = guidance
-        return (
-            "WRITING STYLE GUIDELINES (apply as you write — do not mention these rules):\n"
-            + truncated
-            + "\n"
-        )
-    return f"WRITING STYLE: {_HUMANIZER_STYLE_FALLBACK}\n"
-
-
-def humanize_text(
-    text: str,
-    llm: Any,
-    model: str,
-    cfg: "Config",
-) -> str:
-    """Apply always-on humanizer rewrite pass derived from SKILL.md.
-
-    The rewrite prompt is built from the cached, extracted SKILL.md guidance.
-    If the file is unavailable the compact fallback prompt is used instead.
-    The LLM call is non-fatal: on any exception the original *text* is returned
-    unchanged.
-
-    Args:
-        text:  Text to rewrite.
-        llm:   LLM client with a ``generate(model, prompt, **kwargs)`` interface.
-        model: Agent's model name (used when ``cfg.humanizer_model`` is ``None``).
-        cfg:   Global :class:`Config` instance.
-
-    Returns:
-        Rewritten text, or *text* unchanged if the rewrite fails or produces
-        an empty result.
-    """
-    if not text or not text.strip():
-        return text
-
-    guidance = _load_skill_humanizer_guidance()
-    if guidance:
-        system_part = (
-            "You are a writing editor that removes AI writing patterns to make "
-            "text sound natural and human.\n\n"
-            "GUIDELINES (from SKILL.md):\n" + guidance
-        )
-    else:
-        system_part = _HUMANIZER_FALLBACK_PROMPT
-
-    h_model = getattr(cfg, "humanizer_model", None) or model
-    h_temp = getattr(cfg, "humanizer_temperature", 0.6)
-
-    prompt = (
-        f"{system_part}\n\n"
-        "IMPORTANT RULES FOR THIS REWRITE:\n"
-        "- Preserve meaning and agent voice exactly\n"
-        "- Do not add new facts, names, sources, or citations\n"
-        "- Keep first-person voice (I/me/my) where used\n"
-        "- Output only the rewritten text, no commentary or preamble\n"
-        f"- {LLM_RESPONSE_LIMIT}\n\n"
-        f"TEXT:\n{text}\n\nREWRITE:\n"
-    )
-    try:
-        result = llm.generate(h_model, prompt, temperature=h_temp, use_cache=False)
-        if result and result.strip():
-            return validate_output(result)
-    except Exception as exc:
-        logger.warning("[Humanizer] rewrite failed: %s; returning original", exc)
-    return text
-
-
 def should_humanize(text: str) -> bool:
     """Return True only for free-form dialogue/reflection text.
 
@@ -4131,16 +3910,6 @@ class Agent:
 
         prompt = self._build_compact_prompt(seed, dialog_tail)
 
-        # ── Humanizer: embed SKILL.md style guidelines into the main prompt ──────
-        # Replaces the previous two-pass approach (generate → separate LLM rewrite).
-        # The guidance is loaded from the module-level mtime cache — no disk IO
-        # after the first call.
-        _humanizer_section = _build_humanizer_prompt_section()
-        prompt = prompt.replace(
-            "\nRespond now:\n", f"\n{_humanizer_section}\nRespond now:\n"
-        )
-        # ─────────────────────────────────────────────────────────────────────────
-
         # Inject behavioral rule into prompt if applicable
         behavioral_rule = self._behavioral_rule_instruction()
         if behavioral_rule:
@@ -5496,7 +5265,6 @@ class MainScript:
             logger.info("Observer (Fixy) disabled via enable_observer=False")
 
         logger.info(f"MainScript initialized - Session: {self.session_id}")
-        preload_humanizer_skill_md()
 
     def print_agent(self, agent: Agent, text: str):
         """Print agent message with color."""
