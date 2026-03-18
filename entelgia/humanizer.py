@@ -15,6 +15,7 @@ class HumanizerConfig:
     diversify_agent_voice: bool = True
     randomness: float = 0.3
     seed: Optional[int] = None
+    min_score: float = 0.15
 
 
 @dataclass
@@ -116,6 +117,10 @@ class TextHumanizer:
         flags = []
         score_before = self._score(original)
 
+        if score_before < self.config.min_score:
+            flags.append("score_skip")
+            return HumanizerResult(original, original, False, flags, score_before, score_before)
+
         out = self._remove_scaffolds(original)
         if out != original:
             flags.append("scaffold_removed")
@@ -166,7 +171,10 @@ class TextHumanizer:
         out = text
         for p in self._OPENING_SCAFFOLDS:
             out = re.sub(p, "", out, flags=re.IGNORECASE)
-        return out.strip(" ,.")
+        out = out.strip(" ,.")
+        if out:
+            out = out[0].upper() + out[1:] if len(out) > 1 else out.upper()
+        return out
 
     def _replace_words(self, text: str) -> str:
         out = text
@@ -191,15 +199,36 @@ class TextHumanizer:
             flags=re.IGNORECASE
         )
 
+    _SPLIT_SAFE_CONJUNCTIONS = frozenset({
+        "or", "nor", "and", "but", "yet", "so",
+        "on", "in", "at", "of", "to", "by", "as",
+        "if", "is", "it", "a",
+    })
+
     def _split_sentences(self, text: str) -> str:
         parts = re.split(r"(?<=[.!?])\s+", text)
         out = []
         for p in parts:
             words = p.split()
             if len(words) > self.config.max_sentence_length:
-                mid = len(words)//2
-                out.append(" ".join(words[:mid]) + ".")
-                out.append(" ".join(words[mid:]))
+                mid = len(words) // 2
+                # Slide mid forward to avoid the second half starting with a
+                # conjunction/preposition, or the first half ending with one.
+                while mid < len(words) - 1 and (
+                    words[mid].lower() in self._SPLIT_SAFE_CONJUNCTIONS
+                    or (mid > 0 and words[mid - 1].rstrip(".,;:").lower() in self._SPLIT_SAFE_CONJUNCTIONS)
+                ):
+                    mid += 1
+                first_half = " ".join(words[:mid])
+                second_half = " ".join(words[mid:])
+                # Ensure first half ends with terminal punctuation
+                if first_half and first_half[-1] not in ".!?":
+                    first_half += "."
+                # Ensure second half starts with a capital letter
+                if second_half:
+                    second_half = second_half[0].upper() + second_half[1:] if len(second_half) > 1 else second_half.upper()
+                out.append(first_half)
+                out.append(second_half)
             else:
                 out.append(p)
         return " ".join(out)
@@ -217,7 +246,11 @@ class TextHumanizer:
         starter = random.choice(self._AGENT_VOICE[agent_name])
         first = sentences[0].strip()
         if first:
-            first = starter + " " + first[0].lower() + first[1:]
+            lowered = first[0].lower() + first[1:] if len(first) > 1 else first.lower()
+            # Preserve standalone "I" — never lowercase it
+            if first.startswith("I ") or first == "I":
+                lowered = first
+            first = starter + " " + lowered
         sentences[0] = first
 
         return " ".join(sentences)

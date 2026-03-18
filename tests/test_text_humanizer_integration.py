@@ -240,6 +240,9 @@ class TestConfigDefaults:
     def test_humanizer_diversify_agent_voice_default(self):
         assert Config().humanizer_diversify_agent_voice is True
 
+    def test_humanizer_min_score_default(self):
+        assert Config().humanizer_min_score == pytest.approx(0.15)
+
 
 # ---------------------------------------------------------------------------
 # 10-12. Agent.speak() integration
@@ -335,3 +338,142 @@ class TestSpeakHumanizerIntegration:
 
         # Result should not be the humanized_text when changed=False
         assert isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# 13. TextHumanizer threshold skip (min_score)
+# ---------------------------------------------------------------------------
+
+
+class TestHumanizerMinScore:
+    """Verify that TextHumanizer skips processing when score_before < min_score."""
+
+    def test_low_score_returns_original_unchanged(self):
+        """Text with no LLM-pattern hits scores 0.0 — below default 0.15 threshold."""
+        h = TextHumanizer(HumanizerConfig(min_score=0.15))
+        plain = "This is a plain sentence with no AI patterns at all."
+        result = h.humanize(plain)
+        assert result.humanized_text == plain
+        assert result.changed is False
+        assert "score_skip" in result.flags
+
+    def test_low_score_score_before_recorded(self):
+        """score_before is still populated even on a skip."""
+        h = TextHumanizer(HumanizerConfig(min_score=0.15))
+        plain = "This is a plain sentence with no AI patterns at all."
+        result = h.humanize(plain)
+        assert result.score_before == pytest.approx(0.0)
+
+    def test_above_threshold_does_not_skip(self):
+        """Text with LLM patterns (score ≥ 0.15) must NOT be skipped."""
+        h = TextHumanizer(HumanizerConfig(min_score=0.15, seed=42))
+        high_score = (
+            "It is crucial to examine this topic carefully, because often overlooked is "
+            "the fact that an alternative perspective might reveal underlying assumptions."
+        )
+        result = h.humanize(high_score)
+        assert "score_skip" not in result.flags
+
+    def test_zero_min_score_never_skips(self):
+        """Setting min_score=0.0 must never skip any non-empty text."""
+        h = TextHumanizer(HumanizerConfig(min_score=0.0, seed=42))
+        plain = "This is a plain sentence with no AI patterns at all."
+        result = h.humanize(plain)
+        assert "score_skip" not in result.flags
+
+    def test_min_score_mapped_from_config(self):
+        """_build_humanizer_instance must propagate humanizer_min_score."""
+        cfg = Config(humanizer_min_score=0.25)
+        instance = _build_humanizer_instance(cfg)
+        assert instance is not None
+        assert instance.config.min_score == pytest.approx(0.25)
+
+
+# ---------------------------------------------------------------------------
+# 14. Scaffold removal capitalisation repair
+# ---------------------------------------------------------------------------
+
+
+class TestScaffoldCapitalisation:
+    """After scaffold removal the first letter must be capitalised."""
+
+    def test_capitalises_after_scaffold_removal(self):
+        h = TextHumanizer(HumanizerConfig(
+            min_score=0.0,
+            split_long_sentences=False,
+            diversify_agent_voice=False,
+        ))
+        text = "In examining the topic of inequality and opportunity within society, scrutinize the roots."
+        result = h.humanize(text)
+        assert result.humanized_text[0].isupper()
+
+    def test_no_double_capitalisation_when_already_capitalised(self):
+        h = TextHumanizer(HumanizerConfig(
+            min_score=0.0,
+            split_long_sentences=False,
+            diversify_agent_voice=False,
+        ))
+        text = "In examining the situation, Power corrupts absolutely."
+        result = h.humanize(text)
+        # Should start with capital P
+        stripped = result.humanized_text.lstrip()
+        assert stripped[0].isupper()
+
+
+# ---------------------------------------------------------------------------
+# 15. Voice prefix capitalisation
+# ---------------------------------------------------------------------------
+
+
+class TestVoicePrefixCapitalisation:
+    """Voice prefixes must not lowercase a standalone 'I'."""
+
+    def test_standalone_i_is_preserved(self):
+        """'I notice...' must not become 'i notice...' after prefix injection."""
+        h = TextHumanizer(HumanizerConfig(
+            min_score=0.0,
+            split_long_sentences=False,
+            randomness=1.0,  # always apply voice
+            seed=0,
+        ))
+        text = "I notice that the argument relies on a hidden premise."
+        result = h.humanize(text, agent_name="Fixy")
+        # "I" must remain uppercase wherever it appears as a standalone word
+        import re as _re
+        assert not _re.search(r"\bi notice\b", result.humanized_text)
+
+
+# ---------------------------------------------------------------------------
+# 16. Long-sentence splitting safety
+# ---------------------------------------------------------------------------
+
+
+class TestSplitSentenceSafety:
+    """Sentence splitting must not produce fragments starting with conjunctions."""
+
+    def test_split_does_not_start_fragment_with_or(self):
+        h = TextHumanizer(HumanizerConfig(
+            min_score=0.0,
+            max_sentence_length=8,
+            split_long_sentences=True,
+            diversify_agent_voice=False,
+        ))
+        # 10-word sentence; mid=5 → "laws." then "or policies" — must be fixed
+        text = "Governments enforce unjust laws or policies that restrict individual freedoms greatly."
+        result = h.humanize(text)
+        sentences = result.humanized_text.split(". ")
+        for sent in sentences:
+            first_word = sent.split()[0].lower() if sent.split() else ""
+            assert first_word not in {"or", "nor", "and", "but", "on", "in", "of", "to", "by", "as"}
+
+    def test_split_half_ends_with_punctuation(self):
+        h = TextHumanizer(HumanizerConfig(
+            min_score=0.0,
+            max_sentence_length=8,
+            split_long_sentences=True,
+            diversify_agent_voice=False,
+        ))
+        text = "Raising awareness on critical issues is an important task that society must embrace fully."
+        result = h.humanize(text)
+        # There should be a sentence-ending punctuation somewhere in the middle
+        assert "." in result.humanized_text or "!" in result.humanized_text or "?" in result.humanized_text

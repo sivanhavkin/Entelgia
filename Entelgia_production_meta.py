@@ -1733,6 +1733,7 @@ class Config:
     humanizer_split_long_sentences: bool = True
     humanizer_remove_opening_scaffolds: bool = True
     humanizer_diversify_agent_voice: bool = True
+    humanizer_min_score: float = 0.15
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.
@@ -2231,6 +2232,7 @@ def _build_humanizer_instance(cfg: "Config") -> Optional["TextHumanizer"]:
         split_long_sentences=cfg.humanizer_split_long_sentences,
         remove_opening_scaffolds=cfg.humanizer_remove_opening_scaffolds,
         diversify_agent_voice=cfg.humanizer_diversify_agent_voice,
+        min_score=cfg.humanizer_min_score,
     )
     return TextHumanizer(h_cfg)
 
@@ -4469,7 +4471,13 @@ class Agent:
                 _h_result = HUMANIZER.humanize(out, agent_name=self.name)
                 original_text = _h_result.original_text
                 humanized_text = _h_result.humanized_text
-                if _h_result.changed:
+                if "score_skip" in _h_result.flags:
+                    logger.debug(
+                        "[HUMANIZER-SKIP] agent=%s score_before=%.2f",
+                        self.name,
+                        _h_result.score_before,
+                    )
+                elif _h_result.changed:
                     logger.info(
                         "[HUMANIZER] agent=%s flags=%s score_before=%.2f score_after=%.2f",
                         self.name,
