@@ -37,25 +37,32 @@ class TestFixyResearchTrigger:
     """Tests for fixy_should_search."""
 
     def test_trigger_on_latest(self):
-        assert fixy_should_search("latest AI research") is True
+        # "latest research" is a multi-word phrase → bypasses multi-signal gate
+        assert fixy_should_search("latest research on AI") is True
 
     def test_trigger_on_research(self):
+        # "recent research" is a multi-word phrase → bypasses multi-signal gate
         assert fixy_should_search("Tell me about recent research on climate") is True
 
     def test_trigger_on_news(self):
+        # "current research" is a multi-word phrase → bypasses multi-signal gate
         assert fixy_should_search("What is the current research on this?") is True
 
     def test_trigger_on_find(self):
+        # "find paper" is a multi-word phrase → bypasses multi-signal gate
         assert fixy_should_search("Find paper on quantum computing") is True
 
     def test_trigger_on_search(self):
-        assert fixy_should_search("search for new studies") is True
+        # Multi-signal: study + evidence (uncertainty signal)
+        assert fixy_should_search("search for new studies evidence") is True
 
     def test_trigger_on_today(self):
+        # Multi-signal: study + published (strong keyword)
         assert fixy_should_search("What AI studies were published recently?") is True
 
     def test_trigger_on_paper(self):
-        assert fixy_should_search("Find me a paper on memory") is True
+        # "research paper" is a multi-word phrase → bypasses multi-signal gate
+        assert fixy_should_search("Find me a research paper on memory") is True
 
     def test_no_trigger_ordinary_message(self):
         assert fixy_should_search("Hello, how are you?") is False
@@ -70,16 +77,32 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("cats and dogs love play time") is False
 
     def test_case_insensitive(self):
-        assert fixy_should_search("RESEARCH on modern robotics") is True
+        # "current research" phrase (case-insensitive) → fires
+        assert fixy_should_search("CURRENT RESEARCH on modern robotics") is True
 
     def test_word_boundary_matching(self):
-        # "searches" contains "search" as a substring but as a different word form
-        # The function uses whole-word extraction via re.findall([a-z]+)
-        # Use "research" (a strong trigger) rather than "truth" (now demoted to weak)
-        assert fixy_should_search("web searches for research") is True
+        # Multi-signal: research (strong) + evidence (uncertainty signal)
+        assert fixy_should_search("research evidence for this claim") is True
 
     def test_trigger_on_trend(self):
-        assert fixy_should_search("What is the current trend?") is True
+        # Multi-signal: trend (strong) + evidence (uncertainty signal)
+        assert fixy_should_search("What is the current trend? We need evidence.") is True
+
+    def test_single_generic_keyword_does_not_fire(self):
+        # Single generic keyword alone must NOT fire (multi-signal gate)
+        assert fixy_should_search("I notice bias here") is False
+
+    def test_single_bias_keyword_does_not_fire(self):
+        # "bias" alone should not trigger web search
+        assert fixy_should_search("bias") is False
+
+    def test_multi_concept_fires(self):
+        # Two strong concepts → fires via multi-signal gate
+        assert fixy_should_search("loss aversion risk decisions evidence") is True
+
+    def test_single_keyword_with_uncertainty_fires(self):
+        # Single strong keyword + uncertainty signal → fires
+        assert fixy_should_search("research evidence on cognitive bias") is True
 
     # ------------------------------------------------------------------
     # New tests: dialogue-tail trigger
@@ -93,10 +116,10 @@ class TestFixyResearchTrigger:
         assert fixy_should_search("Let us discuss", dialog_tail=dialog) is True
 
     def test_trigger_from_dialogue_keyword_external(self):
-        # Seed topic (index 0) is neutral; trigger keyword is at index 1
+        # Seed topic (index 0) is neutral; trigger phrase is at index 1
         dialog = [
             {"role": "system", "text": "Let us begin the discussion."},
-            {"role": "Socrates", "text": "Find recent external sources on this topic."},
+            {"role": "Socrates", "text": "Find recent research sources on this topic."},
         ]
         assert fixy_should_search("Discuss.", dialog_tail=dialog) is True
 
@@ -176,9 +199,13 @@ class TestFixyResearchTrigger:
     def test_logs_trigger_keyword_on_seed_match(self, caplog):
         import logging
 
+        # Use multi-signal text ("find research" phrase) so the trigger fires
         with caplog.at_level(logging.INFO, logger="entelgia.fixy_research_trigger"):
-            fixy_should_search("Find the AI research on this topic")
-        assert any("web search triggered by keyword:" in m for m in caplog.messages)
+            fixy_should_search("Find research evidence on this AI topic")
+        assert any(
+            "web search triggered" in m or "WEB-TRIGGER-FIRE" in m
+            for m in caplog.messages
+        )
 
     def test_logs_trigger_keyword_on_dialogue_match(self, caplog):
         import logging
@@ -189,7 +216,10 @@ class TestFixyResearchTrigger:
         ]
         with caplog.at_level(logging.INFO, logger="entelgia.fixy_research_trigger"):
             fixy_should_search("Neutral seed.", dialog_tail=dialog)
-        assert any("web search triggered by keyword:" in m for m in caplog.messages)
+        assert any(
+            "web search triggered" in m or "WEB-TRIGGER-FIRE" in m
+            for m in caplog.messages
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -251,11 +281,11 @@ class TestFindTrigger:
         result = find_trigger("Is the source credibility reliable?")
         assert result == "credibility"
 
-    def test_bias_beats_source_when_both_present(self):
-        # "bias" is a high-value keyword (score 2) and must beat the generic
-        # "source" (score 1) regardless of position.
+    def test_bias_now_weak_source_wins(self):
+        # "bias" is now in the weak trigger word list (moved to prevent spurious
+        # single-word triggers like "I notice bias"). "source" remains strong.
         result = find_trigger("What source would confirm this bias?")
-        assert result == "bias"
+        assert result == "source"
 
     def test_epistemology_beats_source_when_both_present(self):
         # "epistemology" is a high-value keyword (score 2); "source" is score 1.
@@ -423,6 +453,10 @@ class TestMaybeAddWebContext:
             ],
         }
 
+    # Use a trigger text that fires reliably under multi-signal mode:
+    # "latest research" is a multi-word phrase → bypasses gate
+    _TRIGGER_TEXT = "latest research on AI"
+
     def test_returns_empty_string_when_no_trigger(self):
         from entelgia.web_research import maybe_add_web_context
 
@@ -435,7 +469,7 @@ class TestMaybeAddWebContext:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
-            result = maybe_add_web_context("latest AI research")
+            result = maybe_add_web_context(self._TRIGGER_TEXT)
         assert isinstance(result, str)
         assert "External Research:" in result
 
@@ -446,7 +480,7 @@ class TestMaybeAddWebContext:
             "entelgia.web_research.search_and_fetch",
             side_effect=Exception("network error"),
         ):
-            result = maybe_add_web_context("latest AI research")
+            result = maybe_add_web_context(self._TRIGGER_TEXT)
         assert result == ""
 
     def test_returns_empty_when_no_sources(self):
@@ -454,16 +488,16 @@ class TestMaybeAddWebContext:
 
         empty_bundle = {"query": "latest AI", "sources": []}
         with patch("entelgia.web_research.search_and_fetch", return_value=empty_bundle):
-            result = maybe_add_web_context("latest AI research")
+            result = maybe_add_web_context(self._TRIGGER_TEXT)
         assert result == ""
 
     def test_triggered_by_dialogue_turn(self):
         from entelgia.web_research import maybe_add_web_context
 
-        # Seed topic at index 0 is neutral; trigger is at index 1
+        # Seed topic at index 0 is neutral; trigger phrase "latest research" is at index 1
         dialog = [
             {"role": "system", "text": "Let us begin."},
-            {"role": "Athena", "text": "We need to find recent papers on this."},
+            {"role": "Athena", "text": "We need to find the latest research papers on this."},
         ]
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
@@ -1549,6 +1583,9 @@ class TestWeakTriggerWords:
 class TestQueryCache:
     """Tests for the search result cache in maybe_add_web_context."""
 
+    # Use multi-signal phrase that reliably triggers under new gate
+    _TRIGGER_TEXT = "latest research on AI"
+
     def _mock_bundle(self) -> Dict[str, Any]:
         return {
             "query": "latest AI research",
@@ -1569,12 +1606,12 @@ class TestQueryCache:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ) as mock_fetch:
-            maybe_add_web_context("latest AI research")
+            maybe_add_web_context(self._TRIGGER_TEXT)
             # Reset cooldown so the second call is allowed
             from entelgia.fixy_research_trigger import clear_trigger_cooldown
 
             clear_trigger_cooldown()
-            maybe_add_web_context("latest AI research")
+            maybe_add_web_context(self._TRIGGER_TEXT)
         # search_and_fetch must only be called once due to the cache
         assert mock_fetch.call_count == 1
 
@@ -1585,7 +1622,7 @@ class TestQueryCache:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
-            first = maybe_add_web_context("latest AI research")
+            first = maybe_add_web_context(self._TRIGGER_TEXT)
         # Reset cooldown only
         from entelgia.fixy_research_trigger import clear_trigger_cooldown
 
@@ -1593,7 +1630,7 @@ class TestQueryCache:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ) as mock_fetch:
-            second = maybe_add_web_context("latest AI research")
+            second = maybe_add_web_context(self._TRIGGER_TEXT)
         # Should not have called search_and_fetch again (cache hit)
         assert mock_fetch.call_count == 0
         assert first == second
@@ -1606,6 +1643,9 @@ class TestQueryCache:
 
 class TestTopicResearchCache:
     """Tests for the topic research cache in maybe_add_web_context."""
+
+    # Use multi-signal phrase that reliably triggers under new gate
+    _TRIGGER_TEXT = "latest research on AI"
 
     def _mock_bundle(self) -> Dict[str, Any]:
         return {
@@ -1628,7 +1668,7 @@ class TestTopicResearchCache:
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
             first = maybe_add_web_context(
-                "latest AI research", topic="AI & machine learning"
+                self._TRIGGER_TEXT, topic="AI & machine learning"
             )
 
         # Reset trigger cooldown so the second call is not blocked by cooldown
@@ -1640,7 +1680,7 @@ class TestTopicResearchCache:
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ) as mock_fetch:
             second = maybe_add_web_context(
-                "latest AI research", topic="AI & machine learning"
+                self._TRIGGER_TEXT, topic="AI & machine learning"
             )
 
         assert "External Research:" in first
@@ -1655,7 +1695,7 @@ class TestTopicResearchCache:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
-            r1 = maybe_add_web_context("latest AI research", topic="machine learning")
+            r1 = maybe_add_web_context(self._TRIGGER_TEXT, topic="machine learning")
 
         from entelgia.fixy_research_trigger import clear_trigger_cooldown
 
@@ -1664,7 +1704,7 @@ class TestTopicResearchCache:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
         ):
-            r2 = maybe_add_web_context("latest AI research", topic="consciousness")
+            r2 = maybe_add_web_context(self._TRIGGER_TEXT, topic="consciousness")
 
         assert "External Research:" in r1
         assert "External Research:" in r2
@@ -1696,7 +1736,7 @@ class TestQualityGate:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=empty_text_bundle
         ):
-            result = maybe_add_web_context("latest AI research")
+            result = maybe_add_web_context("latest research on AI")
         assert result == ""
 
     def test_skips_injection_when_topic_overlap_too_low(self):
@@ -1719,7 +1759,7 @@ class TestQualityGate:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=irrelevant_bundle
         ):
-            result = maybe_add_web_context("latest AI research")
+            result = maybe_add_web_context("latest research on AI")
         assert result == ""
 
     def test_injects_context_when_quality_gate_passes(self):
@@ -1741,7 +1781,7 @@ class TestQualityGate:
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=relevant_bundle
         ):
-            result = maybe_add_web_context("latest AI research")
+            result = maybe_add_web_context("latest research on AI")
         assert "External Research:" in result
 
 
@@ -1775,7 +1815,7 @@ class TestStructuredLogging:
                 "entelgia.web_research.search_and_fetch",
                 return_value=self._mock_bundle(),
             ):
-                maybe_add_web_context("latest AI research")
+                maybe_add_web_context("latest research on AI")
 
         assert any("sanitized query" in m for m in caplog.messages)
 
@@ -1788,7 +1828,7 @@ class TestStructuredLogging:
                 "entelgia.web_research.search_and_fetch",
                 return_value=self._mock_bundle(),
             ):
-                maybe_add_web_context("latest AI research")
+                maybe_add_web_context("latest research on AI")
 
         assert any("search results" in m for m in caplog.messages)
 
@@ -1801,7 +1841,7 @@ class TestStructuredLogging:
                 "entelgia.web_research.search_and_fetch",
                 return_value=self._mock_bundle(),
             ):
-                maybe_add_web_context("latest AI research")
+                maybe_add_web_context("latest research on AI")
 
         assert any("pages fetched" in m for m in caplog.messages)
 
@@ -1814,7 +1854,7 @@ class TestStructuredLogging:
                 "entelgia.web_research.search_and_fetch",
                 return_value=self._mock_bundle(),
             ):
-                maybe_add_web_context("latest AI research")
+                maybe_add_web_context("latest research on AI")
 
         assert any("context injected" in m for m in caplog.messages)
 
@@ -2041,8 +2081,9 @@ class TestBranchLevelDebugLogging:
         """
         import logging
 
-        # Seed contains the trigger keyword; dialogue turns are neutral.
-        seed = "Tell me about the research on quantum computing."
+        # Seed contains the trigger phrase "research paper" → multi-word phrase
+        # bypass; dialogue turns are neutral.
+        seed = "Tell me about the research paper on quantum computing."
         dialog = [
             {"role": "system", "text": "Welcome to our debate."},
             {"role": "Socrates", "text": "I am curious about your perspective."},
@@ -2052,7 +2093,7 @@ class TestBranchLevelDebugLogging:
         with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
             result = fixy_should_search(seed, dialog_tail=dialog)
 
-        assert result is True, "Trigger should fire because seed contains 'research'"
+        assert result is True, "Trigger should fire because seed contains 'research paper' phrase"
 
         debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
 
@@ -2100,7 +2141,7 @@ class TestBranchLevelDebugLogging:
         with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
             result = fixy_should_search(seed, dialog_tail=dialog)
 
-        assert result is True, "Trigger should fire from dialogue turn"
+        assert result is True, "Trigger should fire from dialogue turn (latest research phrase)"
 
         debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
 
@@ -2146,8 +2187,8 @@ class TestQueryCooldown:
         assert fixy_should_search("AI research paper") is True
         # Advance past the global cooldown window before trying the second query
         frt._trigger_turn_counter += frt._GLOBAL_SEARCH_COOLDOWN_TURNS
-        # Different query text – per-query cooldown should not block this
-        assert fixy_should_search("quantum computing arxiv") is True
+        # Different multi-signal query text – per-query cooldown should not block this
+        assert fixy_should_search("quantum computing research paper") is True
 
     def test_query_cooldown_expires(self):
         """Per-query cooldown must expire after _COOLDOWN_TURNS turns."""

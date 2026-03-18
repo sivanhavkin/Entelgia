@@ -141,7 +141,10 @@ try:
     )
     from entelgia.topic_enforcer import (
         compute_topic_compliance_score,
+        compute_fixy_compliance_score,
         build_soft_reanchor_instruction,
+        get_cluster_wallpaper_terms,
+        get_topic_distinct_lexicon,
         ACCEPT_THRESHOLD as _TOPIC_ACCEPT_THRESHOLD,
         SOFT_REANCHOR_THRESHOLD as _TOPIC_SOFT_REANCHOR_THRESHOLD,
     )
@@ -156,7 +159,7 @@ except ImportError:
     _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.50
 
     def compute_topic_compliance_score(  # type: ignore[no-redef]
-        text, topic, topic_anchors, prev_anchors=None, *, log_agent=""
+        text, topic, topic_anchors, prev_anchors=None, *, log_agent="", cluster_anchors=None
     ):
         """Minimal fallback: delegate to the legacy binary validator."""
         return {
@@ -165,7 +168,22 @@ except ImportError:
             "contamination_penalty": 0.0,
             "memory_hijack_penalty": 0.0,
             "score": 1.0,
+            "topic_exactness": 1.0,
+            "cluster_only_match": 0.0,
         }
+
+    def compute_fixy_compliance_score(  # type: ignore[no-redef]
+        text, topic, topic_anchors, prev_anchors=None, *,
+        new_domain_penalty=0.20, must_name_topic_or_concept=True
+    ):
+        return {"score": 1.0, "names_topic": True, "names_concept": True,
+                "new_domain_drift": False, "contamination_penalty": 0.0, "fixy_mode": True}
+
+    def get_cluster_wallpaper_terms(cluster):  # type: ignore[no-redef]
+        return []
+
+    def get_topic_distinct_lexicon(topic):  # type: ignore[no-redef]
+        return []
 
     def build_soft_reanchor_instruction(topic, anchors):  # type: ignore[no-redef]
         return f"\n[RE-ANCHOR] Please begin your response with a sentence about: {topic}.\n"
@@ -1738,6 +1756,40 @@ class Config:
     humanizer_remove_opening_scaffolds: bool = True
     humanizer_diversify_agent_voice: bool = True
     humanizer_min_score: float = 0.15
+    # ── Grammar Repair (Humanizer extension) ───────────────────────────────
+    humanizer_grammar_repair_enabled: bool = True
+    humanizer_repair_broken_openings: bool = True
+    # ── Topic Anchor (pre-generation) ──────────────────────────────────────
+    topic_anchor_enabled: bool = True
+    topic_anchor_include_forbidden_carryover: bool = True
+    topic_anchor_max_forbidden_items: int = 5
+    # ── Memory Topic Filter ────────────────────────────────────────────────
+    memory_topic_filter_enabled: bool = True
+    memory_topic_min_score: float = 0.45
+    memory_require_same_cluster: bool = True
+    memory_contamination_penalty: float = 0.25
+    # ── Self-Replication Topic Gate ────────────────────────────────────────
+    self_replication_topic_gate_enabled: bool = True
+    self_replication_topic_min_score: float = 0.50
+    self_replication_require_same_cluster: bool = True
+    # ── Fixy Role-Aware Compliance ─────────────────────────────────────────
+    fixy_role_aware_compliance: bool = True
+    fixy_must_name_topic_or_core_concept: bool = True
+    fixy_new_domain_penalty: float = 0.20
+    # ── Web Trigger Multi-Signal ───────────────────────────────────────────
+    web_trigger_require_multi_signal: bool = True
+    web_trigger_min_concepts: int = 2
+    web_trigger_require_uncertainty_or_evidence: bool = True
+    # ── Cluster Wallpaper Penalty ──────────────────────────────────────────
+    topic_specific_lexicon_bias_enabled: bool = True
+    cluster_wallpaper_penalty_enabled: bool = True
+    cluster_wallpaper_repeat_window: int = 6
+    # ── Observability / Debug Flags ────────────────────────────────────────
+    show_topic_anchor_debug: bool = False
+    show_memory_topic_filter_debug: bool = False
+    show_self_replication_topic_debug: bool = False
+    show_fixy_compliance_debug: bool = False
+    show_web_trigger_debug: bool = False
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.
@@ -2237,6 +2289,8 @@ def _build_humanizer_instance(cfg: "Config") -> Optional["TextHumanizer"]:
         remove_opening_scaffolds=cfg.humanizer_remove_opening_scaffolds,
         diversify_agent_voice=cfg.humanizer_diversify_agent_voice,
         min_score=cfg.humanizer_min_score,
+        grammar_repair_enabled=cfg.humanizer_grammar_repair_enabled,
+        repair_broken_openings=cfg.humanizer_repair_broken_openings,
     )
     return TextHumanizer(h_cfg)
 
@@ -3776,6 +3830,308 @@ class Agent:
             )
             return []
 
+    # ── Helper: Memory Topic Filter ─────────────────────────────────────────
+
+    def _score_memory_topic_relevance(
+        self,
+        mem: dict,
+        current_topic: str,
+        current_cluster: str,
+        recent_dialog_terms: set,
+    ) -> float:
+        """Score a memory dict for topic relevance.
+
+        Returns a float in [0, 1] combining cluster match, topic keyword overlap,
+        and recent-dialogue overlap minus a contamination penalty.
+        """
+        content = (mem.get("content") or "").lower()
+        mem_topic = (mem.get("topic") or "").strip()
+        if not content:
+            return 0.0
+
+        # Same topic exact match: high base score
+        if mem_topic and mem_topic == current_topic:
+            return 1.0
+
+        topic_anchors = TOPIC_ANCHORS.get(current_topic, [])
+        cluster_anchors = []
+        for _cluster, _topics in TOPIC_CLUSTERS.items():
+            if current_topic in _topics:
+                # Use anchors from other topics in the same cluster as cluster proxy
+                for t in _topics:
+                    cluster_anchors.extend(TOPIC_ANCHORS.get(t, []))
+                break
+
+        # Semantic overlap score (keyword hits)
+        topic_hits = sum(1 for a in topic_anchors if a.lower() in content)
+        topic_score = min(1.0, topic_hits / max(1, len(topic_anchors))) if topic_anchors else 0.5
+
+        # Cluster match bonus
+        cluster_bonus = 0.0
+        if current_cluster and mem_topic:
+            from entelgia.loop_guard import get_cluster as _get_cluster
+            mem_cluster = _get_cluster(mem_topic)
+            if mem_cluster == current_cluster:
+                cluster_bonus = 0.25
+
+        # Recent dialogue term overlap
+        dialog_hits = sum(1 for w in recent_dialog_terms if len(w) > 3 and w in content)
+        dialog_score = min(0.3, dialog_hits * 0.05)
+
+        # Contamination penalty: memory belongs to a different known cluster
+        contamination_penalty = 0.0
+        if mem_topic and mem_topic != current_topic:
+            old_anchors = TOPIC_ANCHORS.get(mem_topic, [])
+            if old_anchors:
+                contamination_penalty = CFG.memory_contamination_penalty
+
+        score = topic_score + cluster_bonus + dialog_score - contamination_penalty
+        return max(0.0, min(1.0, score))
+
+    def _filter_memories_by_topic(
+        self,
+        memories: List[dict],
+        current_topic: str,
+        current_cluster: str,
+    ) -> List[dict]:
+        """Filter memories by topical relevance before injection.
+
+        Rejects memories whose relevance score is below memory_topic_min_score
+        or (when memory_require_same_cluster is True) belong to a different cluster.
+        """
+        if not memories:
+            return memories
+
+        # Honour global disable flag — pass all memories through unchanged
+        if not CFG.memory_topic_filter_enabled:
+            return memories
+
+        # Build recent dialogue term set for overlap scoring
+        recent_dialog_terms: set = set()
+
+        kept: List[dict] = []
+        rejected_count = 0
+        for mem in memories:
+            score = self._score_memory_topic_relevance(
+                mem, current_topic, current_cluster, recent_dialog_terms
+            )
+
+            # Cluster check
+            mem_topic = (mem.get("topic") or "").strip()
+            if CFG.memory_require_same_cluster and mem_topic and current_cluster:
+                try:
+                    from entelgia.loop_guard import get_cluster as _get_cluster
+                    mem_cluster = _get_cluster(mem_topic)
+                    if mem_cluster and mem_cluster != current_cluster:
+                        reject_reason = "cluster_mismatch"
+                        if CFG.show_memory_topic_filter_debug:
+                            logger.debug(
+                                "[MEMORY-TOPIC-REJECT] id=%s reason=%s "
+                                "mem_cluster=%r current_cluster=%r score=%.2f content=%r",
+                                mem.get("id", "?"),
+                                reject_reason,
+                                mem_cluster,
+                                current_cluster,
+                                score,
+                                (mem.get("content") or "")[:60],
+                            )
+                        else:
+                            logger.debug(
+                                "[MEMORY-TOPIC-REJECT] id=%s reason=%s",
+                                mem.get("id", "?"),
+                                reject_reason,
+                            )
+                        rejected_count += 1
+                        continue
+                except Exception:
+                    pass
+
+            if score < CFG.memory_topic_min_score:
+                reject_reason = "topic_low" if score > 0 else "contamination"
+                if CFG.show_memory_topic_filter_debug:
+                    logger.debug(
+                        "[MEMORY-TOPIC-REJECT] id=%s reason=%s score=%.2f content=%r",
+                        mem.get("id", "?"),
+                        reject_reason,
+                        score,
+                        (mem.get("content") or "")[:60],
+                    )
+                else:
+                    logger.debug(
+                        "[MEMORY-TOPIC-REJECT] id=%s reason=%s score=%.2f",
+                        mem.get("id", "?"),
+                        reject_reason,
+                        score,
+                    )
+                rejected_count += 1
+                continue
+
+            logger.debug(
+                "[MEMORY-TOPIC-KEEP] id=%s score=%.2f",
+                mem.get("id", "?"),
+                score,
+            )
+            kept.append(mem)
+
+        logger.info(
+            "[MEMORY-TOPIC-FILTER] agent=%s kept=%d rejected=%d",
+            self.name,
+            len(kept),
+            rejected_count,
+        )
+        return kept
+
+    # ── Helper: Enhanced Topic Anchor Block ─────────────────────────────────
+
+    def _build_topic_anchor_block(
+        self,
+        topic: str,
+        cluster: str,
+        topic_anchors: list,
+        dialog_tail: list,
+    ) -> str:
+        """Build a strict topic anchor block to inject before generation.
+
+        Includes the topic, cluster, up to 6 sub-angles, forbidden carryover
+        concepts, and a concrete turn question derived from recent dialogue.
+        """
+        if not topic:
+            return ""
+
+        # Sub-angles: use topic anchors as sub-angles (up to 6)
+        sub_angles = topic_anchors[:6] if topic_anchors else []
+        if not sub_angles:
+            # Deterministic fallback from topic words
+            words = [w for w in topic.replace("-", " ").split() if len(w) > 3]
+            sub_angles = words[:4] if words else [topic]
+
+        # Derive a concrete turn question from recent dialogue
+        turn_question = self._derive_turn_question(topic, topic_anchors, dialog_tail)
+
+        lines = [
+            "\n\nTOPIC ANCHOR [STRICT]:",
+            f"Active topic: {topic}",
+        ]
+        if cluster:
+            lines.append(f"Active cluster: {cluster}")
+        if sub_angles:
+            lines.append(f"Allowed sub-angles: {', '.join(sub_angles)}")
+        lines.append(
+            "Your response MUST stay inside the active topic. "
+            "Do not merely stay in the cluster — address the specific topic."
+        )
+        if turn_question:
+            lines.append(f"This turn, address: {turn_question}")
+
+        block = "\n".join(lines) + "\n"
+
+        logger.info(
+            "[TOPIC-ANCHOR] agent=%s topic=%r cluster=%r subangles=%r",
+            self.name,
+            topic,
+            cluster,
+            sub_angles[:4],
+        )
+        if CFG.show_topic_anchor_debug:
+            logger.debug(
+                "[TOPIC-ANCHOR-DEBUG] agent=%s turn_question=%r full_block=%r",
+                self.name,
+                turn_question,
+                block[:200],
+            )
+        return block
+
+    def _derive_turn_question(
+        self,
+        topic: str,
+        topic_anchors: list,
+        dialog_tail: list,
+    ) -> str:
+        """Derive a concrete question for this turn based on topic and recent dialogue."""
+        if not topic:
+            return ""
+
+        # Look for recent unanswered questions in the dialogue
+        recent_turns = dialog_tail[-4:] if dialog_tail else []
+        for turn in reversed(recent_turns):
+            text = (turn.get("text", "") if isinstance(turn, dict) else "").strip()
+            if "?" in text:
+                # Find the last question sentence
+                sentences = text.split(".")
+                for s in reversed(sentences):
+                    if "?" in s and len(s.strip()) > 10:
+                        q = s.strip()
+                        # Only use if it seems related to the topic
+                        if topic_anchors and any(a.lower() in q.lower() for a in topic_anchors):
+                            return q[:120]
+                        elif topic.lower() in q.lower():
+                            return q[:120]
+
+        # Fallback: generate a question from topic and first two anchors
+        if topic_anchors:
+            return f"How does {topic_anchors[0]} relate to {topic}?"
+        return f"What is most important about {topic} in this context?"
+
+    # ── Helper: Cluster Wallpaper Penalty Block ──────────────────────────────
+
+    def _build_wallpaper_penalty_block(
+        self,
+        topic: str,
+        cluster: str,
+        dialog_tail: list,
+    ) -> str:
+        """Build a prompt block penalising cluster-generic wallpaper vocabulary.
+
+        Identifies which wallpaper terms have been overused in recent turns
+        and asks the model to prefer topic-distinct vocabulary.
+        """
+        if not cluster or not topic:
+            return ""
+
+        wallpaper_terms = get_cluster_wallpaper_terms(cluster)
+        distinct_terms = get_topic_distinct_lexicon(topic)
+
+        if not wallpaper_terms:
+            return ""
+
+        # Count wallpaper term usage in recent dialogue
+        window = dialog_tail[-CFG.cluster_wallpaper_repeat_window:] if dialog_tail else []
+        window_text = " ".join(
+            (t.get("text", "") if isinstance(t, dict) else "") for t in window
+        ).lower()
+
+        overused = [
+            w for w in wallpaper_terms
+            if window_text.count(w.lower()) >= 2
+        ]
+
+        if overused:
+            logger.info(
+                "[CLUSTER-WALLPAPER-PENALTY] agent=%s cluster=%r repeated_terms=%r",
+                self.name,
+                cluster,
+                overused[:5],
+            )
+
+        block = ""
+        if overused:
+            block += (
+                f"\nAVOID over-repeating these cluster-generic terms (already used frequently): "
+                f"{', '.join(overused[:5])}.\n"
+            )
+        if distinct_terms and CFG.topic_specific_lexicon_bias_enabled:
+            block += (
+                f"PREFER topic-specific vocabulary such as: "
+                f"{', '.join(distinct_terms[:5])}.\n"
+            )
+            logger.info(
+                "[TOPIC-LEXICON] agent=%s topic=%r preferred_terms=%r",
+                self.name,
+                topic,
+                distinct_terms[:4],
+            )
+        return block
+
     def _build_compact_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
@@ -3793,6 +4149,7 @@ class Agent:
 
         # Extract current topic from seed for topic gating
         _current_topic = self._extract_topic_from_seed(user_seed)
+        _current_cluster = self.topic_cluster or ""
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -3846,6 +4203,13 @@ class Agent:
         # Merge: keep recent memories first, append affective supplement.
         recent_ltm = recent_ltm + self._fetch_affective_ltm_supplement(recent_ltm)
 
+        # ── Memory Topic Filter ─────────────────────────────────────────────
+        # Apply a strict topical relevance filter before injecting memories.
+        if CFG.memory_topic_filter_enabled and _current_topic:
+            recent_ltm = self._filter_memories_by_topic(
+                recent_ltm, _current_topic, _current_cluster
+            )
+
         # Format agent name with optional pronoun
         if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
             agent_header = f"{self.name} ({self.persona_dict['pronoun']}):\n"
@@ -3882,9 +4246,21 @@ class Agent:
                 # are intentionally excluded.
                 prompt += f"- {m.get('content', '')[:400]}\n"
 
-        # ── Topic Anchors: require engagement with topic-specific concepts ──────
+        # ── Enhanced Topic Anchor Block ──────────────────────────────────────
         _topic_anchors = TOPIC_ANCHORS.get(_current_topic, [])
-        if _current_topic and _topic_anchors:
+        if _current_topic and CFG.topic_anchor_enabled:
+            prompt += self._build_topic_anchor_block(
+                _current_topic, _current_cluster, _topic_anchors, dialog_tail
+            )
+        elif _current_topic and _topic_anchors:
+            # Fallback: legacy-style anchor when topic_anchor_enabled=False.
+            # Note: the enhanced anchor block (topic_anchor_enabled=True) is preferred.
+            logger.debug(
+                "[TOPIC-ANCHOR-LEGACY] agent=%s topic=%r using legacy anchor format "
+                "(topic_anchor_enabled=False)",
+                self.name,
+                _current_topic,
+            )
             prompt += (
                 f"\n\nTopic constraint:\n"
                 f"The active topic is: {_current_topic}.\n"
@@ -3897,10 +4273,40 @@ class Agent:
         _prev_anchors = (
             TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
         )
-        if _prev_anchors:
+        if _prev_anchors and CFG.topic_anchor_include_forbidden_carryover:
+            forbidden = _prev_anchors[:CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
-                f"{', '.join(_prev_anchors)}.\n"
+                f"{', '.join(forbidden)}.\n"
+            )
+            logger.info(
+                "[TOPIC-ANCHOR-FORBID] agent=%s items=%r",
+                self.name,
+                forbidden,
+            )
+            if CFG.show_topic_anchor_debug:
+                logger.debug(
+                    "[TOPIC-ANCHOR-FORBID-DEBUG] agent=%s prev_topic=%r items=%r",
+                    self.name,
+                    _last_topic,
+                    forbidden,
+                )
+        elif _prev_anchors:
+            forbidden = _prev_anchors[:CFG.topic_anchor_max_forbidden_items]
+            prompt += (
+                f"Do NOT reuse concepts from previous discussions such as: "
+                f"{', '.join(forbidden)}.\n"
+            )
+            logger.info(
+                "[TOPIC-ANCHOR-FORBID] agent=%s items=%r",
+                self.name,
+                forbidden,
+            )
+
+        # ── Cluster Wallpaper Penalty ───────────────────────────────────────
+        if CFG.cluster_wallpaper_penalty_enabled and _current_cluster:
+            prompt += self._build_wallpaper_penalty_block(
+                _current_topic, _current_cluster, dialog_tail
             )
 
         # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
@@ -4697,9 +5103,70 @@ class Agent:
         # Track texts promoted in this cycle (within-cycle dedup)
         _promoted_this_cycle: List[str] = []
 
+        # Topic/cluster relevance gate
+        _current_cluster = self.topic_cluster or ""
+        _topic_anchors = TOPIC_ANCHORS.get(topic, [])
+
+        kept_count = 0
+        topic_rejected_count = 0
         promoted_count = 0
         for mem in promoted_list:
             content = str(mem.get("content", "")).strip()
+
+            # ── Self-Replication Topic Gate ─────────────────────────────────
+            if CFG.self_replication_topic_gate_enabled and topic:
+                score = self._score_repl_topic_relevance(
+                    mem, topic, _current_cluster, _topic_anchors
+                )
+                if score < CFG.self_replication_topic_min_score:
+                    topic_rejected_count += 1
+                    reject_reason = "topic_low"
+                    if CFG.show_self_replication_topic_debug:
+                        logger.debug(
+                            "[SELF-REPL-REJECT] agent=%s reason=%s score=%.2f content=%r",
+                            self.name,
+                            reject_reason,
+                            score,
+                            content[:60],
+                        )
+                    else:
+                        logger.debug(
+                            "[SELF-REPL-REJECT] agent=%s reason=%s score=%.2f",
+                            self.name,
+                            reject_reason,
+                            score,
+                        )
+                    continue
+
+                # Cluster check
+                if CFG.self_replication_require_same_cluster and _current_cluster:
+                    mem_topic = (mem.get("topic") or "").strip()
+                    if mem_topic and mem_topic != topic:
+                        try:
+                            from entelgia.loop_guard import get_cluster as _get_cluster
+                            mem_cluster = _get_cluster(mem_topic)
+                            if mem_cluster and mem_cluster != _current_cluster:
+                                topic_rejected_count += 1
+                                if CFG.show_self_replication_topic_debug:
+                                    logger.debug(
+                                        "[SELF-REPL-REJECT] agent=%s reason=cluster_mismatch "
+                                        "mem_cluster=%r current_cluster=%r content=%r",
+                                        self.name,
+                                        mem_cluster,
+                                        _current_cluster,
+                                        content[:60],
+                                    )
+                                else:
+                                    logger.debug(
+                                        "[SELF-REPL-REJECT] agent=%s reason=cluster_mismatch",
+                                        self.name,
+                                    )
+                                continue
+                        except Exception:
+                            pass
+
+                kept_count += 1
+
             # Semantic dedup: skip if too similar to recent conscious memories
             # or to items already promoted in this cycle.
             _dedup_corpus = _recent_conscious_texts + _promoted_this_cycle
@@ -4727,7 +5194,33 @@ class Agent:
             _promoted_this_cycle.append(content)
             promoted_count += 1
 
+        if CFG.self_replication_topic_gate_enabled:
+            logger.info(
+                "[SELF-REPL-TOPIC-GATE] agent=%s kept=%d rejected=%d promoted=%d",
+                self.name,
+                kept_count,
+                topic_rejected_count,
+                promoted_count,
+            )
+
         return promoted_count
+
+    def _score_repl_topic_relevance(
+        self, mem: dict, topic: str, cluster: str, topic_anchors: list
+    ) -> float:
+        """Score a self-replication candidate for topic relevance."""
+        content = (mem.get("content") or "").lower()
+        mem_topic = (mem.get("topic") or "").strip()
+
+        # Exact topic match → highest score
+        if mem_topic == topic:
+            return 1.0
+
+        if not topic_anchors:
+            return 0.5  # Unknown topic: allow through
+
+        hits = sum(1 for a in topic_anchors if a.lower() in content)
+        return min(1.0, hits / max(1, len(topic_anchors)))
 
 
 # ============================================
@@ -5894,20 +6387,47 @@ class MainScript:
                             if _fixy_prev_topic and _fixy_prev_topic != topic_label
                             else []
                         )
-                        _fixy_compliance = compute_topic_compliance_score(
-                            intervention,
-                            topic_label,
-                            _fixy_anchors,
-                            prev_anchors=_fixy_prev_anchors,
-                            log_agent="Fixy",
-                        )
+                        # Use role-aware compliance for Fixy when enabled
+                        if CFG.fixy_role_aware_compliance:
+                            _fixy_compliance = compute_fixy_compliance_score(
+                                intervention,
+                                topic_label,
+                                _fixy_anchors,
+                                prev_anchors=_fixy_prev_anchors,
+                                new_domain_penalty=CFG.fixy_new_domain_penalty,
+                                must_name_topic_or_concept=CFG.fixy_must_name_topic_or_core_concept,
+                            )
+                        else:
+                            _fixy_compliance = compute_topic_compliance_score(
+                                intervention,
+                                topic_label,
+                                _fixy_anchors,
+                                prev_anchors=_fixy_prev_anchors,
+                                log_agent="Fixy",
+                            )
                         _fixy_score = _fixy_compliance["score"]
+                        if CFG.show_fixy_compliance_debug:
+                            logger.debug(
+                                "[TOPIC-COMPLIANCE-FIXY] agent=Fixy topic=%r "
+                                "score=%.2f compliance=%r",
+                                topic_label,
+                                _fixy_score,
+                                _fixy_compliance,
+                            )
                         logger.info(
                             "[TOPIC-COMPLIANCE] agent=Fixy topic=%r score=%.2f",
                             topic_label,
                             _fixy_score,
                         )
-                        if _fixy_score < _TOPIC_ACCEPT_THRESHOLD:
+                        # Fixy's acceptance threshold is slightly lower than normal
+                        # agents since meta-analytic content may score lower on
+                        # keyword matching but still be appropriate intervention.
+                        _fixy_accept_threshold = (
+                            _TOPIC_ACCEPT_THRESHOLD - 0.10
+                            if CFG.fixy_role_aware_compliance
+                            else _TOPIC_ACCEPT_THRESHOLD
+                        )
+                        if _fixy_score < _fixy_accept_threshold:
                             logger.warning(
                                 "[TOPIC-MISMATCH] agent=Fixy topic=%r score=%.2f – regenerating",
                                 topic_label,
@@ -5919,13 +6439,23 @@ class MainScript:
                                 mode=fixy_mode,
                                 current_topic=topic_label,
                             )
-                            _fixy_c2 = compute_topic_compliance_score(
-                                intervention,
-                                topic_label,
-                                _fixy_anchors,
-                                prev_anchors=_fixy_prev_anchors,
-                                log_agent="Fixy",
-                            )
+                            if CFG.fixy_role_aware_compliance:
+                                _fixy_c2 = compute_fixy_compliance_score(
+                                    intervention,
+                                    topic_label,
+                                    _fixy_anchors,
+                                    prev_anchors=_fixy_prev_anchors,
+                                    new_domain_penalty=CFG.fixy_new_domain_penalty,
+                                    must_name_topic_or_concept=CFG.fixy_must_name_topic_or_core_concept,
+                                )
+                            else:
+                                _fixy_c2 = compute_topic_compliance_score(
+                                    intervention,
+                                    topic_label,
+                                    _fixy_anchors,
+                                    prev_anchors=_fixy_prev_anchors,
+                                    log_agent="Fixy",
+                                )
                             if _fixy_c2["score"] < _TOPIC_SOFT_REANCHOR_THRESHOLD:
                                 logger.warning(
                                     "[TOPIC-FALLBACK] agent=Fixy topic=%r score=%.2f – using fallback",

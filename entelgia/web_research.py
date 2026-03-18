@@ -91,6 +91,21 @@ _INSTRUCTION_WORDS: FrozenSet[str] = frozenset(
         "disagree",
         "consider",
         "examine",
+        # Discourse / observation verbs that carry no search-concept value
+        "notice",
+        "notices",
+        "noticed",
+        "noticing",
+        "observe",
+        "observes",
+        "observed",
+        "observing",
+        "note",
+        "notes",
+        "focus",
+        "focuses",
+        "focused",
+        "focusing",
     }
 )
 
@@ -425,6 +440,15 @@ _REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
         "limiting",
         # Adverbial connectives with no concept value
         "thereby",
+        # State/continuation verbs that carry no concept value in queries
+        "remains",
+        "remain",
+        "remained",
+        "remaining",
+        "continues",
+        "continue",
+        "continued",
+        "continuing",
         # Weak semantic adverbs that reduce search quality
         "increasingly",
         "really",
@@ -923,6 +947,8 @@ def rewrite_search_query(text: str, trigger: str) -> str:
     meaningful terms.  When the trigger is not located in *text*, concept words
     are extracted from the full text using the same aggressive filler-word filter.
     """
+    logger.debug("[SEARCH-QUERY-RAW] text=%r trigger=%r", text[:200], trigger)
+
     # 0. Short-circuit: if the trigger is already a specific multi-word concept
     #    phrase (≥ 3 non-filler words), return it directly as a ready-made query.
     #    Two-word phrases are kept for contextualization with nearby concepts.
@@ -934,7 +960,9 @@ def rewrite_search_query(text: str, trigger: str) -> str:
             "rewrite_search_query: specific multi-word trigger %r returned as-is",
             trigger,
         )
-        return trigger.lower()
+        result = trigger.lower()
+        logger.info("[SEARCH-QUERY-REWRITTEN] raw=%r rewritten=%r", text[:80], result)
+        return result
 
     # 1. Find the sentence that contains the trigger.
     trigger_lower = trigger.lower()
@@ -958,7 +986,9 @@ def rewrite_search_query(text: str, trigger: str) -> str:
         concepts = [
             w for w in words if w.lower() not in _REWRITE_FILLER_WORDS and len(w) > 2
         ]
-        return _select_concept_terms(concepts, trigger)
+        result = _select_concept_terms(concepts, trigger)
+        logger.info("[SEARCH-QUERY-REWRITTEN] raw=%r rewritten=%r", text[:80], result)
+        return result
 
     # 2. Sanitize the sentence (strips agent names, HTML entities, mode labels,
     #    instruction words, possessives, and punctuation).
@@ -971,7 +1001,9 @@ def rewrite_search_query(text: str, trigger: str) -> str:
     ]
 
     # 4. Rank by concept quality, restore sentence order, and return.
-    return _select_concept_terms(concepts, trigger)
+    result = _select_concept_terms(concepts, trigger)
+    logger.info("[SEARCH-QUERY-REWRITTEN] raw=%r rewritten=%r", target_sentence[:80], result)
+    return result
 
 
 def _extract_topic_line(text: str) -> str:
@@ -1105,6 +1137,10 @@ def maybe_add_web_context(
     db_path: Optional[str] = None,
     max_results: int = 5,
     topic: Optional[str] = None,
+    *,
+    require_multi_signal: bool = True,
+    min_concepts: int = 2,
+    require_uncertainty_or_evidence: bool = True,
 ) -> str:
     """Return a formatted external knowledge context block, or empty string.
 
@@ -1129,6 +1165,15 @@ def maybe_add_web_context(
         Optional current dialogue topic string.  When provided, topics that
         have already been researched in this session are skipped, and the
         topic is logged and stored in the topic research cache on success.
+    require_multi_signal:
+        When True (default), a single generic keyword cannot fire the trigger
+        alone — at least ``min_concepts`` distinct signals are required.
+    min_concepts:
+        Minimum number of distinct strong trigger hits required in multi-signal
+        mode.
+    require_uncertainty_or_evidence:
+        When True, also accepts a single strong trigger if an
+        uncertainty/evidence word co-occurs in the same window.
 
     Returns
     -------
@@ -1152,7 +1197,10 @@ def maybe_add_web_context(
         query = build_research_query(seed_text, dialog_tail, fixy_reason)
 
         if not fixy_should_search(
-            seed_text, dialog_tail, fixy_reason, query_cooldown_key=query
+            seed_text, dialog_tail, fixy_reason, query_cooldown_key=query,
+            require_multi_signal=require_multi_signal,
+            min_concepts=min_concepts,
+            require_uncertainty_or_evidence=require_uncertainty_or_evidence,
         ):
             logger.debug("maybe_add_web_context: Fixy decided no search needed.")
             return ""

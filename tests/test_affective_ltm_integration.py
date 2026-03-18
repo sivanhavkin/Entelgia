@@ -105,8 +105,51 @@ def _make_agent(cfg_overrides=None):
     agent._fetch_affective_ltm_supplement = (
         mod.Agent._fetch_affective_ltm_supplement.__get__(agent, mod.Agent)
     )
+    agent._build_topic_anchor_block = (
+        mod.Agent._build_topic_anchor_block.__get__(agent, mod.Agent)
+    )
+    agent._filter_memories_by_topic = (
+        mod.Agent._filter_memories_by_topic.__get__(agent, mod.Agent)
+    )
+    agent._score_memory_topic_relevance = (
+        mod.Agent._score_memory_topic_relevance.__get__(agent, mod.Agent)
+    )
+    agent._build_wallpaper_penalty_block = (
+        mod.Agent._build_wallpaper_penalty_block.__get__(agent, mod.Agent)
+    )
+    agent._derive_turn_question = (
+        mod.Agent._derive_turn_question.__get__(agent, mod.Agent)
+    )
     # _extract_topic_from_seed is a @staticmethod; assign the underlying function
     agent._extract_topic_from_seed = mod.Agent._extract_topic_from_seed
+
+    # Ensure all new stabilization config flags have sensible defaults
+    new_cfg_defaults = {
+        "topic_anchor_enabled": True,
+        "topic_anchor_include_forbidden_carryover": True,
+        "topic_anchor_max_forbidden_items": 5,
+        "memory_topic_filter_enabled": True,
+        "memory_topic_min_score": 0.45,
+        "memory_require_same_cluster": True,
+        "memory_contamination_penalty": 0.25,
+        "self_replication_topic_gate_enabled": True,
+        "self_replication_topic_min_score": 0.50,
+        "self_replication_require_same_cluster": True,
+        "humanizer_grammar_repair_enabled": True,
+        "humanizer_repair_broken_openings": True,
+        "topic_specific_lexicon_bias_enabled": True,
+        "cluster_wallpaper_penalty_enabled": True,
+        "cluster_wallpaper_repeat_window": 6,
+        "show_topic_anchor_debug": False,
+        "show_memory_topic_filter_debug": False,
+        "show_self_replication_topic_debug": False,
+        "show_fixy_compliance_debug": False,
+        "show_web_trigger_debug": False,
+    }
+    for k, v in new_cfg_defaults.items():
+        if not hasattr(cfg, k):
+            setattr(cfg, k, v)
+
     agent.debate_profile = MagicMock(
         return_value={
             "style": "reflective",
