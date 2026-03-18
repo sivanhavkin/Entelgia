@@ -35,11 +35,13 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
 
 # Hard output contract — injected before generation for all agents
 LLM_OUTPUT_CONTRACT = (
-    "OUTPUT CONTRACT: Your response must contain exactly:\n"
-    "  1. One concrete claim (specific, not abstract).\n"
-    "  2. One supporting reason or mechanism (not a feeling or vague statement).\n"
-    "  3. Optionally one implication or pointed question.\n"
-    "Maximum 3-4 sentences total. No broad preamble. No generic framing opener."
+    "OUTPUT CONTRACT: Structure your response internally as:\n"
+    "  - One concrete claim (specific, not abstract).\n"
+    "  - One supporting reason or mechanism (not a feeling or vague statement).\n"
+    "  - Optionally one implication or pointed question.\n"
+    "Write as natural flowing prose. Do NOT output numbered sections or visible labels "
+    "such as 'Claim:', 'Supporting Reason:', '1.', '2.', '3.'. "
+    "Maximum 2-3 sentences. No broad preamble. No generic framing opener."
 )
 
 # Per-agent behavioral contracts — define output logic and allowed moves,

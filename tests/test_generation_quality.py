@@ -35,6 +35,7 @@ from Entelgia_production_meta import (
     _AGENT_BEHAVIORAL_CONTRACTS,
     _QUALITY_GATE_PATTERNS,
     _QUALITY_GATE_THRESHOLD,
+    _strip_scaffold_labels,
 )
 from entelgia.enhanced_personas import (
     SOCRATES_PERSONA,
@@ -181,8 +182,82 @@ class TestOutputContract:
         lower = LLM_OUTPUT_CONTRACT.lower()
         assert "preamble" in lower or "framing" in lower
 
+    def test_output_contract_bans_visible_labels(self):
+        lower = LLM_OUTPUT_CONTRACT.lower()
+        # Contract must explicitly prohibit numbered sections AND named label markers
+        assert ("do not output" in lower or "not output" in lower) and (
+            "claim:" in lower or "'claim'" in lower
+        )
+
+    def test_output_contract_requires_natural_prose(self):
+        lower = LLM_OUTPUT_CONTRACT.lower()
+        assert "prose" in lower and "natural" in lower
+
     def test_context_manager_has_matching_contract(self):
         assert CM_OUTPUT_CONTRACT == LLM_OUTPUT_CONTRACT
+
+
+# ---------------------------------------------------------------------------
+# 3b. Scaffold label stripping (_strip_scaffold_labels)
+# ---------------------------------------------------------------------------
+
+
+class TestStripScaffoldLabels:
+    """Ensure _strip_scaffold_labels() removes leaked output-contract markers."""
+
+    def test_strips_numbered_claim_label(self):
+        text = "1. Claim: Brain plasticity allows neural reorganization."
+        result = _strip_scaffold_labels(text)
+        assert result == "Brain plasticity allows neural reorganization."
+
+    def test_strips_numbered_supporting_reason(self):
+        text = "2. Supporting Reason: This is the mechanism that makes learning possible."
+        result = _strip_scaffold_labels(text)
+        assert result == "This is the mechanism that makes learning possible."
+
+    def test_strips_numbered_supporting_reason_or_mechanism(self):
+        text = "2. Supporting Reason or Mechanism: Synaptic pruning strengthens used pathways."
+        result = _strip_scaffold_labels(text)
+        assert result == "Synaptic pruning strengthens used pathways."
+
+    def test_strips_bare_numbered_marker(self):
+        text = "1. The brain reorganizes itself through repeated experience."
+        result = _strip_scaffold_labels(text)
+        assert result == "The brain reorganizes itself through repeated experience."
+
+    def test_strips_bare_claim_label(self):
+        text = "Claim: Identity requires continuity of memory."
+        result = _strip_scaffold_labels(text)
+        assert result == "Identity requires continuity of memory."
+
+    def test_strips_bare_implication_label(self):
+        text = "Implication: This means short-term amnesia breaks identity."
+        result = _strip_scaffold_labels(text)
+        assert result == "This means short-term amnesia breaks identity."
+
+    def test_strips_multiline_scaffold(self):
+        text = (
+            "1. Claim: Brain plasticity allows neural reorganization.\n"
+            "2. Supporting Reason: That mechanism enables learning and recovery.\n"
+            "3. Implication: Does this mean the self is never stable?"
+        )
+        result = _strip_scaffold_labels(text)
+        assert "Claim:" not in result
+        assert "Supporting Reason:" not in result
+        assert "Implication:" not in result
+        assert "Brain plasticity" in result
+        assert "enables learning" in result
+        assert "never stable" in result
+
+    def test_does_not_corrupt_clean_prose(self):
+        text = "Brain plasticity allows the brain to reorganize itself. That mechanism is what makes learning possible."
+        result = _strip_scaffold_labels(text)
+        assert result == text
+
+    def test_strips_case_insensitive_labels(self):
+        text = "supporting reason: Neuroplasticity depends on repeated stimulation."
+        result = _strip_scaffold_labels(text)
+        assert result == "Neuroplasticity depends on repeated stimulation."
 
 
 # ---------------------------------------------------------------------------

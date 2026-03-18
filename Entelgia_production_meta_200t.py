@@ -421,13 +421,16 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
 
 # Hard output contract injected before generation for all agents.
 # Each response must contain one concrete claim + one supporting reason.
-# Maximum 3-4 sentences. No broad preamble. No generic framing sentence.
+# Maximum 2-3 sentences. No broad preamble. No generic framing sentence.
+# Responses must read as natural prose — no visible section labels or numbers.
 LLM_OUTPUT_CONTRACT = (
-    "OUTPUT CONTRACT: Your response must contain exactly:\n"
-    "  1. One concrete claim (specific, not abstract).\n"
-    "  2. One supporting reason or mechanism (not a feeling or vague statement).\n"
-    "  3. Optionally one implication or pointed question.\n"
-    "Maximum 3-4 sentences total. No broad preamble. No generic framing opener."
+    "OUTPUT CONTRACT: Structure your response internally as:\n"
+    "  - One concrete claim (specific, not abstract).\n"
+    "  - One supporting reason or mechanism (not a feeling or vague statement).\n"
+    "  - Optionally one implication or pointed question.\n"
+    "Write as natural flowing prose. Do NOT output numbered sections or visible labels "
+    "such as 'Claim:', 'Supporting Reason:', '1.', '2.', '3.'. "
+    "Maximum 2-3 sentences. No broad preamble. No generic framing opener."
 )
 
 # Per-agent behavioral contracts injected at generation time.
@@ -2148,6 +2151,37 @@ def append_csv_row(path: str, row: Dict[str, Any]):
         logger.error(f"CSV Error: {e}")
 
 
+def _strip_scaffold_labels(text: str) -> str:
+    """Strip leaked output-contract labels from agent response.
+
+    The LLM is instructed not to emit numbered sections or labels such as
+    'Claim:', 'Supporting Reason:', '1.', '2.', '3.', but occasionally
+    leaks them anyway.  This function removes such markers while preserving
+    the underlying content.
+    """
+    # Strip numbered markers optionally followed by a label, e.g.:
+    #   "1. Claim: Brain plasticity..." → "Brain plasticity..."
+    #   "2. Supporting Reason: This enables..." → "This enables..."
+    #   "1. Brain plasticity..." → "Brain plasticity..."
+    text = re.sub(
+        r"(?m)^\s*\d+\.\s*"
+        r"(?:(?:Claim|Supporting\s+Reason(?:\s+or\s+Mechanism)?|Implication|Question)\s*:\s*)?",
+        "",
+        text,
+    )
+    # Strip bare label prefixes at line start, e.g. "Claim: ...", "Supporting Reason: ..."
+    text = re.sub(
+        r"(?mi)^\s*(?:Claim|Supporting\s+Reason(?:\s+or\s+Mechanism)?|Implication|Question)\s*:\s*",
+        "",
+        text,
+    )
+    # Collapse leftover blank lines produced by full-line label removal
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    # Normalize multiple spaces
+    text = re.sub(r"  +", " ", text)
+    return text.strip()
+
+
 def validate_output(text: str) -> str:
     """
     Validate and sanitize LLM output.
@@ -2155,6 +2189,7 @@ def validate_output(text: str) -> str:
     Performs sanitization only (no truncation):
     - Removes control characters
     - Normalizes excessive newlines
+    - Strips leaked output-contract scaffold labels (e.g. "1. Claim:", "Supporting Reason:")
     - Removes sentences containing forbidden meta-commentary phrases
 
     Note: Response length is controlled by LLM prompt instructions, not by this function.
@@ -2166,6 +2201,9 @@ def validate_output(text: str) -> str:
     text = re.sub(r"[\x00-\x08\x0b-\x0c\x0e-\x1f]", "", text)
     # Normalize excessive newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # Strip visible output-contract scaffold labels that the LLM leaked into output
+    text = _strip_scaffold_labels(text)
 
     # Remove sentences containing forbidden meta-commentary phrases
     sentences = re.split(r"(?<=[.!?])(?:\s+|$)", text)
@@ -4727,7 +4765,7 @@ class Agent:
                 f"Previous draft was too generic. It contained banned patterns: "
                 f"{', '.join(_gate_hits[:3])}.\n"
                 f"Write a sharper, more specific response that avoids all of these.\n"
-                f"Respond in 3-4 sentences maximum.\n"
+                f"Respond in 2-3 sentences maximum.\n"
                 f"SEED: {seed}\n\nRespond now:\n"
             )
             _regen = validate_output(
