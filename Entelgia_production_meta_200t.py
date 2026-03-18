@@ -1826,7 +1826,7 @@ class Config:
         True  # When False, Fixy is fully disabled (no turns, no interventions)
     )
     # Web Research Module (ENTELGIA_WEB_RESEARCH=1 to enable, default OFF)
-    web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "1")))
+    web_research_enabled: bool = bool(int(os.environ.get("ENTELGIA_WEB_RESEARCH", "0")))
     web_research_max_results: int = int(os.environ.get("ENTELGIA_WEB_MAX_RESULTS", "3"))
     # Freudian Slip controls
     slip_probability: float = float(os.environ.get("ENTELGIA_SLIP_PROBABILITY", "0.05"))
@@ -1848,7 +1848,7 @@ class Config:
     affective_ltm_min_score: float = 0.2  # minimum combined score to include affective memory
     show_affective_ltm_debug: bool = False  # print per-memory debug summary when True
     # ── TextHumanizer post-processing pass ─────────────────────────────────
-    humanizer_enabled: bool = True
+    humanizer_enabled: bool = False
     humanizer_aggressive: bool = False
     humanizer_randomness: float = 0.30
     show_humanizer_debug: bool = False
