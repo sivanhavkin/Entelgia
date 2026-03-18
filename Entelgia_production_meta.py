@@ -1724,6 +1724,9 @@ class Config:
     forgetting_autobio_ttl: int = 365 * 24 * 3600  # autobiographical → 365 days
     # ── Affective Routing (Feature 2) ──────────────────────────────────────
     affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
+    use_affective_ltm: bool = True  # supplement LTM retrieval with affective memories
+    affective_ltm_limit: int = 3  # max affective memories to add per turn
+    affective_ltm_min_score: float = 0.2  # minimum combined score to include affective memory
     # ── TextHumanizer post-processing pass ─────────────────────────────────
     humanizer_enabled: bool = True
     humanizer_aggressive: bool = False
@@ -3683,6 +3686,60 @@ class Agent:
         m = re.search(r"TOPIC:\s*([^\n]+)", seed)
         return m.group(1).strip() if m else ""
 
+    def _fetch_affective_ltm_supplement(
+        self, existing: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Return a small set of affective memories not already in *existing*.
+
+        Safe, additive, and deduplicated. Returns [] on error or when disabled.
+        Logs a single [AFFECTIVE-LTM] info line with retrieval stats.
+        """
+        if not CFG.use_affective_ltm:
+            return []
+        try:
+            raw = self.memory.ltm_search_affective(
+                self.name,
+                limit=CFG.affective_ltm_limit * 3,
+                layer="conscious",
+            )
+            ew = CFG.affective_emotion_weight
+            min_score = CFG.affective_ltm_min_score
+            filtered = [
+                m for m in raw
+                if (
+                    float(m.get("importance") or 0.0) * (1.0 - ew)
+                    + float(m.get("emotion_intensity") or 0.0) * ew
+                ) >= min_score
+            ]
+            seen_ids = {m.get("id") for m in existing if m.get("id") is not None}
+            seen_contents = {(m.get("content") or "").strip() for m in existing}
+            supplement: List[Dict[str, Any]] = []
+            for m in filtered:
+                mid = m.get("id")
+                mc = (m.get("content") or "").strip()
+                if mid is not None and mid in seen_ids:
+                    continue
+                if mc and mc in seen_contents:
+                    continue
+                supplement.append(m)
+                seen_ids.add(mid)
+                seen_contents.add(mc)
+                if len(supplement) >= CFG.affective_ltm_limit:
+                    break
+            logger.info(
+                "[AFFECTIVE-LTM] agent=%s emotion=%s retrieved=%d used=%d",
+                self.name,
+                self._last_emotion,
+                len(raw),
+                len(supplement),
+            )
+            return supplement
+        except Exception as _err:  # noqa: BLE001
+            logger.debug(
+                "[AFFECTIVE-LTM] skipped for agent=%s: %s", self.name, _err
+            )
+            return []
+
     def _build_compact_prompt(
         self, user_seed: str, dialog_tail: List[Dict[str, str]]
     ) -> str:
@@ -3748,6 +3805,10 @@ class Agent:
             recent_ltm = recent_ltm[:ltm_limit]
         else:
             recent_ltm = all_ltm_raw[:ltm_limit]
+
+        # ── Affective LTM supplement ────────────────────────────────────────
+        # Merge: keep recent memories first, append affective supplement.
+        recent_ltm = recent_ltm + self._fetch_affective_ltm_supplement(recent_ltm)
 
         # Format agent name with optional pronoun
         if CFG.show_pronoun and self.persona_dict and "pronoun" in self.persona_dict:
@@ -3842,6 +3903,10 @@ class Agent:
             )
         else:
             ltm = all_ltm[:5] if all_ltm else []
+
+        # ── Affective LTM supplement (enhanced path) ────────────────────────
+        # Optionally augment ltm with emotionally relevant memories.
+        ltm = ltm + self._fetch_affective_ltm_supplement(ltm)
 
         stm = self.memory.stm_load(self.name)
 
