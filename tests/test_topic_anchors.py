@@ -330,7 +330,8 @@ class TestTopicMismatchPersistWarning:
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
-            r.message for r in caplog.records
+            r.message
+            for r in caplog.records
             if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
         ]
         assert recovery_msgs, (
@@ -342,19 +343,22 @@ class TestTopicMismatchPersistWarning:
         """If the initial response is already accepted, no recovery warning is emitted."""
         agent = _make_agent()
         # Single call returns a response that IS on-topic
-        agent.llm.generate.return_value = "Corrigibility is the key concept for AI alignment."
+        agent.llm.generate.return_value = (
+            "Corrigibility is the key concept for AI alignment."
+        )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
-            r.message for r in caplog.records
+            r.message
+            for r in caplog.records
             if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
         ]
-        assert not recovery_msgs, (
-            "Expected no recovery warning when initial response satisfies topic anchors"
-        )
+        assert (
+            not recovery_msgs
+        ), "Expected no recovery warning when initial response satisfies topic anchors"
 
 
 # ---------------------------------------------------------------------------
@@ -444,7 +448,9 @@ class TestTopicHardRecovery:
         satisfies the topic compliance threshold (score >= 0.70)."""
         agent = _make_agent()
         # Directly on-topic: has AI alignment anchor
-        agent.llm.generate.return_value = "Corrigibility is the key concept for AI alignment."
+        agent.llm.generate.return_value = (
+            "Corrigibility is the key concept for AI alignment."
+        )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
             with patch.object(_meta, "CFG", Config()):
@@ -474,9 +480,9 @@ class TestTopicHardRecovery:
             with patch.object(_meta, "CFG", Config()):
                 agent.speak(seed, self._PRIOR_TURN)
 
-        assert len(captured_prompts) == 2, (
-            f"Expected 2 LLM calls; got {len(captured_prompts)}"
-        )
+        assert (
+            len(captured_prompts) == 2
+        ), f"Expected 2 LLM calls; got {len(captured_prompts)}"
         hard_prompt = captured_prompts[1]
         expected_anchors = TOPIC_ANCHORS["AI alignment"][:5]
         for anchor in expected_anchors:
@@ -553,7 +559,8 @@ class TestTopicMismatchFirstTurn:
                 agent.speak(seed, prior_turn)
 
         recovery_msgs = [
-            r.message for r in caplog.records
+            r.message
+            for r in caplog.records
             if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
         ]
         assert recovery_msgs, (
@@ -829,9 +836,9 @@ class TestHardRecoveryPromptEnhancements:
                 agent.speak(seed, self._PRIOR_TURN)
 
         # Two calls: initial + hard recovery
-        assert len(captured_prompts) == 2, (
-            f"Expected 2 LLM calls (initial + hard-recovery); got {len(captured_prompts)}"
-        )
+        assert (
+            len(captured_prompts) == 2
+        ), f"Expected 2 LLM calls (initial + hard-recovery); got {len(captured_prompts)}"
         hard_prompt = captured_prompts[1]
         assert (
             "empirical evidence suggests" in hard_prompt

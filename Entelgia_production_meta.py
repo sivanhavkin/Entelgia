@@ -234,6 +234,7 @@ except ImportError:
             contamination_phrases: list = []
             reasons: list = []
             threshold: float = 0.55
+
         return _R()
 
     def _cg_add_to_history(agent_name, text):  # type: ignore[no-redef]
@@ -618,7 +619,9 @@ def select_next_topic(
         anchors = TOPIC_ANCHORS.get(topic, [])
         if anchors and memory_blob:
             mem_hits = sum(1 for a in anchors if a.lower() in memory_blob)
-            memory_relevance = min(1.0, mem_hits / max(1, min(_MAX_MEMORY_ANCHORS, len(anchors))))
+            memory_relevance = min(
+                1.0, mem_hits / max(1, min(_MAX_MEMORY_ANCHORS, len(anchors)))
+            )
         else:
             memory_relevance = 0.0
 
@@ -1726,7 +1729,9 @@ class Config:
     affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
     use_affective_ltm: bool = True  # supplement LTM retrieval with affective memories
     affective_ltm_limit: int = 3  # max affective memories to add per turn
-    affective_ltm_min_score: float = 0.2  # minimum combined score to include affective memory
+    affective_ltm_min_score: float = (
+        0.2  # minimum combined score to include affective memory
+    )
     show_affective_ltm_debug: bool = False  # print per-memory debug summary when True
     # ── TextHumanizer post-processing pass ─────────────────────────────────
     humanizer_enabled: bool = True
@@ -3710,11 +3715,13 @@ class Agent:
             ew = CFG.affective_emotion_weight
             min_score = CFG.affective_ltm_min_score
             filtered = [
-                m for m in raw
+                m
+                for m in raw
                 if (
                     float(m.get("importance") or 0.0) * (1.0 - ew)
                     + float(m.get("emotion_intensity") or 0.0) * ew
-                ) >= min_score
+                )
+                >= min_score
             ]
             seen_ids = {m.get("id") for m in existing if m.get("id") is not None}
             seen_contents = {(m.get("content") or "").strip() for m in existing}
@@ -3771,9 +3778,7 @@ class Agent:
                     )
             return supplement
         except Exception as _err:  # noqa: BLE001
-            logger.debug(
-                "[AFFECTIVE-LTM] skipped for agent=%s: %s", self.name, _err
-            )
+            logger.debug("[AFFECTIVE-LTM] skipped for agent=%s: %s", self.name, _err)
             return []
 
     def _build_compact_prompt(
@@ -4533,7 +4538,9 @@ class Agent:
         # contamination before accepting the response.  If circularity is detected,
         # inject a new-angle instruction and regenerate once.
         _first_turn_after_change = (
-            _active_topic and _prev_topic_for_circ and _active_topic != _prev_topic_for_circ
+            _active_topic
+            and _prev_topic_for_circ
+            and _active_topic != _prev_topic_for_circ
         )
         _circ = _cg_compute(
             out,
@@ -6031,7 +6038,8 @@ class MainScript:
                 )
                 # Advance using scoring-based selection instead of sequential rotation
                 _recent_frames = [
-                    t.get("text", "") for t in self.dialog[-6:]
+                    t.get("text", "")
+                    for t in self.dialog[-6:]
                     if t.get("role") not in ("seed", "Fixy")
                 ]
                 topicman.advance_with_proposals(
@@ -6053,7 +6061,9 @@ class MainScript:
                     _adv_cluster,
                     _adv_topic,
                 )
-                logger.debug("topic_style updated after advance_with_proposals → %r", _adv_topic)
+                logger.debug(
+                    "topic_style updated after advance_with_proposals → %r", _adv_topic
+                )
 
             elapsed = time.time() - self.start_time
             if elapsed >= timeout_seconds:

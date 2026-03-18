@@ -454,6 +454,15 @@ Stagnation is measured by `_topic_signature(text)` (MD5-based content fingerprin
 
 `Config.drive_mean_reversion_rate` (`0.04`) and `Config.drive_oscillation_range` (`0.15`) govern fluid drive dynamics introduced alongside DrivePressure. Each turn, `id_strength` and `superego_strength` are pulled back toward 5.0 at the reversion rate plus a bounded random oscillation — preventing monotonic drift to extremes.
 
+### Biased Drive Reversion with Extreme Boost (v3.1.0)
+
+Drive mean-reversion uses per-agent preferred targets rather than a neutral 5.0:
+
+- **Athena** — `id_strength` drifts toward `6.5` (slightly elevated creative drive).
+- **Socrates** — `superego_strength` drifts toward `6.5` (slightly elevated principled restraint).
+
+When either biased drive reaches an extreme (`>= 8.5` or `<= 1.5`), an extra reversion boost of `0.06` is applied on top of the normal rate, preventing indefinite lock-in at extreme values. The ego is taxed proportionally: `ego_strength` drains by a small amount each turn that the biased drive exceeds `5.0`, modelling the psychic cost of sustaining a high-drive state.
+
 ---
 
 ## 12) Limbic Hijack State (v2.7.0)
@@ -485,6 +494,16 @@ if id_strength > 7 and emotion_intensity > 0.7 and conflict_index() > 0.6:
     agent.limbic_hijack = True
 ```
 
+### Extreme Id Threshold Effect (v3.1.0)
+
+When `id_strength >= 8.5`, the activation intensity threshold is dynamically lowered from `0.7` to `0.5`:
+
+```python
+intensity_threshold = 0.5 if id_strength >= 8.5 else 0.7
+```
+
+This reflects heightened impulsive-override risk at extreme drive levels, making limbic hijack easier to enter when Id is already at an extreme.
+
 ### Behavioral Effects While Active
 
 | Effect | Detail |
@@ -512,6 +531,67 @@ When `show_meta=True`, `print_meta_state()` uses a priority-ordered single-line 
 | 3 | Neither | *(silent — no output)* |
 
 This replaces the prior unconditional "SuperEgo critic skipped" message that appeared on almost every turn.
+
+---
+
+## 12a) SuperEgo Critique — Extreme Threshold & Consecutive Streak Limit (v3.1.0)
+
+### Extreme SuperEgo Threshold Effect
+
+When Socrates' `superego_strength >= 8.5`, `evaluate_superego_critique()` is called with tightened thresholds:
+
+| Parameter | Normal | Extreme (`superego >= 8.5`) |
+|---|---|---|
+| `dominance_margin` | `0.5` | `0.2` |
+| `conflict_min` | `2.0` | `1.0` |
+
+The limbic hijack suppression of `effective_sup` is also bypassed at this extreme, letting a maximally dominant SuperEgo assert itself even against a mild limbic hijack.
+
+### SuperEgo Consecutive Streak Limit
+
+A `_consecutive_superego_rewrites` counter on `Agent` prevents stylistic lock-in caused by uninterrupted SuperEgo critique rewrites:
+
+- After `MAX_CONSECUTIVE_SUPEREGO_REWRITES` (2) consecutive rewrite turns, the critique is suppressed.
+- `_superego_streak_suppressed` flag is set to `True` while suppressed.
+- The counter resets to `0` on any turn where the critique does not fire.
+- `print_meta_state()` surfaces the streak-suppressed state in meta output.
+
+---
+
+## 12b) Behavioral Rules — `_behavioral_rule_instruction()` (v3.1.0)
+
+`_behavioral_rule_instruction()` selects at most one behavioral instruction per turn, evaluated in priority order. Rules fire only for the current speaker.
+
+### Priority-Ordered Rule Table
+
+| Rule | Agent | Condition | Instruction type | Priority |
+|---|---|---|---|---|
+| **LH** | Athena | `limbic_hijack == True` | Raw anger and harsh language | Highest |
+| **SC** | Socrates | `superego_strength` leads both `id_strength` and `ego_strength` by ≥ 0.5 | Hesitant / anxious language | High |
+| **B** | Athena | Conflict index > 6.0 (random gate) | Dissent / counter-argument | Medium |
+| **A** | Socrates | Conflict index > 6.0 (random gate) | Binary-choice question | Medium |
+| **ID-low** | Both | `id_strength < 5.0` | Low motivation / passive | Medium-low |
+| **SE-low** | Both | `superego_strength < 5.0` and `id_strength >= 5.0` | Reduced inhibition / impulsive | Medium-low |
+| **AI-tension** | Athena | `id_strength` in `[7.0, 8.5)` | Graduated irritation + impulsivity | Low |
+| **AI-curioso** | Athena | `id_strength < 7.0` | Explorative curiosity | Fallback |
+| **SI-anxious** | Socrates | `id_strength` in `[7.0, 8.5)` | Stubbornness and inner unease | Low |
+| **SI-skeptic** | Socrates | `id_strength < 7.0` | Principled skepticism | Fallback |
+
+### Rule Descriptions
+
+- **Rule LH** (Athena Limbic Hijack Anger): When `limbic_hijack == True` for Athena, forces raw anger instruction; takes priority over Rule B.
+- **Rule SC** (Socrates SuperEgo Dominant Anxiety): When SuperEgo leads both Id and Ego by ≥ 0.5 for Socrates, forces hesitant/anxious instruction; takes priority over Rule A.
+- **Rule AI-tension** (Athena id 7.0–8.5): Graduated irritation + impulsivity when id in `[7.0, 8.5)` and no LH/B applies. Phrasing escalates from subtle undercurrent (id near 7.0) through growing frustration (mid-range) to clear irritation (id near 8.5).
+- **Rule AI-curioso** (Athena id < 7.0): Explorative curiosity when id < 7.0 and no higher-priority rule applies.
+- **Rule SI-anxious** (Socrates id 7.0–8.5): Stubbornness and inner unease when id in `[7.0, 8.5)` and no SC/A applies.
+- **Rule SI-skeptic** (Socrates id < 7.0): Principled skepticism — id energy framed as a constructive inner governor — when id < 7.0 and no higher-priority rule applies.
+- **Rule ID-low** (both agents id < 5.0): Low motivation / passive instruction for both Athena and Socrates; overrides agent-specific id fallbacks.
+- **Rule SE-low** (both agents superego < 5.0, id ≥ 5.0): Reduced inhibition / impulsive instruction for both agents; fires only when Rule ID-low did not fire.
+
+### Emotion State Side-Effects
+
+- When Rule LH fires for Athena, `_last_emotion` is set to `"anger"` to keep emotional state consistent with the behavioral rule.
+- When `evaluate_superego_critique()` fires for Socrates, `_last_emotion` is set to `"fear"` and `_last_emotion_intensity` is elevated, reflecting the anxiety introduced by the internal governor.
 
 ---
 

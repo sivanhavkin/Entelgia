@@ -170,11 +170,14 @@ class TestAffectiveLTMAugmentation:
     def test_affective_memories_appended_to_recent(self):
         """Affective memories appear after recent memories in merged bundle."""
         agent, memory, cfg = _make_agent()
-        recent_mem = _make_memory(1, "Recent memory about logic.", importance=0.3,
-                                   emotion_intensity=0.1)
+        recent_mem = _make_memory(
+            1, "Recent memory about logic.", importance=0.3, emotion_intensity=0.1
+        )
         affective_mem = _make_memory(
-            2, "Emotionally salient memory about grief.", importance=0.5,
-            emotion_intensity=0.9
+            2,
+            "Emotionally salient memory about grief.",
+            importance=0.5,
+            emotion_intensity=0.9,
         )
         memory.ltm_recent.return_value = [recent_mem]
         memory.ltm_search_affective.return_value = [affective_mem]
@@ -218,9 +221,7 @@ class TestAffectiveLTMEmptyResults:
     def test_empty_affective_results_no_error(self):
         """No exception raised when ltm_search_affective returns empty list."""
         agent, memory, cfg = _make_agent()
-        memory.ltm_recent.return_value = [
-            _make_memory(1, "Regular memory.")
-        ]
+        memory.ltm_recent.return_value = [_make_memory(1, "Regular memory.")]
         memory.ltm_search_affective.return_value = []
 
         prompt = agent._build_compact_prompt("What is knowledge?", [])
@@ -280,8 +281,9 @@ class TestAffectiveLTMDeduplication:
     def test_duplicate_by_id_excluded(self):
         """Memory already in recent list (same id) is not added twice."""
         agent, memory, cfg = _make_agent()
-        mem = _make_memory(42, "Unique content about justice.", importance=0.8,
-                            emotion_intensity=0.9)
+        mem = _make_memory(
+            42, "Unique content about justice.", importance=0.8, emotion_intensity=0.9
+        )
         memory.ltm_recent.return_value = [mem]
         # Return the same memory from affective as well
         memory.ltm_search_affective.return_value = [mem]
@@ -296,7 +298,9 @@ class TestAffectiveLTMDeduplication:
         agent, memory, cfg = _make_agent()
         content = "The unexamined life is not worth living."
         recent_mem = _make_memory(1, content, importance=0.4, emotion_intensity=0.3)
-        affective_mem = _make_memory(99, content, importance=0.9, emotion_intensity=0.95)
+        affective_mem = _make_memory(
+            99, content, importance=0.9, emotion_intensity=0.95
+        )
         memory.ltm_recent.return_value = [recent_mem]
         memory.ltm_search_affective.return_value = [affective_mem]
 
@@ -320,8 +324,9 @@ class TestAffectiveLTMSizeLimit:
         memory.ltm_recent.return_value = []
         # Return more candidates than the limit
         candidates = [
-            _make_memory(i, f"Affective memory #{i}.", importance=0.8,
-                          emotion_intensity=0.8)
+            _make_memory(
+                i, f"Affective memory #{i}.", importance=0.8, emotion_intensity=0.8
+            )
             for i in range(1, 10)
         ]
         memory.ltm_search_affective.return_value = candidates
@@ -329,9 +334,7 @@ class TestAffectiveLTMSizeLimit:
         prompt = agent._build_compact_prompt("What is truth?", [])
 
         # Count how many affective memories appear
-        included = sum(
-            1 for i in range(1, 10) if f"Affective memory #{i}." in prompt
-        )
+        included = sum(1 for i in range(1, 10) if f"Affective memory #{i}." in prompt)
         assert included <= limit
 
 
@@ -351,8 +354,10 @@ class TestAffectiveLTMMinScore:
         memory.ltm_recent.return_value = []
         # score = 0.1 * 0.6 + 0.05 * 0.4 = 0.06 + 0.02 = 0.08 < 0.5
         low_score_mem = _make_memory(
-            1, "Low importance low emotion memory.", importance=0.1,
-            emotion_intensity=0.05
+            1,
+            "Low importance low emotion memory.",
+            importance=0.1,
+            emotion_intensity=0.05,
         )
         memory.ltm_search_affective.return_value = [low_score_mem]
 
@@ -368,8 +373,7 @@ class TestAffectiveLTMMinScore:
         memory.ltm_recent.return_value = []
         # score = 0.5 * 0.6 + 0.5 * 0.4 = 0.5 >= 0.2
         high_score_mem = _make_memory(
-            2, "High salience emotional memory.", importance=0.5,
-            emotion_intensity=0.5
+            2, "High salience emotional memory.", importance=0.5, emotion_intensity=0.5
         )
         memory.ltm_search_affective.return_value = [high_score_mem]
 
@@ -390,8 +394,12 @@ class TestAffectiveLTMLogging:
         """AFFECTIVE-LTM log record is present when retrieval runs."""
         agent, memory, cfg = _make_agent()
         memory.ltm_search_affective.return_value = [
-            _make_memory(10, "Emotionally vivid recollection.", importance=0.7,
-                          emotion_intensity=0.8)
+            _make_memory(
+                10,
+                "Emotionally vivid recollection.",
+                importance=0.7,
+                emotion_intensity=0.8,
+            )
         ]
 
         with caplog.at_level(logging.INFO):
@@ -411,8 +419,9 @@ class TestAffectiveLTMLogging:
         """[AFFECTIVE-LTM] log line includes avg_score, id_skipped, content_skipped."""
         agent, memory, cfg = _make_agent()
         memory.ltm_search_affective.return_value = [
-            _make_memory(10, "High emotion memory.", importance=0.6,
-                          emotion_intensity=0.8)
+            _make_memory(
+                10, "High emotion memory.", importance=0.6, emotion_intensity=0.8
+            )
         ]
 
         with caplog.at_level(logging.INFO):
@@ -435,9 +444,15 @@ class TestAffectiveLTMLogging:
             _make_memory(1, "dup content", importance=0.3, emotion_intensity=0.2)
         ]
         memory.ltm_search_affective.return_value = [
-            _make_memory(1, "dup content", importance=0.9, emotion_intensity=0.9),  # id+content dup
-            _make_memory(2, "dup content", importance=0.9, emotion_intensity=0.9),  # content dup
-            _make_memory(3, "fresh memory.", importance=0.9, emotion_intensity=0.9),  # passes
+            _make_memory(
+                1, "dup content", importance=0.9, emotion_intensity=0.9
+            ),  # id+content dup
+            _make_memory(
+                2, "dup content", importance=0.9, emotion_intensity=0.9
+            ),  # content dup
+            _make_memory(
+                3, "fresh memory.", importance=0.9, emotion_intensity=0.9
+            ),  # passes
         ]
 
         with caplog.at_level(logging.INFO):
@@ -479,10 +494,15 @@ class TestAffectiveLTMDebugMode:
         """Enabling show_affective_ltm_debug=True must not raise any exception."""
         agent, memory, cfg = _make_agent({"show_affective_ltm_debug": True})
         memory.ltm_search_affective.return_value = [
-            _make_memory(10, "A memorable moment of grief.", importance=0.7,
-                          emotion_intensity=0.85),
-            _make_memory(11, "Second vivid memory.", importance=0.6,
-                          emotion_intensity=0.75),
+            _make_memory(
+                10,
+                "A memorable moment of grief.",
+                importance=0.7,
+                emotion_intensity=0.85,
+            ),
+            _make_memory(
+                11, "Second vivid memory.", importance=0.6, emotion_intensity=0.75
+            ),
         ]
 
         # Must complete without raising
@@ -556,8 +576,9 @@ class TestAffectiveLTMDebugMode:
             {"show_affective_ltm_debug": True, "affective_ltm_min_score": 0.99}
         )
         memory.ltm_search_affective.return_value = [
-            _make_memory(10, "Low score memory.", importance=0.01,
-                          emotion_intensity=0.01),
+            _make_memory(
+                10, "Low score memory.", importance=0.01, emotion_intensity=0.01
+            ),
         ]
 
         with caplog.at_level(logging.DEBUG):

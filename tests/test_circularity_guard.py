@@ -31,13 +31,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import entelgia.circularity_guard as cg
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_identical_texts(n: int, text: str = "consciousness emerges from neural patterns"):
+def _make_identical_texts(
+    n: int, text: str = "consciousness emerges from neural patterns"
+):
     """Return a list of *n* identical strings."""
     return [text] * n
 
@@ -176,7 +177,11 @@ class TestDetectSemanticRepetitionEmbeddings:
 
     def test_low_similarity_not_flagged(self):
         text = "apple orange banana"
-        history = ["jupiter saturn neptune", "mountain river ocean", "ruby golang swift"]
+        history = [
+            "jupiter saturn neptune",
+            "mountain river ocean",
+            "ruby golang swift",
+        ]
         mock_model = self._mock_model_identity(4)
         mock_cosine = MagicMock(return_value=np.array([[0.1, 0.1, 0.1]]))
 
@@ -341,25 +346,33 @@ class TestDetectCrossTopicContamination:
 
     def test_clean_text_not_flagged(self):
         text = "Consciousness may emerge from recursive self-reference."
-        detected, found = cg.detect_cross_topic_contamination(text, "consciousness & self-models")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "consciousness & self-models"
+        )
         assert detected is False
         assert found == []
 
     def test_generic_carryover_option_a_b_flagged(self):
         text = "Option A leads to freedom. Option B leads to determinism."
-        detected, found = cg.detect_cross_topic_contamination(text, "free will & determinism")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "free will & determinism"
+        )
         assert detected is True
         assert "option a" in found or "option b" in found
 
     def test_generic_scenario_a_b_flagged(self):
         text = "Scenario A is optimal. Scenario B is suboptimal."
-        detected, found = cg.detect_cross_topic_contamination(text, "ethics & responsibility")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "ethics & responsibility"
+        )
         assert detected is True
         assert "scenario a" in found or "scenario b" in found
 
     def test_generic_in_the_previous_topic_flagged(self):
         text = "In the previous topic we discussed autonomy."
-        detected, found = cg.detect_cross_topic_contamination(text, "ethics & responsibility")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "ethics & responsibility"
+        )
         assert detected is True
         assert "in the previous topic" in found
 
@@ -371,25 +384,33 @@ class TestDetectCrossTopicContamination:
 
     def test_leaked_template_peace_and_harmony_flagged(self):
         text = "We seek peace and harmony in our reasoning."
-        detected, found = cg.detect_cross_topic_contamination(text, "consciousness & self-models")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "consciousness & self-models"
+        )
         assert detected is True
         assert "peace and harmony" in found
 
     def test_leaked_template_our_community_flagged(self):
         text = "Our community values both freedom and safety."
-        detected, found = cg.detect_cross_topic_contamination(text, "free will & determinism")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "free will & determinism"
+        )
         assert detected is True
         assert "our community" in found
 
     def test_leaked_template_practical_dilemma_flagged(self):
         text = "This is a practical dilemma that requires resolution."
-        detected, found = cg.detect_cross_topic_contamination(text, "truth & epistemology")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "truth & epistemology"
+        )
         assert detected is True
         assert "practical dilemma" in found
 
     def test_topic_specific_carryover_flagged(self):
         text = "The optimization function must be designed with care."
-        detected, found = cg.detect_cross_topic_contamination(text, "ethics & responsibility")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "ethics & responsibility"
+        )
         assert detected is True
         assert "optimization function" in found
 
@@ -400,7 +421,9 @@ class TestDetectCrossTopicContamination:
 
     def test_multiple_carryover_phrases(self):
         text = "As I mentioned, option a and option b both carry weight."
-        detected, found = cg.detect_cross_topic_contamination(text, "truth & epistemology")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "truth & epistemology"
+        )
         assert len(found) >= 2
 
     def test_threshold_one_phrase_flagged(self):
@@ -420,7 +443,9 @@ class TestDetectCrossTopicContamination:
 
     def test_case_insensitive_matching(self):
         text = "OPTION A is preferable to OPTION B in all cases."
-        detected, found = cg.detect_cross_topic_contamination(text, "truth & epistemology")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "truth & epistemology"
+        )
         assert detected is True
 
 
@@ -433,7 +458,9 @@ class TestComputeCircularityScore:
 
     def test_empty_history_low_score(self):
         text = "Consciousness may emerge from recursive self-reference."
-        result = cg.compute_circularity_score(text, "Socrates", topic="consciousness & self-models")
+        result = cg.compute_circularity_score(
+            text, "Socrates", topic="consciousness & self-models"
+        )
         assert result.is_circular is False
         assert result.score < result.threshold  # uses dynamic threshold
 
@@ -469,14 +496,14 @@ class TestComputeCircularityScore:
 
     def test_contamination_raises_score(self):
         text = "Option A and option b are two paths. On the one hand freedom."
-        result = cg.compute_circularity_score(text, "Athena", topic="truth & epistemology")
+        result = cg.compute_circularity_score(
+            text, "Athena", topic="truth & epistemology"
+        )
         assert result.score > 0.0
 
     def test_is_circular_flag_matches_explicit_threshold(self):
         text = "let us examine the question on one hand and the other."
-        result = cg.compute_circularity_score(
-            text, "Socrates", topic="", threshold=0.0
-        )
+        result = cg.compute_circularity_score(text, "Socrates", topic="", threshold=0.0)
         assert result.is_circular is True
 
     def test_reasons_populated_when_circular(self):
@@ -683,31 +710,41 @@ class TestContaminationLeakDetection:
 
     def test_option_a_b_caught(self):
         text = "We face two paths: Option A leads to utility, Option B leads to virtue."
-        detected, found = cg.detect_cross_topic_contamination(text, "ethics & responsibility")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "ethics & responsibility"
+        )
         assert detected is True
         assert "option a" in found or "option b" in found
 
     def test_scenario_a_b_caught(self):
-        text = "Scenario A achieves short-term goals. Scenario B achieves long-term goals."
+        text = (
+            "Scenario A achieves short-term goals. Scenario B achieves long-term goals."
+        )
         detected, found = cg.detect_cross_topic_contamination(text, "AI alignment")
         assert detected is True
         assert "scenario a" in found or "scenario b" in found
 
     def test_forgiveness_caught(self):
         text = "Through forgiveness we reach a higher state of understanding."
-        detected, found = cg.detect_cross_topic_contamination(text, "free will & determinism")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "free will & determinism"
+        )
         assert detected is True
         assert "forgiveness" in found
 
     def test_peace_and_harmony_caught(self):
         text = "We aspire to peace and harmony between reason and emotion."
-        detected, found = cg.detect_cross_topic_contamination(text, "truth & epistemology")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "truth & epistemology"
+        )
         assert detected is True
         assert "peace and harmony" in found
 
     def test_our_community_caught(self):
         text = "Our community should engage with these philosophical questions."
-        detected, found = cg.detect_cross_topic_contamination(text, "consciousness & self-models")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "consciousness & self-models"
+        )
         assert detected is True
         assert "our community" in found
 
@@ -719,7 +756,9 @@ class TestContaminationLeakDetection:
 
     def test_clean_on_topic_text_has_no_contamination(self):
         text = "Free will and determinism are traditional philosophical opponents."
-        detected, found = cg.detect_cross_topic_contamination(text, "free will & determinism")
+        detected, found = cg.detect_cross_topic_contamination(
+            text, "free will & determinism"
+        )
         assert detected is False
         assert found == []
 

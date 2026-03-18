@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-749%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-1011%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -539,32 +539,36 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **749 tests** (749 passed, 0 skipped) in 23 suites.
+Entelgia ships with comprehensive test coverage across **1011 tests** (1011 passed, 0 skipped) in 27 suites.
 
 | Category | Tests | Suite |
 |---|---|---|
 | Web Research | 192 | `test_web_research.py` |
+| Circularity Guard | 92 | `test_circularity_guard.py` |
+| Behavioral Rules | 71 | `test_behavioral_rules.py` |
 | Topic Anchors | 59 | `test_topic_anchors.py` |
 | Dialogue Metrics | 58 | `test_dialogue_metrics.py` |
 | Long-Term Memory | 43 | `test_long_term_memory.py` |
+| Topic Enforcer | 41 | `test_topic_enforcer.py` |
+| Text Humanizer Integration | 41 | `test_text_humanizer_integration.py` |
 | Topic Style | 39 | `test_topic_style.py` |
 | Energy Regulation | 35 | `test_energy_regulation.py` |
 | Revise Draft | 32 | `test_revise_draft.py` |
 | Context Manager | 30 | `test_context_manager.py` |
 | Loop Guard | 30 | `test_loop_guard.py` |
-| Ablation Study | 27 | `test_ablation_study.py` |
-| Drive Pressure | 23 | `test_drive_pressure.py` |
-| Drive Correlations | 28 | `test_drive_correlations.py` |
+| Ablation Study | 28 | `test_ablation_study.py` |
 | SuperEgo Critique | 28 | `test_superego_critique.py` |
-| Memory Security | 19 | `test_memory_security.py` |
-| Web Tool | 18 | `test_web_tool.py` |
-| Behavioral Rules | 29 | `test_behavioral_rules.py` |
+| Drive Correlations | 28 | `test_drive_correlations.py` |
+| Affective LTM Integration | 24 | `test_affective_ltm_integration.py` |
+| Drive Pressure | 23 | `test_drive_pressure.py` |
 | Limbic Hijack | 20 | `test_limbic_hijack.py` |
+| Memory Security | 19 | `test_memory_security.py` |
+| Web Tool | 26 | `test_web_tool.py` |
 | Semantic Repetition | 13 | `test_detect_repetition_semantic.py` |
 | Seed Topic Clusters | 12 | `test_seed_topic_clusters.py` |
+| Enhanced Dialogue | 11 | `test_enhanced_dialogue.py` |
 | Enable Observer | 10 | `test_enable_observer.py` |
 | Memory Signing Migration | 5 | `test_memory_signing_migration.py` |
-| Enhanced Dialogue | 11 | `test_enhanced_dialogue.py` |
 | Demo Dialogue | 1 | `test_demo_dialogue.py` |
 
 For full test documentation, per-suite details, CI/CD pipeline information, and sample output, see the **[Test Suite README (tests/README.md)](tests/README.md)**.
@@ -583,7 +587,8 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v3.0.0** | ✅ **Latest** | current |
+| **v3.1.0** | ✅ **Latest** | current |
+| **v3.0.0** | ⚠️ Superseded | Use v3.1.0 instead |
 | **v2.8.1** | ⚠️ Superseded |  Use v3.0.0 instead |
 | **v2.8.0** | ⚠️ Superseded | Use v3.0.0 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |

@@ -101,7 +101,7 @@ class TextHumanizer:
         "Fixy": [
             "Plainly:",
             "Bottom line:",
-        ]
+        ],
     }
 
     def __init__(self, config: Optional[HumanizerConfig] = None):
@@ -119,7 +119,9 @@ class TextHumanizer:
 
         if score_before < self.config.min_score:
             flags.append("score_skip")
-            return HumanizerResult(original, original, False, flags, score_before, score_before)
+            return HumanizerResult(
+                original, original, False, flags, score_before, score_before
+            )
 
         out = self._remove_scaffolds(original)
         if out != original:
@@ -155,12 +157,7 @@ class TextHumanizer:
         score_after = self._score(out)
 
         return HumanizerResult(
-            original,
-            out,
-            original != out,
-            flags,
-            score_before,
-            score_after
+            original, out, original != out, flags, score_before, score_after
         )
 
     def _score(self, text: str) -> float:
@@ -192,18 +189,29 @@ class TextHumanizer:
         return out
 
     def _rewrite_opening(self, text: str) -> str:
-        return re.sub(
-            r"^(It is .*? to )",
-            "",
-            text,
-            flags=re.IGNORECASE
-        )
+        return re.sub(r"^(It is .*? to )", "", text, flags=re.IGNORECASE)
 
-    _SPLIT_SAFE_CONJUNCTIONS = frozenset({
-        "or", "nor", "and", "but", "yet", "so",
-        "on", "in", "at", "of", "to", "by", "as",
-        "if", "is", "it", "a",
-    })
+    _SPLIT_SAFE_CONJUNCTIONS = frozenset(
+        {
+            "or",
+            "nor",
+            "and",
+            "but",
+            "yet",
+            "so",
+            "on",
+            "in",
+            "at",
+            "of",
+            "to",
+            "by",
+            "as",
+            "if",
+            "is",
+            "it",
+            "a",
+        }
+    )
 
     def _split_sentences(self, text: str) -> str:
         parts = re.split(r"(?<=[.!?])\s+", text)
@@ -216,7 +224,11 @@ class TextHumanizer:
                 # conjunction/preposition, or the first half ending with one.
                 while mid < len(words) - 1 and (
                     words[mid].lower() in self._SPLIT_SAFE_CONJUNCTIONS
-                    or (mid > 0 and words[mid - 1].rstrip(".,;:").lower() in self._SPLIT_SAFE_CONJUNCTIONS)
+                    or (
+                        mid > 0
+                        and words[mid - 1].rstrip(".,;:").lower()
+                        in self._SPLIT_SAFE_CONJUNCTIONS
+                    )
                 ):
                     mid += 1
                 first_half = " ".join(words[:mid])
@@ -226,7 +238,11 @@ class TextHumanizer:
                     first_half += "."
                 # Ensure second half starts with a capital letter
                 if second_half:
-                    second_half = second_half[0].upper() + second_half[1:] if len(second_half) > 1 else second_half.upper()
+                    second_half = (
+                        second_half[0].upper() + second_half[1:]
+                        if len(second_half) > 1
+                        else second_half.upper()
+                    )
                 out.append(first_half)
                 out.append(second_half)
             else:

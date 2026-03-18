@@ -315,9 +315,9 @@ class TestRuleASocrates:
             ],
             title="test_returns_empty_at_or_below_6",
         )
-        assert "A or B" not in rule, (
-            "Rule A (binary choice) must NOT fire when conflict_index <= 6"
-        )
+        assert (
+            "A or B" not in rule
+        ), "Rule A (binary choice) must NOT fire when conflict_index <= 6"
 
     def test_rule_mentions_binary_choice(self):
         agent = _socrates_with_conflict(8.0)
@@ -464,9 +464,9 @@ class TestRuleBAnthena:
             ],
             title="test_returns_empty_at_or_below_6",
         )
-        assert "challenge" not in rule.lower(), (
-            "Rule B (challenge) must NOT fire when conflict_index <= 6"
-        )
+        assert (
+            "challenge" not in rule.lower()
+        ), "Rule B (challenge) must NOT fire when conflict_index <= 6"
 
     def test_rule_mentions_challenge(self):
         agent = _athena_with_conflict(8.0)
@@ -925,7 +925,9 @@ class TestRuleAITensionAthena:
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Athena id=7.0"
         assert "Id is rising" in rule, f"Expected 'Id is rising' in rule; got: {rule}"
-        assert "irritation" in rule.lower(), f"Expected 'irritation' in rule; got: {rule}"
+        assert (
+            "irritation" in rule.lower()
+        ), f"Expected 'irritation' in rule; got: {rule}"
 
     def test_tension_rule_fires_at_id_8(self):
         """id=8.0 (mid range) → growing frustration rule fires."""
@@ -933,7 +935,9 @@ class TestRuleAITensionAthena:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Athena id=8.0"
-        assert "frustration" in rule.lower(), f"Expected 'frustration' in rule; got: {rule}"
+        assert (
+            "frustration" in rule.lower()
+        ), f"Expected 'frustration' in rule; got: {rule}"
 
     def test_tension_rule_fires_at_id_8_4(self):
         """id=8.4 (near-hijack) → clear irritation / barely-contained anger rule fires."""
@@ -941,18 +945,18 @@ class TestRuleAITensionAthena:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Athena id=8.4"
-        assert "anger" in rule.lower() or "irritation" in rule.lower(), (
-            f"Expected 'anger' or 'irritation' in rule; got: {rule}"
-        )
+        assert (
+            "anger" in rule.lower() or "irritation" in rule.lower()
+        ), f"Expected 'anger' or 'irritation' in rule; got: {rule}"
 
     def test_tension_rule_absent_at_exact_8_5(self):
         """id=8.5 is the limbic-hijack threshold — tension rule must NOT fire for id >= 8.5."""
         agent = _athena_id_tension(8.5)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "Id is rising" not in rule, (
-            "AI-tension rule must NOT fire at id=8.5 (limbic hijack range)"
-        )
+        assert (
+            "Id is rising" not in rule
+        ), "AI-tension rule must NOT fire at id=8.5 (limbic hijack range)"
 
     def test_tension_rule_absent_when_hijack_active(self):
         """Limbic hijack takes priority over the tension rule."""
@@ -964,12 +968,12 @@ class TestRuleAITensionAthena:
             limbic_hijack=True,
         )
         rule = agent._behavioral_rule_instruction()
-        assert "anger" in rule.lower() and "harsh" in rule.lower(), (
-            "Rule LH (hijack) must take priority over Rule AI-tension"
-        )
-        assert "Id is rising" not in rule, (
-            "AI-tension text must NOT appear when limbic hijack is active"
-        )
+        assert (
+            "anger" in rule.lower() and "harsh" in rule.lower()
+        ), "Rule LH (hijack) must take priority over Rule AI-tension"
+        assert (
+            "Id is rising" not in rule
+        ), "AI-tension text must NOT appear when limbic hijack is active"
 
     def test_tension_rule_absent_for_socrates(self):
         """Athena tension rule must NOT fire for Socrates."""
@@ -982,27 +986,27 @@ class TestRuleAITensionAthena:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "Id is rising" not in rule, (
-            "Athena AI-tension rule must NOT fire for Socrates"
-        )
+        assert (
+            "Id is rising" not in rule
+        ), "Athena AI-tension rule must NOT fire for Socrates"
 
     def test_tension_rule_instructs_sharpened_language(self):
         """The tension rule must instruct sharpened/edged language."""
         agent = _athena_id_tension(7.5)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "sharpen" in rule.lower() or "tension" in rule.lower(), (
-            f"Expected sharpened/tension language instruction; got: {rule}"
-        )
+        assert (
+            "sharpen" in rule.lower() or "tension" in rule.lower()
+        ), f"Expected sharpened/tension language instruction; got: {rule}"
 
     def test_tension_rule_mentions_impulsive(self):
         """The tension rule must instruct impulsive behaviour (act on instinct)."""
         agent = _athena_id_tension(7.5)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "impulsive" in rule.lower() or "instinct" in rule.lower(), (
-            f"Expected 'impulsive'/'instinct' in AI-tension rule; got: {rule}"
-        )
+        assert (
+            "impulsive" in rule.lower() or "instinct" in rule.lower()
+        ), f"Expected 'impulsive'/'instinct' in AI-tension rule; got: {rule}"
 
 
 # ---------------------------------------------------------------------------
@@ -1031,9 +1035,9 @@ class TestRuleAICuriosoAthena:
         with patch("random.random", return_value=0.99):  # block Rule B
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Athena id=5.0"
-        assert "curious" in rule.lower() or "inquisitive" in rule.lower(), (
-            f"Expected 'curious' or 'inquisitive' in rule; got: {rule}"
-        )
+        assert (
+            "curious" in rule.lower() or "inquisitive" in rule.lower()
+        ), f"Expected 'curious' or 'inquisitive' in rule; got: {rule}"
 
     def test_curioso_rule_fires_at_id_6_9(self):
         """id=6.9 (just below threshold) → curiosity rule fires."""
@@ -1041,27 +1045,27 @@ class TestRuleAICuriosoAthena:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Athena id=6.9"
-        assert "exploration" in rule.lower() or "curious" in rule.lower(), (
-            f"Expected exploration/curious language; got: {rule}"
-        )
+        assert (
+            "exploration" in rule.lower() or "curious" in rule.lower()
+        ), f"Expected exploration/curious language; got: {rule}"
 
     def test_curioso_rule_absent_at_id_7(self):
         """id=7.0 is the tension range — curiosity rule must NOT fire."""
         agent = _athena_id_low(7.0)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "active and curious" not in rule, (
-            "AI-curioso rule must NOT fire at id=7.0 (tension range)"
-        )
+        assert (
+            "active and curious" not in rule
+        ), "AI-curioso rule must NOT fire at id=7.0 (tension range)"
 
     def test_curioso_rule_mentions_wonder(self):
         """The curiosity rule must mention wonder-driven/inquisitive behavior."""
         agent = _athena_id_low(5.0)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "wonder" in rule.lower() or "inquisitive" in rule.lower(), (
-            f"Expected 'wonder' or 'inquisitive' in curiosity rule; got: {rule}"
-        )
+        assert (
+            "wonder" in rule.lower() or "inquisitive" in rule.lower()
+        ), f"Expected 'wonder' or 'inquisitive' in curiosity rule; got: {rule}"
 
     def test_curioso_rule_absent_for_socrates(self):
         """AI-curioso rule must NOT fire for Socrates."""
@@ -1074,9 +1078,9 @@ class TestRuleAICuriosoAthena:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "active and curious" not in rule, (
-            "Athena AI-curioso rule must NOT fire for Socrates"
-        )
+        assert (
+            "active and curious" not in rule
+        ), "Athena AI-curioso rule must NOT fire for Socrates"
 
     def test_lh_takes_priority_over_curioso(self):
         """Rule LH (limbic hijack) must take priority over AI-curioso."""
@@ -1089,9 +1093,9 @@ class TestRuleAICuriosoAthena:
         )
         rule = agent._behavioral_rule_instruction()
         assert "anger" in rule.lower(), "Rule LH must fire when hijack is active"
-        assert "active and curious" not in rule, (
-            "AI-curioso must NOT fire when limbic hijack is active"
-        )
+        assert (
+            "active and curious" not in rule
+        ), "AI-curioso must NOT fire when limbic hijack is active"
 
 
 # ---------------------------------------------------------------------------
@@ -1120,9 +1124,9 @@ class TestRuleSIAnxiousSocrates:
         with patch("random.random", return_value=0.99):  # block Rule A
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Socrates id=7.0"
-        assert "stubbornness" in rule.lower() or "stubborn" in rule.lower(), (
-            f"Expected 'stubborn' in rule; got: {rule}"
-        )
+        assert (
+            "stubbornness" in rule.lower() or "stubborn" in rule.lower()
+        ), f"Expected 'stubborn' in rule; got: {rule}"
 
     def test_anxious_rule_fires_at_id_8(self):
         """id=8.0 → stubbornness/unease rule fires."""
@@ -1130,27 +1134,29 @@ class TestRuleSIAnxiousSocrates:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Socrates id=8.0"
-        assert "unease" in rule.lower() or "anxiety" in rule.lower(), (
-            f"Expected 'unease'/'anxiety' in rule; got: {rule}"
-        )
+        assert (
+            "unease" in rule.lower() or "anxiety" in rule.lower()
+        ), f"Expected 'unease'/'anxiety' in rule; got: {rule}"
 
     def test_anxious_rule_absent_at_id_8_5(self):
         """id=8.5 is above the SI-anxious range — rule must NOT fire."""
         agent = _socrates_id_tension(8.5)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "stubbornness" not in rule.lower(), (
-            "SI-anxious rule must NOT fire at id=8.5"
-        )
+        assert (
+            "stubbornness" not in rule.lower()
+        ), "SI-anxious rule must NOT fire at id=8.5"
 
     def test_anxious_rule_mentions_guardedness(self):
         """The rule must instruct guarded/wary engagement."""
         agent = _socrates_id_tension(7.5)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "guard" in rule.lower() or "wari" in rule.lower() or "resist" in rule.lower(), (
-            f"Expected guarded/wary/resist language in rule; got: {rule}"
-        )
+        assert (
+            "guard" in rule.lower()
+            or "wari" in rule.lower()
+            or "resist" in rule.lower()
+        ), f"Expected guarded/wary/resist language in rule; got: {rule}"
 
     def test_sc_takes_priority_over_si_anxious(self):
         """Rule SC (superego dominant) takes priority over Rule SI-anxious."""
@@ -1163,12 +1169,12 @@ class TestRuleSIAnxiousSocrates:
             limbic_hijack=False,
         )
         rule = agent._behavioral_rule_instruction()
-        assert "SuperEgo is dominant" in rule, (
-            "Rule SC must take priority over Rule SI-anxious"
-        )
-        assert "stubbornness" not in rule.lower(), (
-            "SI-anxious must NOT fire when Rule SC is active"
-        )
+        assert (
+            "SuperEgo is dominant" in rule
+        ), "Rule SC must take priority over Rule SI-anxious"
+        assert (
+            "stubbornness" not in rule.lower()
+        ), "SI-anxious must NOT fire when Rule SC is active"
 
     def test_si_anxious_absent_for_athena(self):
         """SI-anxious rule must NOT fire for Athena."""
@@ -1181,9 +1187,9 @@ class TestRuleSIAnxiousSocrates:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "stubbornness" not in rule.lower(), (
-            "Socrates SI-anxious rule must NOT fire for Athena"
-        )
+        assert (
+            "stubbornness" not in rule.lower()
+        ), "Socrates SI-anxious rule must NOT fire for Athena"
 
 
 # ---------------------------------------------------------------------------
@@ -1212,9 +1218,9 @@ class TestRuleSISkepticSocrates:
         with patch("random.random", return_value=0.99):  # block Rule A
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Socrates id=5.0"
-        assert "skeptic" in rule.lower() or "scrutin" in rule.lower(), (
-            f"Expected 'skeptic'/'scrutin' in rule; got: {rule}"
-        )
+        assert (
+            "skeptic" in rule.lower() or "scrutin" in rule.lower()
+        ), f"Expected 'skeptic'/'scrutin' in rule; got: {rule}"
 
     def test_skeptic_rule_fires_at_id_6_9(self):
         """id=6.9 (just below threshold) → skepticism rule fires."""
@@ -1222,27 +1228,29 @@ class TestRuleSISkepticSocrates:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule at Socrates id=6.9"
-        assert "skeptic" in rule.lower() or "scrutin" in rule.lower(), (
-            f"Expected skepticism/scrutiny language; got: {rule}"
-        )
+        assert (
+            "skeptic" in rule.lower() or "scrutin" in rule.lower()
+        ), f"Expected skepticism/scrutiny language; got: {rule}"
 
     def test_skeptic_rule_absent_at_id_7(self):
         """id=7.0 is the SI-anxious range — skeptic rule must NOT fire."""
         agent = _socrates_id_low(7.0)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "constructive inner" not in rule, (
-            "SI-skeptic rule must NOT fire at id=7.0 (tension range)"
-        )
+        assert (
+            "constructive inner" not in rule
+        ), "SI-skeptic rule must NOT fire at id=7.0 (tension range)"
 
     def test_skeptic_rule_mentions_principled_disagreement(self):
         """The rule must instruct principled disagreement / questioning assumptions."""
         agent = _socrates_id_low(5.0)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "disagree" in rule.lower() or "question" in rule.lower() or "challenge" in rule.lower(), (
-            f"Expected principled disagreement language in rule; got: {rule}"
-        )
+        assert (
+            "disagree" in rule.lower()
+            or "question" in rule.lower()
+            or "challenge" in rule.lower()
+        ), f"Expected principled disagreement language in rule; got: {rule}"
 
     def test_skeptic_rule_absent_for_athena(self):
         """SI-skeptic rule must NOT fire for Athena."""
@@ -1255,9 +1263,9 @@ class TestRuleSISkepticSocrates:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "constructive inner" not in rule, (
-            "Socrates SI-skeptic rule must NOT fire for Athena"
-        )
+        assert (
+            "constructive inner" not in rule
+        ), "Socrates SI-skeptic rule must NOT fire for Athena"
 
     def test_sc_takes_priority_over_si_skeptic(self):
         """Rule SC (superego dominant) takes priority over Rule SI-skeptic."""
@@ -1269,21 +1277,21 @@ class TestRuleSISkepticSocrates:
             superego_strength=8.0,
         )
         rule = agent._behavioral_rule_instruction()
-        assert "SuperEgo is dominant" in rule, (
-            "Rule SC must take priority over Rule SI-skeptic"
-        )
-        assert "constructive inner" not in rule, (
-            "SI-skeptic must NOT fire when Rule SC is active"
-        )
+        assert (
+            "SuperEgo is dominant" in rule
+        ), "Rule SC must take priority over Rule SI-skeptic"
+        assert (
+            "constructive inner" not in rule
+        ), "SI-skeptic must NOT fire when Rule SC is active"
 
     def test_skeptic_rule_positive_framing(self):
         """The skeptic rule must frame skepticism as a positive inner governor, not mere negativity."""
         agent = _socrates_id_low(5.0)
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "governor" in rule.lower() or "constructive" in rule.lower(), (
-            f"Expected 'governor'/'constructive' in skeptic rule; got: {rule}"
-        )
+        assert (
+            "governor" in rule.lower() or "constructive" in rule.lower()
+        ), f"Expected 'governor'/'constructive' in skeptic rule; got: {rule}"
 
 
 # ---------------------------------------------------------------------------
@@ -1307,9 +1315,9 @@ class TestRuleIDLow:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule for Athena id=4.9"
-        assert "suppressed" in rule.lower() or "diminished" in rule.lower(), (
-            f"Expected low-motivation language; got: {rule}"
-        )
+        assert (
+            "suppressed" in rule.lower() or "diminished" in rule.lower()
+        ), f"Expected low-motivation language; got: {rule}"
 
     def test_idlow_fires_for_socrates(self):
         """Socrates with id=4.9 → low-motivation rule fires."""
@@ -1323,9 +1331,9 @@ class TestRuleIDLow:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule for Socrates id=4.9"
-        assert "suppressed" in rule.lower() or "diminished" in rule.lower(), (
-            f"Expected low-motivation language; got: {rule}"
-        )
+        assert (
+            "suppressed" in rule.lower() or "diminished" in rule.lower()
+        ), f"Expected low-motivation language; got: {rule}"
 
     def test_idlow_fires_at_zero(self):
         """id=0.0 (minimum) → low-motivation rule fires."""
@@ -1338,9 +1346,9 @@ class TestRuleIDLow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "suppressed" in rule.lower() or "diminished" in rule.lower(), (
-            f"Expected low-motivation language at id=0.0; got: {rule}"
-        )
+        assert (
+            "suppressed" in rule.lower() or "diminished" in rule.lower()
+        ), f"Expected low-motivation language at id=0.0; got: {rule}"
 
     def test_idlow_absent_at_exactly_5(self):
         """id=5.0 is NOT below the threshold — Rule ID-low must NOT fire."""
@@ -1353,9 +1361,9 @@ class TestRuleIDLow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "Id drive is suppressed" not in rule, (
-            "Rule ID-low must NOT fire at id=5.0 (strict < 5.0 threshold)"
-        )
+        assert (
+            "Id drive is suppressed" not in rule
+        ), "Rule ID-low must NOT fire at id=5.0 (strict < 5.0 threshold)"
 
     def test_idlow_mentions_reserved_passive(self):
         """The rule must instruct reserved/passive/withdrawn quality."""
@@ -1367,9 +1375,11 @@ class TestRuleIDLow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "reserved" in rule.lower() or "passive" in rule.lower() or "withdrawn" in rule.lower(), (
-            f"Expected reserved/passive/withdrawn language; got: {rule}"
-        )
+        assert (
+            "reserved" in rule.lower()
+            or "passive" in rule.lower()
+            or "withdrawn" in rule.lower()
+        ), f"Expected reserved/passive/withdrawn language; got: {rule}"
 
     def test_lh_takes_priority_over_idlow(self):
         """Rule LH (Athena limbic hijack) takes priority over Rule ID-low."""
@@ -1382,9 +1392,9 @@ class TestRuleIDLow:
         )
         rule = agent._behavioral_rule_instruction()
         assert "anger" in rule.lower(), "Rule LH must fire when hijack is active"
-        assert "Id drive is suppressed" not in rule, (
-            "Rule ID-low must NOT fire when Rule LH is active"
-        )
+        assert (
+            "Id drive is suppressed" not in rule
+        ), "Rule ID-low must NOT fire when Rule LH is active"
 
     def test_sc_takes_priority_over_idlow_for_socrates(self):
         """Rule SC (superego dominant) takes priority over Rule ID-low for Socrates."""
@@ -1395,10 +1405,12 @@ class TestRuleIDLow:
             superego_strength=9.0,
         )
         rule = agent._behavioral_rule_instruction()
-        assert "SuperEgo is dominant" in rule, "Rule SC must take priority over Rule ID-low"
-        assert "Id drive is suppressed" not in rule, (
-            "Rule ID-low must NOT fire when Rule SC is active"
-        )
+        assert (
+            "SuperEgo is dominant" in rule
+        ), "Rule SC must take priority over Rule ID-low"
+        assert (
+            "Id drive is suppressed" not in rule
+        ), "Rule ID-low must NOT fire when Rule SC is active"
 
 
 # ---------------------------------------------------------------------------
@@ -1422,9 +1434,9 @@ class TestRuleSELow:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule for Athena sup=4.9"
-        assert "impulsive" in rule.lower() or "inhibited" in rule.lower(), (
-            f"Expected impulsive/uninhibited language; got: {rule}"
-        )
+        assert (
+            "impulsive" in rule.lower() or "inhibited" in rule.lower()
+        ), f"Expected impulsive/uninhibited language; got: {rule}"
 
     def test_selow_fires_for_socrates(self):
         """Socrates with sup=4.9, id=5.0 → SE-low rule fires."""
@@ -1438,9 +1450,9 @@ class TestRuleSELow:
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
         assert rule != "", "Expected non-empty rule for Socrates sup=4.9"
-        assert "impulsive" in rule.lower() or "inhibited" in rule.lower(), (
-            f"Expected impulsive/uninhibited language; got: {rule}"
-        )
+        assert (
+            "impulsive" in rule.lower() or "inhibited" in rule.lower()
+        ), f"Expected impulsive/uninhibited language; got: {rule}"
 
     def test_selow_fires_at_zero_sup(self):
         """sup=0.0 (minimum) → SE-low rule fires."""
@@ -1452,9 +1464,9 @@ class TestRuleSELow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "impulsive" in rule.lower() or "inhibited" in rule.lower(), (
-            f"Expected impulsive language at sup=0.0; got: {rule}"
-        )
+        assert (
+            "impulsive" in rule.lower() or "inhibited" in rule.lower()
+        ), f"Expected impulsive language at sup=0.0; got: {rule}"
 
     def test_selow_absent_at_exactly_5(self):
         """sup=5.0 is NOT below threshold — Rule SE-low must NOT fire."""
@@ -1467,9 +1479,9 @@ class TestRuleSELow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "SuperEgo restraint is weak" not in rule, (
-            "Rule SE-low must NOT fire at sup=5.0 (strict < 5.0 threshold)"
-        )
+        assert (
+            "SuperEgo restraint is weak" not in rule
+        ), "Rule SE-low must NOT fire at sup=5.0 (strict < 5.0 threshold)"
 
     def test_selow_mentions_risk_taking(self):
         """The rule must instruct bold/risky/daring reasoning."""
@@ -1481,9 +1493,9 @@ class TestRuleSELow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "risk" in rule.lower() or "bold" in rule.lower() or "daring" in rule.lower(), (
-            f"Expected risk/bold/daring language; got: {rule}"
-        )
+        assert (
+            "risk" in rule.lower() or "bold" in rule.lower() or "daring" in rule.lower()
+        ), f"Expected risk/bold/daring language; got: {rule}"
 
     def test_idlow_takes_priority_over_selow(self):
         """Rule ID-low takes priority over Rule SE-low when both id < 5 and sup < 5."""
@@ -1496,12 +1508,12 @@ class TestRuleSELow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "Id drive is suppressed" in rule, (
-            "Rule ID-low must take priority when both id < 5 and sup < 5"
-        )
-        assert "SuperEgo restraint is weak" not in rule, (
-            "Rule SE-low must NOT fire when Rule ID-low is active"
-        )
+        assert (
+            "Id drive is suppressed" in rule
+        ), "Rule ID-low must take priority when both id < 5 and sup < 5"
+        assert (
+            "SuperEgo restraint is weak" not in rule
+        ), "Rule SE-low must NOT fire when Rule ID-low is active"
 
     def test_sc_takes_priority_over_selow_for_socrates(self):
         """Rule SC (superego dominant) takes priority over Rule SE-low is irrelevant since
@@ -1516,9 +1528,9 @@ class TestRuleSELow:
         )
         with patch("random.random", return_value=0.99):
             rule = agent._behavioral_rule_instruction()
-        assert "SuperEgo restraint is weak" in rule, (
-            "SE-low must fire when Socrates sup=4.0 and SC does not apply"
-        )
+        assert (
+            "SuperEgo restraint is weak" in rule
+        ), "SE-low must fire when Socrates sup=4.0 and SC does not apply"
 
     def test_lh_takes_priority_over_selow(self):
         """Rule LH (Athena limbic hijack) takes priority over Rule SE-low."""
@@ -1531,9 +1543,9 @@ class TestRuleSELow:
         )
         rule = agent._behavioral_rule_instruction()
         assert "anger" in rule.lower(), "Rule LH must fire when hijack is active"
-        assert "SuperEgo restraint is weak" not in rule, (
-            "Rule SE-low must NOT fire when Rule LH is active"
-        )
+        assert (
+            "SuperEgo restraint is weak" not in rule
+        ), "Rule SE-low must NOT fire when Rule LH is active"
 
 
 if __name__ == "__main__":

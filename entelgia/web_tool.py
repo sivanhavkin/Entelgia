@@ -157,9 +157,7 @@ def web_search(
                 )
                 time.sleep(delay)
             else:
-                logger.warning(
-                    "web_search: network error for query %r: %s", query, exc
-                )
+                logger.warning("web_search: network error for query %r: %s", query, exc)
                 return results
 
     if last_exc is not None:

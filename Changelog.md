@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+---
+
+## [3.1.0] - 2026-03-18
+
 ### Added
 
 - **Rule LH — Athena Limbic Hijack Anger Behaviour** — new behavioral rule in `_behavioral_rule_instruction()`. When Athena is in an active limbic hijack state (`self.limbic_hijack == True`), the injected instruction forces raw anger and harsh language, replacing the generic conflict dissent rule. This rule takes priority over the standard conflict-triggered Rule B so that the emotional override state is always reflected in Athena's output.

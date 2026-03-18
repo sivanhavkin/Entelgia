@@ -390,6 +390,8 @@ if ide > 7 and emotion_intensity > 0.7 and conflict_index() > 0.6:
     agent.limbic_hijack = True
 ```
 
+When `id_strength >= 8.5`, the intensity threshold is lowered from `0.7` to `0.5`, making hijack easier to enter at extreme drive levels.
+
 **Behavioral effects while active:**
 
 | Effect | Detail |
@@ -398,6 +400,7 @@ if ide > 7 and emotion_intensity > 0.7 and conflict_index() > 0.6:
 | Elevated temperature | Computed using `effective_sup` — less restraint |
 | SuperEgo critique suppressed | `effective_sup` passed to `evaluate_superego_critique`; rarely dominant |
 | Impulsive response kind | `response_kind = "impulsive"` fed into drive update loop |
+| Athena anger emotion | `_last_emotion` set to `"anger"` when Athena is in hijack |
 
 **Exit conditions:**
 
@@ -413,6 +416,36 @@ if ide > 7 and emotion_intensity > 0.7 and conflict_index() > 0.6:
 ### Superego Second-Pass Critique
 
 When `superego_strength ≥ 7.5` (and no limbic hijack is active), the initial response is rewritten by the LLM at `temperature=0.25` with a principled internal-governor prompt. This models the ego-superego tension: id produces a raw response; superego revises it.
+
+**Extreme SuperEgo tightening (v3.1.0):** When `superego_strength >= 8.5`, the critique fires with tightened thresholds (`dominance_margin=0.2`, `conflict_min=1.0`) and bypasses limbic-hijack suppression. `_last_emotion` for Socrates is set to `"fear"` when the critique fires.
+
+**Consecutive streak limit (v3.1.0):** After `MAX_CONSECUTIVE_SUPEREGO_REWRITES` (2) consecutive rewrite turns, critique is suppressed and `_superego_streak_suppressed` is set. Counter resets on any non-rewrite turn.
+
+### Behavioral Rules — `_behavioral_rule_instruction()`
+
+At most one instruction is injected per turn, evaluated in priority order:
+
+| Rule | Agent | Condition | Effect |
+|---|---|---|---|
+| **LH** | Athena | `limbic_hijack == True` | Raw anger instruction; priority over Rule B |
+| **SC** | Socrates | SuperEgo leads Id and Ego by ≥ 0.5 | Hesitant/anxious instruction; priority over Rule A |
+| **B** | Athena | Conflict > 6.0 (random gate) | Dissent / counter-argument |
+| **A** | Socrates | Conflict > 6.0 (random gate) | Binary-choice question |
+| **ID-low** | Both | `id_strength < 5.0` | Low motivation / passive |
+| **SE-low** | Both | `superego < 5.0` and `id >= 5.0` | Reduced inhibition / impulsive |
+| **AI-tension** | Athena | id in `[7.0, 8.5)` | Graduated irritation + impulsivity |
+| **AI-curioso** | Athena | id < 7.0 | Explorative curiosity |
+| **SI-anxious** | Socrates | id in `[7.0, 8.5)` | Stubbornness and inner unease |
+| **SI-skeptic** | Socrates | id < 7.0 | Principled skepticism |
+
+### Biased Drive Reversion (v3.1.0)
+
+Drive reversion targets are per-agent rather than neutral 5.0:
+
+- **Athena** — `id_strength` drifts toward `6.5`.
+- **Socrates** — `superego_strength` drifts toward `6.5`.
+
+When either drive reaches extreme (`>= 8.5` or `<= 1.5`), an extra boost of `0.06` is applied. `ego_strength` drains proportionally when the biased drive exceeds `5.0`.
 
 ### Ego-Driven Memory Retrieval Depth
 

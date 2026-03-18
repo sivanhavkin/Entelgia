@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **749 tests** (749 passed, 0 skipped) in 23 suites:
+Entelgia ships with comprehensive test coverage across **1011 tests** (1011 passed, 0 skipped) in 27 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -130,7 +130,7 @@ Tests verify the DrivePressure urgency/tension system:
 
 ---
 
-### 🛡️ Behavioral Rules Tests (29 tests)
+### 🛡️ Behavioral Rules Tests (71 tests)
 
 ```bash
 pytest tests/test_behavioral_rules.py -v
@@ -341,7 +341,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 749 total tests (192 web research + 18 web tool + 30 context manager + 27 ablation study + 59 topic anchors + 39 topic style + 32 revise draft + 12 seed topic clusters + 11 dialogue + 35 energy + 43 LTM + 19 security + 28 drive correlations + 23 drive pressure + 29 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 28 superego critique + 20 limbic hijack + 10 enable observer + 30 loop guard) |
+| **Unit Tests** | `pytest` | Runs 1011 total tests (192 web research + 26 web tool + 30 context manager + 28 ablation study + 59 topic anchors + 39 topic style + 32 revise draft + 12 seed topic clusters + 11 dialogue + 35 energy + 43 LTM + 19 security + 28 drive correlations + 23 drive pressure + 71 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 28 superego critique + 20 limbic hijack + 10 enable observer + 30 loop guard + 92 circularity guard + 41 topic enforcer + 41 text humanizer integration + 24 affective LTM integration) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -468,7 +468,7 @@ All network calls in tests are mocked — no real HTTP requests are made.
 
 ---
 
-### 🌐 Web Tool Tests (18 tests)
+### 🌐 Web Tool Tests (26 tests)
 
 ```bash
 pytest tests/test_web_tool.py -v
@@ -519,7 +519,7 @@ Tests verify `entelgia/context_manager.py` — the prompt-assembly and memory-in
 
 ---
 
-### 🔬 Ablation Study Tests (27 tests)
+### 🔬 Ablation Study Tests (28 tests)
 
 ```bash
 pytest tests/test_ablation_study.py -v
@@ -604,6 +604,69 @@ Tests verify `TOPIC_CLUSTERS` structure and `SeedGenerator` behaviour:
 - ✅ **Cluster structure** — all clusters non-empty and contain unique topic strings
 - ✅ **`SeedGenerator.generate_seed`** — returns non-empty string for every known topic
 - ✅ **Unknown topic fallback** — graceful handling of topic not in any cluster
+
+---
+
+### 🔄 Circularity Guard Tests (92 tests)
+
+```bash
+pytest tests/test_circularity_guard.py -v
+```
+
+Tests verify:
+- ✅ **Semantic repetition detection** — delta-based scoring with adaptive threshold
+- ✅ **Structural template detection** — detects leaked rhetorical patterns and template phrases
+- ✅ **Cross-topic contamination detection** — flags content that bleeds across topic boundaries
+- ✅ **Circularity score computation** — blends semantic, structural, and cross-topic signals
+- ✅ **Dynamic threshold** — `min(0.7, 0.55 + 0.01 × history_size)`, first-turn leniency (0.7)
+- ✅ **MIN_HISTORY_FOR_DETECTION=3** — prevents spurious triggering with insufficient history
+- ✅ **History management** — add, get, and clear per-agent history
+- ✅ **New-angle instruction** — generates redirection instructions when circularity detected
+
+---
+
+### 📌 Topic Enforcer Tests (41 tests)
+
+```bash
+pytest tests/test_topic_enforcer.py -v
+```
+
+Tests verify:
+- ✅ **Topic compliance scoring** — `compute_topic_compliance_score()` with ACCEPT=0.70, SOFT=0.50
+- ✅ **Semantic relevance** — binary `_semantic_relevance`: 0 hits → 0.0, 1+ hits → 1.0
+- ✅ **Soft re-anchor instruction** — `build_soft_reanchor_instruction()` injects corrective guidance
+- ✅ **Threshold constants** — `ACCEPT_THRESHOLD` and `SOFT_REANCHOR_THRESHOLD` values verified
+- ✅ **Edge cases** — empty text, missing anchors, unknown clusters
+
+---
+
+### 🗣️ Text Humanizer Integration Tests (41 tests)
+
+```bash
+pytest tests/test_text_humanizer_integration.py -v
+```
+
+Tests verify:
+- ✅ **Humanizer output** — `Humanizer.humanize()` produces natural-language text
+- ✅ **Rhetorical opener scrubbing** — `scrub_rhetorical_openers()` removes template preambles
+- ✅ **Integration with dialogue output** — humanization applied to agent responses
+- ✅ **Idempotency** — repeated humanization does not degrade text quality
+- ✅ **Edge cases** — empty input, very long input, non-ASCII content
+
+---
+
+### 💛 Affective LTM Integration Tests (24 tests)
+
+```bash
+pytest tests/test_affective_ltm_integration.py -v
+```
+
+Tests verify:
+- ✅ **Affective routing** — `ltm_search_affective()` ranks memories by `importance × (1−w) + emotion_intensity × w`
+- ✅ **Emotion weight parameter** — configurable via `Config.affective_emotion_weight` (default 0.4)
+- ✅ **Layer filtering** — retrieval correctly filters by memory layer
+- ✅ **Forgetting policy integration** — expired memories excluded from affective retrieval
+- ✅ **Confidence and provenance** — new metadata columns correctly stored and retrieved
 
 ---
 

@@ -213,7 +213,8 @@ def compute_topic_compliance_score(
     # to avoid double-counting sentences present in both opening and body.
     full_contamination = _contamination_score(text, _prev_anchors)
     memory_hijack = max(
-        0.0, full_contamination - opening_contamination * _OPENING_CONTAMINATION_DISCOUNT
+        0.0,
+        full_contamination - opening_contamination * _OPENING_CONTAMINATION_DISCOUNT,
     )
 
     score = (
