@@ -56,6 +56,8 @@ _TRIGGER_PHRASES: frozenset = frozenset(
     {
         # recency / updates
         "latest research",
+        "recent research",
+        "current research",
         "recent study",
         "recent studies",
         "recent paper",
@@ -64,6 +66,7 @@ _TRIGGER_PHRASES: frozenset = frozenset(
         "latest findings",
         "latest results",
         "current evidence",
+        "recent evidence",
         "recent developments",
         # academic sources
         "peer reviewed",
@@ -81,6 +84,12 @@ _TRIGGER_PHRASES: frozenset = frozenset(
         "supporting evidence",
         "published research",
         "empirical study",
+        # explicit research actions
+        "find paper",
+        "find study",
+        "find research",
+        "look up research",
+        "search for evidence",
     }
 )
 
@@ -182,12 +191,55 @@ _WEAK_TRIGGER_WORDS: frozenset = frozenset(
         "latest",
         "truth",
         "reasoning",
+        "bias",  # too generic alone — "cognitive bias study" is fine, "I notice bias" is not
     }
 )
 
 # Effective keyword set after removing weak/non-conceptual entries.
 # Computed once at module load to avoid repeated set-difference at call time.
 _STRONG_TRIGGER_KEYWORDS: frozenset = _TRIGGER_KEYWORDS - _WEAK_TRIGGER_WORDS
+
+# ---------------------------------------------------------------------------
+# Multi-signal detection helpers
+# ---------------------------------------------------------------------------
+
+# Words that signal explicit factual uncertainty or a request for evidence
+_UNCERTAINTY_SIGNAL_WORDS: frozenset = frozenset(
+    {
+        "uncertain", "uncertainty", "unclear", "unsure", "unknown",
+        "not sure", "don't know", "do we know", "question",
+        "verify", "verification", "check", "confirm",
+        "evidence", "proof", "support", "demonstrate", "show",
+        "source", "sources", "reference", "references",
+        "data", "findings", "results", "outcome",
+    }
+)
+
+# Minimum number of distinct strong trigger hits for multi-signal mode
+_MIN_MULTI_SIGNAL_CONCEPTS: int = 2
+
+
+def _count_strong_trigger_hits(text: str) -> int:
+    """Count distinct strong trigger keyword/phrase hits in *text*."""
+    text_lower = text.lower()
+    hits = 0
+    seen: set = set()
+    for phrase in _TRIGGER_PHRASES:
+        if phrase in text_lower and phrase not in seen:
+            hits += 1
+            seen.add(phrase)
+    for m in re.finditer(r"\b[a-zA-Z\-]+\b", text_lower):
+        word = m.group()
+        if word in _STRONG_TRIGGER_KEYWORDS and word not in seen:
+            hits += 1
+            seen.add(word)
+    return hits
+
+
+def _has_uncertainty_or_evidence_signal(text: str) -> bool:
+    """Return True if *text* contains an uncertainty or evidence signal."""
+    text_lower = text.lower()
+    return any(w in text_lower for w in _UNCERTAINTY_SIGNAL_WORDS)
 
 
 # ---------------------------------------------------------------------------
@@ -273,20 +325,28 @@ def fixy_should_search(
     dialog_tail: Optional[List[Dict[str, str]]] = None,
     fixy_reason: Optional[str] = None,
     query_cooldown_key: Optional[str] = None,
+    *,
+    require_multi_signal: bool = True,
+    min_concepts: int = 2,
+    require_uncertainty_or_evidence: bool = True,
 ) -> bool:
     """Decide whether Fixy should trigger a web research cycle.
 
     Returns ``True`` when any of the following conditions hold:
 
-    1. A trigger keyword or phrase is present in *seed_text* and has not
-       fired within the last ``_COOLDOWN_TURNS`` turns.
-    2. A trigger keyword or phrase appears in the last
-       ``_DIALOG_TAIL_WINDOW`` turns of *dialog_tail* and has not fired
-       within the cooldown window.
+    1. A trigger phrase (multi-word) is present in *seed_text* and not cooled down.
+    2. Multiple trigger signals are present across seed text and recent dialogue,
+       and the multi-signal gate (``require_multi_signal``) is satisfied.
     3. *fixy_reason* matches one of the known research-signal values.
 
-    A per-trigger cooldown (``_COOLDOWN_TURNS = 8``) prevents repeated
-    searches for the same keyword in rapid succession.
+    Multi-signal mode (``require_multi_signal=True``, default):
+        A single generic keyword is no longer sufficient.  At least
+        ``min_concepts`` distinct strong triggers must be found across the
+        combined text window, OR at least one trigger must co-occur with
+        an explicit uncertainty/evidence signal word.
+
+    A per-trigger cooldown (``_COOLDOWN_TURNS``) prevents repeated searches
+    for the same keyword in rapid succession.
 
     Parameters
     ----------
@@ -301,9 +361,17 @@ def fixy_should_search(
     query_cooldown_key:
         Optional pre-built sanitized search query string.  When provided,
         this key is used for ``_recent_queries`` tracking instead of
-        ``seed_text``.  Pass the actual sanitized query (as built by
-        ``build_research_query``) so that different ``seed_text`` values
-        that resolve to the same search query share a single cooldown slot.
+        ``seed_text``.
+    require_multi_signal:
+        When True (default), a single generic keyword cannot fire the trigger
+        alone — at least ``min_concepts`` distinct signals are required, or an
+        uncertainty/evidence signal must co-occur.
+    min_concepts:
+        Minimum number of distinct strong trigger hits required in multi-signal
+        mode.
+    require_uncertainty_or_evidence:
+        When True, also accepts a single strong trigger if an
+        uncertainty/evidence word co-occurs in the same window.
 
     Returns
     -------
@@ -326,14 +394,9 @@ def fixy_should_search(
             return False
 
     # Determine the key used for per-query cooldown tracking.
-    # When the caller provides a pre-built sanitized query, use that so
-    # that different seed_text values which resolve to the same search
-    # query correctly share a cooldown slot.
     _cooldown_key = query_cooldown_key if query_cooldown_key is not None else seed_text
 
-    # 0. Per-query cooldown: if the same sanitized query (or seed_text when
-    #    no sanitized key is given) was already searched within the cooldown
-    #    window, suppress the search immediately.
+    # 0. Per-query cooldown
     if _cooldown_key in _recent_queries:
         if (current_turn - _recent_queries[_cooldown_key]) <= _COOLDOWN_TURNS:
             logger.info(
@@ -345,31 +408,43 @@ def fixy_should_search(
             )
             return False
 
-    # 1. Check seed text
+    # --- Build combined text window for multi-signal analysis ---
+    combined_texts = [seed_text]
+    if dialog_tail:
+        turns_to_scan = dialog_tail[1:]
+        recent_turns = turns_to_scan[-_DIALOG_TAIL_WINDOW:]
+        for turn in recent_turns:
+            turn_text = turn.get("text", "") if isinstance(turn, dict) else ""
+            if turn_text:
+                combined_texts.append(turn_text)
+    combined_window = " ".join(combined_texts)
+
+    logger.debug(
+        "[WEB-TRIGGER-CHECK] combined_window_preview=%r require_multi_signal=%s min_concepts=%d",
+        combined_window[:200],
+        require_multi_signal,
+        min_concepts,
+    )
+
+    # 1. High-priority: explicit trigger phrase in seed text (multi-word → bypass single-signal gate)
     logger.debug(
         "[branch=seed] source_type=seed_text text_preview=%r",
         seed_text[:160],
     )
-    trigger = find_trigger(seed_text)
-    logger.debug("[branch=seed] detected_trigger=%r", trigger)
-    if trigger:
-        if _is_trigger_cooled_down(trigger, current_turn):
-            logger.debug(
-                "trigger %r is in cooldown (last fired on turn %d, current %d), skipping",
-                trigger,
-                _recent_triggers[trigger],
-                current_turn,
-            )
-        else:
-            _recent_triggers[trigger] = current_turn
+    seed_trigger = find_trigger(seed_text)
+    logger.debug("[branch=seed] detected_trigger=%r", seed_trigger)
+    if seed_trigger and seed_trigger in _TRIGGER_PHRASES:
+        # Multi-word phrase: high confidence, skip multi-signal gate
+        if not _is_trigger_cooled_down(seed_trigger, current_turn):
+            _recent_triggers[seed_trigger] = current_turn
             _recent_queries[_cooldown_key] = current_turn
             _last_global_search_turn = current_turn
-            logger.info("web search triggered by keyword: %r", trigger)
+            logger.info(
+                "[WEB-TRIGGER-FIRE] trigger=%r type=phrase concepts=1", seed_trigger
+            )
             return True
 
-    # 2. Check recent dialogue turns (skip index 0 – the seed topic)
-    # Scanning starts from index 1 to prevent the seed topic from
-    # activating web search on every turn.
+    # Emit per-turn dialogue debug logs (for observability regardless of mode)
     if dialog_tail:
         turns_to_scan = dialog_tail[1:]
         recent_turns = turns_to_scan[-_DIALOG_TAIL_WINDOW:]
@@ -381,24 +456,75 @@ def fixy_should_search(
                 turn_role,
                 turn_text[:160],
             )
-            trigger = find_trigger(turn_text)
-            logger.debug("[branch=dialogue] detected_trigger=%r", trigger)
-            if trigger:
-                if _is_trigger_cooled_down(trigger, current_turn):
-                    logger.debug(
-                        "trigger %r is in cooldown (last fired on turn %d, current %d), skipping",
-                        trigger,
-                        _recent_triggers[trigger],
-                        current_turn,
-                    )
-                    continue
+            turn_trigger = find_trigger(turn_text)
+            logger.debug("[branch=dialogue] detected_trigger=%r", turn_trigger)
+
+    # 2. Multi-signal gate across combined window
+    if require_multi_signal:
+        concept_count = _count_strong_trigger_hits(combined_window)
+        has_uncertainty = _has_uncertainty_or_evidence_signal(combined_window)
+
+        logger.debug(
+            "[WEB-TRIGGER-CHECK] concept_count=%d has_uncertainty=%s min_concepts=%d",
+            concept_count,
+            has_uncertainty,
+            min_concepts,
+        )
+
+        # Fire if enough distinct concepts, or one strong concept + uncertainty
+        multi_ok = concept_count >= min_concepts
+        uncertainty_ok = require_uncertainty_or_evidence and has_uncertainty and concept_count >= 1
+
+        if not (multi_ok or uncertainty_ok):
+            trigger = find_trigger(combined_window)
+            logger.info(
+                "[WEB-TRIGGER-SKIP] reason=%s trigger=%r concept_count=%d "
+                "has_uncertainty=%s",
+                "single_keyword" if concept_count == 1 else "insufficient_concepts",
+                trigger,
+                concept_count,
+                has_uncertainty,
+            )
+            # Still check Fixy reason below before returning False
+        else:
+            # Gate passed — find the best trigger from combined window
+            trigger = find_trigger(combined_window)
+            if trigger and not _is_trigger_cooled_down(trigger, current_turn):
                 _recent_triggers[trigger] = current_turn
                 _recent_queries[_cooldown_key] = current_turn
                 _last_global_search_turn = current_turn
-                logger.info("web search triggered by keyword: %r", trigger)
+                logger.info(
+                    "[WEB-TRIGGER-FIRE] trigger=%r concepts=%d uncertainty=%s",
+                    trigger,
+                    concept_count,
+                    has_uncertainty,
+                )
                 return True
+    else:
+        # Legacy single-signal mode
+        # 1a. Check seed text trigger (single-signal)
+        if seed_trigger and not _is_trigger_cooled_down(seed_trigger, current_turn):
+            _recent_triggers[seed_trigger] = current_turn
+            _recent_queries[_cooldown_key] = current_turn
+            _last_global_search_turn = current_turn
+            logger.info("[WEB-TRIGGER-FIRE] trigger=%r type=single", seed_trigger)
+            return True
 
-    # 3. Check Fixy meta-reason signal
+        # 1b. Check recent dialogue turns (single-signal)
+        if dialog_tail:
+            turns_to_scan = dialog_tail[1:]
+            recent_turns = turns_to_scan[-_DIALOG_TAIL_WINDOW:]
+            for turn in recent_turns:
+                turn_text = turn.get("text", "") if isinstance(turn, dict) else ""
+                turn_trigger = find_trigger(turn_text)
+                if turn_trigger and not _is_trigger_cooled_down(turn_trigger, current_turn):
+                    _recent_triggers[turn_trigger] = current_turn
+                    _recent_queries[_cooldown_key] = current_turn
+                    _last_global_search_turn = current_turn
+                    logger.info("[WEB-TRIGGER-FIRE] trigger=%r type=dialogue", turn_trigger)
+                    return True
+
+    # 3. Check Fixy meta-reason signal (always checked regardless of multi-signal setting)
     logger.debug(
         "[branch=fixy_reason] source_type=fixy_reason text_preview=%r",
         (fixy_reason or "")[:160],

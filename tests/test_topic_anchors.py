@@ -239,9 +239,10 @@ class TestBuildCompactPromptTopicAnchors:
         with patch.object(_meta, "CFG", cfg):
             prompt = agent._build_compact_prompt(seed, [])
 
-        assert "Topic constraint:" in prompt
-        assert "The active topic is: AI alignment." in prompt
-        assert "must stay within this topic" in prompt
+        # The new enhanced anchor format uses "TOPIC ANCHOR [STRICT]:"
+        assert "TOPIC ANCHOR [STRICT]:" in prompt
+        assert "Active topic: AI alignment" in prompt
+        assert "MUST stay inside the active topic" in prompt
         assert "corrigibility" in prompt
         assert "reward hacking" in prompt
 
@@ -252,8 +253,11 @@ class TestBuildCompactPromptTopicAnchors:
         with patch.object(_meta, "CFG", cfg):
             prompt = agent._build_compact_prompt(seed, [])
 
-        assert "Topic constraint:" not in prompt
-        assert "The active topic is:" not in prompt
+        # Even for an unknown topic, the enhanced anchor block is generated
+        # with deterministic fallback sub-angles derived from the topic words.
+        # The anchor should be present but use a fallback.
+        assert "TOPIC ANCHOR [STRICT]:" in prompt
+        assert "Active topic: Some unknown topic" in prompt
 
     def test_no_anchor_requirement_when_no_topic_in_seed(self):
         cfg = Config()
@@ -262,8 +266,9 @@ class TestBuildCompactPromptTopicAnchors:
         with patch.object(_meta, "CFG", cfg):
             prompt = agent._build_compact_prompt(seed, [])
 
+        assert "TOPIC ANCHOR [STRICT]:" not in prompt
+        assert "Active topic:" not in prompt
         assert "Topic constraint:" not in prompt
-        assert "The active topic is:" not in prompt
 
     def test_forbidden_carryover_injected_on_topic_change(self):
         cfg = Config()
@@ -273,8 +278,9 @@ class TestBuildCompactPromptTopicAnchors:
             prompt = agent._build_compact_prompt(seed, [])
 
         assert "Do NOT reuse concepts from previous discussions" in prompt
-        # Autonomous systems anchors should appear as forbidden
-        for concept in TOPIC_ANCHORS["Autonomous systems"]:
+        # Only the first topic_anchor_max_forbidden_items (default 5) are included
+        limited_anchors = TOPIC_ANCHORS["Autonomous systems"][:cfg.topic_anchor_max_forbidden_items]
+        for concept in limited_anchors:
             assert (
                 concept in prompt
             ), f"Expected forbidden concept {concept!r} in prompt"
@@ -296,6 +302,19 @@ class TestBuildCompactPromptTopicAnchors:
             prompt = agent._build_compact_prompt(seed, [])
 
         assert "Do NOT reuse concepts from previous discussions" not in prompt
+
+    def test_topic_anchor_disabled_falls_back_to_legacy(self):
+        """When topic_anchor_enabled=False, the old 'Topic constraint:' format is used."""
+        cfg = Config()
+        cfg.topic_anchor_enabled = False
+        agent = _make_agent()
+        seed = "TOPIC: AI alignment\nDiscuss."
+        with patch.object(_meta, "CFG", cfg):
+            prompt = agent._build_compact_prompt(seed, [])
+
+        assert "Topic constraint:" in prompt
+        assert "The active topic is: AI alignment." in prompt
+        assert "TOPIC ANCHOR [STRICT]:" not in prompt
 
 
 # ---------------------------------------------------------------------------

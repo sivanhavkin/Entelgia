@@ -1742,6 +1742,40 @@ class Config:
     humanizer_remove_opening_scaffolds: bool = True
     humanizer_diversify_agent_voice: bool = True
     humanizer_min_score: float = 0.15
+    # ── Grammar Repair (Humanizer extension) ───────────────────────────────
+    humanizer_grammar_repair_enabled: bool = True
+    humanizer_repair_broken_openings: bool = True
+    # ── Topic Anchor (pre-generation) ──────────────────────────────────────
+    topic_anchor_enabled: bool = True
+    topic_anchor_include_forbidden_carryover: bool = True
+    topic_anchor_max_forbidden_items: int = 5
+    # ── Memory Topic Filter ────────────────────────────────────────────────
+    memory_topic_filter_enabled: bool = True
+    memory_topic_min_score: float = 0.45
+    memory_require_same_cluster: bool = True
+    memory_contamination_penalty: float = 0.25
+    # ── Self-Replication Topic Gate ────────────────────────────────────────
+    self_replication_topic_gate_enabled: bool = True
+    self_replication_topic_min_score: float = 0.50
+    self_replication_require_same_cluster: bool = True
+    # ── Fixy Role-Aware Compliance ─────────────────────────────────────────
+    fixy_role_aware_compliance: bool = True
+    fixy_must_name_topic_or_core_concept: bool = True
+    fixy_new_domain_penalty: float = 0.20
+    # ── Web Trigger Multi-Signal ───────────────────────────────────────────
+    web_trigger_require_multi_signal: bool = True
+    web_trigger_min_concepts: int = 2
+    web_trigger_require_uncertainty_or_evidence: bool = True
+    # ── Cluster Wallpaper Penalty ──────────────────────────────────────────
+    topic_specific_lexicon_bias_enabled: bool = True
+    cluster_wallpaper_penalty_enabled: bool = True
+    cluster_wallpaper_repeat_window: int = 6
+    # ── Observability / Debug Flags ────────────────────────────────────────
+    show_topic_anchor_debug: bool = False
+    show_memory_topic_filter_debug: bool = False
+    show_self_replication_topic_debug: bool = False
+    show_fixy_compliance_debug: bool = False
+    show_web_trigger_debug: bool = False
 
     def __post_init__(self):
         """Validate configuration and apply the debug logging level.

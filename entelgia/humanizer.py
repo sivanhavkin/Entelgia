@@ -1,7 +1,10 @@
 import re
 import random
+import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -16,6 +19,8 @@ class HumanizerConfig:
     randomness: float = 0.3
     seed: Optional[int] = None
     min_score: float = 0.15
+    grammar_repair_enabled: bool = True
+    repair_broken_openings: bool = True
 
 
 @dataclass
@@ -140,6 +145,19 @@ class TextHumanizer:
             flags.append("opening_rewrite")
         out = new_out
 
+        # ── Grammar repair pass (after scaffold removal) ─────────────────────
+        if self.config.grammar_repair_enabled:
+            new_out, repair_fixes = self._repair_grammar(out, agent_name)
+            if new_out != out:
+                flags.append("grammar_repair")
+                if repair_fixes:
+                    logger.info(
+                        "[HUMANIZER-REPAIR] agent=%s fixes=%r",
+                        agent_name or "unknown",
+                        repair_fixes[:5],
+                    )
+            out = new_out
+
         if self.config.split_long_sentences:
             new_out = self._split_sentences(out)
             if new_out != out:
@@ -254,3 +272,86 @@ class TextHumanizer:
         sentences[0] = first
 
         return " ".join(sentences)
+
+    # ── Grammar repair patterns ───────────────────────────────────────────
+
+    # Patterns that indicate a broken opening after scaffold removal.
+    # Key: compiled regex, Value: repair prefix to prepend.
+    _BROKEN_OPENING_PATTERNS: List = []
+
+    @staticmethod
+    def _build_broken_patterns() -> list:
+        """Build the list of (pattern, repair_prefix) tuples for broken openings."""
+        return [
+            # "consider how X" → "A useful angle is to consider how X"
+            (re.compile(r"^consider how\b", re.IGNORECASE),
+             "A useful angle is to consider how"),
+            # "consider X" at start → "Worth considering is X"
+            (re.compile(r"^consider\b", re.IGNORECASE),
+             "Worth considering:"),
+            # "notice X" at start → "What stands out is X"
+            (re.compile(r"^notice\b", re.IGNORECASE),
+             "What stands out is to notice"),
+            # "reflect on X" → "It helps to reflect on X"
+            (re.compile(r"^reflect on\b", re.IGNORECASE),
+             "It helps to reflect on"),
+            # lowercase letter at start of sentence (mid-thought continuation)
+            (re.compile(r"^[a-z]"),
+             None),  # special-case: capitalise first letter
+        ]
+
+    def _repair_grammar(self, text: str, agent_name: Optional[str] = None) -> tuple:
+        """Apply grammar-safety repairs to *text* after scaffold removal.
+
+        Returns (repaired_text, list_of_fix_descriptions).
+        """
+        if not self.config.repair_broken_openings:
+            return text, []
+
+        fixes: List[str] = []
+        sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+        repaired_sentences: List[str] = []
+
+        patterns = self._build_broken_patterns()
+
+        for i, sentence in enumerate(sentences):
+            sentence = sentence.strip()
+            if not sentence:
+                repaired_sentences.append(sentence)
+                continue
+
+            repaired = sentence
+            for pattern, prefix in patterns:
+                if pattern.match(repaired):
+                    if prefix is None:
+                        # Capitalise first letter
+                        repaired = repaired[0].upper() + repaired[1:]
+                        fixes.append(f"capitalised_opening[{i}]")
+                    else:
+                        # Remove the matched prefix and replace with the repair prefix
+                        matched = pattern.match(repaired)
+                        if matched:
+                            remainder = repaired[matched.end():].strip()
+                            if remainder:
+                                # Lower-case the continuation (it was mid-sentence)
+                                remainder = remainder[0].lower() + remainder[1:] if len(remainder) > 1 else remainder.lower()
+                            repaired = f"{prefix} {remainder}".strip()
+                            fixes.append(f"broken_opening[{i}]:{pattern.pattern[:30]}")
+                    break
+
+            # Fix duplicated spaces
+            cleaned = re.sub(r"  +", " ", repaired)
+            if cleaned != repaired:
+                fixes.append(f"dup_space[{i}]")
+                repaired = cleaned
+
+            # Fix malformed punctuation spacing (e.g. " ," → ",")
+            cleaned = re.sub(r"\s+([,;:!?])", r"\1", repaired)
+            if cleaned != repaired:
+                fixes.append(f"punct_space[{i}]")
+                repaired = cleaned
+
+            repaired_sentences.append(repaired)
+
+        result = " ".join(s for s in repaired_sentences if s)
+        return result, fixes
