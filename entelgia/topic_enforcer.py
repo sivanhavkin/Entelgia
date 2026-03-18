@@ -254,9 +254,16 @@ def compute_topic_compliance_score(
         cluster_hits = sum(1 for a in _cluster_anchors if a.lower() in text_lower)
         cluster_only_match = min(1.0, cluster_hits / max(1, len(_cluster_anchors)))
         # Penalise cluster-only drift: lower the score when topic is imprecise
-        # but cluster terms are present (wallpaper effect)
-        if cluster_only_match > 0.3 and topic_exactness < 0.2:
-            wallpaper_penalty = 0.10 * cluster_only_match
+        # but cluster terms are present (wallpaper effect).
+        # Thresholds:
+        #   0.3 = cluster_only_match minimum to trigger (avoid false positives)
+        #   0.2 = topic_exactness ceiling below which drift is flagged
+        #   0.10 = max wallpaper penalty multiplier (keeps total penalty modest)
+        _WALLPAPER_CLUSTER_MIN = 0.30
+        _WALLPAPER_TOPIC_MAX = 0.20
+        _WALLPAPER_PENALTY_MULTIPLIER = 0.10
+        if cluster_only_match > _WALLPAPER_CLUSTER_MIN and topic_exactness < _WALLPAPER_TOPIC_MAX:
+            wallpaper_penalty = _WALLPAPER_PENALTY_MULTIPLIER * cluster_only_match
             score = max(0.0, score - wallpaper_penalty)
 
     result = {

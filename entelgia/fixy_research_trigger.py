@@ -419,12 +419,13 @@ def fixy_should_search(
                 combined_texts.append(turn_text)
     combined_window = " ".join(combined_texts)
 
-    logger.debug(
-        "[WEB-TRIGGER-CHECK] combined_window_preview=%r require_multi_signal=%s min_concepts=%d",
-        combined_window[:200],
-        require_multi_signal,
-        min_concepts,
-    )
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "[WEB-TRIGGER-CHECK] combined_window_preview=%r require_multi_signal=%s min_concepts=%d",
+            combined_window[:200],
+            require_multi_signal,
+            min_concepts,
+        )
 
     # 1. High-priority: explicit trigger phrase in seed text (multi-word → bypass single-signal gate)
     logger.debug(
@@ -485,7 +486,8 @@ def fixy_should_search(
                 concept_count,
                 has_uncertainty,
             )
-            # Still check Fixy reason below before returning False
+            # Gate failed — execution falls through to step 3 (Fixy reason check)
+            # before returning False.
         else:
             # Gate passed — find the best trigger from combined window
             trigger = find_trigger(combined_window)

@@ -91,6 +91,21 @@ _INSTRUCTION_WORDS: FrozenSet[str] = frozenset(
         "disagree",
         "consider",
         "examine",
+        # Discourse / observation verbs that carry no search-concept value
+        "notice",
+        "notices",
+        "noticed",
+        "noticing",
+        "observe",
+        "observes",
+        "observed",
+        "observing",
+        "note",
+        "notes",
+        "focus",
+        "focuses",
+        "focused",
+        "focusing",
     }
 )
 
@@ -425,6 +440,15 @@ _REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
         "limiting",
         # Adverbial connectives with no concept value
         "thereby",
+        # State/continuation verbs that carry no concept value in queries
+        "remains",
+        "remain",
+        "remained",
+        "remaining",
+        "continues",
+        "continue",
+        "continued",
+        "continuing",
         # Weak semantic adverbs that reduce search quality
         "increasingly",
         "really",

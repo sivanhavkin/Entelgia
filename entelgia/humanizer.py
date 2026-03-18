@@ -334,7 +334,7 @@ class TextHumanizer:
                             remainder = repaired[matched.end():].strip()
                             if remainder:
                                 # Lower-case the continuation (it was mid-sentence)
-                                remainder = remainder[0].lower() + remainder[1:] if len(remainder) > 1 else remainder.lower()
+                                remainder = remainder[0].lower() + remainder[1:]
                             repaired = f"{prefix} {remainder}".strip()
                             fixes.append(f"broken_opening[{i}]:{pattern.pattern[:30]}")
                     break

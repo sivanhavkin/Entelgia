@@ -3902,6 +3902,10 @@ class Agent:
         if not memories:
             return memories
 
+        # Honour global disable flag — pass all memories through unchanged
+        if not CFG.memory_topic_filter_enabled:
+            return memories
+
         # Build recent dialogue term set for overlap scoring
         recent_dialog_terms: set = set()
 
@@ -4249,7 +4253,14 @@ class Agent:
                 _current_topic, _current_cluster, _topic_anchors, dialog_tail
             )
         elif _current_topic and _topic_anchors:
-            # Fallback: legacy-style anchor when feature flag is off
+            # Fallback: legacy-style anchor when topic_anchor_enabled=False.
+            # Note: the enhanced anchor block (topic_anchor_enabled=True) is preferred.
+            logger.debug(
+                "[TOPIC-ANCHOR-LEGACY] agent=%s topic=%r using legacy anchor format "
+                "(topic_anchor_enabled=False)",
+                self.name,
+                _current_topic,
+            )
             prompt += (
                 f"\n\nTopic constraint:\n"
                 f"The active topic is: {_current_topic}.\n"
@@ -4268,10 +4279,16 @@ class Agent:
                 f"Do NOT reuse concepts from previous discussions such as: "
                 f"{', '.join(forbidden)}.\n"
             )
+            logger.info(
+                "[TOPIC-ANCHOR-FORBID] agent=%s items=%r",
+                self.name,
+                forbidden,
+            )
             if CFG.show_topic_anchor_debug:
                 logger.debug(
-                    "[TOPIC-ANCHOR-FORBID] agent=%s items=%r",
+                    "[TOPIC-ANCHOR-FORBID-DEBUG] agent=%s prev_topic=%r items=%r",
                     self.name,
+                    _last_topic,
                     forbidden,
                 )
         elif _prev_anchors:
@@ -4279,6 +4296,11 @@ class Agent:
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
                 f"{', '.join(forbidden)}.\n"
+            )
+            logger.info(
+                "[TOPIC-ANCHOR-FORBID] agent=%s items=%r",
+                self.name,
+                forbidden,
             )
 
         # ── Cluster Wallpaper Penalty ───────────────────────────────────────
