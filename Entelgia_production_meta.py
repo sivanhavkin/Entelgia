@@ -2442,6 +2442,7 @@ class LLM:
                     "model": model,
                     "prompt": prompt,
                     "stream": False,
+                    "keep_alive": "30m",
                     "options": {"temperature": temperature},
                 }
                 r = requests.post(
