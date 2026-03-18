@@ -146,8 +146,9 @@ def ltm_search_affective(
 
 - **Status:** Explicitly labeled prototype ("Draft: Energy-Based Agent Regulation for Entelgia"). Defines `FixyRegulator` and `EntelgiaAgent` classes that closely duplicate content in `entelgia/energy_regulation.py`.
 - **Imports:** This file is **never imported** anywhere in the codebase.
+- **Code Duplication Risk:** Because `scripts/draft.py` and `entelgia/energy_regulation.py` define equivalent classes with no shared base, any logic change in production must be manually mirrored or the draft will diverge silently. This is a maintainability hazard regardless of whether the file is eventually integrated or discarded.
 - **Confidence:** MEDIUM — intentionally kept as draft, but all code paths are dead.
-- **Recommendation:** MANUAL REVIEW — either archive to a `/drafts` folder or formalize the integration it describes.
+- **Recommendation:** MANUAL REVIEW — either archive to a `/drafts` folder (or remove entirely) to eliminate the duplication risk, or formalize the integration it describes and remove the duplicate from production.
 
 ---
 
@@ -255,7 +256,7 @@ def _extract_topic_from_seed(seed: str) -> str:
 
 ---
 
-## Section 3 — LOW CONFIDENCE / Confirmed Alive (Indirect Use)
+## Section 3 — Confirmed Alive (Indirect Use)
 
 These symbols were investigated and confirmed alive through indirect use, optional code paths, or explicit test coverage:
 
@@ -280,9 +281,9 @@ These symbols were investigated and confirmed alive through indirect use, option
 | `entelgia/fixy_interactive.py` | ~256 | `import numpy as _np` (inside try block) | HIGH — `_np` never referenced |
 | `entelgia/circularity_guard.py` | ~56 | `import numpy as np  # noqa: F401` | MEDIUM — `np` never referenced; developer suppressed lint |
 
-### Minor Typing Import Cleanup (Low Severity)
+### Minor Typing Import Cleanup (Low Priority — Still Legitimate Cleanup)
 
-These may reflect Python version compatibility choices and are low priority:
+These may reflect Python version compatibility choices, but unused imports can confuse developers reading the module about which types are actually in use, and they may trigger linter warnings in CI/CD pipelines. They should be cleaned up even if not urgently:
 
 | File | Unused Import |
 |---|---|
@@ -384,7 +385,7 @@ TOPIC_STYLE: Dict[str, str] = { ... }
 
 11. Embedded `test_*` functions in production meta — intentional self-test pattern; consider migrating to `tests/` directory.
 12. `from __future__ import annotations` imports — harmless compatibility shims.
-13. Minor unused `typing` imports (`Tuple`, `List`, `Any`) — cosmetic cleanup only.
+13. Minor unused `typing` imports (`Tuple`, `List`, `Any`) — legitimate cleanup items; low priority but worth addressing to reduce developer confusion and avoid CI lint warnings.
 14. `import numpy as np  # noqa: F401` in `circularity_guard.py` — developer intentionally suppressed; verify before removing.
 
 ---
