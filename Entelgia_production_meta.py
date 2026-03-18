@@ -5019,32 +5019,6 @@ class Agent:
                         _active_topic,
                     )
 
-        emo, inten = self.emotion.infer(self.model, out)
-        # During Athena's limbic hijack, register emotion as anger so that
-        # drive updates correctly amplify the id-dominant state.
-        if self.name == "Athena" and self.limbic_hijack:
-            emo = "anger"
-            inten = max(float(inten), 0.8)
-        # When Socrates' superego critique fires, register emotion as fear (anxiety)
-        # so that drive updates correctly amplify the superego-dominant state.
-        # Safety: `_last_superego_rewrite` is reset to False at the top of every speak()
-        # call and only set True when evaluate_superego_critique returns should_apply=True,
-        # so this branch only runs for the specific agent instance whose critique fired.
-        elif self.name == "Socrates" and self._last_superego_rewrite:
-            emo = "fear"
-            inten = max(float(inten), 0.8)
-        kind = "reflective"
-        if self.limbic_hijack:
-            kind = "impulsive"
-        elif emo in ("anger", "frustration") or self.conflict_index() >= 8.5:
-            kind = "aggressive"
-        elif emo in ("fear", "anxiety"):
-            kind = "guilt"
-        self._last_emotion = emo
-        self._last_emotion_intensity = float(inten)
-        self._last_response_kind = kind
-        self.update_drives_after_turn(kind, emo, float(inten))
-
         m = re.search(r"\[LANG\s*=\s*([a-zA-Z\-]+)\]", out)
         if m:
             self.language.set(self.name, m.group(1))
@@ -5252,6 +5226,36 @@ class Agent:
                     self.name,
                     _h_exc,
                 )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Emotion inference (on final text, after all post-processing) ──────────
+        # Placed here so the cached result matches what store_turn() will use,
+        # avoiding a redundant blocking LLM call in store_turn() every turn.
+        emo, inten = self.emotion.infer(self.model, out)
+        # During Athena's limbic hijack, register emotion as anger so that
+        # drive updates correctly amplify the id-dominant state.
+        if self.name == "Athena" and self.limbic_hijack:
+            emo = "anger"
+            inten = max(float(inten), 0.8)
+        # When Socrates' superego critique fires, register emotion as fear (anxiety)
+        # so that drive updates correctly amplify the superego-dominant state.
+        # Safety: `_last_superego_rewrite` is reset to False at the top of every speak()
+        # call and only set True when evaluate_superego_critique returns should_apply=True,
+        # so this branch only runs for the specific agent instance whose critique fired.
+        elif self.name == "Socrates" and self._last_superego_rewrite:
+            emo = "fear"
+            inten = max(float(inten), 0.8)
+        kind = "reflective"
+        if self.limbic_hijack:
+            kind = "impulsive"
+        elif emo in ("anger", "frustration") or self.conflict_index() >= 8.5:
+            kind = "aggressive"
+        elif emo in ("fear", "anxiety"):
+            kind = "guilt"
+        self._last_emotion = emo
+        self._last_emotion_intensity = float(inten)
+        self._last_response_kind = kind
+        self.update_drives_after_turn(kind, emo, float(inten))
         # ─────────────────────────────────────────────────────────────────────────
 
         return out
