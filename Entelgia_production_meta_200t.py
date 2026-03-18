@@ -4707,16 +4707,26 @@ class Agent:
         # One regeneration attempt is made with a tighter stricter prompt; if
         # the second draft also fails the gate we proceed anyway (no infinite loop).
         if not output_passes_quality_gate(out):
+            # Collect the specific banned patterns that triggered the gate so
+            # the regeneration prompt can tell the LLM what to avoid.
+            _gate_hits = [
+                pat.pattern for pat in _QUALITY_GATE_PATTERNS
+                if pat.search(out.lower())
+            ]
             logger.info(
-                "[QUALITY-GATE] agent=%s draft failed quality gate — regenerating with stricter prompt",
+                "[QUALITY-GATE] agent=%s draft failed quality gate (hits=%r) — "
+                "regenerating with stricter prompt",
                 self.name,
+                _gate_hits[:3],
             )
             _strict_contract = _AGENT_BEHAVIORAL_CONTRACTS.get(self.name, "")
             _strict_prompt = (
                 f"{_strict_contract}\n\n"
                 f"{LLM_OUTPUT_CONTRACT}\n\n"
                 f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n\n"
-                f"Previous draft was too generic. Write a sharper, more specific response now.\n"
+                f"Previous draft was too generic. It contained banned patterns: "
+                f"{', '.join(_gate_hits[:3])}.\n"
+                f"Write a sharper, more specific response that avoids all of these.\n"
                 f"Respond in 3-4 sentences maximum.\n"
                 f"SEED: {seed}\n\nRespond now:\n"
             )

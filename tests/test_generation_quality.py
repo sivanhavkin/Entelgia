@@ -442,7 +442,8 @@ class TestContractVsStyleLabel:
         for adj in self._STYLE_ADJECTIVES:
             if adj in lower:
                 # Allowed if it appears in a "do NOT use" or prohibition context
-                if "not" not in lower[max(0, lower.index(adj) - 20):lower.index(adj)]:
+                idx = lower.index(adj)
+                if "not" not in lower[max(0, idx - 20):idx]:
                     return False
         return True
 

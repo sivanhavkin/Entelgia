@@ -343,7 +343,9 @@ class TextHumanizer:
                             # Grammar safety: only accept repair if it does not
                             # produce a fragment (fewer than 3 words) when the
                             # original had more words.
-                            if len(candidate.split()) >= 3 or len(sentence.split()) < 3:
+                            candidate_words = len(candidate.split())
+                            original_words = len(sentence.split())
+                            if candidate_words >= 3 or original_words < 3:
                                 repaired = candidate
                                 fixes.append(f"broken_opening[{i}]:{pattern.pattern[:30]}")
                             # else: skip this repair — keep the original sentence
@@ -372,7 +374,9 @@ class TextHumanizer:
         result = " ".join(s for s in repaired_sentences if s)
         # Final safety: if the result is shorter than half the original and the
         # original was not empty, return the original text unchanged.
-        if text.strip() and len(result.split()) < max(1, len(text.split()) // 2):
+        # min_words ensures we never use 0 as a threshold for very short inputs.
+        min_words = max(1, len(text.split()) // 2)
+        if text.strip() and len(result.split()) < min_words:
             logger.warning(
                 "[HUMANIZER-REPAIR] result too short after repair "
                 "(orig=%d words, repaired=%d words) — reverting to original",
