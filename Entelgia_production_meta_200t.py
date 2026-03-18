@@ -412,24 +412,26 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "'A recent thought', 'I ponder', or any variation of these phrases. "
     "Never begin your response with 'I am' followed by your own name. "
     "BANNED RHETORICAL TEMPLATES (never use these): "
-    "'we must consider', 'it is important to recognize', 'this raises questions about', "
-    "'let us examine', 'let us consider', 'in the context of', 'however it is crucial', "
+    "'we must consider', 'it is important to recognize', 'it is important', "
+    "'this raises questions about', "
+    "'let us examine', 'let us consider', \"let's consider\", 'in the context of', "
+    "'given the topic', 'however it is crucial', "
     "'one assumption that often goes unexamined', 'one might argue', 'it can be argued', "
     "'in other words', 'in conclusion', 'to summarize', 'it is worth noting', "
     "'needless to say', 'an alternative perspective', 'underlying assumptions'."
 )
 
 # Hard output contract injected before generation for all agents.
-# Each response must contain one concrete claim + one supporting reason.
+# Each response must contain one concrete claim + one specific mechanism or reason.
 # Maximum 2-3 sentences. No broad preamble. No generic framing sentence.
 # Responses must read as natural prose — no visible section labels or numbers.
 LLM_OUTPUT_CONTRACT = (
     "OUTPUT CONTRACT: Structure your response internally as:\n"
     "  - One concrete claim (specific, not abstract).\n"
-    "  - One supporting reason or mechanism (not a feeling or vague statement).\n"
+    "  - One specific mechanism or reason (not a feeling or vague statement).\n"
     "  - Optionally one implication or pointed question.\n"
     "Write as natural flowing prose. Do NOT output numbered sections or visible labels "
-    "such as 'Claim:', 'Supporting Reason:', '1.', '2.', '3.'. "
+    "such as 'Claim:', 'Mechanism:', '1.', '2.', '3.'. "
     "Maximum 2-3 sentences. No broad preamble. No generic framing opener."
 )
 
@@ -437,7 +439,7 @@ LLM_OUTPUT_CONTRACT = (
 # These define output logic and allowed moves, not tone or style labels.
 LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "SOCRATES CONTRACT:\n"
-    "- Attack ONE hidden assumption. Name it explicitly.\n"
+    "- Attack ONE implicit assumption. Name it explicitly.\n"
     "- Make ONE sharp objection — not a survey of options.\n"
     "- Ask at most ONE pointed question.\n"
     "- Do NOT write explanations or lectures.\n"
@@ -2155,23 +2157,23 @@ def _strip_scaffold_labels(text: str) -> str:
     """Strip leaked output-contract labels from agent response.
 
     The LLM is instructed not to emit numbered sections or labels such as
-    'Claim:', 'Supporting Reason:', '1.', '2.', '3.', but occasionally
+    'Claim:', 'Mechanism:', '1.', '2.', '3.', but occasionally
     leaks them anyway.  This function removes such markers while preserving
     the underlying content.
     """
     # Strip numbered markers optionally followed by a label, e.g.:
     #   "1. Claim: Brain plasticity..." → "Brain plasticity..."
-    #   "2. Supporting Reason: This enables..." → "This enables..."
+    #   "2. Mechanism: This enables..." → "This enables..."
     #   "1. Brain plasticity..." → "Brain plasticity..."
     text = re.sub(
         r"(?m)^\s*\d+\.\s*"
-        r"(?:(?:Claim|Supporting\s+Reason(?:\s+or\s+Mechanism)?|Implication|Question)\s*:\s*)?",
+        r"(?:(?:Claim|Supporting\s+Reason(?:\s+or\s+Mechanism)?|Mechanism|Implication|Question)\s*:\s*)?",
         "",
         text,
     )
-    # Strip bare label prefixes at line start, e.g. "Claim: ...", "Supporting Reason: ..."
+    # Strip bare label prefixes at line start, e.g. "Claim: ...", "Mechanism: ..."
     text = re.sub(
-        r"(?mi)^\s*(?:Claim|Supporting\s+Reason(?:\s+or\s+Mechanism)?|Implication|Question)\s*:\s*",
+        r"(?mi)^\s*(?:Claim|Supporting\s+Reason(?:\s+or\s+Mechanism)?|Mechanism|Implication|Question)\s*:\s*",
         "",
         text,
     )

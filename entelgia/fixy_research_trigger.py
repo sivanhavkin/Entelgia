@@ -143,11 +143,13 @@ _TRIGGER_KEYWORDS: frozenset = frozenset(
 _PHRASE_SCORE: int = 3
 _KEYWORD_SCORE: int = 1
 
-# Academic and concept-bearing keywords that carry extra weight (+1) when found
+# Academic and concept-bearing keywords that carry extra weight (+1) when found.
+# These represent genuinely epistemic/academic concepts (not generic sourcing terms).
 _HIGH_VALUE_KEYWORDS: frozenset = frozenset(
     {
         "research",
         "study",
+        "studies",
         "paper",
         "arxiv",
         "journal",
@@ -199,6 +201,12 @@ _WEAK_TRIGGER_WORDS: frozenset = frozenset(
 # Computed once at module load to avoid repeated set-difference at call time.
 _STRONG_TRIGGER_KEYWORDS: frozenset = _TRIGGER_KEYWORDS - _WEAK_TRIGGER_WORDS
 
+# Effective set of high-value keywords after removing weak/non-conceptual entries.
+# Used for quality-based concept counting in the multi-signal gate.
+# Excludes entries also in _WEAK_TRIGGER_WORDS (e.g. "truth", "reasoning", "bias")
+# that are too generic to justify a search on their own.
+_HIGH_VALUE_EFFECTIVE: frozenset = _HIGH_VALUE_KEYWORDS - _WEAK_TRIGGER_WORDS
+
 # ---------------------------------------------------------------------------
 # Multi-signal detection helpers
 # ---------------------------------------------------------------------------
@@ -231,6 +239,30 @@ def _count_strong_trigger_hits(text: str) -> int:
     for m in re.finditer(r"\b[a-zA-Z\-]+\b", text_lower):
         word = m.group()
         if word in _STRONG_TRIGGER_KEYWORDS and word not in seen:
+            hits += 1
+            seen.add(word)
+    return hits
+
+
+def _count_quality_concept_hits(text: str) -> int:
+    """Count distinct high-quality concept hits in *text*.
+
+    Only trigger phrases and keywords from ``_HIGH_VALUE_EFFECTIVE`` (genuinely
+    epistemic/academic terms) count toward the quality threshold.  Generic
+    sourcing terms (e.g. ``evidence``, ``source``) and rhetorical framing words
+    are excluded so that the multi-signal gate fires only on real conceptual
+    content, not on count alone.
+    """
+    text_lower = text.lower()
+    hits = 0
+    seen: set = set()
+    for phrase in _TRIGGER_PHRASES:
+        if phrase in text_lower and phrase not in seen:
+            hits += 1
+            seen.add(phrase)
+    for m in re.finditer(r"\b[a-zA-Z\-]+\b", text_lower):
+        word = m.group()
+        if word in _HIGH_VALUE_EFFECTIVE and word not in seen:
             hits += 1
             seen.add(word)
     return hits
@@ -463,17 +495,22 @@ def fixy_should_search(
     # 2. Multi-signal gate across combined window
     if require_multi_signal:
         concept_count = _count_strong_trigger_hits(combined_window)
+        quality_concept_count = _count_quality_concept_hits(combined_window)
         has_uncertainty = _has_uncertainty_or_evidence_signal(combined_window)
 
         logger.debug(
-            "[WEB-TRIGGER-CHECK] concept_count=%d has_uncertainty=%s min_concepts=%d",
+            "[WEB-TRIGGER-CHECK] concept_count=%d quality_count=%d has_uncertainty=%s min_concepts=%d",
             concept_count,
+            quality_concept_count,
             has_uncertainty,
             min_concepts,
         )
 
-        # Fire if enough distinct concepts, or one strong concept + uncertainty
-        multi_ok = concept_count >= min_concepts
+        # Fire if enough distinct concepts with at least one quality concept,
+        # or one strong concept co-occurs with an uncertainty/evidence signal.
+        # quality_concept_count >= 1 ensures the trigger is based on real
+        # epistemic content (not just generic sourcing terms or rhetorical phrases).
+        multi_ok = concept_count >= min_concepts and quality_concept_count >= 1
         uncertainty_ok = require_uncertainty_or_evidence and has_uncertainty and concept_count >= 1
 
         if not (multi_ok or uncertainty_ok):

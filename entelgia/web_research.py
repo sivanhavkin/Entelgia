@@ -470,6 +470,11 @@ _REWRITE_FILLER_WORDS: FrozenSet[str] = frozenset(
         "analysis",
         "synthesis",
         "deconstruction",
+        # Rhetorical framing words that leak from output-contract templates into queries
+        "topic",
+        "let",
+        "hidden",
+        "supporting",
         # Comparatives, quantifiers, and determiners with no search value
         "more",
         "less",

@@ -221,6 +221,49 @@ class TestFixyResearchTrigger:
             for m in caplog.messages
         )
 
+    def test_quality_concept_required_for_multi_ok(self):
+        # Two generic sourcing terms without a quality concept should NOT fire
+        # via the multi_ok path — only via the uncertainty path (uncertainty signal
+        # fires separately, so this tests the multi_ok quality gate in isolation).
+        from entelgia.fixy_research_trigger import (
+            _count_quality_concept_hits,
+            _count_strong_trigger_hits,
+        )
+        text = "evidence source reference"
+        assert _count_strong_trigger_hits(text) >= 2
+        assert _count_quality_concept_hits(text) == 0
+
+    def test_generic_sourcing_terms_fire_via_uncertainty_not_multi_ok(self):
+        # "evidence source" has uncertainty signal but no quality concept.
+        # It fires via uncertainty_ok, NOT via multi_ok (quality gate blocks it).
+        # This integration test confirms the multi_ok quality requirement.
+        from entelgia.fixy_research_trigger import (
+            _count_quality_concept_hits,
+            _count_strong_trigger_hits,
+            _has_uncertainty_or_evidence_signal,
+        )
+        text = "evidence source for this claim"
+        concept_count = _count_strong_trigger_hits(text)
+        quality_count = _count_quality_concept_hits(text)
+        has_uncertainty = _has_uncertainty_or_evidence_signal(text)
+        # multi_ok requires quality_count >= 1 AND concept_count >= 2
+        multi_ok = concept_count >= 2 and quality_count >= 1
+        # uncertainty_ok fires when has_uncertainty AND concept_count >= 1
+        uncertainty_ok = has_uncertainty and concept_count >= 1
+        assert not multi_ok, "Generic sourcing terms should not pass quality gate"
+        assert uncertainty_ok, "Should still fire via uncertainty signal path"
+
+    def test_high_value_keyword_qualifies_as_quality_concept(self):
+        from entelgia.fixy_research_trigger import _count_quality_concept_hits
+
+        assert _count_quality_concept_hits("research on epistemology") >= 2
+        assert _count_quality_concept_hits("arxiv journal paper") >= 3
+
+    def test_studies_is_high_value_keyword(self):
+        from entelgia.fixy_research_trigger import _count_quality_concept_hits
+
+        assert _count_quality_concept_hits("AI studies were published") >= 1
+
 
 # ---------------------------------------------------------------------------
 # fixy_research_trigger.find_trigger
@@ -1086,6 +1129,38 @@ class TestRewriteQueryQuality:
         # Concept terms must be retained.
         assert "freedom" in result.lower()
         assert "autonomy" in result.lower() or "knowledge" in result.lower()
+
+    def test_rhetorical_framing_words_excluded(self):
+        # "topic", "let", "hidden", "supporting" must be filtered from queries.
+        from entelgia.web_research import rewrite_search_query
+
+        text = (
+            "Let us explore the topic of truth through epistemology."
+            " What hidden assumption are we supporting here?"
+        )
+        trigger = "epistemology"
+        result = rewrite_search_query(text, trigger)
+        # Rhetorical framing words must not appear in the query.
+        words = result.lower().split()
+        assert "let" not in words, f'"let" should not be in query: {result!r}'
+        assert "topic" not in words, f'"topic" should not be in query: {result!r}'
+        assert "hidden" not in words, f'"hidden" should not be in query: {result!r}'
+        assert "supporting" not in words, f'"supporting" should not be in query: {result!r}'
+        # The actual concept must still be present.
+        assert "epistemology" in result.lower()
+
+    def test_concept_quality_preserved(self):
+        # With rhetorical words removed, genuine concepts survive.
+        from entelgia.web_research import rewrite_search_query
+
+        text = "Subjective experience and objective truth expose the limits of epistemology."
+        trigger = "epistemology"
+        result = rewrite_search_query(text, trigger)
+        assert "epistemology" in result.lower()
+        assert any(
+            term in result.lower()
+            for term in ["subjective", "objective", "truth", "experience"]
+        )
 
 
 class TestStoreExternalKnowledge:
