@@ -34,12 +34,12 @@ TOPIC_STYLE: Dict[str, str] = {
     "technology": "analytical, concrete, system-oriented",
     "economics": "pragmatic, causal, incentive-based",
     "biology": "scientific, explanatory, mechanism-focused",
-    "psychology": "reflective, behavioral, example-driven",
+    "psychology": "behavioral, example-driven, analytical",
     "society": "sociological, institutional, real-world",
     "ethics_social": "normative, case-based, real-world",
     "practical_dilemmas": "case-based, scenario-driven",
     "practical": "case-based, scenario-driven",
-    "identity": "reflective, behavioral, example-driven",
+    "identity": "behavioral, example-driven, analytical",
     "biological": "scientific, explanatory, mechanism-focused",
     "philosophy": "conceptual and reflective",
 }
@@ -157,7 +157,7 @@ TOPIC_TONE_POLICY: Dict[str, Dict] = {
         "response_mode": "decision_support",
     },
     "philosophy": {
-        "allowed_registers": ["dialectical", "reflective", "socratic"],
+        "allowed_registers": ["dialectical", "socratic", "analytical"],
         "forbidden_registers": [],
         "forbidden_phrases": [],
         "preferred_cues": [
@@ -204,7 +204,7 @@ TOPIC_TONE_POLICY: Dict[str, Dict] = {
         "response_mode": "decision_support",
     },
     "identity": {
-        "allowed_registers": ["reflective", "behavioral", "explanatory"],
+        "allowed_registers": ["behavioral", "explanatory", "analytical"],
         "forbidden_registers": ["theatrical", "overly abstract"],
         "forbidden_phrases": [
             "my dear friend",

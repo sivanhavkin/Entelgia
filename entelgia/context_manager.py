@@ -26,8 +26,10 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "'A recent thought', 'I ponder', or any variation of these phrases. "
     "Never begin your response with 'I am' followed by your own name. "
     "BANNED RHETORICAL TEMPLATES (never use these): "
-    "'we must consider', 'it is important to recognize', 'this raises questions about', "
-    "'let us examine', 'let us consider', 'in the context of', 'however it is crucial', "
+    "'we must consider', 'it is important to recognize', 'it is important', "
+    "'this raises questions about', "
+    "'let us examine', 'let us consider', \"let's consider\", 'in the context of', "
+    "'given the topic', 'however it is crucial', "
     "'one assumption that often goes unexamined', 'one might argue', 'it can be argued', "
     "'in other words', 'in conclusion', 'to summarize', 'it is worth noting', "
     "'needless to say', 'an alternative perspective', 'underlying assumptions'."
@@ -37,10 +39,10 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
 LLM_OUTPUT_CONTRACT = (
     "OUTPUT CONTRACT: Structure your response internally as:\n"
     "  - One concrete claim (specific, not abstract).\n"
-    "  - One supporting reason or mechanism (not a feeling or vague statement).\n"
+    "  - One specific mechanism or reason (not a feeling or vague statement).\n"
     "  - Optionally one implication or pointed question.\n"
     "Write as natural flowing prose. Do NOT output numbered sections or visible labels "
-    "such as 'Claim:', 'Supporting Reason:', '1.', '2.', '3.'. "
+    "such as 'Claim:', 'Mechanism:', '1.', '2.', '3.'. "
     "Maximum 2-3 sentences. No broad preamble. No generic framing opener."
 )
 
@@ -49,7 +51,7 @@ LLM_OUTPUT_CONTRACT = (
 _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
     "Socrates": (
         "SOCRATES CONTRACT:\n"
-        "- Attack ONE hidden assumption. Name it explicitly.\n"
+        "- Attack ONE implicit assumption. Name it explicitly.\n"
         "- Make ONE sharp objection — not a survey of options.\n"
         "- Ask at most ONE pointed question.\n"
         "- Do NOT write explanations or lectures.\n"

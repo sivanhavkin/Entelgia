@@ -259,6 +259,44 @@ class TestStripScaffoldLabels:
         result = _strip_scaffold_labels(text)
         assert result == "Neuroplasticity depends on repeated stimulation."
 
+    def test_strips_mechanism_label(self):
+        # "Mechanism:" is the new output-contract label — must be stripped too
+        text = "Mechanism: Synaptic pruning strengthens used pathways."
+        result = _strip_scaffold_labels(text)
+        assert result == "Synaptic pruning strengthens used pathways."
+
+    def test_strips_numbered_mechanism_label(self):
+        text = "2. Mechanism: This is why learning is possible."
+        result = _strip_scaffold_labels(text)
+        assert result == "This is why learning is possible."
+
+
+# ---------------------------------------------------------------------------
+# 3c. Output contract — no "supporting reason" template phrase
+# ---------------------------------------------------------------------------
+
+
+class TestOutputContractPhraseCleanliness:
+    """Ensure LLM_OUTPUT_CONTRACT does not teach template phrases that leak."""
+
+    def test_output_contract_has_no_supporting_reason(self):
+        assert "supporting reason" not in LLM_OUTPUT_CONTRACT.lower()
+
+    def test_output_contract_uses_mechanism_label(self):
+        assert "mechanism" in LLM_OUTPUT_CONTRACT.lower()
+
+    def test_forbidden_phrases_bans_given_the_topic(self):
+        lower = CM_FORBIDDEN.lower()
+        assert "given the topic" in lower
+
+    def test_forbidden_phrases_bans_lets_consider(self):
+        lower = CM_FORBIDDEN.lower()
+        assert "let's consider" in lower
+
+    def test_forbidden_phrases_bans_it_is_important(self):
+        lower = CM_FORBIDDEN.lower()
+        assert "it is important" in lower
+
 
 # ---------------------------------------------------------------------------
 # 4. Per-agent behavioral contracts — structural distinctness
