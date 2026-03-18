@@ -303,6 +303,10 @@ class TextHumanizer:
     def _repair_grammar(self, text: str, agent_name: Optional[str] = None) -> tuple:
         """Apply grammar-safety repairs to *text* after scaffold removal.
 
+        Safety rule: never return repaired text that is less grammatical than
+        the original.  If the repair confidence drops below the original
+        confidence, the original sentence is kept.
+
         Returns (repaired_text, list_of_fix_descriptions).
         """
         if not self.config.repair_broken_openings:
@@ -335,8 +339,14 @@ class TextHumanizer:
                             if remainder:
                                 # Lower-case the continuation (it was mid-sentence)
                                 remainder = remainder[0].lower() + remainder[1:]
-                            repaired = f"{prefix} {remainder}".strip()
-                            fixes.append(f"broken_opening[{i}]:{pattern.pattern[:30]}")
+                            candidate = f"{prefix} {remainder}".strip()
+                            # Grammar safety: only accept repair if it does not
+                            # produce a fragment (fewer than 3 words) when the
+                            # original had more words.
+                            if len(candidate.split()) >= 3 or len(sentence.split()) < 3:
+                                repaired = candidate
+                                fixes.append(f"broken_opening[{i}]:{pattern.pattern[:30]}")
+                            # else: skip this repair — keep the original sentence
                     break
 
             # Fix duplicated spaces
@@ -351,7 +361,23 @@ class TextHumanizer:
                 fixes.append(f"punct_space[{i}]")
                 repaired = cleaned
 
+            # Grammar safety: if the repaired sentence is now empty or a bare
+            # punctuation artifact, fall back to the original sentence.
+            if not repaired.strip() or repaired.strip() in ".!?,;:":
+                repaired = sentence
+                fixes.append(f"safety_fallback[{i}]")
+
             repaired_sentences.append(repaired)
 
         result = " ".join(s for s in repaired_sentences if s)
+        # Final safety: if the result is shorter than half the original and the
+        # original was not empty, return the original text unchanged.
+        if text.strip() and len(result.split()) < max(1, len(text.split()) // 2):
+            logger.warning(
+                "[HUMANIZER-REPAIR] result too short after repair "
+                "(orig=%d words, repaired=%d words) — reverting to original",
+                len(text.split()),
+                len(result.split()),
+            )
+            return text, fixes + ["length_safety_revert"]
         return result, fixes

@@ -24,8 +24,58 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "or 'Our conversations reveal'. "
     "FORBIDDEN OPENERS: Never begin your response with 'Recent thought', "
     "'A recent thought', 'I ponder', or any variation of these phrases. "
-    "Never begin your response with 'I am' followed by your own name."
+    "Never begin your response with 'I am' followed by your own name. "
+    "BANNED RHETORICAL TEMPLATES (never use these): "
+    "'we must consider', 'it is important to recognize', 'this raises questions about', "
+    "'let us examine', 'let us consider', 'in the context of', 'however it is crucial', "
+    "'one assumption that often goes unexamined', 'one might argue', 'it can be argued', "
+    "'in other words', 'in conclusion', 'to summarize', 'it is worth noting', "
+    "'needless to say', 'an alternative perspective', 'underlying assumptions'."
 )
+
+# Hard output contract — injected before generation for all agents
+LLM_OUTPUT_CONTRACT = (
+    "OUTPUT CONTRACT: Your response must contain exactly:\n"
+    "  1. One concrete claim (specific, not abstract).\n"
+    "  2. One supporting reason or mechanism (not a feeling or vague statement).\n"
+    "  3. Optionally one implication or pointed question.\n"
+    "Maximum 3-4 sentences total. No broad preamble. No generic framing opener."
+)
+
+# Per-agent behavioral contracts — define output logic and allowed moves,
+# not tone or style labels.
+_AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
+    "Socrates": (
+        "SOCRATES CONTRACT:\n"
+        "- Attack ONE hidden assumption. Name it explicitly.\n"
+        "- Make ONE sharp objection — not a survey of options.\n"
+        "- Ask at most ONE pointed question.\n"
+        "- Do NOT write explanations or lectures.\n"
+        "- Do NOT use: 'let us consider', 'we must examine', 'it is important', "
+        "'one might argue', 'this raises questions about', 'in the context of'.\n"
+        "- Specify the mechanism or tension you are targeting."
+    ),
+    "Athena": (
+        "ATHENA CONTRACT:\n"
+        "- Construct ONE clear model or distinction. Not a list.\n"
+        "- Define your key terms with a specific mechanism or causal chain.\n"
+        "- Do NOT use: 'balance', 'integrate', 'holistic', 'nuanced', 'multifaceted', "
+        "'furthermore', 'moreover', 'in addition', 'it is worth noting'.\n"
+        "- State the specific design tradeoff or structural tension your model reveals."
+    ),
+    "Fixy": (
+        "FIXY CONTRACT:\n"
+        "- Diagnose conversation STRUCTURE only — not the topic itself.\n"
+        "- Use this format:\n"
+        "  Problem: [structural failure occurring]\n"
+        "  Missing: [what has not been addressed]\n"
+        "  Suggestion: [one concrete redirection]\n"
+        "- Do NOT philosophize or lecture.\n"
+        "- Do NOT use: 'it is important', 'we must consider', 'one might argue', "
+        "'let us examine', 'in the context of'.\n"
+        "- Maximum 3 lines total."
+    ),
+}
 
 # ── Memory leakage guard ────────────────────────────────────────────────────
 # These sets enumerate every LTM / STM field that is *internal* to the
@@ -315,6 +365,11 @@ class ContextManager:
         prompt += (
             f"FORBIDDEN OPENER: Never begin your response with 'I am {agent_name}'.\n"
         )
+        # Inject hard output contract and agent-specific behavioral contract
+        prompt += f"\n{LLM_OUTPUT_CONTRACT}\n"
+        _agent_contract = _AGENT_BEHAVIORAL_CONTRACTS.get(agent_name, "")
+        if _agent_contract:
+            prompt += f"\n{_agent_contract}\n"
         prompt += f"{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"

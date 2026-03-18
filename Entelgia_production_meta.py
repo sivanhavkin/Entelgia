@@ -367,14 +367,106 @@ FORBIDDEN_STARTERS = [
     "i ponder",
 ]
 
+# Rhetorical scaffolding phrases banned at generation time.
+# These produce generic academic prose and must not appear in agent output.
+BANNED_RHETORICAL_TEMPLATES = [
+    "we must consider",
+    "it is important to recognize",
+    "it is important to note",
+    "it is worth noting",
+    "it is worth considering",
+    "this raises questions about",
+    "let us examine",
+    "let us consider",
+    "in the context of",
+    "however, it is crucial",
+    "one assumption that often goes unexamined",
+    "one might argue",
+    "it can be argued",
+    "it should be noted",
+    "needless to say",
+    "it is essential to",
+    "it is imperative to",
+    "in other words",
+    "in conclusion",
+    "to summarize",
+    "as we can see",
+    "in examining",
+    "in considering",
+    "in reflecting on",
+    "it becomes clear that",
+    "an alternative perspective",
+    "underlying assumptions",
+    "prevailing notion",
+]
+
 # LLM instruction to avoid forbidden meta-commentary phrases and opening patterns
 LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "FORBIDDEN PHRASES: Never use 'In our dialogue', 'We learn', "
     "or 'Our conversations reveal'. "
     "FORBIDDEN OPENERS: Never begin your response with 'Recent thought', "
     "'A recent thought', 'I ponder', or any variation of these phrases. "
-    "Never begin your response with 'I am' followed by your own name."
+    "Never begin your response with 'I am' followed by your own name. "
+    "BANNED RHETORICAL TEMPLATES (never use these): "
+    "'we must consider', 'it is important to recognize', 'this raises questions about', "
+    "'let us examine', 'let us consider', 'in the context of', 'however it is crucial', "
+    "'one assumption that often goes unexamined', 'one might argue', 'it can be argued', "
+    "'in other words', 'in conclusion', 'to summarize', 'it is worth noting', "
+    "'needless to say', 'an alternative perspective', 'underlying assumptions'."
 )
+
+# Hard output contract injected before generation for all agents.
+# Each response must contain one concrete claim + one supporting reason.
+# Maximum 3-4 sentences. No broad preamble. No generic framing sentence.
+LLM_OUTPUT_CONTRACT = (
+    "OUTPUT CONTRACT: Your response must contain exactly:\n"
+    "  1. One concrete claim (specific, not abstract).\n"
+    "  2. One supporting reason or mechanism (not a feeling or vague statement).\n"
+    "  3. Optionally one implication or pointed question.\n"
+    "Maximum 3-4 sentences total. No broad preamble. No generic framing opener."
+)
+
+# Per-agent behavioral contracts injected at generation time.
+# These define output logic and allowed moves, not tone or style labels.
+LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
+    "SOCRATES CONTRACT:\n"
+    "- Attack ONE hidden assumption. Name it explicitly.\n"
+    "- Make ONE sharp objection — not a survey of options.\n"
+    "- Ask at most ONE pointed question.\n"
+    "- Do NOT write explanations or lectures.\n"
+    "- Do NOT use: 'let us consider', 'we must examine', 'it is important', "
+    "'one might argue', 'this raises questions about', 'in the context of'.\n"
+    "- Specify the mechanism or tension you are targeting."
+)
+
+LLM_BEHAVIORAL_CONTRACT_ATHENA = (
+    "ATHENA CONTRACT:\n"
+    "- Construct ONE clear model or distinction. Not a list.\n"
+    "- Define your key terms with a specific mechanism or causal chain.\n"
+    "- Do NOT use: 'balance', 'integrate', 'holistic', 'nuanced', 'multifaceted', "
+    "'furthermore', 'moreover', 'in addition', 'it is worth noting'.\n"
+    "- State the specific design tradeoff or structural tension your model reveals."
+)
+
+LLM_BEHAVIORAL_CONTRACT_FIXY = (
+    "FIXY CONTRACT:\n"
+    "- Diagnose conversation STRUCTURE only — not the topic itself.\n"
+    "- Use this format:\n"
+    "  Problem: [structural failure occurring]\n"
+    "  Missing: [what has not been addressed]\n"
+    "  Suggestion: [one concrete redirection]\n"
+    "- Do NOT philosophize or lecture.\n"
+    "- Do NOT use: 'it is important', 'we must consider', 'one might argue', "
+    "'let us examine', 'in the context of'.\n"
+    "- Maximum 3 lines total."
+)
+
+# Map agent name → behavioral contract string
+_AGENT_BEHAVIORAL_CONTRACTS: dict = {
+    "Socrates": LLM_BEHAVIORAL_CONTRACT_SOCRATES,
+    "Athena": LLM_BEHAVIORAL_CONTRACT_ATHENA,
+    "Fixy": LLM_BEHAVIORAL_CONTRACT_FIXY,
+}
 
 # Initial energy for all agents (restored after each dream cycle)
 AGENT_INITIAL_ENERGY: float = 100.0
@@ -2374,6 +2466,68 @@ def _is_question_resolved(text: str) -> bool:
     )
 
 
+# ── Quality gate: detect generic academic scaffolding before final output ─────
+
+# Compiled patterns used by the quality gate.  A response that matches
+# _QUALITY_GATE_THRESHOLD or more of these is flagged as generic/LLM-like.
+_QUALITY_GATE_PATTERNS: List[re.Pattern] = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"\bwe must consider\b",
+        r"\bit is important to recognize\b",
+        r"\bit is important to note\b",
+        r"\bthis raises questions about\b",
+        r"\blet us (?:examine|consider|explore|reflect)\b",
+        r"\bin the context of\b",
+        r"\bhowever[,\s]+it is crucial\b",
+        r"\bone assumption that often goes unexamined\b",
+        r"\bone might argue\b",
+        r"\bit can be argued\b",
+        r"\bit is worth (?:noting|considering|reflecting)\b",
+        r"\bin (?:conclusion|summary|other words)\b",
+        r"\bto summarize\b",
+        r"\ban alternative perspective\b",
+        r"\bunderlying assumptions\b",
+        r"\bprevailing notion\b",
+        r"\bit is (?:crucial|essential|imperative) to\b",
+        r"\bit should be noted\b",
+        r"\bneedless to say\b",
+    ]
+]
+
+# Number of pattern hits at or above which a response is considered generic
+_QUALITY_GATE_THRESHOLD: int = 2
+
+# Abstract nouns that signal low-specificity output when used without
+# a concrete mechanism in the same sentence
+_LOW_SPECIFICITY_NOUNS: frozenset = frozenset(
+    {"complexity", "values", "society", "systems", "dynamics", "factors", "aspects"}
+)
+
+
+def output_passes_quality_gate(text: str) -> bool:
+    """Return True if *text* passes the generation quality gate.
+
+    Flags output as low-quality when it contains two or more banned rhetorical
+    scaffolding patterns.  The caller may then choose to regenerate rather than
+    post-process the draft.
+
+    This gate operates at generation time — it is not a post-processing cleaner.
+
+    Args:
+        text: Raw or lightly validated agent output.
+
+    Returns:
+        True  → output is acceptable (proceed normally).
+        False → output is generic / scaffolded (consider regenerating).
+    """
+    if not text or len(text.split()) < _MIN_WORDS_FOR_REVISION:
+        return True  # too short to gate — pass through
+    lower = text.lower()
+    hits = sum(1 for pat in _QUALITY_GATE_PATTERNS if pat.search(lower))
+    return hits < _QUALITY_GATE_THRESHOLD
+
+
 # ============================================
 # PRIVACY / REDACTION
 # ============================================
@@ -4318,6 +4472,11 @@ class Agent:
         # Inject topic-aware style instruction when set
         if self.topic_style:
             prompt += f"\nSTYLE INSTRUCTION: {self.topic_style}\n"
+        # Inject hard output contract and agent-specific behavioral contract
+        prompt += f"\n{LLM_OUTPUT_CONTRACT}\n"
+        _agent_contract = _AGENT_BEHAVIORAL_CONTRACTS.get(self.name, "")
+        if _agent_contract:
+            prompt += f"\n{_agent_contract}\n"
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
@@ -4562,6 +4721,43 @@ class Agent:
             )
             if len(_parts) > 1:
                 out = _parts[0].strip()
+
+        # ── Quality gate: regenerate once if draft is generic/scaffolded ──────
+        # The gate fires before superego critique and topic enforcement so that
+        # later passes never need to rescue a fundamentally bland first draft.
+        # One regeneration attempt is made with a tighter stricter prompt; if
+        # the second draft also fails the gate we proceed anyway (no infinite loop).
+        if not output_passes_quality_gate(out):
+            logger.info(
+                "[QUALITY-GATE] agent=%s draft failed quality gate — regenerating with stricter prompt",
+                self.name,
+            )
+            _strict_contract = _AGENT_BEHAVIORAL_CONTRACTS.get(self.name, "")
+            _strict_prompt = (
+                f"{_strict_contract}\n\n"
+                f"{LLM_OUTPUT_CONTRACT}\n\n"
+                f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n\n"
+                f"Previous draft was too generic. Write a sharper, more specific response now.\n"
+                f"Respond in 3-4 sentences maximum.\n"
+                f"SEED: {seed}\n\nRespond now:\n"
+            )
+            _regen = validate_output(
+                self.llm.generate(
+                    self.model, _strict_prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            if output_passes_quality_gate(_regen):
+                out = _regen
+                logger.info(
+                    "[QUALITY-GATE] agent=%s regenerated draft passed quality gate",
+                    self.name,
+                )
+            else:
+                logger.info(
+                    "[QUALITY-GATE] agent=%s regenerated draft also failed gate — keeping original",
+                    self.name,
+                )
 
         # Superego → second-pass critique (internal governor)
         # When Socrates' superego is at extreme high (>= 8.5), tighten the critique
