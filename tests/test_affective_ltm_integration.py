@@ -59,6 +59,7 @@ def _make_agent(cfg_overrides=None):
         "affective_emotion_weight": 0.4,
         "affective_ltm_limit": 3,
         "affective_ltm_min_score": 0.2,
+        "show_affective_ltm_debug": False,
         "show_pronoun": False,
         "web_research_enabled": False,
         "web_research_max_results": 3,
@@ -406,6 +407,50 @@ class TestAffectiveLTMLogging:
         assert "retrieved=" in log_msg
         assert "used=" in log_msg
 
+    def test_log_includes_avg_score_and_dedup_counts(self, caplog):
+        """[AFFECTIVE-LTM] log line includes avg_score, id_skipped, content_skipped."""
+        agent, memory, cfg = _make_agent()
+        memory.ltm_search_affective.return_value = [
+            _make_memory(10, "High emotion memory.", importance=0.6,
+                          emotion_intensity=0.8)
+        ]
+
+        with caplog.at_level(logging.INFO):
+            agent._build_compact_prompt("What is virtue?", [])
+
+        affective_logs = [
+            r for r in caplog.records if "[AFFECTIVE-LTM]" in r.getMessage()
+        ]
+        assert len(affective_logs) >= 1
+        log_msg = affective_logs[0].getMessage()
+        assert "avg_score=" in log_msg
+        assert "id_skipped=" in log_msg
+        assert "content_skipped=" in log_msg
+
+    def test_log_dedup_counts_reflect_skips(self, caplog):
+        """id_skipped and content_skipped are non-zero when dedup filters run."""
+        agent, memory, cfg = _make_agent()
+        # recent_ltm already has id=1 and content "dup content"
+        memory.ltm_recent.return_value = [
+            _make_memory(1, "dup content", importance=0.3, emotion_intensity=0.2)
+        ]
+        memory.ltm_search_affective.return_value = [
+            _make_memory(1, "dup content", importance=0.9, emotion_intensity=0.9),  # id+content dup
+            _make_memory(2, "dup content", importance=0.9, emotion_intensity=0.9),  # content dup
+            _make_memory(3, "fresh memory.", importance=0.9, emotion_intensity=0.9),  # passes
+        ]
+
+        with caplog.at_level(logging.INFO):
+            agent._build_compact_prompt("What is virtue?", [])
+
+        affective_logs = [
+            r for r in caplog.records if "[AFFECTIVE-LTM]" in r.getMessage()
+        ]
+        assert len(affective_logs) >= 1
+        log_msg = affective_logs[0].getMessage()
+        assert "id_skipped=1" in log_msg
+        assert "content_skipped=1" in log_msg
+
     def test_no_affective_log_when_disabled(self, caplog):
         """No AFFECTIVE-LTM log line when use_affective_ltm=False."""
         agent, memory, cfg = _make_agent({"use_affective_ltm": False})
@@ -420,6 +465,108 @@ class TestAffectiveLTMLogging:
             r for r in caplog.records if "[AFFECTIVE-LTM]" in r.getMessage()
         ]
         assert len(affective_logs) == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: debug mode (show_affective_ltm_debug=True)
+# ---------------------------------------------------------------------------
+
+
+class TestAffectiveLTMDebugMode:
+    """Debug mode emits per-memory detail log lines; does not crash."""
+
+    def test_debug_mode_does_not_crash(self, caplog):
+        """Enabling show_affective_ltm_debug=True must not raise any exception."""
+        agent, memory, cfg = _make_agent({"show_affective_ltm_debug": True})
+        memory.ltm_search_affective.return_value = [
+            _make_memory(10, "A memorable moment of grief.", importance=0.7,
+                          emotion_intensity=0.85),
+            _make_memory(11, "Second vivid memory.", importance=0.6,
+                          emotion_intensity=0.75),
+        ]
+
+        # Must complete without raising
+        with caplog.at_level(logging.DEBUG):
+            result = agent._build_compact_prompt("What is suffering?", [])
+
+        assert isinstance(result, str)
+        assert "PERSONA:" in result
+
+    def test_debug_mode_emits_detail_lines(self, caplog):
+        """When debug enabled, AFFECTIVE-LTM-DETAIL lines are emitted per used memory."""
+        agent, memory, cfg = _make_agent({"show_affective_ltm_debug": True})
+        memory.ltm_search_affective.return_value = [
+            _make_memory(10, "Grief memory.", importance=0.7, emotion_intensity=0.85),
+        ]
+
+        with caplog.at_level(logging.DEBUG):
+            agent._build_compact_prompt("What is suffering?", [])
+
+        detail_logs = [
+            r for r in caplog.records if "[AFFECTIVE-LTM-DETAIL]" in r.getMessage()
+        ]
+        assert len(detail_logs) >= 1
+        detail_msg = detail_logs[0].getMessage()
+        assert "id=" in detail_msg
+        assert "emotion=" in detail_msg
+        assert "emotion_intensity=" in detail_msg
+        assert "importance=" in detail_msg
+        assert "score=" in detail_msg
+        assert "content=" in detail_msg
+
+    def test_debug_mode_content_preview_capped_at_80_chars(self, caplog):
+        """Content preview in debug output must not exceed 80 characters."""
+        long_content = "X" * 200
+        agent, memory, cfg = _make_agent({"show_affective_ltm_debug": True})
+        memory.ltm_search_affective.return_value = [
+            _make_memory(10, long_content, importance=0.8, emotion_intensity=0.9),
+        ]
+
+        with caplog.at_level(logging.DEBUG):
+            agent._build_compact_prompt("What is memory?", [])
+
+        detail_logs = [
+            r for r in caplog.records if "[AFFECTIVE-LTM-DETAIL]" in r.getMessage()
+        ]
+        assert len(detail_logs) >= 1
+        # The repr of the 80-char preview will be at most 82 chars (quotes included)
+        # but the actual content slice must be ≤80 chars
+        msg = detail_logs[0].getMessage()
+        # Extract the content= value: it appears as content='XXXX...' or content="XXXX..."
+        assert "X" * 81 not in msg  # preview must be truncated
+
+    def test_no_debug_lines_when_debug_disabled(self, caplog):
+        """No AFFECTIVE-LTM-DETAIL lines when show_affective_ltm_debug=False."""
+        agent, memory, cfg = _make_agent({"show_affective_ltm_debug": False})
+        memory.ltm_search_affective.return_value = [
+            _make_memory(10, "Memory content.", importance=0.7, emotion_intensity=0.8),
+        ]
+
+        with caplog.at_level(logging.DEBUG):
+            agent._build_compact_prompt("What is truth?", [])
+
+        detail_logs = [
+            r for r in caplog.records if "[AFFECTIVE-LTM-DETAIL]" in r.getMessage()
+        ]
+        assert len(detail_logs) == 0
+
+    def test_debug_mode_empty_supplement_no_detail_lines(self, caplog):
+        """No detail lines when supplement is empty (score too low)."""
+        agent, memory, cfg = _make_agent(
+            {"show_affective_ltm_debug": True, "affective_ltm_min_score": 0.99}
+        )
+        memory.ltm_search_affective.return_value = [
+            _make_memory(10, "Low score memory.", importance=0.01,
+                          emotion_intensity=0.01),
+        ]
+
+        with caplog.at_level(logging.DEBUG):
+            agent._build_compact_prompt("What is justice?", [])
+
+        detail_logs = [
+            r for r in caplog.records if "[AFFECTIVE-LTM-DETAIL]" in r.getMessage()
+        ]
+        assert len(detail_logs) == 0
 
 
 if __name__ == "__main__":
