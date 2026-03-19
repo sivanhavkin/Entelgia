@@ -100,10 +100,17 @@ import hmac
 import datetime as dt
 import logging
 import asyncio
+import signal
+import threading
+import concurrent.futures
 from dataclasses import dataclass, asdict, field
 from typing import Any, Dict, List, Optional, Tuple
 from collections import OrderedDict
 from pathlib import Path
+
+# Module-level event that is set when a graceful shutdown is requested (Ctrl+C).
+# Used by LLM.generate() to interrupt blocking HTTP calls within ~0.5 seconds.
+_shutdown_event = threading.Event()
 
 import requests
 from colorama import Fore, Style, init as colorama_init
@@ -2714,6 +2721,9 @@ class LLM:
         self.cfg = cfg
         self.metrics = metrics
         self.cache = LRUCache(max_size=cfg.cache_size)
+        # Single-worker thread pool reused across all generate() calls so that
+        # blocking requests.post() calls can be interrupted via _shutdown_event.
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         logger.info(f"LLM initialized: {cfg.ollama_url}")
 
     def generate(
@@ -2732,6 +2742,8 @@ class LLM:
         self.metrics.record_cache_miss()
 
         for attempt in range(self.cfg.llm_max_retries):
+            if _shutdown_event.is_set():
+                raise KeyboardInterrupt()
             try:
                 start_time = time.time()
                 payload = {
@@ -2741,11 +2753,26 @@ class LLM:
                     "keep_alive": "30m",
                     "options": {"temperature": temperature},
                 }
-                r = requests.post(
+                # Run the blocking HTTP request in a daemon thread so that
+                # Ctrl+C (SIGINT) can interrupt it within ~0.5 seconds.
+                _future = self._executor.submit(
+                    requests.post,
                     self.cfg.ollama_url,
                     json=payload,
                     timeout=(10, self.cfg.llm_timeout),
                 )
+                try:
+                    while True:
+                        try:
+                            r = _future.result(timeout=0.5)
+                            break
+                        except concurrent.futures.TimeoutError:
+                            if _shutdown_event.is_set():
+                                _future.cancel()
+                                raise KeyboardInterrupt()
+                except:
+                    _future.cancel()
+                    raise
                 r.raise_for_status()
                 data = r.json()
                 result = (data.get("response") or "").strip()
@@ -2759,19 +2786,26 @@ class LLM:
 
                 return result
 
+            except KeyboardInterrupt:
+                raise
+
             except requests.Timeout:
                 logger.warning(
                     f"LLM Timeout (attempt {attempt + 1}/{self.cfg.llm_max_retries})"
                 )
                 self.metrics.record_llm_call(0, success=False)
                 if attempt < self.cfg.llm_max_retries - 1:
-                    time.sleep(2**attempt)
+                    _shutdown_event.wait(timeout=2**attempt)
+                    if _shutdown_event.is_set():
+                        raise KeyboardInterrupt()
 
             except Exception as e:
                 logger.error(f"LLM Error: {e}")
                 self.metrics.record_llm_call(0, success=False)
                 if attempt < self.cfg.llm_max_retries - 1:
-                    time.sleep(2**attempt)
+                    _shutdown_event.wait(timeout=2**attempt)
+                    if _shutdown_event.is_set():
+                        raise KeyboardInterrupt()
 
         logger.error(f"LLM failed after {self.cfg.llm_max_retries} retries")
         return ""
@@ -6391,6 +6425,24 @@ class MainScript:
 
     def run(self):
         """Main execution loop (timeout configurable in minutes)."""
+        # Install a SIGINT handler so Ctrl+C interrupts blocking LLM calls
+        # within ~0.5 s rather than waiting up to llm_timeout seconds.
+        _shutdown_event.clear()
+        _prev_sigint = signal.getsignal(signal.SIGINT)
+
+        def _handle_sigint(signum, frame):
+            _shutdown_event.set()
+            # Restore the previous handler so a second Ctrl+C exits immediately.
+            signal.signal(signal.SIGINT, _prev_sigint)
+
+        signal.signal(signal.SIGINT, _handle_sigint)
+        try:
+            self._run_loop()
+        finally:
+            signal.signal(signal.SIGINT, _prev_sigint)
+
+    def _run_loop(self):
+        """Inner execution loop (called from run())."""
         # Reset module-level search/cooldown state so that a new session always
         # starts with a clean slate, regardless of how many sessions have already
         # run in the same Python process.
@@ -6469,6 +6521,8 @@ class MainScript:
         logger.info(f"Starting session {self.session_id} with {_log_timeout} timeout")
 
         while time.time() - self.start_time < timeout_seconds:
+            if _shutdown_event.is_set():
+                raise KeyboardInterrupt()
             self.turn_index += 1
 
             # ── v2.9.0: Loop guard — run detection before each turn ──────────
