@@ -105,7 +105,7 @@ import threading
 import concurrent.futures
 from dataclasses import dataclass, asdict, field
 from typing import Any, Dict, List, Optional, Tuple
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from pathlib import Path
 
 # Module-level event that is set when a graceful shutdown is requested (Ctrl+C).
@@ -166,8 +166,9 @@ except ImportError:
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
 
     # Fallback stubs for topic_enforcer when enhanced modules are unavailable.
-    _TOPIC_ACCEPT_THRESHOLD = 0.70
-    _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.50
+    # Fallback stubs for topic_enforcer when enhanced modules are unavailable.
+    _TOPIC_ACCEPT_THRESHOLD = 0.60
+    _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.40
 
     def compute_topic_compliance_score(  # type: ignore[no-redef]
         text,
@@ -481,21 +482,25 @@ LLM_OUTPUT_CONTRACT = (
 # Per-agent behavioral contracts injected at generation time.
 # These define output logic and allowed moves, not tone or style labels.
 LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
-    "SOCRATES CONTRACT:\n"
-    "- Choose ONE move: blunt challenge, sharp question, or direct claim — do not blend all three.\n"
-    "- Do NOT follow a fixed three-step formula. Each response should pick a single attack angle.\n"
+    "SOCRATES ROLE GOAL: Expose a weak assumption, contradiction, or hidden dependency.\n"
+    "Allowed forms (vary each turn): direct statement | short critique | pointed question | contrast | concrete example.\n"
+    "Not required: question every turn | 'challenge' framing every turn.\n"
     "- Do NOT write explanations or lectures.\n"
     "- Ask at most ONE pointed question per response.\n"
     "- Do NOT use: 'let us consider', 'we must examine', 'it is important', "
     "'one might argue', 'this raises questions about', 'in the context of', "
     "'one implicit assumption', 'the mechanism at play', 'this notion overlooks'.\n"
+    "- Do NOT begin with 'Blunt challenge:' or any fixed signature prefix.\n"
     "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
 )
 
 LLM_BEHAVIORAL_CONTRACT_ATHENA = (
-    "ATHENA CONTRACT:\n"
+    "ATHENA ROLE GOAL: Clarify structure, make a distinction, or articulate a mechanism.\n"
+    "Allowed forms (vary each turn): sharp claim | contrast | model | concrete example | narrowing statement.\n"
+    "Not required: balanced synthesis every turn | harmony language | 'both sides' framing.\n"
     "- State ONE clear distinction, tension, or observation — not a list.\n"
     "- Start directly with the idea. Do NOT announce that you have a model or framework.\n"
+    "- Commit to a position: prefer definitive phrasing over 'appears', 'often', 'may'.\n"
     "- Do NOT use: 'my model posits', 'this model reveals', 'my model reveals', "
     "'overlooks a critical', 'overlooks a constraint', 'reveals a tradeoff', "
     "'reveals an ethical tension', 'leading to tension'.\n"
@@ -505,7 +510,9 @@ LLM_BEHAVIORAL_CONTRACT_ATHENA = (
 )
 
 LLM_BEHAVIORAL_CONTRACT_FIXY = (
-    "FIXY CONTRACT:\n"
+    "FIXY ROLE GOAL: Improve dialogue movement.\n"
+    "Allowed forms (vary each turn): structural diagnosis | concise redirect | conflict summary | deadlock naming | missing-variable identification.\n"
+    "Not required: mediation phrasing every turn | 'Shift focus to' framing.\n"
     "- Diagnose conversation STRUCTURE only — not the topic itself.\n"
     "- Use this format:\n"
     "  Problem: [structural failure occurring]\n"
@@ -513,8 +520,8 @@ LLM_BEHAVIORAL_CONTRACT_FIXY = (
     "  Suggestion: [one concrete redirection]\n"
     "- Do NOT philosophize or lecture.\n"
     "- Do NOT use: 'it is important', 'we must consider', 'one might argue', "
-    "'let us examine', 'in the context of'.\n"
-    "- Maximum 3 lines total."
+    "'let us examine', 'in the context of', 'Shift focus to'.\n"
+    "- Maximum 2 sentences total. No sermonizing."
 )
 
 # Map agent name → behavioral contract string
@@ -2553,16 +2560,16 @@ def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
 # Per-agent identity instructions injected into the Stage 2 transformation prompt.
 _FINAL_STAGE_PERSONA_NOTES: Dict[str, str] = {
     "Socrates": (
-        "You are Socrates. You probe and challenge. "
-        "Pick ONE move: blunt challenge, sharp question, or direct claim."
+        "You are Socrates. Your goal is to expose a weak assumption, contradiction, or hidden dependency. "
+        "Vary your form: use direct statement, critique, question, contrast, or example — not always a question."
     ),
     "Athena": (
-        "You are Athena. You synthesize and connect. "
-        "State one clear observation or distinction directly."
+        "You are Athena. Your goal is to clarify structure, make a distinction, or articulate a mechanism. "
+        "Commit to a position: avoid 'appears', 'often', 'may'. Prefer definitive, incisive phrasing."
     ),
     "Fixy": (
-        "You are Fixy. You diagnose conversation structure and redirect. "
-        "Be direct and concrete, not philosophical."
+        "You are Fixy. Your goal is to improve dialogue movement. "
+        "Diagnose the structural problem. Be direct and concrete — no mediation clichés."
     ),
 }
 
@@ -2574,6 +2581,7 @@ def transform_draft_to_final(
     model: str,
     topic: str = "",
     temperature: float = 0.7,
+    recent_forms: Optional[List[str]] = None,
 ) -> str:
     """Stage 2 of the DRAFT → FINAL two-stage generation pipeline.
 
@@ -2590,16 +2598,19 @@ def transform_draft_to_final(
     5. No meta phrases — forbidden: 'my model', 'this suggests', 'it is important',
        'we must consider', 'one might argue', 'it is worth noting'.
     6. Identity preservation — agent role (Socrates / Athena / Fixy) is kept.
+    7. Form variation — if recent_forms shows the same form used ≥2 times, the
+       final output must use a different rhetorical form.
 
     Pipeline: LLM → draft_text → transform_draft_to_final() → final_output
 
     Args:
-        draft_text:  Post-processed agent draft (not yet shown to user).
-        agent_name:  Name of the speaking agent.
-        llm:         LLM backend with a ``generate(model, prompt, ...)`` method.
-        model:       Model identifier string.
-        topic:       Active dialogue topic (optional context).
-        temperature: Sampling temperature for the Stage 2 call.
+        draft_text:   Post-processed agent draft (not yet shown to user).
+        agent_name:   Name of the speaking agent.
+        llm:          LLM backend with a ``generate(model, prompt, ...)`` method.
+        model:        Model identifier string.
+        topic:        Active dialogue topic (optional context).
+        temperature:  Sampling temperature for the Stage 2 call.
+        recent_forms: Last 1–3 rhetorical forms used by this agent (oldest first).
 
     Returns:
         Transformed final response, or *draft_text* unchanged on any error or
@@ -2611,6 +2622,33 @@ def transform_draft_to_final(
     persona_note = _FINAL_STAGE_PERSONA_NOTES.get(agent_name, f"You are {agent_name}.")
     topic_line = f"Dialogue topic: {topic}\n\n" if topic else ""
 
+    # Detect form lock-in: if the last 2 forms are the same, force a different form
+    form_instruction = ""
+    if recent_forms and len(recent_forms) >= 2:
+        last_two = recent_forms[-2:]
+        if last_two[0] == last_two[1]:
+            locked_form = last_two[0]
+            if locked_form == "question":
+                form_instruction = (
+                    "FORM RULE: The draft is a question. "
+                    "The final output MUST be a statement or critique instead — NOT a question.\n"
+                )
+            elif locked_form in ("synthesis", "balanced_synthesis_openers"):
+                form_instruction = (
+                    "FORM RULE: The draft uses balanced synthesis. "
+                    "The final output MUST make a sharp, committed claim or concrete distinction instead.\n"
+                )
+            elif locked_form in ("directive", "mediation_openers"):
+                form_instruction = (
+                    "FORM RULE: The draft uses a mediation directive. "
+                    "The final output MUST diagnose structurally or summarize the conflict without 'Shift focus to'.\n"
+                )
+            elif locked_form == "challenge":
+                form_instruction = (
+                    "FORM RULE: The draft uses a challenge opener. "
+                    "The final output MUST use a statement, contrast, or example instead.\n"
+                )
+
     transform_prompt = (
         f"FINAL STAGE REWRITE\n\n"
         f"{topic_line}"
@@ -2621,8 +2659,9 @@ def transform_draft_to_final(
         f"3. Do NOT reuse any sentence or phrase from the draft.\n"
         f"4. Do NOT preserve the same sentence structure.\n"
         f"5. Do NOT use connectors: 'furthermore', 'moreover', 'in addition', "
-        f"'in conclusion', 'needless to say'.\n\n"
-        f"OUTPUT RULES:\n"
+        f"'in conclusion', 'needless to say'.\n"
+        f"{form_instruction}"
+        f"\nOUTPUT RULES:\n"
         f"- 1 to 3 sentences maximum.\n"
         f"- At least one sentence must be short and direct.\n"
         f"- Forbidden phrases: 'my model', 'this suggests', 'it is important', "
@@ -2734,6 +2773,187 @@ def output_passes_quality_gate(text: str) -> bool:
     lower = text.lower()
     hits = sum(1 for pat in _QUALITY_GATE_PATTERNS if pat.search(lower))
     return hits < _QUALITY_GATE_THRESHOLD
+
+
+# ── Anti-repetition form control ─────────────────────────────────────────────
+# Tracks the rhetorical form of each agent response so that the same form
+# cannot be used more than 2 turns in a row.  Form classification is done
+# after each generation and the result is stored in the per-agent deque.
+
+# Ordered priority: checked top-to-bottom; first match wins.
+_FORM_CLASSIFY_RULES: List[Tuple[str, re.Pattern]] = [
+    ("question", re.compile(r"\?", re.IGNORECASE)),
+    (
+        "challenge",
+        re.compile(
+            r"\b(blunt challenge|you assume|that assumes|your premise|"
+            r"premise fails|fails once|treating \S+ as if|wrong)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "example",
+        re.compile(
+            r"\b(for example|consider|for instance|such as|imagine|take the case)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "definition",
+        re.compile(
+            r"\b(define|definition|means|is defined|what we call|what is)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "synthesis",
+        re.compile(
+            r"\b(both|integrate|synthesis|balance between|holistic|combined)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "critique",
+        re.compile(
+            r"\b(fail|weak|insufficient|problem with|flaw|overlooks|misses|ignores)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "contrast",
+        re.compile(
+            r"\b(however|whereas|unlike|rather than|instead of|yet|although|but)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "directive",
+        re.compile(
+            r"\b(shift|redirect|focus|should|must|need to|let us|move|consider instead)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    ("statement", re.compile(r".*", re.IGNORECASE)),  # fallback
+]
+
+
+def classify_response_form(text: str) -> str:
+    """Classify the primary rhetorical form of *text*.
+
+    Returns one of: question | challenge | example | definition | synthesis |
+    critique | contrast | directive | statement (fallback).
+    """
+    stripped = text.strip()
+    if not stripped:
+        return "statement"
+    for form_name, pattern in _FORM_CLASSIFY_RULES:
+        if pattern.search(stripped):
+            return form_name
+    return "statement"
+
+
+# Template families — groups of repeated opener patterns that, when used
+# consecutively, signal rhetorical lock-in.
+_TEMPLATE_FAMILIES: Dict[str, List[re.Pattern]] = {
+    "challenge_openers": [
+        re.compile(r"^blunt challenge\s*:", re.IGNORECASE),
+        re.compile(r"^do you truly\b", re.IGNORECASE),
+        re.compile(r"^can you truly\b", re.IGNORECASE),
+        re.compile(r"^how can (?:you|we) truly\b", re.IGNORECASE),
+    ],
+    "balanced_synthesis_openers": [
+        re.compile(r"^the balance between\b", re.IGNORECASE),
+        re.compile(r"^truth and knowledge\b", re.IGNORECASE),
+        re.compile(r"^identity hinges on\b", re.IGNORECASE),
+        re.compile(
+            r"^(freedom|truth|knowledge|identity|ethics)\s+(often|always|can|may|is|shapes)\b",
+            re.IGNORECASE,
+        ),
+    ],
+    "mediation_openers": [
+        re.compile(r"^shift focus to\b", re.IGNORECASE),
+        re.compile(r"^the ongoing debate\b", re.IGNORECASE),
+        re.compile(r"^(both|this) (?:debate|discussion|argument) misses\b", re.IGNORECASE),
+    ],
+    "abstract_generalization_openers": [
+        re.compile(r"^my model posits\b", re.IGNORECASE),
+        re.compile(r"^(my position is|my view is)\b", re.IGNORECASE),
+    ],
+}
+
+_TEMPLATE_FAMILY_REPEAT_LIMIT: int = 2
+
+
+def _detect_template_family(text: str) -> Optional[str]:
+    """Return the template family name matched in *text*, or None."""
+    stripped = text.strip()
+    for family_name, patterns in _TEMPLATE_FAMILIES.items():
+        for pat in patterns:
+            if pat.search(stripped):
+                return family_name
+    return None
+
+
+# Abstract nouns that signal generic philosophical wallpaper when used without
+# a mechanism, example, or concrete dependency in the same response.
+_ABSTRACT_NOUNS_RE: re.Pattern = re.compile(
+    r"\b(?:freedom|truth|knowledge|identity|ethics|responsibility|"
+    r"norms|society|autonomy|justice|consciousness|meaning)\b",
+    re.IGNORECASE,
+)
+
+_MECHANISM_PATTERNS: re.Pattern = re.compile(
+    r"\b(because|since|when|if|unless|causes|leads to|results in|"
+    r"for example|such as|consider|imagine|specifically|"
+    r"mechanism|depends on|requires|breaks down|fails when)\b",
+    re.IGNORECASE,
+)
+
+_ABSTRACTION_PENALTY_NOUN_THRESHOLD: int = 3
+
+
+def _check_abstraction_penalty(text: str) -> bool:
+    """Return True if *text* is generic philosophical wallpaper."""
+    if not text:
+        return False
+    abstract_count = len(_ABSTRACT_NOUNS_RE.findall(text))
+    if abstract_count < _ABSTRACTION_PENALTY_NOUN_THRESHOLD:
+        return False
+    return not bool(_MECHANISM_PATTERNS.search(text))
+
+
+# ── Variation modes per agent ────────────────────────────────────────────────
+_VARIATION_MODES: Dict[str, List[str]] = {
+    "Socrates": ["skeptical", "diagnostic", "confrontational", "austere", "example-driven"],
+    "Athena": ["analytical", "incisive", "model-building", "contrastive", "compressive"],
+    "Fixy": ["mediator", "debugger", "deadlock-breaker", "reframer", "structural observer"],
+}
+
+_VARIATION_MODE_INSTRUCTIONS: Dict[str, Dict[str, str]] = {
+    "Socrates": {
+        "skeptical": "Be genuinely skeptical: doubt the premise itself, not just its wording.",
+        "diagnostic": "Diagnose the hidden assumption: name it directly and plainly.",
+        "confrontational": "Confront the weakness head-on: state what is wrong without softening.",
+        "austere": "Be austere: one short, hard statement. No hedging.",
+        "example-driven": "Use one concrete example or analogy to expose the failure.",
+    },
+    "Athena": {
+        "analytical": "Analyze the structure: show how the parts relate to each other.",
+        "incisive": "Make one sharp, committed claim. Do not hedge or qualify.",
+        "model-building": "Build a small model: define a term and state the key relationship.",
+        "contrastive": "Draw a clear contrast: what this is versus what it is not.",
+        "compressive": "Compress the insight: say as much as possible in one sentence.",
+    },
+    "Fixy": {
+        "mediator": "Identify exactly what is blocking resolution and name it precisely.",
+        "debugger": "Debug the conversation: locate where the argument went wrong.",
+        "deadlock-breaker": "Name the deadlock: what neither side will concede.",
+        "reframer": "Reframe the question: what should they actually be arguing about?",
+        "structural observer": "Observe from outside: what structural pattern is playing out?",
+    },
+}
+
+_VARIATION_MODE_MAX_CONSECUTIVE: int = 2
 
 
 # ============================================
@@ -3838,6 +4058,13 @@ class Agent:
         # Raw draft storage — populated each turn for debug logging only;
         # never stored in long-term memory.
         self._last_raw_draft: str = ""
+        # ── Anti-repetition form tracking ─────────────────────────────────────
+        self._last_response_forms: deque = deque(maxlen=3)
+        self._last_template_families: deque = deque(maxlen=3)
+        # ── Variation mode per agent ───────────────────────────────────────────
+        _modes = _VARIATION_MODES.get(name, ["default"])
+        self._variation_mode: str = _modes[0]
+        self._variation_mode_turns: int = 0
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -4866,6 +5093,73 @@ class Agent:
                 "\nBe concise. Avoid long exposition. Prefer 1 key claim + 1 sharp question.\nRespond now:\n",
             )
 
+        # ── Anti-repetition: ban overused rhetorical forms ────────────────────
+        _recent_forms_list = list(self._last_response_forms)
+        if len(_recent_forms_list) >= 2 and _recent_forms_list[-1] == _recent_forms_list[-2]:
+            _locked_form = _recent_forms_list[-1]
+            if _locked_form == "question":
+                _form_ban = (
+                    "FORM RULE: You have asked questions two turns in a row. "
+                    "This turn you MUST use a statement, critique, or contrast — NOT a question."
+                )
+            elif _locked_form == "synthesis":
+                _form_ban = (
+                    "FORM RULE: You have used balanced synthesis two turns in a row. "
+                    "This turn you MUST make a sharp committed claim, concrete example, or clear distinction."
+                )
+            elif _locked_form == "directive":
+                _form_ban = (
+                    "FORM RULE: You have used mediation directives two turns in a row. "
+                    "This turn you MUST diagnose structurally or name the deadlock — do NOT use 'Shift focus to'."
+                )
+            elif _locked_form == "challenge":
+                _form_ban = (
+                    "FORM RULE: You have used a challenge opener two turns in a row. "
+                    "This turn you MUST use a statement, contrast, or example instead."
+                )
+            else:
+                _form_ban = (
+                    f"FORM RULE: You have used '{_locked_form}' form two turns in a row. "
+                    "This turn you MUST use a clearly different rhetorical approach."
+                )
+            prompt = prompt.replace(
+                "\nRespond now:\n", f"\n{_form_ban}\nRespond now:\n"
+            )
+            logger.debug(
+                "[FORM] agent=%s locked_form=%s recent=%s — injecting form ban",
+                self.name,
+                _locked_form,
+                _recent_forms_list,
+            )
+
+        # ── Variation mode injection ──────────────────────────────────────────
+        _agent_modes = _VARIATION_MODES.get(self.name, [])
+        if _agent_modes:
+            if self._variation_mode_turns >= _VARIATION_MODE_MAX_CONSECUTIVE:
+                _curr_idx = (
+                    _agent_modes.index(self._variation_mode)
+                    if self._variation_mode in _agent_modes
+                    else -1
+                )
+                _next_idx = (_curr_idx + 1) % len(_agent_modes)
+                self._variation_mode = _agent_modes[_next_idx]
+                self._variation_mode_turns = 0
+            _mode_instr = _VARIATION_MODE_INSTRUCTIONS.get(self.name, {}).get(
+                self._variation_mode, ""
+            )
+            if _mode_instr:
+                prompt = prompt.replace(
+                    "\nRespond now:\n",
+                    f"\nVARIATION MODE ({self._variation_mode}): {_mode_instr}\nRespond now:\n",
+                )
+            logger.debug(
+                "[VARIATION-MODE] agent=%s mode=%s turns_in_mode=%d",
+                self.name,
+                self._variation_mode,
+                self._variation_mode_turns,
+            )
+        # ─────────────────────────────────────────────────────────────────────
+
         # Drives → temperature (cognition control); conflict raises volatility
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
@@ -5385,7 +5679,104 @@ class Agent:
                 self.model,
                 topic=_active_topic or "",
                 temperature=temperature,
+                recent_forms=list(self._last_response_forms),
             )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Abstract noun penalty gate ────────────────────────────────────────────
+        if _check_abstraction_penalty(out) and not _skip_draft_transform:
+            logger.info(
+                "[ABSTRACTION-PENALTY] agent=%s — generic abstraction detected, regenerating",
+                self.name,
+            )
+            _abs_prompt = (
+                f"{_AGENT_BEHAVIORAL_CONTRACTS.get(self.name, '')}\n\n"
+                f"{LLM_OUTPUT_CONTRACT}\n\n"
+                f"Previous response was too abstract. It used general philosophical terms "
+                f"without a concrete mechanism, example, or dependency.\n"
+                f"Rewrite with at least one specific mechanism or concrete example.\n"
+                f"SEED: {seed}\n\nRespond now:\n"
+            )
+            _abs_raw = validate_output(
+                self.llm.generate(
+                    self.model, _abs_prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            if not _check_abstraction_penalty(_abs_raw):
+                out = _abs_raw
+                logger.info(
+                    "[ABSTRACTION-PENALTY] agent=%s — regenerated draft passed abstraction check",
+                    self.name,
+                )
+            else:
+                logger.info(
+                    "[ABSTRACTION-PENALTY] agent=%s — regenerated draft also abstract — keeping original",
+                    self.name,
+                )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Template family gate ──────────────────────────────────────────────────
+        _current_family = _detect_template_family(out)
+        _family_history = list(self._last_template_families)
+        _family_repeat_count = 0
+        if _current_family and _family_history:
+            for _fam in reversed(_family_history):
+                if _fam == _current_family:
+                    _family_repeat_count += 1
+                else:
+                    break
+        if _family_repeat_count >= _TEMPLATE_FAMILY_REPEAT_LIMIT and not _skip_draft_transform:
+            logger.info(
+                "[TEMPLATE-FAMILY] agent=%s family=%s repeat_count=%d — forcing regeneration",
+                self.name,
+                _current_family,
+                _family_repeat_count + 1,
+            )
+            _family_prompt = (
+                f"{_AGENT_BEHAVIORAL_CONTRACTS.get(self.name, '')}\n\n"
+                f"{LLM_OUTPUT_CONTRACT}\n\n"
+                f"Your last {_family_repeat_count + 1} responses all used the same "
+                f"opener pattern ('{_current_family}'). "
+                f"You MUST use a completely different rhetorical opening this turn.\n"
+                f"SEED: {seed}\n\nRespond now:\n"
+            )
+            _family_raw = validate_output(
+                self.llm.generate(
+                    self.model, _family_prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            _new_family = _detect_template_family(_family_raw)
+            if _new_family != _current_family:
+                out = _family_raw
+                _current_family = _new_family
+                logger.info(
+                    "[TEMPLATE-FAMILY] agent=%s — new family=%s after regeneration",
+                    self.name,
+                    _new_family,
+                )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Form classification and diagnostics ───────────────────────────────────
+        _response_form = classify_response_form(out)
+        _recent_forms_snapshot = list(self._last_response_forms)
+        logger.info(
+            "[FORM] agent=%s form=%s recent=%s",
+            self.name,
+            _response_form,
+            _recent_forms_snapshot,
+        )
+        if _current_family:
+            logger.info(
+                "[TEMPLATE-FAMILY] agent=%s family=%s repeat_count=%d",
+                self.name,
+                _current_family,
+                _family_repeat_count + 1,
+            )
+        self._last_response_forms.append(_response_form)
+        self._last_template_families.append(_current_family)
+        self._variation_mode_turns += 1
         # ─────────────────────────────────────────────────────────────────────────
 
         out = revise_draft(out, self.name, topic=_active_topic or "")

@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 # Enforcement thresholds
 # ---------------------------------------------------------------------------
 
-ACCEPT_THRESHOLD: float = 0.70
+ACCEPT_THRESHOLD: float = 0.60
 """Responses at or above this score are accepted without further action."""
 
-SOFT_REANCHOR_THRESHOLD: float = 0.50
+SOFT_REANCHOR_THRESHOLD: float = 0.40
 """Responses in [SOFT_REANCHOR_THRESHOLD, ACCEPT_THRESHOLD) receive a
 soft re-anchor instruction and are regenerated once."""
 
