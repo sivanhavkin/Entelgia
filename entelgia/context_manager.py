@@ -32,18 +32,20 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "'given the topic', 'however it is crucial', "
     "'one assumption that often goes unexamined', 'one might argue', 'it can be argued', "
     "'in other words', 'in conclusion', 'to summarize', 'it is worth noting', "
-    "'needless to say', 'an alternative perspective', 'underlying assumptions'."
+    "'needless to say', 'an alternative perspective', 'underlying assumptions', "
+    "'one implicit assumption', 'the mechanism at play', 'this notion overlooks', "
+    "'the implicit assumption', 'identify the assumption', 'explain the mechanism'."
 )
 
 # Hard output contract — injected before generation for all agents
 LLM_OUTPUT_CONTRACT = (
-    "OUTPUT CONTRACT: Structure your response internally as:\n"
-    "  - One concrete claim (specific, not abstract).\n"
-    "  - One specific mechanism or reason (not a feeling or vague statement).\n"
-    "  - Optionally one implication or pointed question.\n"
+    "OUTPUT CONTRACT: Respond directly and concisely.\n"
+    "  - Start immediately with your point — no preamble.\n"
+    "  - Length is dynamic: 1–2 sentences is fine; up to 4 sentences when the thought demands it.\n"
+    "  - Vary your move: blunt challenge, sharp question, direct claim, or pointed objection.\n"
     "Write as natural flowing prose. Do NOT output numbered sections or visible labels "
     "such as 'Claim:', 'Mechanism:', '1.', '2.', '3.'. "
-    "Maximum 2-3 sentences. No broad preamble. No generic framing opener."
+    "No broad preamble. No generic framing opener."
 )
 
 # Per-agent behavioral contracts — define output logic and allowed moves,
@@ -51,13 +53,14 @@ LLM_OUTPUT_CONTRACT = (
 _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
     "Socrates": (
         "SOCRATES CONTRACT:\n"
-        "- Attack ONE implicit assumption. Name it explicitly.\n"
-        "- Make ONE sharp objection — not a survey of options.\n"
-        "- Ask at most ONE pointed question.\n"
+        "- Choose ONE move: blunt challenge, sharp question, or direct claim — do not blend all three.\n"
+        "- Do NOT always follow the assumption → objection → question formula. Vary your approach.\n"
         "- Do NOT write explanations or lectures.\n"
+        "- Ask at most ONE pointed question per response.\n"
         "- Do NOT use: 'let us consider', 'we must examine', 'it is important', "
-        "'one might argue', 'this raises questions about', 'in the context of'.\n"
-        "- Specify the mechanism or tension you are targeting."
+        "'one might argue', 'this raises questions about', 'in the context of', "
+        "'one implicit assumption', 'the mechanism at play', 'this notion overlooks'.\n"
+        "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
     ),
     "Athena": (
         "ATHENA CONTRACT:\n"

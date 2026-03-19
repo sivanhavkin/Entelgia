@@ -171,11 +171,13 @@ class TestOutputContract:
 
     def test_output_contract_requires_concrete_claim(self):
         lower = LLM_OUTPUT_CONTRACT.lower()
-        assert "concrete claim" in lower or "concrete" in lower
+        # Contract must still reference direct claims or challenges as valid moves
+        assert "direct claim" in lower or "blunt challenge" in lower
 
     def test_output_contract_enforces_sentence_limit(self):
         lower = LLM_OUTPUT_CONTRACT.lower()
-        assert "3-4 sentences" in lower or "maximum" in lower
+        # Contract must provide length guidance (dynamic, not a fixed hard cap)
+        assert "length is dynamic" in lower or "sentences" in lower
 
     def test_output_contract_no_broad_preamble(self):
         lower = LLM_OUTPUT_CONTRACT.lower()
@@ -283,8 +285,11 @@ class TestOutputContractPhraseCleanliness:
     def test_output_contract_has_no_supporting_reason(self):
         assert "supporting reason" not in LLM_OUTPUT_CONTRACT.lower()
 
-    def test_output_contract_uses_mechanism_label(self):
-        assert "mechanism" in LLM_OUTPUT_CONTRACT.lower()
+    def test_output_contract_allows_variable_length(self):
+        """OUTPUT CONTRACT must no longer mandate a fixed claim+mechanism structure."""
+        lower = LLM_OUTPUT_CONTRACT.lower()
+        # Verify the new flexible contract: supports dynamic length and varied moves
+        assert "length is dynamic" in lower or "vary your move" in lower
 
     def test_forbidden_phrases_bans_given_the_topic(self):
         lower = CM_FORBIDDEN.lower()
