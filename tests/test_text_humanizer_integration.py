@@ -38,7 +38,6 @@ from Entelgia_production_meta import (
 )
 from entelgia.humanizer import TextHumanizer, HumanizerConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -50,9 +49,7 @@ def _make_agent(cfg=None):
         cfg = Config()
 
     llm_mock = MagicMock()
-    llm_mock.generate.return_value = (
-        "In examining the nature of knowledge, it is crucial to consider the limits of certainty."
-    )
+    llm_mock.generate.return_value = "In examining the nature of knowledge, it is crucial to consider the limits of certainty."
 
     memory_mock = MagicMock()
     memory_mock.get_agent_state.return_value = {
@@ -266,7 +263,10 @@ class TestSpeakHumanizerIntegration:
         mock_result.score_after = 0.0
         mock_humanizer.humanize.return_value = mock_result
 
-        with patch.object(_meta, "CFG", cfg), patch.object(_meta, "HUMANIZER", mock_humanizer):
+        with (
+            patch.object(_meta, "CFG", cfg),
+            patch.object(_meta, "HUMANIZER", mock_humanizer),
+        ):
             result = agent.speak("TOPIC: Philosophy of mind\nRespond now:\n", [])
 
         mock_humanizer.humanize.assert_called_once()
@@ -279,11 +279,18 @@ class TestSpeakHumanizerIntegration:
 
         mock_humanizer = MagicMock(spec=TextHumanizer)
         mock_humanizer.humanize.return_value = MagicMock(
-            changed=False, humanized_text="Yes.", original_text="Yes.",
-            flags=[], score_before=0.0, score_after=0.0,
+            changed=False,
+            humanized_text="Yes.",
+            original_text="Yes.",
+            flags=[],
+            score_before=0.0,
+            score_after=0.0,
         )
 
-        with patch.object(_meta, "CFG", cfg), patch.object(_meta, "HUMANIZER", mock_humanizer):
+        with (
+            patch.object(_meta, "CFG", cfg),
+            patch.object(_meta, "HUMANIZER", mock_humanizer),
+        ):
             agent.speak("TOPIC: Philosophy\nRespond now:\n", [])
 
         mock_humanizer.humanize.assert_not_called()
@@ -308,7 +315,10 @@ class TestSpeakHumanizerIntegration:
         mock_humanizer = MagicMock(spec=TextHumanizer)
         mock_humanizer.humanize.side_effect = RuntimeError("unexpected failure")
 
-        with patch.object(_meta, "CFG", cfg), patch.object(_meta, "HUMANIZER", mock_humanizer):
+        with (
+            patch.object(_meta, "CFG", cfg),
+            patch.object(_meta, "HUMANIZER", mock_humanizer),
+        ):
             result = agent.speak("TOPIC: Philosophy of mind\nRespond now:\n", [])
 
         # Must return the (unhumanized) output, not raise
@@ -333,7 +343,10 @@ class TestSpeakHumanizerIntegration:
         mock_result.score_after = 0.0
         mock_humanizer.humanize.return_value = mock_result
 
-        with patch.object(_meta, "CFG", cfg), patch.object(_meta, "HUMANIZER", mock_humanizer):
+        with (
+            patch.object(_meta, "CFG", cfg),
+            patch.object(_meta, "HUMANIZER", mock_humanizer),
+        ):
             result = agent.speak("TOPIC: Philosophy of mind\nRespond now:\n", [])
 
         # Result should not be the humanized_text when changed=False
@@ -398,21 +411,25 @@ class TestScaffoldCapitalisation:
     """After scaffold removal the first letter must be capitalised."""
 
     def test_capitalises_after_scaffold_removal(self):
-        h = TextHumanizer(HumanizerConfig(
-            min_score=0.0,
-            split_long_sentences=False,
-            diversify_agent_voice=False,
-        ))
+        h = TextHumanizer(
+            HumanizerConfig(
+                min_score=0.0,
+                split_long_sentences=False,
+                diversify_agent_voice=False,
+            )
+        )
         text = "In examining the topic of inequality and opportunity within society, scrutinize the roots."
         result = h.humanize(text)
         assert result.humanized_text[0].isupper()
 
     def test_no_double_capitalisation_when_already_capitalised(self):
-        h = TextHumanizer(HumanizerConfig(
-            min_score=0.0,
-            split_long_sentences=False,
-            diversify_agent_voice=False,
-        ))
+        h = TextHumanizer(
+            HumanizerConfig(
+                min_score=0.0,
+                split_long_sentences=False,
+                diversify_agent_voice=False,
+            )
+        )
         text = "In examining the situation, Power corrupts absolutely."
         result = h.humanize(text)
         # Should start with capital P
@@ -430,16 +447,19 @@ class TestVoicePrefixCapitalisation:
 
     def test_standalone_i_is_preserved(self):
         """'I notice...' must not become 'i notice...' after prefix injection."""
-        h = TextHumanizer(HumanizerConfig(
-            min_score=0.0,
-            split_long_sentences=False,
-            randomness=1.0,  # always apply voice
-            seed=0,
-        ))
+        h = TextHumanizer(
+            HumanizerConfig(
+                min_score=0.0,
+                split_long_sentences=False,
+                randomness=1.0,  # always apply voice
+                seed=0,
+            )
+        )
         text = "I notice that the argument relies on a hidden premise."
         result = h.humanize(text, agent_name="Fixy")
         # "I" must remain uppercase wherever it appears as a standalone word
         import re as _re
+
         assert not _re.search(r"\bi notice\b", result.humanized_text)
 
 
@@ -452,28 +472,47 @@ class TestSplitSentenceSafety:
     """Sentence splitting must not produce fragments starting with conjunctions."""
 
     def test_split_does_not_start_fragment_with_or(self):
-        h = TextHumanizer(HumanizerConfig(
-            min_score=0.0,
-            max_sentence_length=8,
-            split_long_sentences=True,
-            diversify_agent_voice=False,
-        ))
+        h = TextHumanizer(
+            HumanizerConfig(
+                min_score=0.0,
+                max_sentence_length=8,
+                split_long_sentences=True,
+                diversify_agent_voice=False,
+            )
+        )
         # 10-word sentence; mid=5 → "laws." then "or policies" — must be fixed
         text = "Governments enforce unjust laws or policies that restrict individual freedoms greatly."
         result = h.humanize(text)
         sentences = result.humanized_text.split(". ")
         for sent in sentences:
             first_word = sent.split()[0].lower() if sent.split() else ""
-            assert first_word not in {"or", "nor", "and", "but", "on", "in", "of", "to", "by", "as"}
+            assert first_word not in {
+                "or",
+                "nor",
+                "and",
+                "but",
+                "on",
+                "in",
+                "of",
+                "to",
+                "by",
+                "as",
+            }
 
     def test_split_half_ends_with_punctuation(self):
-        h = TextHumanizer(HumanizerConfig(
-            min_score=0.0,
-            max_sentence_length=8,
-            split_long_sentences=True,
-            diversify_agent_voice=False,
-        ))
+        h = TextHumanizer(
+            HumanizerConfig(
+                min_score=0.0,
+                max_sentence_length=8,
+                split_long_sentences=True,
+                diversify_agent_voice=False,
+            )
+        )
         text = "Raising awareness on critical issues is an important task that society must embrace fully."
         result = h.humanize(text)
         # There should be a sentence-ending punctuation somewhere in the middle
-        assert "." in result.humanized_text or "!" in result.humanized_text or "?" in result.humanized_text
+        assert (
+            "." in result.humanized_text
+            or "!" in result.humanized_text
+            or "?" in result.humanized_text
+        )

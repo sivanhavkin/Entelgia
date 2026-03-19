@@ -41,7 +41,6 @@ from entelgia.topic_enforcer import (
     _STALE_CONTAMINATION_PHRASES,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -71,9 +70,9 @@ class TestTopicProposal:
             "Socrates", current, cluster, recent_topics=[], recent_memory=[]
         )
         # Proposal must come from the economics cluster
-        assert proposal in cluster_topics, (
-            f"Expected proposal in economics cluster, got {proposal!r}"
-        )
+        assert (
+            proposal in cluster_topics
+        ), f"Expected proposal in economics cluster, got {proposal!r}"
 
     def test_proposal_avoids_current_topic(self):
         cluster = "economics"
@@ -99,9 +98,9 @@ class TestTopicProposal:
             if proposal not in recent:
                 avoidance_count += 1
         # At least 5/10 proposals should avoid recent topics
-        assert avoidance_count >= 5, (
-            f"Expected proposals to mostly avoid recent topics, got {avoidance_count}/10"
-        )
+        assert (
+            avoidance_count >= 5
+        ), f"Expected proposals to mostly avoid recent topics, got {avoidance_count}/10"
 
     def test_proposal_influenced_by_memory(self):
         """Anchors from memory should make related topics more likely."""
@@ -124,9 +123,9 @@ class TestTopicProposal:
             for _ in range(20)
         ]
         # "Scarcity and human behavior" should appear at least once in 20 trials
-        assert "Scarcity and human behavior" in proposals, (
-            "Memory-relevant topic should appear in proposals when anchors match"
-        )
+        assert (
+            "Scarcity and human behavior" in proposals
+        ), "Memory-relevant topic should appear in proposals when anchors match"
 
     def test_proposal_returns_string(self):
         proposal = propose_next_topic(
@@ -151,12 +150,8 @@ class TestTopicSelection:
         # Propose one novel (not recent) topic and one that was very recent
         novel = cluster_topics[5] if len(cluster_topics) > 5 else cluster_topics[-1]
         stale = recent[-1]  # most recent
-        selected = select_next_topic(
-            [stale, novel], cluster, recent_topics=recent
-        )
-        assert selected == novel, (
-            f"Expected novel topic {novel!r}, got {selected!r}"
-        )
+        selected = select_next_topic([stale, novel], cluster, recent_topics=recent)
+        assert selected == novel, f"Expected novel topic {novel!r}, got {selected!r}"
 
     def test_selector_prefers_cluster_topic_over_external(self):
         cluster = "economics"
@@ -167,9 +162,9 @@ class TestTopicSelection:
         selected = select_next_topic(
             [out_cluster, in_cluster], cluster, recent_topics=[]
         )
-        assert selected == in_cluster, (
-            f"Should prefer in-cluster topic, got {selected!r}"
-        )
+        assert (
+            selected == in_cluster
+        ), f"Should prefer in-cluster topic, got {selected!r}"
 
     def test_selector_penalises_most_recent_topic(self):
         cluster = "economics"
@@ -180,9 +175,9 @@ class TestTopicSelection:
         selected = select_next_topic(
             [most_recent, novel], cluster, recent_topics=recent
         )
-        assert selected == novel, (
-            f"Most-recent topic should be penalised; expected {novel!r}, got {selected!r}"
-        )
+        assert (
+            selected == novel
+        ), f"Most-recent topic should be penalised; expected {novel!r}, got {selected!r}"
 
     def test_selector_returns_string_for_single_proposal(self):
         result = select_next_topic(["Economic freedom"], "economics")
@@ -211,9 +206,9 @@ class TestTopicSelection:
             recent_topics=[other],
             recent_agent_frames=frames,
         )
-        assert selected == target, (
-            f"Memory-relevant topic should be selected; got {selected!r}"
-        )
+        assert (
+            selected == target
+        ), f"Memory-relevant topic should be selected; got {selected!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -236,9 +231,9 @@ class TestComplianceScoreAccept:
             "When institutions constrain individual choice, economic outcomes suffer."
         )
         result = compute_topic_compliance_score(text, topic, anchors)
-        assert result["score"] >= ACCEPT_THRESHOLD, (
-            f"Well-anchored response should be accepted; score={result['score']:.2f}"
-        )
+        assert (
+            result["score"] >= ACCEPT_THRESHOLD
+        ), f"Well-anchored response should be accepted; score={result['score']:.2f}"
 
     def test_score_structure(self):
         """compute_topic_compliance_score always returns all expected keys."""
@@ -299,9 +294,9 @@ class TestMildMemoryInfluence:
         result = compute_topic_compliance_score(
             text, topic, anchors, prev_anchors=prev_anchors
         )
-        assert result["score"] >= ACCEPT_THRESHOLD, (
-            f"Mild body-level carryover should be accepted; score={result['score']:.2f}"
-        )
+        assert (
+            result["score"] >= ACCEPT_THRESHOLD
+        ), f"Mild body-level carryover should be accepted; score={result['score']:.2f}"
 
 
 # ---------------------------------------------------------------------------
@@ -331,18 +326,20 @@ class TestOpeningContaminationPenalised:
         result = compute_topic_compliance_score(
             text, topic, anchors, prev_anchors=prev_anchors
         )
-        assert result["contamination_penalty"] > 0.0, (
-            "Opening dominated by previous topic should have non-zero contamination"
-        )
-        assert result["score"] < ACCEPT_THRESHOLD, (
-            f"Score should be below acceptance threshold; score={result['score']:.2f}"
-        )
+        assert (
+            result["contamination_penalty"] > 0.0
+        ), "Opening dominated by previous topic should have non-zero contamination"
+        assert (
+            result["score"] < ACCEPT_THRESHOLD
+        ), f"Score should be below acceptance threshold; score={result['score']:.2f}"
 
     def test_stale_phrase_in_opening_adds_penalty(self):
         """Stale contamination phrases in the opening should add to the penalty."""
         topic = "Economic freedom"
         anchors = TOPIC_ANCHORS.get(topic, ["market", "trade"])
-        stale_phrase = _STALE_CONTAMINATION_PHRASES[0]  # "strict adherence to initial programming"
+        stale_phrase = _STALE_CONTAMINATION_PHRASES[
+            0
+        ]  # "strict adherence to initial programming"
         text = (
             f"Through {stale_phrase} we can understand economic systems. "
             "Market forces then determine the outcome."
@@ -419,9 +416,9 @@ class TestHardRecoveryThreshold:
             text, topic, anchors, prev_anchors=prev_anchors
         )
         # Zero opening_topic_relevance drives score very low
-        assert result["opening_topic_relevance"] == 0.0, (
-            "Off-topic opening should have zero opening relevance"
-        )
+        assert (
+            result["opening_topic_relevance"] == 0.0
+        ), "Off-topic opening should have zero opening relevance"
         assert result["score"] < ACCEPT_THRESHOLD
 
     def test_thresholds_are_ordered(self):
@@ -498,9 +495,9 @@ class TestAgentContinuityVsSessionTopic:
         r1 = compute_topic_compliance_score(resp1, topic, anchors)
         r2 = compute_topic_compliance_score(resp2, topic, anchors)
         # r1 opening is anchored → opening_rel = 1.0; r2 opening is not → opening_rel = 0.0
-        assert r1["opening_topic_relevance"] > r2["opening_topic_relevance"], (
-            "Response with anchor in opening should have higher opening_relevance"
-        )
+        assert (
+            r1["opening_topic_relevance"] > r2["opening_topic_relevance"]
+        ), "Response with anchor in opening should have higher opening_relevance"
         # Full-text relevance: both mention the anchor somewhere, but r2 body also includes it
         # The higher opening weight (0.45 vs 0.35) means r1 overall scores higher
         assert r1["score"] > r2["score"], (
@@ -520,9 +517,7 @@ class TestTopicManagerProposalAdvancement:
     def test_advance_with_proposals_returns_string(self):
         topics = _economics_cluster_topics()
         mgr = TopicManager(topics[:], rotate_every_rounds=1)
-        result = mgr.advance_with_proposals(
-            [topics[2], topics[3]], "economics"
-        )
+        result = mgr.advance_with_proposals([topics[2], topics[3]], "economics")
         assert isinstance(result, str)
         assert result in topics
 
@@ -535,9 +530,7 @@ class TestTopicManagerProposalAdvancement:
         mgr._history = topics[:2]
         novel = topics[4]
         recent = topics[1]
-        result = mgr.advance_with_proposals(
-            [recent, novel], "economics"
-        )
+        result = mgr.advance_with_proposals([recent, novel], "economics")
         assert result == novel, f"Expected novel topic {novel!r}, got {result!r}"
 
     def test_advance_with_no_proposals_falls_back(self):
@@ -593,11 +586,15 @@ class TestInternalHelpers:
         assert opening == text
 
     def test_semantic_relevance_full_match(self):
-        score = _semantic_relevance("freedom autonomy liberty", ["freedom", "autonomy", "liberty"])
+        score = _semantic_relevance(
+            "freedom autonomy liberty", ["freedom", "autonomy", "liberty"]
+        )
         assert score == 1.0
 
     def test_semantic_relevance_single_match(self):
-        score = _semantic_relevance("freedom is paramount", ["freedom", "autonomy", "liberty"])
+        score = _semantic_relevance(
+            "freedom is paramount", ["freedom", "autonomy", "liberty"]
+        )
         assert score == 1.0
 
     def test_semantic_relevance_no_match(self):

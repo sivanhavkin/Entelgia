@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-749%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-1043%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -539,27 +539,32 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **749 tests** (749 passed, 0 skipped) in 23 suites.
+Entelgia ships with comprehensive test coverage across **1043 tests** (1043 passed, 0 skipped) in 29 suites.
 
 | Category | Tests | Suite |
 |---|---|---|
-| Web Research | 192 | `test_web_research.py` |
-| Topic Anchors | 59 | `test_topic_anchors.py` |
+| Web Research | 202 | `test_web_research.py` |
+| Generation Quality | 75 | `test_generation_quality.py` |
+| Topic Anchors | 60 | `test_topic_anchors.py` |
 | Dialogue Metrics | 58 | `test_dialogue_metrics.py` |
+| Stabilization Pass | 55 | `test_stabilization_pass.py` |
 | Long-Term Memory | 43 | `test_long_term_memory.py` |
+| Text Humanizer Integration | 41 | `test_text_humanizer_integration.py` |
+| Topic Enforcer | 41 | `test_topic_enforcer.py` |
 | Topic Style | 39 | `test_topic_style.py` |
 | Energy Regulation | 35 | `test_energy_regulation.py` |
 | Revise Draft | 32 | `test_revise_draft.py` |
 | Context Manager | 30 | `test_context_manager.py` |
 | Loop Guard | 30 | `test_loop_guard.py` |
-| Ablation Study | 27 | `test_ablation_study.py` |
+| Affective LTM Integration | 24 | `test_affective_ltm_integration.py` |
 | Drive Pressure | 23 | `test_drive_pressure.py` |
 | Drive Correlations | 28 | `test_drive_correlations.py` |
 | SuperEgo Critique | 28 | `test_superego_critique.py` |
-| Memory Security | 19 | `test_memory_security.py` |
-| Web Tool | 18 | `test_web_tool.py` |
-| Behavioral Rules | 29 | `test_behavioral_rules.py` |
+| Ablation Study | 28 | `test_ablation_study.py` |
+| Behavioral Rules | 71 | `test_behavioral_rules.py` |
 | Limbic Hijack | 20 | `test_limbic_hijack.py` |
+| Memory Security | 19 | `test_memory_security.py` |
+| Web Tool | 26 | `test_web_tool.py` |
 | Semantic Repetition | 13 | `test_detect_repetition_semantic.py` |
 | Seed Topic Clusters | 12 | `test_seed_topic_clusters.py` |
 | Enable Observer | 10 | `test_enable_observer.py` |

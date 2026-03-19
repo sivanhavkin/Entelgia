@@ -106,7 +106,7 @@ class TextHumanizer:
         "Fixy": [
             "Plainly:",
             "Bottom line:",
-        ]
+        ],
     }
 
     def __init__(self, config: Optional[HumanizerConfig] = None):
@@ -124,7 +124,9 @@ class TextHumanizer:
 
         if score_before < self.config.min_score:
             flags.append("score_skip")
-            return HumanizerResult(original, original, False, flags, score_before, score_before)
+            return HumanizerResult(
+                original, original, False, flags, score_before, score_before
+            )
 
         out = self._remove_scaffolds(original)
         if out != original:
@@ -173,12 +175,7 @@ class TextHumanizer:
         score_after = self._score(out)
 
         return HumanizerResult(
-            original,
-            out,
-            original != out,
-            flags,
-            score_before,
-            score_after
+            original, out, original != out, flags, score_before, score_after
         )
 
     def _score(self, text: str) -> float:
@@ -210,18 +207,29 @@ class TextHumanizer:
         return out
 
     def _rewrite_opening(self, text: str) -> str:
-        return re.sub(
-            r"^(It is .*? to )",
-            "",
-            text,
-            flags=re.IGNORECASE
-        )
+        return re.sub(r"^(It is .*? to )", "", text, flags=re.IGNORECASE)
 
-    _SPLIT_SAFE_CONJUNCTIONS = frozenset({
-        "or", "nor", "and", "but", "yet", "so",
-        "on", "in", "at", "of", "to", "by", "as",
-        "if", "is", "it", "a",
-    })
+    _SPLIT_SAFE_CONJUNCTIONS = frozenset(
+        {
+            "or",
+            "nor",
+            "and",
+            "but",
+            "yet",
+            "so",
+            "on",
+            "in",
+            "at",
+            "of",
+            "to",
+            "by",
+            "as",
+            "if",
+            "is",
+            "it",
+            "a",
+        }
+    )
 
     def _split_sentences(self, text: str) -> str:
         parts = re.split(r"(?<=[.!?])\s+", text)
@@ -234,7 +242,11 @@ class TextHumanizer:
                 # conjunction/preposition, or the first half ending with one.
                 while mid < len(words) - 1 and (
                     words[mid].lower() in self._SPLIT_SAFE_CONJUNCTIONS
-                    or (mid > 0 and words[mid - 1].rstrip(".,;:").lower() in self._SPLIT_SAFE_CONJUNCTIONS)
+                    or (
+                        mid > 0
+                        and words[mid - 1].rstrip(".,;:").lower()
+                        in self._SPLIT_SAFE_CONJUNCTIONS
+                    )
                 ):
                     mid += 1
                 first_half = " ".join(words[:mid])
@@ -244,7 +256,11 @@ class TextHumanizer:
                     first_half += "."
                 # Ensure second half starts with a capital letter
                 if second_half:
-                    second_half = second_half[0].upper() + second_half[1:] if len(second_half) > 1 else second_half.upper()
+                    second_half = (
+                        second_half[0].upper() + second_half[1:]
+                        if len(second_half) > 1
+                        else second_half.upper()
+                    )
                 out.append(first_half)
                 out.append(second_half)
             else:
@@ -284,20 +300,18 @@ class TextHumanizer:
         """Build the list of (pattern, repair_prefix) tuples for broken openings."""
         return [
             # "consider how X" → "A useful angle is to consider how X"
-            (re.compile(r"^consider how\b", re.IGNORECASE),
-             "A useful angle is to consider how"),
+            (
+                re.compile(r"^consider how\b", re.IGNORECASE),
+                "A useful angle is to consider how",
+            ),
             # "consider X" at start → "Worth considering is X"
-            (re.compile(r"^consider\b", re.IGNORECASE),
-             "Worth considering:"),
+            (re.compile(r"^consider\b", re.IGNORECASE), "Worth considering:"),
             # "notice X" at start → "What stands out is X"
-            (re.compile(r"^notice\b", re.IGNORECASE),
-             "What stands out is to notice"),
+            (re.compile(r"^notice\b", re.IGNORECASE), "What stands out is to notice"),
             # "reflect on X" → "It helps to reflect on X"
-            (re.compile(r"^reflect on\b", re.IGNORECASE),
-             "It helps to reflect on"),
+            (re.compile(r"^reflect on\b", re.IGNORECASE), "It helps to reflect on"),
             # lowercase letter at start of sentence (mid-thought continuation)
-            (re.compile(r"^[a-z]"),
-             None),  # special-case: capitalise first letter
+            (re.compile(r"^[a-z]"), None),  # special-case: capitalise first letter
         ]
 
     def _repair_grammar(self, text: str, agent_name: Optional[str] = None) -> tuple:
@@ -335,7 +349,7 @@ class TextHumanizer:
                         # Remove the matched prefix and replace with the repair prefix
                         matched = pattern.match(repaired)
                         if matched:
-                            remainder = repaired[matched.end():].strip()
+                            remainder = repaired[matched.end() :].strip()
                             if remainder:
                                 # Lower-case the continuation (it was mid-sentence)
                                 remainder = remainder[0].lower() + remainder[1:]
@@ -347,7 +361,9 @@ class TextHumanizer:
                             original_words = len(sentence.split())
                             if candidate_words >= 3 or original_words < 3:
                                 repaired = candidate
-                                fixes.append(f"broken_opening[{i}]:{pattern.pattern[:30]}")
+                                fixes.append(
+                                    f"broken_opening[{i}]:{pattern.pattern[:30]}"
+                                )
                             # else: skip this repair — keep the original sentence
                     break
 

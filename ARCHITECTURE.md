@@ -507,5 +507,62 @@ Instructions for agents:
 - Memory storage only for sources with `credibility_score > 0.6`
 - **Failed-URL blacklist**: URLs returning 403 or 404 are permanently skipped for the process lifetime, preventing redundant retries
 - **Per-query cooldown**: the same `seed_text` cannot trigger a search more than once per `_COOLDOWN_TURNS` turns, in addition to the existing per-trigger-keyword cooldown
+- **Multi-signal gate**: when `Config.web_trigger_require_multi_signal` is `True`, a search requires ≥ `Config.web_trigger_min_concepts` strong concept hits AND an uncertainty/evidence signal
+
+---
+
+## Output Quality Pipeline
+
+Entelgia applies a multi-layer output quality pipeline inside `speak()` to ensure responses are concrete, topic-relevant, and free of LLM scaffolding artefacts.
+
+### Output Contract
+
+`LLM_OUTPUT_CONTRACT` is injected before generation for every agent turn. It requires:
+- One concrete claim (specific, not abstract)
+- One supporting reason or mechanism (not a feeling or vague statement)
+- Optionally one implication or pointed question
+- Maximum 2–3 sentences total; no broad preamble; no generic framing opener
+- Natural prose — no visible section labels or numbers
+
+Per-agent behavioral contracts (`LLM_BEHAVIORAL_CONTRACT_SOCRATES`, `LLM_BEHAVIORAL_CONTRACT_ATHENA`, `LLM_BEHAVIORAL_CONTRACT_FIXY`) define allowed output moves independently of tone instructions.
+
+### Quality Gate
+
+`output_passes_quality_gate(text)` scans the LLM output against `_QUALITY_GATE_PATTERNS` (compiled regex for banned rhetorical templates). If ≥ `_QUALITY_GATE_THRESHOLD` (2) patterns are found, the draft fails. One regeneration attempt is made with a stricter prompt that names the specific failing patterns. If the second draft also fails, the output proceeds to avoid an infinite loop.
+
+### Scaffold Label Stripper
+
+`_strip_scaffold_labels(text)` is applied after all validation and critique steps. It removes numbered scaffold labels (e.g. `"1. Claim:"`, `"2. Supporting reason:"`, `"Implication:"`) that occasionally leak into LLM output, ensuring final responses read as natural prose.
+
+### Grammar Repair
+
+`TextHumanizer._repair_grammar()` detects broken sentence openings (e.g. sentences starting with a lowercase letter after a period, or with common broken patterns from `_build_broken_patterns()`) and corrects them. Controlled by `Config.humanizer_grammar_repair_enabled` and `Config.humanizer_repair_broken_openings`.
+
+### Memory Topic Filter
+
+`Agent._score_memory_topic_relevance()` scores each retrieved LTM entry against the current topic using:
+1. Exact topic label match (score = 1.0)
+2. Cluster match + topic keyword overlap
+3. Recent-dialogue term overlap
+4. Minus a contamination penalty for off-topic content
+
+Entries below `Config.memory_topic_min_score` (default 0.45) are excluded. `Config.memory_require_same_cluster` (default True) enforces cluster alignment.
+
+### Fixy Role-Aware Compliance
+
+`compute_fixy_compliance_score()` in `entelgia/topic_enforcer.py` applies stricter compliance rules to Fixy's output: must explicitly name the current topic or a core concept, and receives a penalty for introducing new-domain content. Controlled by `Config.fixy_role_aware_compliance`, `Config.fixy_must_name_topic_or_core_concept`, and `Config.fixy_new_domain_penalty`.
+
+### Cluster Wallpaper Penalty
+
+Generic cluster-level vocabulary that appears repeatedly within a `Config.cluster_wallpaper_repeat_window` (default 6) turn window is penalised, biasing generation toward topic-distinct terms. `get_cluster_wallpaper_terms(cluster)` and `get_topic_distinct_lexicon(topic)` in `entelgia/topic_enforcer.py` supply the word lists. Controlled by `Config.cluster_wallpaper_penalty_enabled` and `Config.topic_specific_lexicon_bias_enabled`.
+
+### Web Trigger Multi-Signal Gate
+
+`fixy_research_trigger.py` adds a multi-signal gate before any web search is triggered:
+- `_count_strong_trigger_hits(text)` counts concept-bearing trigger keywords (excluding rhetorical framing words)
+- `_has_uncertainty_or_evidence_signal(text)` checks for epistemic uncertainty or evidence-seeking language
+- When `Config.web_trigger_require_multi_signal` is `True`, both ≥ `Config.web_trigger_min_concepts` (default 2) concept hits AND an uncertainty/evidence signal are required for a search to proceed
+
+`_HIGH_VALUE_KEYWORDS` (e.g. `"studies"`, `"research"`, `"data"`) qualify as strong concept hits regardless of the rhetorical-framing filter.
 
 ---

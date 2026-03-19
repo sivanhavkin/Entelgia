@@ -163,7 +163,13 @@ except ImportError:
     _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.50
 
     def compute_topic_compliance_score(  # type: ignore[no-redef]
-        text, topic, topic_anchors, prev_anchors=None, *, log_agent="", cluster_anchors=None
+        text,
+        topic,
+        topic_anchors,
+        prev_anchors=None,
+        *,
+        log_agent="",
+        cluster_anchors=None,
     ):
         """Minimal fallback: delegate to the legacy binary validator."""
         return {
@@ -177,11 +183,22 @@ except ImportError:
         }
 
     def compute_fixy_compliance_score(  # type: ignore[no-redef]
-        text, topic, topic_anchors, prev_anchors=None, *,
-        new_domain_penalty=0.20, must_name_topic_or_concept=True
+        text,
+        topic,
+        topic_anchors,
+        prev_anchors=None,
+        *,
+        new_domain_penalty=0.20,
+        must_name_topic_or_concept=True,
     ):
-        return {"score": 1.0, "names_topic": True, "names_concept": True,
-                "new_domain_drift": False, "contamination_penalty": 0.0, "fixy_mode": True}
+        return {
+            "score": 1.0,
+            "names_topic": True,
+            "names_concept": True,
+            "new_domain_drift": False,
+            "contamination_penalty": 0.0,
+            "fixy_mode": True,
+        }
 
     def get_cluster_wallpaper_terms(cluster):  # type: ignore[no-redef]
         return []
@@ -256,6 +273,7 @@ except ImportError:
             contamination_phrases: list = []
             reasons: list = []
             threshold: float = 0.55
+
         return _R()
 
     def _cg_add_to_history(agent_name, text):  # type: ignore[no-redef]
@@ -737,7 +755,9 @@ def select_next_topic(
         anchors = TOPIC_ANCHORS.get(topic, [])
         if anchors and memory_blob:
             mem_hits = sum(1 for a in anchors if a.lower() in memory_blob)
-            memory_relevance = min(1.0, mem_hits / max(1, min(_MAX_MEMORY_ANCHORS, len(anchors))))
+            memory_relevance = min(
+                1.0, mem_hits / max(1, min(_MAX_MEMORY_ANCHORS, len(anchors)))
+            )
         else:
             memory_relevance = 0.0
 
@@ -1845,7 +1865,9 @@ class Config:
     affective_emotion_weight: float = 0.4  # weight of emotion_intensity vs importance
     use_affective_ltm: bool = True  # supplement LTM retrieval with affective memories
     affective_ltm_limit: int = 3  # max affective memories to add per turn
-    affective_ltm_min_score: float = 0.2  # minimum combined score to include affective memory
+    affective_ltm_min_score: float = (
+        0.2  # minimum combined score to include affective memory
+    )
     show_affective_ltm_debug: bool = False  # print per-memory debug summary when True
     # ── TextHumanizer post-processing pass ─────────────────────────────────
     humanizer_enabled: bool = False
@@ -3951,11 +3973,13 @@ class Agent:
             ew = CFG.affective_emotion_weight
             min_score = CFG.affective_ltm_min_score
             filtered = [
-                m for m in raw
+                m
+                for m in raw
                 if (
                     float(m.get("importance") or 0.0) * (1.0 - ew)
                     + float(m.get("emotion_intensity") or 0.0) * ew
-                ) >= min_score
+                )
+                >= min_score
             ]
             seen_ids = {m.get("id") for m in existing if m.get("id") is not None}
             seen_contents = {(m.get("content") or "").strip() for m in existing}
@@ -4012,9 +4036,7 @@ class Agent:
                     )
             return supplement
         except Exception as _err:  # noqa: BLE001
-            logger.debug(
-                "[AFFECTIVE-LTM] skipped for agent=%s: %s", self.name, _err
-            )
+            logger.debug("[AFFECTIVE-LTM] skipped for agent=%s: %s", self.name, _err)
             return []
 
     # ── Helper: Memory Topic Filter ─────────────────────────────────────────
@@ -4051,12 +4073,15 @@ class Agent:
 
         # Semantic overlap score (keyword hits)
         topic_hits = sum(1 for a in topic_anchors if a.lower() in content)
-        topic_score = min(1.0, topic_hits / max(1, len(topic_anchors))) if topic_anchors else 0.5
+        topic_score = (
+            min(1.0, topic_hits / max(1, len(topic_anchors))) if topic_anchors else 0.5
+        )
 
         # Cluster match bonus
         cluster_bonus = 0.0
         if current_cluster and mem_topic:
             from entelgia.loop_guard import get_cluster as _get_cluster
+
             mem_cluster = _get_cluster(mem_topic)
             if mem_cluster == current_cluster:
                 cluster_bonus = 0.25
@@ -4108,6 +4133,7 @@ class Agent:
             if CFG.memory_require_same_cluster and mem_topic and current_cluster:
                 try:
                     from entelgia.loop_guard import get_cluster as _get_cluster
+
                     mem_cluster = _get_cluster(mem_topic)
                     if mem_cluster and mem_cluster != current_cluster:
                         reject_reason = "cluster_mismatch"
@@ -4249,7 +4275,9 @@ class Agent:
                     if "?" in s and len(s.strip()) > 10:
                         q = s.strip()
                         # Only use if it seems related to the topic
-                        if topic_anchors and any(a.lower() in q.lower() for a in topic_anchors):
+                        if topic_anchors and any(
+                            a.lower() in q.lower() for a in topic_anchors
+                        ):
                             return q[:120]
                         elif topic.lower() in q.lower():
                             return q[:120]
@@ -4282,15 +4310,14 @@ class Agent:
             return ""
 
         # Count wallpaper term usage in recent dialogue
-        window = dialog_tail[-CFG.cluster_wallpaper_repeat_window:] if dialog_tail else []
+        window = (
+            dialog_tail[-CFG.cluster_wallpaper_repeat_window :] if dialog_tail else []
+        )
         window_text = " ".join(
             (t.get("text", "") if isinstance(t, dict) else "") for t in window
         ).lower()
 
-        overused = [
-            w for w in wallpaper_terms
-            if window_text.count(w.lower()) >= 2
-        ]
+        overused = [w for w in wallpaper_terms if window_text.count(w.lower()) >= 2]
 
         if overused:
             logger.info(
@@ -4462,7 +4489,7 @@ class Agent:
             TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
         )
         if _prev_anchors and CFG.topic_anchor_include_forbidden_carryover:
-            forbidden = _prev_anchors[:CFG.topic_anchor_max_forbidden_items]
+            forbidden = _prev_anchors[: CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
                 f"{', '.join(forbidden)}.\n"
@@ -4480,7 +4507,7 @@ class Agent:
                     forbidden,
                 )
         elif _prev_anchors:
-            forbidden = _prev_anchors[:CFG.topic_anchor_max_forbidden_items]
+            forbidden = _prev_anchors[: CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
                 f"{', '.join(forbidden)}.\n"
@@ -4750,8 +4777,7 @@ class Agent:
             # Collect the specific banned patterns that triggered the gate so
             # the regeneration prompt can tell the LLM what to avoid.
             _gate_hits = [
-                pat.pattern for pat in _QUALITY_GATE_PATTERNS
-                if pat.search(out.lower())
+                pat.pattern for pat in _QUALITY_GATE_PATTERNS if pat.search(out.lower())
             ]
             logger.info(
                 "[QUALITY-GATE] agent=%s draft failed quality gate (hits=%r) — "
@@ -5138,7 +5164,9 @@ class Agent:
         # contamination before accepting the response.  If circularity is detected,
         # inject a new-angle instruction and regenerate once.
         _first_turn_after_change = (
-            _active_topic and _prev_topic_for_circ and _active_topic != _prev_topic_for_circ
+            _active_topic
+            and _prev_topic_for_circ
+            and _active_topic != _prev_topic_for_circ
         )
         _circ = _cg_compute(
             out,
@@ -5373,6 +5401,7 @@ class Agent:
                     if mem_topic and mem_topic != topic:
                         try:
                             from entelgia.loop_guard import get_cluster as _get_cluster
+
                             mem_cluster = _get_cluster(mem_topic)
                             if mem_cluster and mem_cluster != _current_cluster:
                                 topic_rejected_count += 1
@@ -6800,7 +6829,8 @@ class MainScript:
                 )
                 # Advance using scoring-based selection instead of sequential rotation
                 _recent_frames = [
-                    t.get("text", "") for t in self.dialog[-6:]
+                    t.get("text", "")
+                    for t in self.dialog[-6:]
                     if t.get("role") not in ("seed", "Fixy")
                 ]
                 topicman.advance_with_proposals(
@@ -6822,7 +6852,9 @@ class MainScript:
                     _adv_cluster,
                     _adv_topic,
                 )
-                logger.debug("topic_style updated after advance_with_proposals → %r", _adv_topic)
+                logger.debug(
+                    "topic_style updated after advance_with_proposals → %r", _adv_topic
+                )
 
             elapsed = time.time() - self.start_time
             if elapsed >= timeout_seconds:

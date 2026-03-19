@@ -179,7 +179,7 @@ def _simulate_dialogue_engine(turns: int, rng: random.Random) -> List[Dict[str, 
     """
     # Seed global random so DialogueEngine's internal random calls are
     # reproducible for a given rng state (same caveat as _simulate_dream).
-    random.seed(rng.randint(0, 2 ** 31))
+    random.seed(rng.randint(0, 2**31))
     engine = DialogueEngine()
     pool = _TOPIC_POOLS["evolving"]
     dialog: List[Dict[str, str]] = []

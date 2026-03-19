@@ -86,7 +86,9 @@ class TestFixyResearchTrigger:
 
     def test_trigger_on_trend(self):
         # Multi-signal: trend (strong) + evidence (uncertainty signal)
-        assert fixy_should_search("What is the current trend? We need evidence.") is True
+        assert (
+            fixy_should_search("What is the current trend? We need evidence.") is True
+        )
 
     def test_single_generic_keyword_does_not_fire(self):
         # Single generic keyword alone must NOT fire (multi-signal gate)
@@ -229,6 +231,7 @@ class TestFixyResearchTrigger:
             _count_quality_concept_hits,
             _count_strong_trigger_hits,
         )
+
         text = "evidence source reference"
         assert _count_strong_trigger_hits(text) >= 2
         assert _count_quality_concept_hits(text) == 0
@@ -242,6 +245,7 @@ class TestFixyResearchTrigger:
             _count_strong_trigger_hits,
             _has_uncertainty_or_evidence_signal,
         )
+
         text = "evidence source for this claim"
         concept_count = _count_strong_trigger_hits(text)
         quality_count = _count_quality_concept_hits(text)
@@ -540,7 +544,10 @@ class TestMaybeAddWebContext:
         # Seed topic at index 0 is neutral; trigger phrase "latest research" is at index 1
         dialog = [
             {"role": "system", "text": "Let us begin."},
-            {"role": "Athena", "text": "We need to find the latest research papers on this."},
+            {
+                "role": "Athena",
+                "text": "We need to find the latest research papers on this.",
+            },
         ]
         with patch(
             "entelgia.web_research.search_and_fetch", return_value=self._mock_bundle()
@@ -1145,7 +1152,9 @@ class TestRewriteQueryQuality:
         assert "let" not in words, f'"let" should not be in query: {result!r}'
         assert "topic" not in words, f'"topic" should not be in query: {result!r}'
         assert "hidden" not in words, f'"hidden" should not be in query: {result!r}'
-        assert "supporting" not in words, f'"supporting" should not be in query: {result!r}'
+        assert (
+            "supporting" not in words
+        ), f'"supporting" should not be in query: {result!r}'
         # The actual concept must still be present.
         assert "epistemology" in result.lower()
 
@@ -2168,7 +2177,9 @@ class TestBranchLevelDebugLogging:
         with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
             result = fixy_should_search(seed, dialog_tail=dialog)
 
-        assert result is True, "Trigger should fire because seed contains 'research paper' phrase"
+        assert (
+            result is True
+        ), "Trigger should fire because seed contains 'research paper' phrase"
 
         debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
 
@@ -2216,7 +2227,9 @@ class TestBranchLevelDebugLogging:
         with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_research_trigger"):
             result = fixy_should_search(seed, dialog_tail=dialog)
 
-        assert result is True, "Trigger should fire from dialogue turn (latest research phrase)"
+        assert (
+            result is True
+        ), "Trigger should fire from dialogue turn (latest research phrase)"
 
         debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
 

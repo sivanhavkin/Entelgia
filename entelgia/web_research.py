@@ -1007,7 +1007,9 @@ def rewrite_search_query(text: str, trigger: str) -> str:
 
     # 4. Rank by concept quality, restore sentence order, and return.
     result = _select_concept_terms(concepts, trigger)
-    logger.info("[SEARCH-QUERY-REWRITTEN] raw=%r rewritten=%r", target_sentence[:80], result)
+    logger.info(
+        "[SEARCH-QUERY-REWRITTEN] raw=%r rewritten=%r", target_sentence[:80], result
+    )
     return result
 
 
@@ -1202,7 +1204,10 @@ def maybe_add_web_context(
         query = build_research_query(seed_text, dialog_tail, fixy_reason)
 
         if not fixy_should_search(
-            seed_text, dialog_tail, fixy_reason, query_cooldown_key=query,
+            seed_text,
+            dialog_tail,
+            fixy_reason,
+            query_cooldown_key=query,
             require_multi_signal=require_multi_signal,
             min_concepts=min_concepts,
             require_uncertainty_or_evidence=require_uncertainty_or_evidence,
