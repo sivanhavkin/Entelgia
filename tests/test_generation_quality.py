@@ -290,6 +290,9 @@ class TestOutputContractPhraseCleanliness:
         lower = LLM_OUTPUT_CONTRACT.lower()
         # Verify the new flexible contract: supports dynamic length and varied moves
         assert "length is dynamic" in lower or "vary your move" in lower
+        # Verify the old rigid structure is gone
+        assert "one concrete claim" not in lower
+        assert "specific mechanism or reason" not in lower
 
     def test_forbidden_phrases_bans_given_the_topic(self):
         lower = CM_FORBIDDEN.lower()

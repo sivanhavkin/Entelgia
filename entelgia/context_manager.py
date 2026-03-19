@@ -34,7 +34,10 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
     "'in other words', 'in conclusion', 'to summarize', 'it is worth noting', "
     "'needless to say', 'an alternative perspective', 'underlying assumptions', "
     "'one implicit assumption', 'the mechanism at play', 'this notion overlooks', "
-    "'the implicit assumption', 'identify the assumption', 'explain the mechanism'."
+    "'the implicit assumption', 'identify the assumption', 'explain the mechanism', "
+    "'my model posits', 'this model reveals', 'my model reveals', "
+    "'overlooks a critical', 'overlooks a constraint', 'reveals a tradeoff', "
+    "'reveals an ethical tension', 'leading to tension'."
 )
 
 # Hard output contract — injected before generation for all agents
@@ -54,7 +57,7 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
     "Socrates": (
         "SOCRATES CONTRACT:\n"
         "- Choose ONE move: blunt challenge, sharp question, or direct claim — do not blend all three.\n"
-        "- Do NOT always follow the assumption → objection → question formula. Vary your approach.\n"
+        "- Do NOT follow a fixed three-step formula. Each response should pick a single attack angle.\n"
         "- Do NOT write explanations or lectures.\n"
         "- Ask at most ONE pointed question per response.\n"
         "- Do NOT use: 'let us consider', 'we must examine', 'it is important', "
@@ -64,11 +67,14 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
     ),
     "Athena": (
         "ATHENA CONTRACT:\n"
-        "- Construct ONE clear model or distinction. Not a list.\n"
-        "- Define your key terms with a specific mechanism or causal chain.\n"
+        "- State ONE clear distinction, tension, or observation — not a list.\n"
+        "- Start directly with the idea. Do NOT announce that you have a model or framework.\n"
+        "- Do NOT use: 'my model posits', 'this model reveals', 'my model reveals', "
+        "'overlooks a critical', 'overlooks a constraint', 'reveals a tradeoff', "
+        "'reveals an ethical tension', 'leading to tension'.\n"
         "- Do NOT use: 'balance', 'integrate', 'holistic', 'nuanced', 'multifaceted', "
         "'furthermore', 'moreover', 'in addition', 'it is worth noting'.\n"
-        "- State the specific design tradeoff or structural tension your model reveals."
+        "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification."
     ),
     "Fixy": (
         "FIXY CONTRACT:\n"
