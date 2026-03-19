@@ -162,8 +162,8 @@ except ImportError:
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
 
     # Fallback stubs for topic_enforcer when enhanced modules are unavailable.
-    _TOPIC_ACCEPT_THRESHOLD = 0.70
-    _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.50
+    _TOPIC_ACCEPT_THRESHOLD = 0.60
+    _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.40
 
     def compute_topic_compliance_score(  # type: ignore[no-redef]
         text,
@@ -2782,7 +2782,7 @@ _FORM_CLASSIFY_RULES: List[Tuple[str, re.Pattern]] = [
         "challenge",
         re.compile(
             r"\b(blunt challenge|you assume|that assumes|your premise|"
-            r"premise fails|fails once|treating .* as if|wrong)\b",
+            r"premise fails|fails once|treating \S+ as if|wrong)\b",
             re.IGNORECASE,
         ),
     ),
@@ -2893,21 +2893,10 @@ def _detect_template_family(text: str) -> Optional[str]:
 
 # Abstract nouns that signal generic philosophical wallpaper when used without
 # a mechanism, example, or concrete dependency in the same response.
-_ABSTRACT_NOUNS: frozenset = frozenset(
-    {
-        "freedom",
-        "truth",
-        "knowledge",
-        "identity",
-        "ethics",
-        "responsibility",
-        "norms",
-        "society",
-        "autonomy",
-        "justice",
-        "consciousness",
-        "meaning",
-    }
+_ABSTRACT_NOUNS_RE: re.Pattern = re.compile(
+    r"\b(?:freedom|truth|knowledge|identity|ethics|responsibility|"
+    r"norms|society|autonomy|justice|consciousness|meaning)\b",
+    re.IGNORECASE,
 )
 
 # Phrases that indicate a concrete mechanism or example is present.
@@ -2930,11 +2919,10 @@ def _check_abstraction_penalty(text: str) -> bool:
     """
     if not text:
         return False
-    lower = text.lower()
-    abstract_count = sum(1 for noun in _ABSTRACT_NOUNS if f" {noun}" in lower or lower.startswith(noun))
+    abstract_count = len(_ABSTRACT_NOUNS_RE.findall(text))
     if abstract_count < _ABSTRACTION_PENALTY_NOUN_THRESHOLD:
         return False
-    return not bool(_MECHANISM_PATTERNS.search(lower))
+    return not bool(_MECHANISM_PATTERNS.search(text))
 
 
 # ── Variation modes per agent ────────────────────────────────────────────────
@@ -4081,6 +4069,16 @@ class Agent:
         # Raw draft storage — populated each turn for debug logging only;
         # never stored in long-term memory.
         self._last_raw_draft: str = ""
+        # ── Anti-repetition form tracking ─────────────────────────────────────
+        # Tracks the last 3 rhetorical forms used by this agent.  The same
+        # form must not be used more than 2 consecutive turns.
+        self._last_response_forms: deque = deque(maxlen=3)
+        # Tracks the last 3 template families used (e.g. "challenge_openers").
+        self._last_template_families: deque = deque(maxlen=3)
+        # ── Variation mode per agent ───────────────────────────────────────────
+        _modes = _VARIATION_MODES.get(name, ["default"])
+        self._variation_mode: str = _modes[0]
+        self._variation_mode_turns: int = 0  # consecutive turns in current mode
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -5129,6 +5127,77 @@ class Agent:
                 "\nBe concise. Avoid long exposition. Prefer 1 key claim + 1 sharp question.\nRespond now:\n",
             )
 
+        # ── Anti-repetition: ban overused rhetorical forms ────────────────────
+        # If the same primary form was used ≥2 times in a row, inject an
+        # explicit instruction to use a different form this turn.
+        _recent_forms_list = list(self._last_response_forms)
+        if len(_recent_forms_list) >= 2 and _recent_forms_list[-1] == _recent_forms_list[-2]:
+            _locked_form = _recent_forms_list[-1]
+            if _locked_form == "question":
+                _form_ban = (
+                    "FORM RULE: You have asked questions two turns in a row. "
+                    "This turn you MUST use a statement, critique, or contrast — NOT a question."
+                )
+            elif _locked_form == "synthesis":
+                _form_ban = (
+                    "FORM RULE: You have used balanced synthesis two turns in a row. "
+                    "This turn you MUST make a sharp committed claim, concrete example, or clear distinction."
+                )
+            elif _locked_form == "directive":
+                _form_ban = (
+                    "FORM RULE: You have used mediation directives two turns in a row. "
+                    "This turn you MUST diagnose structurally or name the deadlock — do NOT use 'Shift focus to'."
+                )
+            elif _locked_form == "challenge":
+                _form_ban = (
+                    "FORM RULE: You have used a challenge opener two turns in a row. "
+                    "This turn you MUST use a statement, contrast, or example instead."
+                )
+            else:
+                _form_ban = (
+                    f"FORM RULE: You have used '{_locked_form}' form two turns in a row. "
+                    "This turn you MUST use a clearly different rhetorical approach."
+                )
+            prompt = prompt.replace(
+                "\nRespond now:\n", f"\n{_form_ban}\nRespond now:\n"
+            )
+            logger.debug(
+                "[FORM] agent=%s locked_form=%s recent=%s — injecting form ban",
+                self.name,
+                _locked_form,
+                _recent_forms_list,
+            )
+
+        # ── Variation mode injection ──────────────────────────────────────────
+        # Rotate variation mode when the same mode has been used too long.
+        _agent_modes = _VARIATION_MODES.get(self.name, [])
+        if _agent_modes:
+            if self._variation_mode_turns >= _VARIATION_MODE_MAX_CONSECUTIVE:
+                # Rotate to next mode in the list
+                _curr_idx = (
+                    _agent_modes.index(self._variation_mode)
+                    if self._variation_mode in _agent_modes
+                    else -1
+                )
+                _next_idx = (_curr_idx + 1) % len(_agent_modes)
+                self._variation_mode = _agent_modes[_next_idx]
+                self._variation_mode_turns = 0
+            _mode_instr = _VARIATION_MODE_INSTRUCTIONS.get(self.name, {}).get(
+                self._variation_mode, ""
+            )
+            if _mode_instr:
+                prompt = prompt.replace(
+                    "\nRespond now:\n",
+                    f"\nVARIATION MODE ({self._variation_mode}): {_mode_instr}\nRespond now:\n",
+                )
+            logger.debug(
+                "[VARIATION-MODE] agent=%s mode=%s turns_in_mode=%d",
+                self.name,
+                self._variation_mode,
+                self._variation_mode_turns,
+            )
+        # ─────────────────────────────────────────────────────────────────────
+
         # Drives → temperature (cognition control); conflict raises volatility
         ide = float(self.drives.get("id_strength", 5.0))
         ego = float(self.drives.get("ego_strength", 5.0))
@@ -5648,7 +5717,110 @@ class Agent:
                 self.model,
                 topic=_active_topic or "",
                 temperature=temperature,
+                recent_forms=list(self._last_response_forms),
             )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Abstract noun penalty gate ────────────────────────────────────────────
+        # Regenerate once when the response is pure philosophical wallpaper:
+        # many abstract nouns with no concrete mechanism or example.
+        if _check_abstraction_penalty(out) and not _skip_draft_transform:
+            logger.info(
+                "[ABSTRACTION-PENALTY] agent=%s — generic abstraction detected, regenerating",
+                self.name,
+            )
+            _abs_prompt = (
+                f"{_AGENT_BEHAVIORAL_CONTRACTS.get(self.name, '')}\n\n"
+                f"{LLM_OUTPUT_CONTRACT}\n\n"
+                f"Previous response was too abstract. It used general philosophical terms "
+                f"without a concrete mechanism, example, or dependency.\n"
+                f"Rewrite with at least one specific mechanism or concrete example.\n"
+                f"SEED: {seed}\n\nRespond now:\n"
+            )
+            _abs_raw = validate_output(
+                self.llm.generate(
+                    self.model, _abs_prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            if not _check_abstraction_penalty(_abs_raw):
+                out = _abs_raw
+                logger.info(
+                    "[ABSTRACTION-PENALTY] agent=%s — regenerated draft passed abstraction check",
+                    self.name,
+                )
+            else:
+                logger.info(
+                    "[ABSTRACTION-PENALTY] agent=%s — regenerated draft also abstract — keeping original",
+                    self.name,
+                )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Template family gate ──────────────────────────────────────────────────
+        # If the same opener template family has been used ≥ _TEMPLATE_FAMILY_REPEAT_LIMIT
+        # consecutive turns, regenerate once with an explicit family ban.
+        _current_family = _detect_template_family(out)
+        _family_history = list(self._last_template_families)
+        _family_repeat_count = 0
+        if _current_family and _family_history:
+            for _fam in reversed(_family_history):
+                if _fam == _current_family:
+                    _family_repeat_count += 1
+                else:
+                    break
+        if _family_repeat_count >= _TEMPLATE_FAMILY_REPEAT_LIMIT and not _skip_draft_transform:
+            logger.info(
+                "[TEMPLATE-FAMILY] agent=%s family=%s repeat_count=%d — forcing regeneration",
+                self.name,
+                _current_family,
+                _family_repeat_count + 1,
+            )
+            _family_prompt = (
+                f"{_AGENT_BEHAVIORAL_CONTRACTS.get(self.name, '')}\n\n"
+                f"{LLM_OUTPUT_CONTRACT}\n\n"
+                f"Your last {_family_repeat_count + 1} responses all used the same "
+                f"opener pattern ('{_current_family}'). "
+                f"You MUST use a completely different rhetorical opening this turn.\n"
+                f"SEED: {seed}\n\nRespond now:\n"
+            )
+            _family_raw = validate_output(
+                self.llm.generate(
+                    self.model, _family_prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            _new_family = _detect_template_family(_family_raw)
+            if _new_family != _current_family:
+                out = _family_raw
+                _current_family = _new_family  # update for deque storage below
+                logger.info(
+                    "[TEMPLATE-FAMILY] agent=%s — new family=%s after regeneration",
+                    self.name,
+                    _new_family,
+                )
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Form classification and diagnostics ───────────────────────────────────
+        _response_form = classify_response_form(out)
+        _recent_forms_snapshot = list(self._last_response_forms)
+        logger.info(
+            "[FORM] agent=%s form=%s recent=%s",
+            self.name,
+            _response_form,
+            _recent_forms_snapshot,
+        )
+        if _current_family:
+            logger.info(
+                "[TEMPLATE-FAMILY] agent=%s family=%s repeat_count=%d",
+                self.name,
+                _current_family,
+                _family_repeat_count + 1,
+            )
+        # Store form and family for next turn's anti-repetition check
+        self._last_response_forms.append(_response_form)
+        self._last_template_families.append(_current_family)
+        # Update variation mode turn counter
+        self._variation_mode_turns += 1
         # ─────────────────────────────────────────────────────────────────────────
 
         out = revise_draft(out, self.name, topic=_active_topic or "")
