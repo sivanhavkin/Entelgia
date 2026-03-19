@@ -2548,6 +2548,119 @@ def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
     return result
 
 
+# ── DRAFT → FINAL two-stage generation ───────────────────────────────────────
+
+# Per-agent identity instructions injected into the Stage 2 transformation prompt.
+_FINAL_STAGE_PERSONA_NOTES: Dict[str, str] = {
+    "Socrates": (
+        "You are Socrates. You probe and challenge. "
+        "Pick ONE move: blunt challenge, sharp question, or direct claim."
+    ),
+    "Athena": (
+        "You are Athena. You synthesize and connect. "
+        "State one clear observation or distinction directly."
+    ),
+    "Fixy": (
+        "You are Fixy. You diagnose conversation structure and redirect. "
+        "Be direct and concrete, not philosophical."
+    ),
+}
+
+
+def transform_draft_to_final(
+    draft_text: str,
+    agent_name: str,
+    llm: Any,
+    model: str,
+    topic: str = "",
+    temperature: float = 0.7,
+) -> str:
+    """Stage 2 of the DRAFT → FINAL two-stage generation pipeline.
+
+    Extracts 1–2 core ideas from *draft_text* and regenerates a completely
+    new response — discarding original phrasing, sentence structure, and
+    rhetorical connectors.  A second LLM call is made; the draft is never
+    shown to the user.
+
+    Transformation rules:
+    1. Extract core ideas — identify 1–2 main ideas from the draft.
+    2. Discard original phrasing — no sentences, structure, or connectors reused.
+    3. Regenerate from scratch — write new response based on extracted ideas only.
+    4. Output constraints — 1–3 sentences maximum; at least one must be short/direct.
+    5. No meta phrases — forbidden: 'my model', 'this suggests', 'it is important',
+       'we must consider', 'one might argue', 'it is worth noting'.
+    6. Identity preservation — agent role (Socrates / Athena / Fixy) is kept.
+
+    Pipeline: LLM → draft_text → transform_draft_to_final() → final_output
+
+    Args:
+        draft_text:  Post-processed agent draft (not yet shown to user).
+        agent_name:  Name of the speaking agent.
+        llm:         LLM backend with a ``generate(model, prompt, ...)`` method.
+        model:       Model identifier string.
+        topic:       Active dialogue topic (optional context).
+        temperature: Sampling temperature for the Stage 2 call.
+
+    Returns:
+        Transformed final response, or *draft_text* unchanged on any error or
+        if the draft is too short to transform.
+    """
+    if not draft_text or len(draft_text.split()) < _MIN_WORDS_FOR_REVISION:
+        return draft_text
+
+    persona_note = _FINAL_STAGE_PERSONA_NOTES.get(agent_name, f"You are {agent_name}.")
+    topic_line = f"Dialogue topic: {topic}\n\n" if topic else ""
+
+    transform_prompt = (
+        f"FINAL STAGE REWRITE\n\n"
+        f"{topic_line}"
+        f"DRAFT (internal only — do NOT copy this wording):\n{draft_text}\n\n"
+        f"TASK:\n"
+        f"1. Identify 1-2 core ideas in the draft.\n"
+        f"2. Write a COMPLETELY NEW response from those ideas only.\n"
+        f"3. Do NOT reuse any sentence or phrase from the draft.\n"
+        f"4. Do NOT preserve the same sentence structure.\n"
+        f"5. Do NOT use connectors: 'furthermore', 'moreover', 'in addition', "
+        f"'in conclusion', 'needless to say'.\n\n"
+        f"OUTPUT RULES:\n"
+        f"- 1 to 3 sentences maximum.\n"
+        f"- At least one sentence must be short and direct.\n"
+        f"- Forbidden phrases: 'my model', 'this suggests', 'it is important', "
+        f"'we must consider', 'one might argue', 'it is worth noting'.\n"
+        f"- No preamble. No labels. No numbered sections. No meta-commentary.\n"
+        f"- Write as natural flowing prose.\n\n"
+        f"{persona_note}\n\n"
+        f"Final response:\n"
+    )
+
+    try:
+        raw = llm.generate(model, transform_prompt, temperature=temperature, use_cache=False)
+        if not raw or not raw.strip():
+            logger.warning(
+                "[DRAFT-FINAL] agent=%s Stage 2 returned empty — using draft",
+                agent_name,
+            )
+            return draft_text
+        result = validate_output(raw)
+        logger.debug(
+            "[DRAFT-FINAL] agent=%s draft=%r final=%r",
+            agent_name,
+            draft_text[:120] + ("…" if len(draft_text) > 120 else ""),
+            result[:120] + ("…" if len(result) > 120 else ""),
+        )
+        return result
+    except Exception as exc:
+        logger.warning(
+            "[DRAFT-FINAL] agent=%s Stage 2 failed: %s — using draft",
+            agent_name,
+            exc,
+        )
+        return draft_text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 def _is_question_resolved(text: str) -> bool:
     """Return True if *text* contains a clear resolution to an open question.
 
@@ -4938,6 +5051,10 @@ class Agent:
         #   The OPENING sentences must be anchored to the SESSION topic.
         #   Agent-local memory continuity may shape reasoning *after* the opening
         #   but must not override the session topic in the first sentences.
+        #
+        # _skip_draft_transform: set True when a topic-safe fallback template is
+        # injected (hard recovery failed).  The template is already a crafted final
+        # response — Stage 2 LLM transform must not overwrite it.
         _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
         _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
         _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
@@ -4946,6 +5063,7 @@ class Agent:
             if self._last_topic and self._last_topic != _active_topic
             else []
         )
+        _skip_draft_transform = False  # set True when fallback template is injected
 
         if own_texts and _active_topic and _active_anchors:
             _compliance = compute_topic_compliance_score(
@@ -5074,6 +5192,7 @@ class Agent:
                         _active_topic,
                         f"This question touches directly on {_active_topic}.",
                     )
+                    _skip_draft_transform = True  # fallback text is final; skip Stage 2
                     logger.info(
                         "[TOPIC-ENFORCE] agent=%s topic=%r action=fallback_template",
                         self.name,
@@ -5250,6 +5369,23 @@ class Agent:
             )
             out = validate_output(_circ_raw)
         _cg_add_to_history(self.name, out)
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Stage 2: DRAFT → FINAL transformation (LLM-based rewrite) ────────────
+        # The draft produced above is internal only and never shown to the user.
+        # transform_draft_to_final() extracts 1–2 core ideas from the draft and
+        # regenerates a completely new response — discarding original phrasing,
+        # sentence structure, and rhetorical connectors.
+        # Skipped when a topic-safe fallback template was injected (_skip_draft_transform).
+        if not _skip_draft_transform:
+            out = transform_draft_to_final(
+                out,
+                self.name,
+                self.llm,
+                self.model,
+                topic=_active_topic or "",
+                temperature=temperature,
+            )
         # ─────────────────────────────────────────────────────────────────────────
 
         out = revise_draft(out, self.name, topic=_active_topic or "")

@@ -896,21 +896,49 @@ which caused the system to repeat the same narrow set of topics indefinitely.
 
 ---
 
-## 17) Post-Generation Revision Layer — `revise_draft()` (v3.0.0)
+## 17) Post-Generation Revision Layer — `revise_draft()` (v3.0.0) + DRAFT → FINAL Transform
 
 ### Overview
 
-Every agent response passes through a **post-generation revision layer** before it is displayed or stored.  The raw LLM draft is never shown directly; only the revised output is returned from `Agent.speak()`.
+Every agent response passes through a **two-stage post-generation pipeline** before it is displayed or stored.  The raw LLM draft is never shown directly; only the final transformed output is returned from `Agent.speak()`.
 
 ```
-LLM draft  →  post-process  →  revise_draft()  →  display / memory
+LLM draft  →  post-process  →  transform_draft_to_final()  →  revise_draft()  →  display / memory
 ```
 
-The revision layer is **rule-based and deterministic** — no additional LLM call is made.  It is cheap, fast, and has no latency impact on the dialogue loop.
+**Stage 1 — DRAFT (LLM output)**
+- The agent calls the LLM normally.
+- The result is stored as `draft_text` (via `Agent._last_raw_draft`).
+- This text is NOT shown to the user; it is treated as raw material only.
+
+**Stage 2 — FINAL (LLM-based rewrite)**
+- `transform_draft_to_final()` makes a second LLM call.
+- It extracts 1–2 core ideas from the draft and regenerates a completely new response.
+- No sentences, phrasing, or connectors from the draft are reused.
+- Output is 1–3 sentences maximum; at least one must be short and direct.
+- Agent identity (Socrates / Athena / Fixy) is preserved.
+- Skipped automatically when a topic-safe fallback template is injected (hard recovery failure).
+
+After Stage 2, `revise_draft()` provides a final rule-based safety net.
 
 ---
 
-### Revision Steps (applied in order)
+### `transform_draft_to_final()` — Stage 2 Transformation Rules
+
+| Rule | Detail |
+|---|---|
+| 1. Extract core ideas | Identify 1–2 main ideas from the draft |
+| 2. Discard original phrasing | No sentences, structure, or rhetorical connectors reused |
+| 3. Regenerate from scratch | Write a new response based on extracted ideas only |
+| 4. Output constraints | 1–3 sentences max; at least one must be short and direct |
+| 5. No meta phrases | Forbidden: `"my model"`, `"this suggests"`, `"it is important"`, `"we must consider"`, `"one might argue"`, `"it is worth noting"` |
+| 6. Identity preservation | Agent role (Socrates / Athena / Fixy) is kept |
+
+Fallback: if the LLM returns empty or raises an exception, the draft is used unchanged.
+
+---
+
+### `revise_draft()` — Rule-Based Safety Net (applied after Stage 2)
 
 | Step | What it does |
 |---|---|
@@ -940,14 +968,14 @@ If revision would produce an empty string (edge case), the original text is retu
 |---|---|---|
 | `_MIN_WORDS_FOR_REVISION` | `3` | Responses shorter than this are returned unchanged |
 | `_DUPLICATE_THRESHOLD` | `0.70` | Word-overlap ratio at or above which a sentence is treated as a near-duplicate |
-| `_MAX_REVISED_SENTENCES` | `4` | Hard cap on sentences per revised response |
+| `_MAX_REVISED_SENTENCES` | `4` | Hard cap on sentences per revised response (revise_draft safety net) |
 
 ---
 
 ### Raw Draft Handling
 
-- `Agent._last_raw_draft: str` — stores the pre-revision text for debug inspection only.  It is populated every turn inside `speak()` and logged at `DEBUG` level.
-- The raw draft is **never stored in long-term memory**.  `store_turn()` is called by `MainScript` after `speak()` returns, so it always receives the revised (not raw) text.
+- `Agent._last_raw_draft: str` — stores the pre-Stage-2 text for debug inspection only.  It is populated every turn inside `speak()` and logged at `DEBUG` level.
+- The raw draft is **never stored in long-term memory**.  `store_turn()` is called by `MainScript` after `speak()` returns, so it always receives the final transformed text.
 - Raw draft is **never printed** to the console or API output.
 
 ---
@@ -955,16 +983,23 @@ If revision would produce an empty string (edge case), the original text is retu
 ### Helper Functions
 
 ```python
+def transform_draft_to_final(
+    draft_text: str, agent_name: str, llm, model: str,
+    topic: str = "", temperature: float = 0.7,
+) -> str:
+    """Stage 2: extract core ideas from draft and regenerate a completely new response.
+    Falls back to draft_text on LLM error or empty response."""
+
+def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
+    """Rule-based safety net applied after Stage 2 transform.
+    Returns the revised text, or the original if revision produces nothing."""
+
 def _split_sentences(text: str) -> List[str]:
     """Split text into sentences at [.!?] boundaries."""
 
 def _sentence_overlap(a: str, b: str) -> float:
     """Word-overlap ratio between two sentences (0..1).
     Used to identify near-duplicate sentences for deduplication."""
-
-def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
-    """Post-generation revision layer applied to every agent response.
-    Returns the revised text, or the original if revision produces nothing."""
 ```
 
 ---
@@ -975,12 +1010,19 @@ def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
 # ── Post-generation revision layer ──────────────────────────────
 self._last_raw_draft = out
 logger.debug("[%s] raw_draft: %s", self.name, out[:200] + ("…" if len(out) > 200 else ""))
+
+# Stage 2: DRAFT → FINAL (LLM-based rewrite — skipped for topic fallback templates)
+if not _skip_draft_transform:
+    out = transform_draft_to_final(out, self.name, self.llm, self.model,
+                                    topic=_active_topic or "", temperature=temperature)
+
+# Safety net: rule-based cleanup
 out = revise_draft(out, self.name, topic=_active_topic or "")
 # ────────────────────────────────────────────────────────────────
 return out
 ```
 
-This block is the final step in `speak()`, after all other output transformations (superego rewrite, topic-anchor validation, drive-pressure word-cap, etc.).
+Pipeline: `LLM → draft_text → transform_draft_to_final() → revise_draft() → display / memory`
 
 ---
 

@@ -739,10 +739,11 @@ class TestSuperEgoConsecutiveStreakLimit:
         assert (
             agent._superego_streak_suppressed is True
         ), "Turn 3: _superego_streak_suppressed must be True"
-        # Only one LLM call (main response), no extra rewrite call
+        # Two LLM calls expected: main response + Stage 2 DRAFT→FINAL transform.
+        # No additional superego rewrite call must occur (streak limit suppresses it).
         assert (
-            agent.llm.generate.call_count - calls_before == 1
-        ), "Turn 3: LLM must not be called a second time for the rewrite"
+            agent.llm.generate.call_count - calls_before == 2
+        ), "Turn 3: LLM must be called exactly twice (main + Stage-2 transform), not for a superego rewrite"
 
     def test_counter_resets_after_non_critique_turn(self):
         """
