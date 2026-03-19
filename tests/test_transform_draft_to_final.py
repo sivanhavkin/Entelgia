@@ -54,7 +54,7 @@ class TestShortInputPassthrough:
         assert result == ""
         llm.generate.assert_not_called()
 
-    def test_none_like_very_short_text_returned_unchanged(self):
+    def test_single_word_text_returned_unchanged(self):
         # "Hi" is 1 word, below _MIN_WORDS_FOR_REVISION (3)
         llm = _make_mock_llm()
         result = transform_draft_to_final("Hi.", "Athena", llm, "model-x")
@@ -212,7 +212,7 @@ class TestPromptContract:
 
     def test_prompt_requests_max_three_sentences(self):
         prompt = self._get_prompt()
-        assert "1 to 3 sentences" in prompt or "3 sentences" in prompt
+        assert "1 to 3 sentences" in prompt
 
     def test_prompt_bans_my_model(self):
         prompt = self._get_prompt()

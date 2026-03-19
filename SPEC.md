@@ -900,7 +900,7 @@ which caused the system to repeat the same narrow set of topics indefinitely.
 
 ### Overview
 
-Every agent response passes through a **two-stage post-generation pipeline** before it is displayed or stored.  The raw LLM draft is never shown directly; only the final transformed output is returned from `Agent.speak()`.
+Every agent response passes through a **two-stage post-generation pipeline** before it is displayed or stored. The raw LLM draft is never shown directly; only the final transformed output is returned from `Agent.speak()`.
 
 ```
 LLM draft  →  post-process  →  transform_draft_to_final()  →  revise_draft()  →  display / memory
