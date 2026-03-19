@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **749 tests** (749 passed, 0 skipped) in 23 suites:
+Entelgia ships with comprehensive test coverage across **1043 tests** (1043 passed, 0 skipped) in 29 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -130,7 +130,7 @@ Tests verify the DrivePressure urgency/tension system:
 
 ---
 
-### 🛡️ Behavioral Rules Tests (29 tests)
+### 🛡️ Behavioral Rules Tests (71 tests)
 
 ```bash
 pytest tests/test_behavioral_rules.py -v
@@ -431,7 +431,7 @@ Tests verify the semantic similarity layer added to `InteractiveFixy._detect_rep
 
 ---
 
-### 🌐 Web Research Module Tests (192 tests)
+### 🌐 Web Research Module Tests (202 tests)
 
 The web research modules include unit tests for all components:
 
@@ -468,7 +468,7 @@ All network calls in tests are mocked — no real HTTP requests are made.
 
 ---
 
-### 🌐 Web Tool Tests (18 tests)
+### 🌐 Web Tool Tests (26 tests)
 
 ```bash
 pytest tests/test_web_tool.py -v
@@ -519,7 +519,7 @@ Tests verify `entelgia/context_manager.py` — the prompt-assembly and memory-in
 
 ---
 
-### 🔬 Ablation Study Tests (27 tests)
+### 🔬 Ablation Study Tests (28 tests)
 
 ```bash
 pytest tests/test_ablation_study.py -v
@@ -559,7 +559,7 @@ Tests verify `entelgia/topic_style.py` — the topic-aware style selection syste
 
 ---
 
-### ⚓ Topic Anchors Tests (59 tests)
+### ⚓ Topic Anchors Tests (60 tests)
 
 ```bash
 pytest tests/test_topic_anchors.py -v
@@ -604,6 +604,92 @@ Tests verify `TOPIC_CLUSTERS` structure and `SeedGenerator` behaviour:
 - ✅ **Cluster structure** — all clusters non-empty and contain unique topic strings
 - ✅ **`SeedGenerator.generate_seed`** — returns non-empty string for every known topic
 - ✅ **Unknown topic fallback** — graceful handling of topic not in any cluster
+
+---
+
+### 🧬 Affective LTM Integration Tests (24 tests)
+
+```bash
+pytest tests/test_affective_ltm_integration.py -v
+```
+
+Tests verify affective long-term memory retrieval integration:
+
+- ✅ **Debug toggle** — `show_affective_ltm_debug` flag controls debug output
+- ✅ **Min-score threshold** — memories below threshold are excluded
+- ✅ **Supplement injection** — affective memories injected into prompt context
+- ✅ **Empty supplement when disabled** — no injection when feature is off
+- ✅ **Per-agent emotion weighting** — `affective_emotion_weight` applied correctly per agent
+
+---
+
+### 🎯 Generation Quality Tests (75 tests)
+
+```bash
+pytest tests/test_generation_quality.py -v
+```
+
+Tests verify output quality pipeline components:
+
+- ✅ **`output_passes_quality_gate`** — returns False when ≥ 2 banned rhetorical patterns are found
+- ✅ **`_strip_scaffold_labels`** — removes numbered scaffold labels (e.g. `"1. Claim:"`, `"Implication:"`)
+- ✅ **`LLM_OUTPUT_CONTRACT` phrase cleanliness** — contract text is free of banned phrases
+- ✅ **`LLM_FORBIDDEN_PHRASES_INSTRUCTION`** — includes new banned phrases (`'it is important'`, `"let's consider"`, `'given the topic'`)
+- ✅ **Per-agent behavioral contracts** — Socrates, Athena, and Fixy contracts present and distinct
+- ✅ **Output contract prose requirements** — 2–3 sentence limit and no-visible-labels requirement enforced
+
+---
+
+### 🔩 Stabilization Pass Tests (55 tests)
+
+```bash
+pytest tests/test_stabilization_pass.py -v
+```
+
+Tests verify stabilization pass features:
+
+- ✅ **Memory topic filter** — `_score_memory_topic_relevance` scoring, min-score threshold, cluster requirement
+- ✅ **Cluster wallpaper penalty** — repeated cluster-generic terms penalised within repeat window
+- ✅ **Fixy role-aware compliance** — `compute_fixy_compliance_score` stricter rules applied to Fixy
+- ✅ **Web trigger multi-signal gate** — `_count_strong_trigger_hits`, `_has_uncertainty_or_evidence_signal` gating
+- ✅ **Topic anchor configurable fields** — `topic_anchor_enabled`, `topic_anchor_max_forbidden_items` respected
+- ✅ **Self-replication topic gate** — pattern matching gated by topic-relevance scoring
+- ✅ **Debug flag forwarding** — all `show_*_debug` flags control output correctly
+
+---
+
+### ✍️ Text Humanizer Integration Tests (41 tests)
+
+```bash
+pytest tests/test_text_humanizer_integration.py -v
+```
+
+Tests verify `TextHumanizer` grammar repair and pipeline integration:
+
+- ✅ **Broken opening detection** — `_build_broken_patterns()` correctly identifies broken sentence starts
+- ✅ **Repair correctness** — `_repair_grammar()` fixes broken openings as expected
+- ✅ **`repair_broken_openings` flag** — repair skipped when flag is False
+- ✅ **`grammar_repair_enabled` flag** — repair skipped when flag is False
+- ✅ **Humanizer pipeline integration** — grammar repair applied in correct order within pipeline
+- ✅ **`show_humanizer_debug` flag** — debug output controlled by flag
+
+---
+
+### 🔍 Topic Enforcer Tests (41 tests)
+
+```bash
+pytest tests/test_topic_enforcer.py -v
+```
+
+Tests verify `entelgia/topic_enforcer.py` compliance scoring and vocabulary functions:
+
+- ✅ **`compute_topic_compliance_score`** — correct scoring for compliant and non-compliant responses
+- ✅ **`compute_fixy_compliance_score`** — Fixy-specific stricter rules applied correctly
+- ✅ **`get_cluster_wallpaper_terms`** — returns cluster-generic vocabulary list
+- ✅ **`get_topic_distinct_lexicon`** — returns topic-distinct vocabulary list
+- ✅ **`build_soft_reanchor_instruction`** — generates correct reanchor instruction text
+- ✅ **`ACCEPT_THRESHOLD`** — constant value correct
+- ✅ **`SOFT_REANCHOR_THRESHOLD`** — constant value correct
 
 ---
 

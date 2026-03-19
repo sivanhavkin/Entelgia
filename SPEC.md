@@ -82,11 +82,13 @@ Need-based intervention:
 
 ### Web Research Module (v2.8.0)
 External knowledge pipeline triggered by Fixy:
-- `fixy_research_trigger` — detects research-intent keywords in user messages
+- `fixy_research_trigger` — detects research-intent keywords in user messages; multi-signal gate (`_count_strong_trigger_hits`, `_has_uncertainty_or_evidence_signal`) requires ≥ `web_trigger_min_concepts` concept hits AND an uncertainty/evidence signal when `web_trigger_require_multi_signal` is `True`
 - `web_tool` — DuckDuckGo HTML search + BeautifulSoup page extraction
 - `source_evaluator` — heuristic credibility scoring (domain, text length)
 - `research_context_builder` — formats top-3 sources as LLM-ready context
 - `web_research.maybe_add_web_context` — full pipeline orchestration + LTM persistence
+
+> **Note**: `web_research_enabled` now defaults to `False`. Set `ENTELGIA_WEB_RESEARCH=1` or `Config(web_research_enabled=True)` to enable.
 
 
 
@@ -1104,6 +1106,37 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 * `slip_probability` — Per-turn probability a slip fires (env: `ENTELGIA_SLIP_PROBABILITY`; default: `0.05`)
 * `slip_cooldown_turns` — Minimum turns between two successful slips (env: `ENTELGIA_SLIP_COOLDOWN`; default: `10`)
 * `slip_dedup_window` — Number of recent slip hashes remembered to suppress identical repeats (env: `ENTELGIA_SLIP_DEDUP_WINDOW`; default: `10`)
+
+### Output Quality Pipeline
+
+* `humanizer_grammar_repair_enabled` — Enable grammar repair in `TextHumanizer` (default: `True`)
+* `humanizer_repair_broken_openings` — Enable broken-opening repair specifically (default: `True`)
+* `topic_anchor_enabled` — Enable topic anchor injection into prompts (default: `True`)
+* `topic_anchor_include_forbidden_carryover` — Include forbidden carryover terms in anchor block (default: `True`)
+* `topic_anchor_max_forbidden_items` — Max carryover terms injected (default: `5`)
+* `memory_topic_filter_enabled` — Enable topic-relevance filtering of retrieved LTM entries (default: `True`)
+* `memory_topic_min_score` — Minimum topic-relevance score to include a memory (default: `0.45`)
+* `memory_require_same_cluster` — Require retrieved memory to be in the same topic cluster (default: `True`)
+* `memory_contamination_penalty` — Penalty subtracted from relevance score for off-topic content (default: `0.25`)
+* `self_replication_topic_gate_enabled` — Gate self-replication pattern matching by topic relevance (default: `True`)
+* `self_replication_topic_min_score` — Minimum topic-relevance score for self-replication (default: `0.50`)
+* `self_replication_require_same_cluster` — Require same cluster for self-replication (default: `True`)
+* `fixy_role_aware_compliance` — Enable Fixy role-aware compliance scoring (default: `True`)
+* `fixy_must_name_topic_or_core_concept` — Require Fixy output to name topic or core concept (default: `True`)
+* `fixy_new_domain_penalty` — Penalty for new-domain drift in Fixy output (default: `0.20`)
+* `web_trigger_require_multi_signal` — Require multi-signal gate before web search (default: `True`)
+* `web_trigger_min_concepts` — Minimum concept hits required to trigger web search (default: `2`)
+* `web_trigger_require_uncertainty_or_evidence` — Require uncertainty/evidence signal alongside concept hits (default: `True`)
+* `topic_specific_lexicon_bias_enabled` — Enable bias toward topic-distinct vocabulary (default: `True`)
+* `cluster_wallpaper_penalty_enabled` — Enable penalty for repeated cluster-generic terms (default: `True`)
+* `cluster_wallpaper_repeat_window` — Turn window for wallpaper repeat detection (default: `6`)
+* `show_topic_anchor_debug` — Print topic anchor debug info per turn (default: `False`)
+* `show_memory_topic_filter_debug` — Print memory filter debug info per turn (default: `False`)
+* `show_self_replication_topic_debug` — Print self-replication gate debug info (default: `False`)
+* `show_fixy_compliance_debug` — Print Fixy compliance debug info (default: `False`)
+* `show_web_trigger_debug` — Print web trigger multi-signal gate debug info (default: `False`)
+
+> **Note**: `web_research_enabled` now defaults to `False` (env var `ENTELGIA_WEB_RESEARCH=1` to enable). `humanizer_enabled` now defaults to `False` (enable via `Config(humanizer_enabled=True)`).
 
 ### Energy & Drive (v2.5.0+)
 

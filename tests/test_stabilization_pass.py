@@ -33,7 +33,6 @@ from entelgia.topic_enforcer import (
 )
 from entelgia.humanizer import TextHumanizer as Humanizer, HumanizerConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -194,7 +193,12 @@ class TestMemoryTopicFilter:
     def test_same_cluster_memory_is_kept(self):
         agent, memory, cfg = _make_agent()
         with patch.object(_meta, "CFG", cfg):
-            mem = _make_memory(1, "Risk and uncertainty are key concepts.", topic="Risk and decision making", cluster="economics")
+            mem = _make_memory(
+                1,
+                "Risk and uncertainty are key concepts.",
+                topic="Risk and decision making",
+                cluster="economics",
+            )
             result = agent._filter_memories_by_topic(
                 [mem], "Risk and decision making", "economics"
             )
@@ -221,7 +225,12 @@ class TestMemoryTopicFilter:
         agent, memory, cfg = _make_agent()
         cfg.memory_topic_filter_enabled = False
         with patch.object(_meta, "CFG", cfg):
-            mem = _make_memory(3, "Totally unrelated content.", topic="Mars colonization", cluster="space")
+            mem = _make_memory(
+                3,
+                "Totally unrelated content.",
+                topic="Mars colonization",
+                cluster="space",
+            )
             result = agent._filter_memories_by_topic(
                 [mem], "Risk and decision making", "economics"
             )
@@ -267,12 +276,16 @@ class TestSelfReplicationTopicGate:
 
         # Simulate content from old topic "Civil disobedience" being
         # checked against current topic "Risk and decision making"
-        old_topic_text = "Civil disobedience challenges unjust authority and systemic injustice."
+        old_topic_text = (
+            "Civil disobedience challenges unjust authority and systemic injustice."
+        )
         topic = "Risk and decision making"
         anchors = TOPIC_ANCHORS.get(topic, ["uncertainty", "decision", "risk"])
 
         result = compute_topic_compliance_score(
-            old_topic_text, topic, anchors,
+            old_topic_text,
+            topic,
+            anchors,
             prev_anchors=["civil disobedience", "authority", "injustice"],
         )
         # Should score low — old topic content doesn't match new topic
@@ -284,7 +297,9 @@ class TestSelfReplicationTopicGate:
 
         topic = "Risk and decision making"
         anchors = TOPIC_ANCHORS.get(topic, ["uncertainty", "decision", "risk"])
-        on_topic_text = "Uncertainty and loss aversion drive risk decisions under expected utility."
+        on_topic_text = (
+            "Uncertainty and loss aversion drive risk decisions under expected utility."
+        )
 
         result = compute_topic_compliance_score(on_topic_text, topic, anchors)
         assert result["score"] >= 0.50
@@ -299,14 +314,18 @@ class TestFixyRoleAwareCompliance:
     """Verify Fixy uses a role-aware compliance rubric."""
 
     def _anchors(self):
-        return TOPIC_ANCHORS.get("Risk and decision making",
-                                  ["uncertainty", "loss aversion", "decision", "risk"])
+        return TOPIC_ANCHORS.get(
+            "Risk and decision making",
+            ["uncertainty", "loss aversion", "decision", "risk"],
+        )
 
     def test_meta_but_topic_anchored_fixy_passes(self):
         """Fixy output that is meta-analytic but names the topic should pass."""
-        text = ("The dialogue keeps circling around risk and uncertainty without "
-                "resolving the core question of expected utility under loss aversion. "
-                "Let me redirect: what specific decision context are we examining?")
+        text = (
+            "The dialogue keeps circling around risk and uncertainty without "
+            "resolving the core question of expected utility under loss aversion. "
+            "Let me redirect: what specific decision context are we examining?"
+        )
         result = compute_fixy_compliance_score(
             text, "Risk and decision making", self._anchors()
         )
@@ -315,9 +334,11 @@ class TestFixyRoleAwareCompliance:
 
     def test_domain_drifting_fixy_fails(self):
         """Fixy output that drifts to a new unrelated domain should score lower."""
-        text = ("The history of the Roman Empire reveals how military conquest "
-                "and bureaucratic organization shaped Western civilization. "
-                "The political structures of antiquity mirror modern governance.")
+        text = (
+            "The history of the Roman Empire reveals how military conquest "
+            "and bureaucratic organization shaped Western civilization. "
+            "The political structures of antiquity mirror modern governance."
+        )
         result = compute_fixy_compliance_score(
             text,
             "Risk and decision making",
@@ -369,9 +390,9 @@ class TestHumanizerGrammarRepair:
         repaired = self._repair(text)
         # Should not start with bare "consider how"
         first_sentence = repaired.split(".")[0].lower()
-        assert not first_sentence.startswith("consider how"), (
-            f"Expected repaired opening, got: {first_sentence!r}"
-        )
+        assert not first_sentence.startswith(
+            "consider how"
+        ), f"Expected repaired opening, got: {first_sentence!r}"
         assert len(repaired) > 0
 
     def test_double_spaces_removed(self):
@@ -383,7 +404,9 @@ class TestHumanizerGrammarRepair:
     def test_grammar_repair_disabled_preserves_original(self):
         """When grammar repair is disabled, broken openings are not repaired."""
         text = "consider how policy constraints shape decision-making."
-        cfg = HumanizerConfig(grammar_repair_enabled=False, repair_broken_openings=False)
+        cfg = HumanizerConfig(
+            grammar_repair_enabled=False, repair_broken_openings=False
+        )
         h = Humanizer(cfg)
         result = h.humanize(text, agent_name="Socrates")
         # Text should pass through without repair
@@ -442,6 +465,7 @@ class TestWebTriggerMultiSignalGate:
     def test_multi_signal_disabled_allows_single_keyword(self):
         """With require_multi_signal=False, single keyword still fires."""
         from entelgia.fixy_research_trigger import clear_trigger_cooldown
+
         clear_trigger_cooldown()
         assert fixy_should_search("research on AI", require_multi_signal=False) is True
 
@@ -456,6 +480,7 @@ class TestSearchQueryRewriting:
 
     def test_prose_fragment_not_passed_through(self):
         from entelgia.web_research import rewrite_search_query
+
         raw = "notice focus remains individual scarcity bias"
         result = rewrite_search_query(raw, "scarcity")
         # Discourse filler words must be removed
@@ -465,6 +490,7 @@ class TestSearchQueryRewriting:
 
     def test_rewritten_is_compact(self):
         from entelgia.web_research import rewrite_search_query
+
         raw = "I think we need to consider how cognitive bias affects our judgment"
         result = rewrite_search_query(raw, "bias")
         # Must be 6 words or fewer
@@ -472,12 +498,14 @@ class TestSearchQueryRewriting:
 
     def test_concept_terms_retained(self):
         from entelgia.web_research import rewrite_search_query
+
         raw = "cognitive bias scarcity decision making and resource allocation"
         result = rewrite_search_query(raw, "cognitive")
         assert "bias" in result or "cognitive" in result or "scarcity" in result
 
     def test_loss_aversion_query(self):
         from entelgia.web_research import build_research_query
+
         seed = "loss aversion in risk decisions evidence"
         result = build_research_query(seed, None, None)
         # Should produce a compact concept query
@@ -486,6 +514,7 @@ class TestSearchQueryRewriting:
 
     def test_filler_verbs_removed(self):
         from entelgia.web_research import rewrite_search_query
+
         # Filler/stylistic verbs should be stripped
         raw = "notice consider reflect overlook bias research"
         result = rewrite_search_query(raw, "research")
@@ -498,13 +527,18 @@ class TestSearchQueryRewriting:
         from entelgia.web_research import build_research_query
 
         dialog = [
-            {"role": "Socrates", "text": "What recent research exists on scarcity bias?"},
+            {
+                "role": "Socrates",
+                "text": "What recent research exists on scarcity bias?",
+            },
         ]
         with caplog.at_level(logging.INFO, logger="entelgia.web_research"):
             build_research_query("Seed.", dialog, None)
 
-        assert any("SEARCH-QUERY-RAW" in m or "SEARCH-QUERY-REWRITTEN" in m
-                   for m in caplog.messages)
+        assert any(
+            "SEARCH-QUERY-RAW" in m or "SEARCH-QUERY-REWRITTEN" in m
+            for m in caplog.messages
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +552,9 @@ class TestTopicComplianceSubScores:
     def test_exact_topic_alignment_scores_higher(self):
         """Text with exact topic anchors scores higher than cluster-generic text."""
         topic = "Risk and decision making"
-        anchors = TOPIC_ANCHORS.get(topic, ["uncertainty", "loss aversion", "decision", "risk"])
+        anchors = TOPIC_ANCHORS.get(
+            topic, ["uncertainty", "loss aversion", "decision", "risk"]
+        )
         cluster_anchors = get_cluster_wallpaper_terms("economics")
 
         # On-topic: uses specific anchors
@@ -580,6 +616,7 @@ class TestTopicComplianceSubScores:
     def test_compliance_detail_log_emitted(self, caplog):
         """[TOPIC-COMPLIANCE-DETAIL] must be logged during scoring."""
         import logging
+
         with caplog.at_level(logging.DEBUG, logger="entelgia.topic_enforcer"):
             compute_topic_compliance_score(
                 "uncertainty and risk",
@@ -591,7 +628,9 @@ class TestTopicComplianceSubScores:
     def test_contamination_sub_score_present(self):
         """Result dict must include contamination_penalty key."""
         result = compute_topic_compliance_score(
-            "Some text.", "topic", ["anchor"],
+            "Some text.",
+            "topic",
+            ["anchor"],
             prev_anchors=["old", "topic"],
         )
         assert "contamination_penalty" in result
@@ -599,7 +638,9 @@ class TestTopicComplianceSubScores:
     def test_memory_hijack_sub_score_present(self):
         """Result dict must include memory_hijack_penalty key."""
         result = compute_topic_compliance_score(
-            "Some text.", "topic", ["anchor"],
+            "Some text.",
+            "topic",
+            ["anchor"],
         )
         assert "memory_hijack_penalty" in result
 
@@ -637,8 +678,14 @@ class TestClusterWallpaperAndTopicLexicon:
         agent.topic_cluster = "economics"
         # Simulate some recent turns with wallpaper terms
         dialog_tail = [
-            {"role": "Socrates", "text": "Allocation and incentives shape market tradeoffs."},
-            {"role": "Athena", "text": "Policy efficiency requires opportunity cost analysis."},
+            {
+                "role": "Socrates",
+                "text": "Allocation and incentives shape market tradeoffs.",
+            },
+            {
+                "role": "Athena",
+                "text": "Policy efficiency requires opportunity cost analysis.",
+            },
         ]
         with patch.object(_meta, "CFG", cfg):
             block = agent._build_wallpaper_penalty_block(
@@ -658,6 +705,7 @@ class TestFixyComplianceLogging:
 
     def test_fixy_compliance_log_emitted(self, caplog):
         import logging
+
         with caplog.at_level(logging.INFO, logger="entelgia.topic_enforcer"):
             compute_fixy_compliance_score(
                 "The dialogue is drifting from uncertainty and risk.",
@@ -668,6 +716,7 @@ class TestFixyComplianceLogging:
 
     def test_fixy_domain_drift_logged_when_detected(self, caplog):
         import logging
+
         with caplog.at_level(logging.INFO, logger="entelgia.topic_enforcer"):
             compute_fixy_compliance_score(
                 "The history of ancient Rome and its military campaigns",
@@ -691,6 +740,7 @@ class TestTopicAnchorLogging:
 
     def test_topic_anchor_log_emitted(self, caplog):
         import logging
+
         agent, memory, cfg = _make_agent()
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.INFO, logger="entelgia"):
@@ -700,6 +750,7 @@ class TestTopicAnchorLogging:
 
     def test_topic_anchor_forbid_log_emitted_on_topic_change(self, caplog):
         import logging
+
         agent, memory, cfg = _make_agent(last_topic="Autonomous systems")
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.INFO, logger="entelgia"):

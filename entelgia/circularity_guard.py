@@ -233,7 +233,8 @@ def _get_semantic_model() -> Optional["SentenceTransformer"]:
     if _ST_MODEL is None:
         try:
             logger.info(
-                "CircularityGuard: loading SentenceTransformer '%s'…", _SEMANTIC_MODEL_NAME
+                "CircularityGuard: loading SentenceTransformer '%s'…",
+                _SEMANTIC_MODEL_NAME,
             )
             _ST_MODEL = SentenceTransformer(_SEMANTIC_MODEL_NAME)  # type: ignore[name-defined]
             logger.info("CircularityGuard: model loaded.")
@@ -535,7 +536,11 @@ def compute_circularity_score(
     raw_score = 0.5 * sem_component + 0.3 * tpl_component + 0.2 * ct_component
 
     # Apply leniency factor on the first turn after a topic change
-    score = raw_score * FIRST_TURN_SCORE_FACTOR if first_turn_after_topic_change else raw_score
+    score = (
+        raw_score * FIRST_TURN_SCORE_FACTOR
+        if first_turn_after_topic_change
+        else raw_score
+    )
 
     reasons: List[str] = []
     if sem_detected:
@@ -593,6 +598,8 @@ def compute_circularity_score(
 def get_new_angle_instruction() -> str:
     """Return the next new-angle prompt instruction (rotates through the list)."""
     global _new_angle_index
-    instruction = _NEW_ANGLE_INSTRUCTIONS[_new_angle_index % len(_NEW_ANGLE_INSTRUCTIONS)]
+    instruction = _NEW_ANGLE_INSTRUCTIONS[
+        _new_angle_index % len(_NEW_ANGLE_INSTRUCTIONS)
+    ]
     _new_angle_index += 1
     return instruction

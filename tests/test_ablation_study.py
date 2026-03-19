@@ -71,6 +71,7 @@ def _print_bar_chart(data_pairs, title=None, max_width=36):
         print(f"  {str(label):>22} │ {bar:<{max_width}} {value:.4f}")
     print()
 
+
 # ---------------------------------------------------------------------------
 # AblationCondition enum
 # ---------------------------------------------------------------------------
@@ -240,8 +241,7 @@ class TestRunAblation:
         _print_table(
             ["Condition"] + [k.replace("_", " ").title() for k in metric_keys],
             [
-                [label]
-                + [f"{data['metrics'].get(k, 0.0):.4f}" for k in metric_keys]
+                [label] + [f"{data['metrics'].get(k, 0.0):.4f}" for k in metric_keys]
                 for label, data in self.results.items()
             ],
             title="test_metrics_values_are_numeric — Full Metrics",

@@ -52,7 +52,6 @@ from entelgia.context_manager import (
     LLM_FORBIDDEN_PHRASES_INSTRUCTION as CM_FORBIDDEN,
 )
 
-
 # ---------------------------------------------------------------------------
 # 1. Quality gate — rejects generic scaffolded text
 # ---------------------------------------------------------------------------
@@ -155,9 +154,9 @@ class TestBannedTemplatesList:
         lower_inst = LLM_FORBIDDEN_PHRASES_INSTRUCTION.lower()
         # Spot-check that the instruction mentions several banned patterns
         for phrase in ["we must consider", "let us examine", "one might argue"]:
-            assert phrase in lower_inst, (
-                f"LLM_FORBIDDEN_PHRASES_INSTRUCTION does not mention: {phrase!r}"
-            )
+            assert (
+                phrase in lower_inst
+            ), f"LLM_FORBIDDEN_PHRASES_INSTRUCTION does not mention: {phrase!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +210,9 @@ class TestStripScaffoldLabels:
         assert result == "Brain plasticity allows neural reorganization."
 
     def test_strips_numbered_supporting_reason(self):
-        text = "2. Supporting Reason: This is the mechanism that makes learning possible."
+        text = (
+            "2. Supporting Reason: This is the mechanism that makes learning possible."
+        )
         result = _strip_scaffold_labels(text)
         assert result == "This is the mechanism that makes learning possible."
 
@@ -353,9 +354,9 @@ class TestAgentBehavioralContracts:
 
     def test_context_manager_contracts_match_main(self):
         for agent in ("Socrates", "Athena", "Fixy"):
-            assert CM_CONTRACTS[agent] == _AGENT_BEHAVIORAL_CONTRACTS[agent], (
-                f"Contract mismatch for {agent} between main script and context_manager"
-            )
+            assert (
+                CM_CONTRACTS[agent] == _AGENT_BEHAVIORAL_CONTRACTS[agent]
+            ), f"Contract mismatch for {agent} between main script and context_manager"
 
 
 # ---------------------------------------------------------------------------
@@ -498,9 +499,9 @@ class TestGrammarRepairSafety:
         orig_words = len(text.split())
         result_words = len(result.split())
         # Result must be at least half of original word count
-        assert result_words >= orig_words // 2, (
-            f"Repair produced too-short result: {result_words} words from {orig_words}"
-        )
+        assert (
+            result_words >= orig_words // 2
+        ), f"Repair produced too-short result: {result_words} words from {orig_words}"
 
     def test_repair_keeps_content_after_scaffold_removal(self):
         h = self._make_humanizer()
@@ -544,8 +545,12 @@ class TestContractVsStyleLabel:
     """Ensure contracts encode output logic, not style adjectives."""
 
     _STYLE_ADJECTIVES = {
-        "reflective", "measured", "balanced", "ethical scrutiny",
-        "rigorous", "calibrated",
+        "reflective",
+        "measured",
+        "balanced",
+        "ethical scrutiny",
+        "rigorous",
+        "calibrated",
     }
 
     def _contract_has_no_pure_style_labels(self, contract: str) -> bool:
@@ -556,7 +561,7 @@ class TestContractVsStyleLabel:
             if adj in lower:
                 # Allowed if it appears in a "do NOT use" or prohibition context
                 idx = lower.index(adj)
-                if "not" not in lower[max(0, idx - 20):idx]:
+                if "not" not in lower[max(0, idx - 20) : idx]:
                     return False
         return True
 
@@ -580,9 +585,9 @@ class TestContractVsStyleLabel:
                     re.IGNORECASE,
                 )
             )
-            assert has_imperative, (
-                f"Contract for {name} lacks imperative instructions: {contract[:80]!r}"
-            )
+            assert (
+                has_imperative
+            ), f"Contract for {name} lacks imperative instructions: {contract[:80]!r}"
 
 
 if __name__ == "__main__":

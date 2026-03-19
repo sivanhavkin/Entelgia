@@ -214,12 +214,32 @@ _HIGH_VALUE_EFFECTIVE: frozenset = _HIGH_VALUE_KEYWORDS - _WEAK_TRIGGER_WORDS
 # Words that signal explicit factual uncertainty or a request for evidence
 _UNCERTAINTY_SIGNAL_WORDS: frozenset = frozenset(
     {
-        "uncertain", "uncertainty", "unclear", "unsure", "unknown",
-        "not sure", "don't know", "do we know", "question",
-        "verify", "verification", "check", "confirm",
-        "evidence", "proof", "support", "demonstrate", "show",
-        "source", "sources", "reference", "references",
-        "data", "findings", "results", "outcome",
+        "uncertain",
+        "uncertainty",
+        "unclear",
+        "unsure",
+        "unknown",
+        "not sure",
+        "don't know",
+        "do we know",
+        "question",
+        "verify",
+        "verification",
+        "check",
+        "confirm",
+        "evidence",
+        "proof",
+        "support",
+        "demonstrate",
+        "show",
+        "source",
+        "sources",
+        "reference",
+        "references",
+        "data",
+        "findings",
+        "results",
+        "outcome",
     }
 )
 
@@ -511,7 +531,9 @@ def fixy_should_search(
         # quality_concept_count >= 1 ensures the trigger is based on real
         # epistemic content (not just generic sourcing terms or rhetorical phrases).
         multi_ok = concept_count >= min_concepts and quality_concept_count >= 1
-        uncertainty_ok = require_uncertainty_or_evidence and has_uncertainty and concept_count >= 1
+        uncertainty_ok = (
+            require_uncertainty_or_evidence and has_uncertainty and concept_count >= 1
+        )
 
         if not (multi_ok or uncertainty_ok):
             trigger = find_trigger(combined_window)
@@ -556,11 +578,15 @@ def fixy_should_search(
             for turn in recent_turns:
                 turn_text = turn.get("text", "") if isinstance(turn, dict) else ""
                 turn_trigger = find_trigger(turn_text)
-                if turn_trigger and not _is_trigger_cooled_down(turn_trigger, current_turn):
+                if turn_trigger and not _is_trigger_cooled_down(
+                    turn_trigger, current_turn
+                ):
                     _recent_triggers[turn_trigger] = current_turn
                     _recent_queries[_cooldown_key] = current_turn
                     _last_global_search_turn = current_turn
-                    logger.info("[WEB-TRIGGER-FIRE] trigger=%r type=dialogue", turn_trigger)
+                    logger.info(
+                        "[WEB-TRIGGER-FIRE] trigger=%r type=dialogue", turn_trigger
+                    )
                     return True
 
     # 3. Check Fixy meta-reason signal (always checked regardless of multi-signal setting)

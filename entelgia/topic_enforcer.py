@@ -230,7 +230,8 @@ def compute_topic_compliance_score(
     # to avoid double-counting sentences present in both opening and body.
     full_contamination = _contamination_score(text, _prev_anchors)
     memory_hijack = max(
-        0.0, full_contamination - opening_contamination * _OPENING_CONTAMINATION_DISCOUNT
+        0.0,
+        full_contamination - opening_contamination * _OPENING_CONTAMINATION_DISCOUNT,
     )
 
     score = (
@@ -262,7 +263,10 @@ def compute_topic_compliance_score(
         _WALLPAPER_CLUSTER_MIN = 0.30
         _WALLPAPER_TOPIC_MAX = 0.20
         _WALLPAPER_PENALTY_MULTIPLIER = 0.10
-        if cluster_only_match > _WALLPAPER_CLUSTER_MIN and topic_exactness < _WALLPAPER_TOPIC_MAX:
+        if (
+            cluster_only_match > _WALLPAPER_CLUSTER_MIN
+            and topic_exactness < _WALLPAPER_TOPIC_MAX
+        ):
             wallpaper_penalty = _WALLPAPER_PENALTY_MULTIPLIER * cluster_only_match
             score = max(0.0, score - wallpaper_penalty)
 
@@ -308,32 +312,88 @@ def compute_topic_compliance_score(
 # a cluster but drift from the specific topic ("wallpaper" vocabulary).
 CLUSTER_WALLPAPER_TERMS: dict[str, list[str]] = {
     "economics": [
-        "allocation", "incentives", "tradeoffs", "opportunity cost",
-        "policy", "markets", "efficiency", "equilibrium", "supply", "demand",
+        "allocation",
+        "incentives",
+        "tradeoffs",
+        "opportunity cost",
+        "policy",
+        "markets",
+        "efficiency",
+        "equilibrium",
+        "supply",
+        "demand",
     ],
     "philosophy": [
-        "truth", "knowledge", "reality", "existence", "reasoning",
-        "morality", "ethics", "perspective", "concept", "notion",
+        "truth",
+        "knowledge",
+        "reality",
+        "existence",
+        "reasoning",
+        "morality",
+        "ethics",
+        "perspective",
+        "concept",
+        "notion",
     ],
     "psychology": [
-        "behavior", "cognition", "perception", "emotion", "response",
-        "pattern", "motivation", "awareness", "feelings", "mind",
+        "behavior",
+        "cognition",
+        "perception",
+        "emotion",
+        "response",
+        "pattern",
+        "motivation",
+        "awareness",
+        "feelings",
+        "mind",
     ],
     "biology": [
-        "evolution", "adaptation", "organism", "survival", "genetic",
-        "neural", "biological", "system", "mechanism", "process",
+        "evolution",
+        "adaptation",
+        "organism",
+        "survival",
+        "genetic",
+        "neural",
+        "biological",
+        "system",
+        "mechanism",
+        "process",
     ],
     "society": [
-        "social", "structure", "norms", "community", "power",
-        "institutions", "collective", "culture", "society", "values",
+        "social",
+        "structure",
+        "norms",
+        "community",
+        "power",
+        "institutions",
+        "collective",
+        "culture",
+        "society",
+        "values",
     ],
     "technology": [
-        "system", "algorithm", "data", "digital", "network",
-        "process", "model", "technology", "automated", "interface",
+        "system",
+        "algorithm",
+        "data",
+        "digital",
+        "network",
+        "process",
+        "model",
+        "technology",
+        "automated",
+        "interface",
     ],
     "practical_dilemmas": [
-        "balance", "tension", "compromise", "choice", "value",
-        "conflict", "decision", "priority", "trade-off", "consideration",
+        "balance",
+        "tension",
+        "compromise",
+        "choice",
+        "value",
+        "conflict",
+        "decision",
+        "priority",
+        "trade-off",
+        "consideration",
     ],
 }
 
@@ -341,28 +401,62 @@ CLUSTER_WALLPAPER_TERMS: dict[str, list[str]] = {
 # and should be preferred over generic cluster vocabulary.
 TOPIC_DISTINCT_LEXICON: dict[str, list[str]] = {
     "Risk and decision making": [
-        "uncertainty", "expected utility", "probability weighting", "loss aversion",
-        "signal", "variance", "risk premium", "gamble", "expected value",
+        "uncertainty",
+        "expected utility",
+        "probability weighting",
+        "loss aversion",
+        "signal",
+        "variance",
+        "risk premium",
+        "gamble",
+        "expected value",
     ],
     "Scarcity and human behavior": [
-        "deprivation", "prioritization", "scarcity mindset", "rationing",
-        "adaptation", "delayed gratification", "bandwidth", "tunneling",
+        "deprivation",
+        "prioritization",
+        "scarcity mindset",
+        "rationing",
+        "adaptation",
+        "delayed gratification",
+        "bandwidth",
+        "tunneling",
     ],
     "Cognitive bias": [
-        "heuristic", "anchoring", "availability", "representativeness",
-        "confirmation bias", "framing effect", "sunk cost",
+        "heuristic",
+        "anchoring",
+        "availability",
+        "representativeness",
+        "confirmation bias",
+        "framing effect",
+        "sunk cost",
     ],
     "Memory and identity": [
-        "episodic memory", "narrative self", "autobiographical", "recall",
-        "recognition", "encoding", "retrieval", "continuity of self",
+        "episodic memory",
+        "narrative self",
+        "autobiographical",
+        "recall",
+        "recognition",
+        "encoding",
+        "retrieval",
+        "continuity of self",
     ],
     "AI alignment": [
-        "corrigibility", "reward hacking", "value alignment", "mesa-optimizer",
-        "goal misgeneralization", "outer alignment", "inner alignment",
+        "corrigibility",
+        "reward hacking",
+        "value alignment",
+        "mesa-optimizer",
+        "goal misgeneralization",
+        "outer alignment",
+        "inner alignment",
     ],
     "Free will vs determinism": [
-        "compatibilism", "libertarian free will", "causal chain", "agency",
-        "moral responsibility", "deterministic universe", "randomness",
+        "compatibilism",
+        "libertarian free will",
+        "causal chain",
+        "agency",
+        "moral responsibility",
+        "deterministic universe",
+        "randomness",
     ],
 }
 
