@@ -343,11 +343,8 @@ def configure_grok_api_key():
     print("Once your API key is saved in .env, Entelgia will ask you to select")
     print("the backend (Ollama or Grok) and model for each agent at startup.\n")
     print("Available Grok models (you will choose at startup):")
-    print("  - grok-3           (most capable, best reasoning)")
-    print("  - grok-3-fast      (faster, slightly less capable)")
-    print("  - grok-3-mini      (lightweight, low-cost)")
-    print("  - grok-3-mini-fast (fastest, minimal cost)")
-    print("  - grok-2-1212      (previous generation, stable)")
+    print("  - grok-4.20-multi-agent    (multi-agent capable, latest)")
+    print("  - grok-4-1-fast-reasoning  (fast reasoning, high performance)")
 
     grok_api_key = getpass.getpass("\nEnter your Grok API key (or press Enter to skip): ").strip()
 
