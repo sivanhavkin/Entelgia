@@ -152,8 +152,14 @@ try:
         build_soft_reanchor_instruction,
         get_cluster_wallpaper_terms,
         get_topic_distinct_lexicon,
+        detect_meta_framing_opener,
+        build_pre_generation_anchor_instruction,
+        build_topic_continuity_hint,
+        build_draft_topic_reanchor_instruction,
+        extract_key_concept,
         ACCEPT_THRESHOLD as _TOPIC_ACCEPT_THRESHOLD,
         SOFT_REANCHOR_THRESHOLD as _TOPIC_SOFT_REANCHOR_THRESHOLD,
+        PARTIAL_RECOVERY_THRESHOLD as _TOPIC_PARTIAL_RECOVERY_THRESHOLD,
     )
 
     ENTELGIA_ENHANCED = True
@@ -164,6 +170,7 @@ except ImportError:
     # Fallback stubs for topic_enforcer when enhanced modules are unavailable.
     _TOPIC_ACCEPT_THRESHOLD = 0.60
     _TOPIC_SOFT_REANCHOR_THRESHOLD = 0.40
+    _TOPIC_PARTIAL_RECOVERY_THRESHOLD = 0.30
 
     def compute_topic_compliance_score(  # type: ignore[no-redef]
         text,
@@ -211,6 +218,23 @@ except ImportError:
 
     def build_soft_reanchor_instruction(topic, anchors):  # type: ignore[no-redef]
         return f"\n[RE-ANCHOR] Please begin your response with a sentence about: {topic}.\n"
+
+    def detect_meta_framing_opener(text):  # type: ignore[no-redef]
+        return False
+
+    def build_pre_generation_anchor_instruction(topic, lexicon_items):  # type: ignore[no-redef]
+        return f"Start directly inside the topic: {topic}."
+
+    def build_topic_continuity_hint(topic, key_concept):  # type: ignore[no-redef]
+        if key_concept:
+            return f"Continue within topic: {topic}. Last key concept: {key_concept}."
+        return f"Continue within topic: {topic}."
+
+    def build_draft_topic_reanchor_instruction(topic, anchors, *, strict=False):  # type: ignore[no-redef]
+        return f"[TOPIC-REANCHOR] Sharpen opening to enter: {topic}."
+
+    def extract_key_concept(text, anchors):  # type: ignore[no-redef]
+        return ""
 
     def get_style_for_topic(topic, topic_clusters):  # type: ignore[no-redef]
         return ("custom", "conceptual and reflective")
@@ -2550,6 +2574,7 @@ def transform_draft_to_final(
     topic: str = "",
     temperature: float = 0.7,
     recent_forms: Optional[List[str]] = None,
+    topic_reanchor_hint: str = "",
 ) -> str:
     """Stage 2 (REWRITE) of the DRAFT → REWRITE two-stage generation pipeline.
 
@@ -2569,17 +2594,22 @@ def transform_draft_to_final(
     6. Identity preservation — agent role (Socrates / Athena / Fixy) is kept.
     7. Form variation — if recent_forms shows the same form used ≥2 times, the
        rewrite should prefer a different rhetorical form.
+    8. Topic reanchor — when *topic_reanchor_hint* is provided, the rewrite
+       should sharpen the opening toward the active topic before other refinements.
 
     Pipeline: Stage 1 DRAFT → transform_draft_to_final() → final_output
 
     Args:
-        draft_text:   Post-processed agent draft (not yet shown to user).
-        agent_name:   Name of the speaking agent.
-        llm:          LLM backend with a ``generate(model, prompt, ...)`` method.
-        model:        Model identifier string.
-        topic:        Active dialogue topic (optional context).
-        temperature:  Sampling temperature for the Stage 2 call.
-        recent_forms: Last 1–3 rhetorical forms used by this agent (oldest first).
+        draft_text:          Post-processed agent draft (not yet shown to user).
+        agent_name:          Name of the speaking agent.
+        llm:                 LLM backend with a ``generate(model, prompt, ...)`` method.
+        model:               Model identifier string.
+        topic:               Active dialogue topic (optional context).
+        temperature:         Sampling temperature for the Stage 2 call.
+        recent_forms:        Last 1–3 rhetorical forms used by this agent (oldest first).
+        topic_reanchor_hint: Optional compact instruction to sharpen topic entry point.
+                             Injected at the top of the TASK section when the DRAFT
+                             was detected as weakly anchored.
 
     Returns:
         Refined final response, or *draft_text* unchanged on any error or
@@ -2590,6 +2620,9 @@ def transform_draft_to_final(
 
     persona_note = _FINAL_STAGE_PERSONA_NOTES.get(agent_name, f"You are {agent_name}.")
     topic_line = f"Dialogue topic: {topic}\n\n" if topic else ""
+
+    # When a topic reanchor hint is provided, prepend it to the TASK instructions
+    reanchor_line = f"{topic_reanchor_hint}\n" if topic_reanchor_hint else ""
 
     # Detect form lock-in: if the last 2 forms are the same, prefer a different form
     form_instruction = ""
@@ -2623,6 +2656,7 @@ def transform_draft_to_final(
         f"{topic_line}"
         f"DRAFT:\n{draft_text}\n\n"
         f"TASK:\n"
+        f"{reanchor_line}"
         f"1. Keep the core idea — do NOT change what the draft is saying.\n"
         f"2. Improve clarity and natural flow if needed — preserve original phrasing where it works.\n"
         f"3. Reduce generic or filler phrases (e.g. 'we must consider', 'it is worth noting').\n"
@@ -4967,6 +5001,49 @@ class Agent:
                 _current_topic, _current_cluster, dialog_tail
             )
 
+        # ── Pre-generation topic anchor (compact, one-line) ─────────────────
+        # Forces the DRAFT to enter the topic in the first sentence.
+        # Injected only when a topic is active; kept compact to avoid bloat.
+        if _current_topic and _topic_anchors:
+            _lexicon_items = get_topic_distinct_lexicon(_current_topic)
+            _anchor_instr = build_pre_generation_anchor_instruction(
+                _current_topic, _lexicon_items[:3]
+            )
+            prompt += f"\n{_anchor_instr}\n"
+            if _lexicon_items:
+                _used_lexicon = _lexicon_items[:3]
+                logger.info(
+                    "[TOPIC-LEXICON] agent=%s topic=%r used=%r",
+                    self.name,
+                    _current_topic,
+                    _used_lexicon,
+                )
+
+        # ── Topic continuity hint (one-line, carries sub-concept forward) ───
+        # Extracts the key concept from the last other-agent turn and injects
+        # a continuity hint so agents don't lose the active sub-concept.
+        if _current_topic:
+            _other_turn_texts = [
+                t.get("text", "")
+                for t in dialog_tail[-3:]
+                if t.get("role") != self.name and t.get("text", "").strip()
+            ]
+            _prev_key_concept = ""
+            if _other_turn_texts and _topic_anchors:
+                _prev_key_concept = extract_key_concept(
+                    _other_turn_texts[-1], _topic_anchors
+                )
+            if _prev_key_concept:
+                _continuity_hint = build_topic_continuity_hint(
+                    _current_topic, _prev_key_concept
+                )
+                prompt += f"{_continuity_hint}\n"
+                logger.info(
+                    "[TOPIC-CONTINUITY] agent=%s previous_key_concept=%r",
+                    self.name,
+                    _prev_key_concept,
+                )
+
         # Add first-person and 150-word limit instructions for LLM (DRAFT stage).
         # Hard output contract and forbidden-phrase rules are applied in Stage 2 (REWRITE).
         # Identity lock: drives are internal psychology metrics, not persona labels.
@@ -5366,22 +5443,20 @@ class Agent:
         else:
             self._consecutive_superego_rewrites = 0
 
-        # ── Topic Compliance: graded soft enforcement (Parts C, D, E) ────────────
-        # Skip on the agent's very first turn (own_texts is empty) to avoid
-        # triggering validation before the agent has had any context to engage
-        # with the topic — which would produce regeneration warnings before the
-        # agent speaks at all.
+        # ── Pre-Stage-2 DRAFT topic check ────────────────────────────────────────
+        # Runs topic compliance on the DRAFT output BEFORE Stage 2 REWRITE.
+        # Weakly-anchored or meta-framing drafts get a compact reanchor hint
+        # injected into Stage 2 (cheaper than regenerating Stage 1 from scratch).
+        # Severely off-topic drafts are hard-recovered here to avoid wasting
+        # the Stage 2 REWRITE on a completely wrong foundation.
         #
-        # Enforcement ladder:
-        #   score >= ACCEPT_THRESHOLD (0.70)               → accept
-        #   SOFT_REANCHOR_THRESHOLD <= score < 0.70        → soft re-anchor + single regen
+        # Recovery ladder (applied at this checkpoint):
+        #   draft_score >= ACCEPT_THRESHOLD               → no hint needed
+        #   SOFT_REANCHOR_THRESHOLD <= score < ACCEPT     → soft hint → Stage 2
+        #   PARTIAL_RECOVERY_THRESHOLD <= score < SOFT    → strict hint → Stage 2
+        #   score < PARTIAL_RECOVERY_THRESHOLD            → hard recovery now
         #
-        # _skip_draft_transform: set True when a topic-safe fallback template is
-        # injected (hard recovery failed).  The template is already a crafted final
-        # response — Stage 2 LLM transform must not overwrite it.
-        #   score < SOFT_REANCHOR_THRESHOLD (0.50)         → hard recovery
-        #
-        # Opening-dominance rule (Part E):
+        # Opening-dominance rule:
         #   The OPENING sentences must be anchored to the SESSION topic.
         #   Agent-local memory continuity may shape reasoning *after* the opening
         #   but must not override the session topic in the first sentences.
@@ -5394,70 +5469,78 @@ class Agent:
             else []
         )
         _skip_draft_transform = False  # set True when fallback template is injected
+        _draft_reanchor_hint = ""  # compact hint passed to Stage 2 REWRITE
 
         if own_texts and _active_topic and _active_anchors:
-            _compliance = compute_topic_compliance_score(
+            # Detect meta-framing opener BEFORE scoring so it doesn't produce
+            # a spuriously low score that triggers unnecessary regeneration.
+            _draft_meta_framing = detect_meta_framing_opener(out)
+            if _draft_meta_framing:
+                logger.info(
+                    "[DRAFT-META-FRAMING] agent=%s topic=%r – meta opener detected; "
+                    "will ask Stage 2 to remove it",
+                    self.name,
+                    _active_topic,
+                )
+
+            _draft_compliance = compute_topic_compliance_score(
                 out,
                 _active_topic,
                 _active_anchors,
                 prev_anchors=_prev_anchors_for_score,
                 log_agent=self.name,
             )
-            _score = _compliance["score"]
+            _draft_score = _draft_compliance["score"]
 
             logger.info(
-                "[TOPIC-COMPLIANCE] agent=%s topic=%r cluster=%r "
-                "opening_rel=%.2f full_rel=%.2f contamination=%.2f hijack=%.2f score=%.2f",
+                "[DRAFT-TOPIC] agent=%s topic=%r opening_score=%.2f full_score=%.2f "
+                "score=%.2f meta_framing=%s",
                 self.name,
                 _active_topic,
-                getattr(self, "topic_cluster", ""),
-                _compliance["opening_topic_relevance"],
-                _compliance["full_response_topic_relevance"],
-                _compliance["contamination_penalty"],
-                _compliance["memory_hijack_penalty"],
-                _score,
+                _draft_compliance["opening_topic_relevance"],
+                _draft_compliance["full_response_topic_relevance"],
+                _draft_score,
+                _draft_meta_framing,
             )
 
-            if _score >= _TOPIC_ACCEPT_THRESHOLD:
-                # ── Accept: response is well-anchored ─────────────────────────
+            if _draft_score >= _TOPIC_ACCEPT_THRESHOLD and not _draft_meta_framing:
+                # Draft is well-anchored; no reanchor hint needed
                 logger.debug(
-                    "[TOPIC-ENFORCE] agent=%s topic=%r action=accepted score=%.2f",
+                    "[TOPIC-RECOVERY] agent=%s level=none score=%.2f – draft accepted",
                     self.name,
-                    _active_topic,
-                    _score,
+                    _draft_score,
                 )
 
-            elif _score >= _TOPIC_SOFT_REANCHOR_THRESHOLD:
-                # ── Soft re-anchor: mildly contaminated or weakly anchored ─────
-                logger.warning(
-                    "[TOPIC-SOFT-REANCHOR] agent=%s topic=%r score=%.2f – "
-                    "appending re-anchor instruction and regenerating once",
-                    self.name,
-                    _active_topic,
-                    _score,
+            elif _draft_score >= _TOPIC_SOFT_REANCHOR_THRESHOLD or _draft_meta_framing:
+                # Mild drift or meta-framing → inject soft hint into Stage 2 REWRITE.
+                # No full Stage 1 regeneration needed; Stage 2 will sharpen the opener.
+                _draft_reanchor_hint = build_draft_topic_reanchor_instruction(
+                    _active_topic, _active_anchors, strict=False
                 )
-                _reanchor_instr = build_soft_reanchor_instruction(
-                    _active_topic, _active_anchors
-                )
-                _regen_prompt = prompt + _reanchor_instr
-                _regen_response = (
-                    self.llm.generate(
-                        self.model,
-                        _regen_prompt,
-                        temperature=temperature,
-                        use_cache=False,
-                    )
-                    or out
-                )
-                out = validate_output(_regen_response)
                 logger.info(
-                    "[TOPIC-ENFORCE] agent=%s topic=%r action=soft_reanchor_regen",
+                    "[TOPIC-RECOVERY] agent=%s level=soft topic=%r score=%.2f "
+                    "– injecting soft reanchor hint into Stage 2",
                     self.name,
                     _active_topic,
+                    _draft_score,
+                )
+
+            elif _draft_score >= _TOPIC_PARTIAL_RECOVERY_THRESHOLD:
+                # Medium drift → stronger hint for Stage 2 REWRITE.
+                # Stage 2 will replace the opener and sharpen the topic entry point.
+                _draft_reanchor_hint = build_draft_topic_reanchor_instruction(
+                    _active_topic, _active_anchors, strict=True
+                )
+                logger.warning(
+                    "[TOPIC-RECOVERY] agent=%s level=partial topic=%r score=%.2f "
+                    "– injecting strict reanchor hint into Stage 2",
+                    self.name,
+                    _active_topic,
+                    _draft_score,
                 )
 
             else:
-                # ── Hard recovery: severely contaminated or off-topic ──────────
+                # Severe drift → hard recovery before Stage 2 to avoid wasting REWRITE.
                 _hard_anchors = _active_anchors[:5]
                 _forbidden_abstractions = (
                     "balanced approach",
@@ -5477,11 +5560,11 @@ class Agent:
                     f"Respond in 2-4 sentences only.\n"
                 )
                 logger.warning(
-                    "[TOPIC-HARD-RECOVERY] agent=%s topic=%r score=%.2f – "
-                    "forcing strict anchor prompt",
+                    "[TOPIC-RECOVERY] agent=%s level=hard topic=%r score=%.2f "
+                    "– forcing strict anchor prompt",
                     self.name,
                     _active_topic,
-                    _score,
+                    _draft_score,
                 )
                 _hard_response = (
                     self.llm.generate(
@@ -5705,6 +5788,7 @@ class Agent:
         # The DRAFT produced above is internal only and never shown to the user.
         # transform_draft_to_final() refines the draft — preserving its core idea
         # while reducing generic filler and optionally concretising one element.
+        # When _draft_reanchor_hint is set, Stage 2 also sharpens the topic entry.
         # Skipped when a topic-safe fallback template was injected (_skip_draft_transform).
         logger.debug(
             "[DRAFT] agent=%s draft=%r",
@@ -5720,11 +5804,36 @@ class Agent:
                 topic=_active_topic or "",
                 temperature=temperature,
                 recent_forms=list(self._last_response_forms),
+                topic_reanchor_hint=_draft_reanchor_hint,
             )
             logger.debug(
                 "[REWRITE] agent=%s result=%r",
                 self.name,
                 out[:200] + ("…" if len(out) > 200 else ""),
+            )
+
+        # ── Post-Stage-2 topic compliance log ─────────────────────────────────────
+        # Log the final compliance score after Stage 2 has had a chance to apply
+        # any reanchor hint.  This is diagnostic only — no further regeneration.
+        if own_texts and _active_topic and _active_anchors and not _skip_draft_transform:
+            _final_compliance = compute_topic_compliance_score(
+                out,
+                _active_topic,
+                _active_anchors,
+                prev_anchors=_prev_anchors_for_score,
+                log_agent=self.name,
+            )
+            logger.info(
+                "[TOPIC-COMPLIANCE] agent=%s topic=%r cluster=%r "
+                "opening_rel=%.2f full_rel=%.2f contamination=%.2f hijack=%.2f score=%.2f",
+                self.name,
+                _active_topic,
+                getattr(self, "topic_cluster", ""),
+                _final_compliance["opening_topic_relevance"],
+                _final_compliance["full_response_topic_relevance"],
+                _final_compliance["contamination_penalty"],
+                _final_compliance["memory_hijack_penalty"],
+                _final_compliance["score"],
             )
         # ─────────────────────────────────────────────────────────────────────────
 

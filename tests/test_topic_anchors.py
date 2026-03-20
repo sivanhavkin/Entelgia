@@ -325,11 +325,12 @@ class TestBuildCompactPromptTopicAnchors:
 
 
 class TestTopicMismatchPersistWarning:
-    """Agent.speak applies graded topic compliance and logs [TOPIC-HARD-RECOVERY]
-    or [TOPIC-SOFT-REANCHOR] when the initial response is off-topic.
+    """Agent.speak applies graded topic compliance and logs [TOPIC-RECOVERY] with
+    level=hard or level=soft|partial when the initial response is off-topic.
 
-    Note: The old [TOPIC-MISMATCH-PERSIST] log entry is replaced by the graded
-    enforcement ladder introduced in v3.0.0.
+    Note: The old [TOPIC-MISMATCH-PERSIST] and [TOPIC-HARD-RECOVERY] /
+    [TOPIC-SOFT-REANCHOR] log entries are superseded by the unified
+    [TOPIC-RECOVERY] tag introduced in the topic-enforcement refactor.
     """
 
     # A prior turn for Socrates is required so the validation is not skipped
@@ -337,9 +338,8 @@ class TestTopicMismatchPersistWarning:
     _PRIOR_TURN = [{"role": "Socrates", "text": "I have thought about this before."}]
 
     def test_persist_warning_logged_when_regen_also_fails(self, caplog):
-        """If the initial response is severely off-topic (score < 0.50), a
-        [TOPIC-HARD-RECOVERY] warning must be emitted (the old [TOPIC-MISMATCH-PERSIST]
-        is superseded by the graded enforcement flow)."""
+        """If the initial response is severely off-topic, a [TOPIC-RECOVERY] warning
+        must be emitted (supersedes the old [TOPIC-MISMATCH-PERSIST] tag)."""
         agent = _make_agent()
         # Both calls return a response with no anchor for 'AI alignment'
         agent.llm.generate.return_value = (
@@ -353,10 +353,11 @@ class TestTopicMismatchPersistWarning:
         recovery_msgs = [
             r.message
             for r in caplog.records
-            if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
+            if "TOPIC-RECOVERY" in r.message and "level=" in r.message
+            and r.levelno >= logging.WARNING
         ]
         assert recovery_msgs, (
-            "Expected [TOPIC-HARD-RECOVERY] or [TOPIC-SOFT-REANCHOR] warning when "
+            "Expected [TOPIC-RECOVERY] warning when "
             "initial response lacks required topic anchors"
         )
 
@@ -375,7 +376,9 @@ class TestTopicMismatchPersistWarning:
         recovery_msgs = [
             r.message
             for r in caplog.records
-            if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
+            if ("TOPIC-RECOVERY" in r.message and "level=hard" in r.message)
+            or ("TOPIC-RECOVERY" in r.message and "level=soft" in r.message)
+            or ("TOPIC-RECOVERY" in r.message and "level=partial" in r.message)
         ]
         assert (
             not recovery_msgs
@@ -388,14 +391,14 @@ class TestTopicMismatchPersistWarning:
 
 
 class TestTopicHardRecovery:
-    """Agent.speak applies [TOPIC-HARD-RECOVERY] when the initial response scores
-    below the soft re-anchor threshold (< 0.50)."""
+    """Agent.speak applies [TOPIC-RECOVERY] level=hard when the initial response scores
+    below the partial recovery threshold (< 0.30)."""
 
     _PRIOR_TURN = [{"role": "Socrates", "text": "I have thought about this before."}]
 
     def test_hard_recovery_logged_when_regen_also_fails(self, caplog):
-        """[TOPIC-HARD-RECOVERY] must be logged when the initial response is
-        severely off-topic (score < 0.50)."""
+        """[TOPIC-RECOVERY] level=hard must be logged when the initial response is
+        severely off-topic (score < PARTIAL_RECOVERY_THRESHOLD)."""
         agent = _make_agent()
         # All calls return a generic response with no anchor for 'AI alignment'
         agent.llm.generate.return_value = (
@@ -407,11 +410,13 @@ class TestTopicHardRecovery:
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
-            r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message
+            r.message
+            for r in caplog.records
+            if "TOPIC-RECOVERY" in r.message and "level=hard" in r.message
         ]
         assert recovery_msgs, (
-            "Expected [TOPIC-HARD-RECOVERY] warning when initial response is "
-            "severely off-topic (score < 0.50)"
+            "Expected [TOPIC-RECOVERY] level=hard warning when initial response is "
+            "severely off-topic (score < PARTIAL_RECOVERY_THRESHOLD)"
         )
 
     def test_hard_recovery_uses_strict_prompt(self, caplog):
@@ -465,7 +470,7 @@ class TestTopicHardRecovery:
         ), "Expected the hard-recovery response to be used as the final output"
 
     def test_no_hard_recovery_when_initial_accepted(self, caplog):
-        """[TOPIC-HARD-RECOVERY] must NOT be logged when the initial response
+        """[TOPIC-RECOVERY] level=hard must NOT be logged when the initial response
         satisfies the topic compliance threshold (score >= 0.70)."""
         agent = _make_agent()
         # Directly on-topic: has AI alignment anchor
@@ -478,10 +483,12 @@ class TestTopicHardRecovery:
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
-            r.message for r in caplog.records if "TOPIC-HARD-RECOVERY" in r.message
+            r.message
+            for r in caplog.records
+            if "TOPIC-RECOVERY" in r.message and "level=hard" in r.message
         ]
         assert not recovery_msgs, (
-            "Expected no [TOPIC-HARD-RECOVERY] when the initial response "
+            "Expected no [TOPIC-RECOVERY] level=hard when the initial response "
             "satisfies the topic compliance threshold"
         )
 
@@ -567,7 +574,7 @@ class TestTopicMismatchFirstTurn:
         ), "Expected no [TOPIC-MISMATCH-PERSIST] warning on the agent's first turn"
 
     def test_validation_runs_from_second_turn_onwards(self, caplog):
-        """A recovery warning IS emitted once the agent has a prior turn and the
+        """A [TOPIC-RECOVERY] warning IS emitted once the agent has a prior turn and the
         response is off-topic."""
         agent = _make_agent()
         agent.llm.generate.return_value = (
@@ -582,10 +589,11 @@ class TestTopicMismatchFirstTurn:
         recovery_msgs = [
             r.message
             for r in caplog.records
-            if "TOPIC-HARD-RECOVERY" in r.message or "TOPIC-SOFT-REANCHOR" in r.message
+            if "TOPIC-RECOVERY" in r.message and "level=" in r.message
+            and r.levelno >= logging.WARNING
         ]
         assert recovery_msgs, (
-            "Expected a recovery warning on the agent's second turn when "
+            "Expected a [TOPIC-RECOVERY] warning on the agent's second turn when "
             "the response lacks required topic anchors"
         )
 
