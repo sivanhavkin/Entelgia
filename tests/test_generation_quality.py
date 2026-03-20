@@ -467,11 +467,19 @@ class TestContextManagerContractInjection:
         fxy_prompt = self._build_prompt("Fixy")
         # Each prompt must contain its own contract/role-goal label, not the others'
         assert "SOCRATES" in soc_prompt
-        assert "ATHENA ROLE GOAL" not in soc_prompt and "ATHENA CONTRACT" not in soc_prompt
+        assert (
+            "ATHENA ROLE GOAL" not in soc_prompt and "ATHENA CONTRACT" not in soc_prompt
+        )
         assert "ATHENA" in ath_prompt
-        assert "SOCRATES ROLE GOAL" not in ath_prompt and "SOCRATES CONTRACT" not in ath_prompt
+        assert (
+            "SOCRATES ROLE GOAL" not in ath_prompt
+            and "SOCRATES CONTRACT" not in ath_prompt
+        )
         assert "FIXY" in fxy_prompt
-        assert "SOCRATES ROLE GOAL" not in fxy_prompt and "SOCRATES CONTRACT" not in fxy_prompt
+        assert (
+            "SOCRATES ROLE GOAL" not in fxy_prompt
+            and "SOCRATES CONTRACT" not in fxy_prompt
+        )
 
 
 # ---------------------------------------------------------------------------

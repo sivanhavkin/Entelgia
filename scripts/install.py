@@ -197,7 +197,9 @@ def setup_ollama_model():
     print("  - mistral:latest - Balanced reasoning and conversational coherence")
 
     response = (
-        input("\nWould you like to pull the qwen2.5:7b model now? (y/n): ").strip().lower()
+        input("\nWould you like to pull the qwen2.5:7b model now? (y/n): ")
+        .strip()
+        .lower()
     )
 
     if response == "y":

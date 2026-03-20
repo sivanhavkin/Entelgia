@@ -316,7 +316,7 @@ The Forgetting Policy automatically deletes expired LTM records each dream cycle
 | `conscious` / `semantic` | 90 days |
 | `autobiographical` | 365 days |
 
-You can adjust TTLs via `Config`: `forgetting_episodic_ttl`, `forgetting_semantic_ttl`, `forgetting_autobio_ttl` (all in seconds). Set `forgetting_enabled = False` to disable expiry entirely.
+You can adjust TTLs via `Config`: `forgetting_episodic_ttl`, `forgetting_semantic_ttl`, `forgetting_autobio_ttl` (all in seconds). Set `forgetting_enabled = True` to enable expiry (disabled by default).
 
 ### What is Affective Routing?
 

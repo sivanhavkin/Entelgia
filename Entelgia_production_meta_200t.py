@@ -1882,7 +1882,7 @@ class Config:
     )
     # ── Forgetting Policy (Feature 1) ──────────────────────────────────────
     # TTL in seconds per memory layer.  Set to 0 to disable expiry for a layer.
-    forgetting_enabled: bool = True
+    forgetting_enabled: bool = False
     forgetting_episodic_ttl: int = 7 * 24 * 3600  # subconscious/episodic → 7 days
     forgetting_semantic_ttl: int = 90 * 24 * 3600  # conscious/semantic → 90 days
     forgetting_autobio_ttl: int = 365 * 24 * 3600  # autobiographical → 365 days
@@ -2597,7 +2597,9 @@ def transform_draft_to_final(
     )
 
     try:
-        raw = llm.generate(model, transform_prompt, temperature=temperature, use_cache=False)
+        raw = llm.generate(
+            model, transform_prompt, temperature=temperature, use_cache=False
+        )
         if not raw or not raw.strip():
             logger.warning(
                 "[DRAFT-FINAL] agent=%s Stage 2 returned empty — using draft",
@@ -2797,7 +2799,9 @@ _TEMPLATE_FAMILIES: Dict[str, List[re.Pattern]] = {
     "mediation_openers": [
         re.compile(r"^shift focus to\b", re.IGNORECASE),
         re.compile(r"^the ongoing debate\b", re.IGNORECASE),
-        re.compile(r"^(both|this) (?:debate|discussion|argument) misses\b", re.IGNORECASE),
+        re.compile(
+            r"^(both|this) (?:debate|discussion|argument) misses\b", re.IGNORECASE
+        ),
     ],
     "abstract_generalization_openers": [
         re.compile(r"^my model posits\b", re.IGNORECASE),
@@ -2848,9 +2852,27 @@ def _check_abstraction_penalty(text: str) -> bool:
 
 # ── Variation modes per agent ────────────────────────────────────────────────
 _VARIATION_MODES: Dict[str, List[str]] = {
-    "Socrates": ["skeptical", "diagnostic", "confrontational", "austere", "example-driven"],
-    "Athena": ["analytical", "incisive", "model-building", "contrastive", "compressive"],
-    "Fixy": ["mediator", "debugger", "deadlock-breaker", "reframer", "structural observer"],
+    "Socrates": [
+        "skeptical",
+        "diagnostic",
+        "confrontational",
+        "austere",
+        "example-driven",
+    ],
+    "Athena": [
+        "analytical",
+        "incisive",
+        "model-building",
+        "contrastive",
+        "compressive",
+    ],
+    "Fixy": [
+        "mediator",
+        "debugger",
+        "deadlock-breaker",
+        "reframer",
+        "structural observer",
+    ],
 }
 
 _VARIATION_MODE_INSTRUCTIONS: Dict[str, Dict[str, str]] = {
@@ -5019,7 +5041,10 @@ class Agent:
 
         # ── Anti-repetition: ban overused rhetorical forms ────────────────────
         _recent_forms_list = list(self._last_response_forms)
-        if len(_recent_forms_list) >= 2 and _recent_forms_list[-1] == _recent_forms_list[-2]:
+        if (
+            len(_recent_forms_list) >= 2
+            and _recent_forms_list[-1] == _recent_forms_list[-2]
+        ):
             _locked_form = _recent_forms_list[-1]
             if _locked_form == "question":
                 _form_ban = (
@@ -5650,7 +5675,10 @@ class Agent:
                     _family_repeat_count += 1
                 else:
                     break
-        if _family_repeat_count >= _TEMPLATE_FAMILY_REPEAT_LIMIT and not _skip_draft_transform:
+        if (
+            _family_repeat_count >= _TEMPLATE_FAMILY_REPEAT_LIMIT
+            and not _skip_draft_transform
+        ):
             logger.info(
                 "[TEMPLATE-FAMILY] agent=%s family=%s repeat_count=%d — forcing regeneration",
                 self.name,

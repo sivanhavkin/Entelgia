@@ -401,7 +401,7 @@ For the complete list of configuration options, see the `Config` class definitio
 ### 🗂️ Forgetting Policy Settings
 
 ```python
-config.forgetting_enabled = True              # Master switch; False disables all TTL expiry (default: True)
+config.forgetting_enabled = False             # Master switch; False disables all TTL expiry (default: False)
 config.forgetting_episodic_ttl = 604800       # Subconscious / episodic layer TTL in seconds (default: 7 days)
 config.forgetting_semantic_ttl = 7776000      # Conscious / semantic layer TTL in seconds (default: 90 days)
 config.forgetting_autobio_ttl = 31536000      # Autobiographical layer TTL in seconds (default: 365 days)

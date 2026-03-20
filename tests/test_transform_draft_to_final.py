@@ -79,7 +79,10 @@ class TestNormalTransform:
         expected = "What do you mean by 'known'?"
         llm = _make_mock_llm(expected)
         result = transform_draft_to_final(
-            "It is important to note that knowledge depends on context.", "Socrates", llm, "model-x"
+            "It is important to note that knowledge depends on context.",
+            "Socrates",
+            llm,
+            "model-x",
         )
         assert result == expected
 
@@ -100,7 +103,11 @@ class TestNormalTransform:
     def test_topic_included_in_prompt_when_provided(self):
         llm = _make_mock_llm("Short answer.")
         transform_draft_to_final(
-            "Consider the implications of free will carefully.", "Socrates", llm, "model-x", topic="free will"
+            "Consider the implications of free will carefully.",
+            "Socrates",
+            llm,
+            "model-x",
+            topic="free will",
         )
         prompt_arg = llm.generate.call_args[0][1]
         assert "free will" in prompt_arg
@@ -108,7 +115,11 @@ class TestNormalTransform:
     def test_no_topic_line_when_topic_empty(self):
         llm = _make_mock_llm("Short answer.")
         transform_draft_to_final(
-            "Consider the implications of free will carefully.", "Socrates", llm, "model-x", topic=""
+            "Consider the implications of free will carefully.",
+            "Socrates",
+            llm,
+            "model-x",
+            topic="",
         )
         prompt_arg = llm.generate.call_args[0][1]
         assert "Dialogue topic:" not in prompt_arg
@@ -116,7 +127,10 @@ class TestNormalTransform:
     def test_model_passed_to_generate(self):
         llm = _make_mock_llm("Output.")
         transform_draft_to_final(
-            "It is worth noting the significance of this claim.", "Athena", llm, "my-custom-model"
+            "It is worth noting the significance of this claim.",
+            "Athena",
+            llm,
+            "my-custom-model",
         )
         model_arg = llm.generate.call_args[0][0]
         assert model_arg == "my-custom-model"
@@ -124,7 +138,11 @@ class TestNormalTransform:
     def test_temperature_passed_to_generate(self):
         llm = _make_mock_llm("Output.")
         transform_draft_to_final(
-            "It is worth noting the significance of this claim.", "Athena", llm, "model-x", temperature=0.42
+            "It is worth noting the significance of this claim.",
+            "Athena",
+            llm,
+            "model-x",
+            temperature=0.42,
         )
         kwargs = llm.generate.call_args[1]
         assert kwargs.get("temperature") == pytest.approx(0.42)
@@ -165,7 +183,10 @@ class TestPersonaNotes:
     def test_socrates_persona_in_prompt(self):
         llm = _make_mock_llm("Sharp question?")
         transform_draft_to_final(
-            "This argument has several hidden assumptions worth examining.", "Socrates", llm, "model-x"
+            "This argument has several hidden assumptions worth examining.",
+            "Socrates",
+            llm,
+            "model-x",
         )
         prompt_arg = llm.generate.call_args[0][1]
         assert "Socrates" in prompt_arg
@@ -173,7 +194,10 @@ class TestPersonaNotes:
     def test_athena_persona_in_prompt(self):
         llm = _make_mock_llm("Direct observation.")
         transform_draft_to_final(
-            "The interplay between structure and content reveals a tension.", "Athena", llm, "model-x"
+            "The interplay between structure and content reveals a tension.",
+            "Athena",
+            llm,
+            "model-x",
         )
         prompt_arg = llm.generate.call_args[0][1]
         assert "Athena" in prompt_arg
@@ -181,7 +205,10 @@ class TestPersonaNotes:
     def test_fixy_persona_in_prompt(self):
         llm = _make_mock_llm("Concrete redirect.")
         transform_draft_to_final(
-            "The dialogue appears to be looping without resolution.", "Fixy", llm, "model-x"
+            "The dialogue appears to be looping without resolution.",
+            "Fixy",
+            llm,
+            "model-x",
         )
         prompt_arg = llm.generate.call_args[0][1]
         assert "Fixy" in prompt_arg
@@ -193,7 +220,10 @@ class TestPersonaNotes:
     def test_unknown_agent_uses_generic_persona(self):
         llm = _make_mock_llm("Some output.")
         transform_draft_to_final(
-            "There are important considerations to examine here.", "NewAgent", llm, "model-x"
+            "There are important considerations to examine here.",
+            "NewAgent",
+            llm,
+            "model-x",
         )
         prompt_arg = llm.generate.call_args[0][1]
         assert "NewAgent" in prompt_arg
@@ -205,7 +235,9 @@ class TestPersonaNotes:
 
 
 class TestPromptContract:
-    def _get_prompt(self, agent="Socrates", draft="It is worth noting that meaning is contextual."):
+    def _get_prompt(
+        self, agent="Socrates", draft="It is worth noting that meaning is contextual."
+    ):
         llm = _make_mock_llm("Output.")
         transform_draft_to_final(draft, agent, llm, "model-x")
         return llm.generate.call_args[0][1]
@@ -297,8 +329,9 @@ class TestSpeakIntegration:
 
         transform_sentinel = MagicMock(return_value="Truth eludes easy capture.")
 
-        with patch.object(_meta, "CFG", cfg), patch.object(
-            _meta, "transform_draft_to_final", transform_sentinel
+        with (
+            patch.object(_meta, "CFG", cfg),
+            patch.object(_meta, "transform_draft_to_final", transform_sentinel),
         ):
             agent.speak("What is truth?", [])
 
@@ -315,8 +348,9 @@ class TestSpeakIntegration:
             captured_draft.append(draft_text)
             return draft_text  # passthrough
 
-        with patch.object(_meta, "CFG", cfg), patch.object(
-            _meta, "transform_draft_to_final", side_effect=_capture
+        with (
+            patch.object(_meta, "CFG", cfg),
+            patch.object(_meta, "transform_draft_to_final", side_effect=_capture),
         ):
             agent.speak("What grounds knowledge?", [])
 
@@ -330,8 +364,9 @@ class TestSpeakIntegration:
         final = "Consciousness resists simple definition."
         agent, cfg, llm = self._make_agent(draft)
 
-        with patch.object(_meta, "CFG", cfg), patch.object(
-            _meta, "transform_draft_to_final", return_value=final
+        with (
+            patch.object(_meta, "CFG", cfg),
+            patch.object(_meta, "transform_draft_to_final", return_value=final),
         ):
             result = agent.speak("What is consciousness?", [])
 
