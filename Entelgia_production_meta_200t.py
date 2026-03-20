@@ -5709,7 +5709,7 @@ class Agent:
         # ── Form classification and diagnostics ───────────────────────────────────
         _response_form = classify_response_form(out)
         _recent_forms_snapshot = list(self._last_response_forms)
-        logger.info(
+        logger.debug(
             "[FORM] agent=%s form=%s recent=%s",
             self.name,
             _response_form,
