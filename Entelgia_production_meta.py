@@ -4372,7 +4372,7 @@ class Agent:
         """Return a small set of affective memories not already in *existing*.
 
         Safe, additive, and deduplicated. Returns [] on error or when disabled.
-        Logs a single [AFFECTIVE-LTM] info line with retrieval stats including
+        Logs a single [AFFECTIVE-LTM] debug line with retrieval stats including
         average affective score, id-dedup skips, and content-dedup skips.
         When ``CFG.show_affective_ltm_debug`` is True, also emits a compact
         per-memory DEBUG summary (id, emotion, scores, short content preview).
@@ -4421,7 +4421,7 @@ class Agent:
                 for m in supplement
             ]
             avg_score = sum(scores) / len(scores) if scores else 0.0
-            logger.info(
+            logger.debug(
                 "[AFFECTIVE-LTM] agent=%s emotion=%s retrieved=%d used=%d"
                 " avg_score=%.3f id_skipped=%d content_skipped=%d",
                 self.name,

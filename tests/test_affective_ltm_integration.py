@@ -445,7 +445,7 @@ class TestAffectiveLTMLogging:
             )
         ]
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.DEBUG):
             agent._build_compact_prompt("What is courage?", [])
 
         affective_logs = [
@@ -467,7 +467,7 @@ class TestAffectiveLTMLogging:
             )
         ]
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.DEBUG):
             agent._build_compact_prompt("What is virtue?", [])
 
         affective_logs = [
@@ -498,7 +498,7 @@ class TestAffectiveLTMLogging:
             ),  # passes
         ]
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.DEBUG):
             agent._build_compact_prompt("What is virtue?", [])
 
         affective_logs = [
@@ -516,7 +516,7 @@ class TestAffectiveLTMLogging:
             _make_memory(10, "Should not appear.")
         ]
 
-        with caplog.at_level(logging.INFO):
+        with caplog.at_level(logging.DEBUG):
             agent._build_compact_prompt("What is courage?", [])
 
         affective_logs = [
