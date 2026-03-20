@@ -135,8 +135,6 @@ def _make_agent(cfg_overrides=None):
         "self_replication_topic_gate_enabled": True,
         "self_replication_topic_min_score": 0.50,
         "self_replication_require_same_cluster": True,
-        "humanizer_grammar_repair_enabled": True,
-        "humanizer_repair_broken_openings": True,
         "topic_specific_lexicon_bias_enabled": True,
         "cluster_wallpaper_penalty_enabled": True,
         "cluster_wallpaper_repeat_window": 6,

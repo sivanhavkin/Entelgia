@@ -658,23 +658,6 @@ Tests verify stabilization pass features:
 
 ---
 
-### ✍️ Text Humanizer Integration Tests (41 tests)
-
-```bash
-pytest tests/test_text_humanizer_integration.py -v
-```
-
-Tests verify `TextHumanizer` grammar repair and pipeline integration:
-
-- ✅ **Broken opening detection** — `_build_broken_patterns()` correctly identifies broken sentence starts
-- ✅ **Repair correctness** — `_repair_grammar()` fixes broken openings as expected
-- ✅ **`repair_broken_openings` flag** — repair skipped when flag is False
-- ✅ **`grammar_repair_enabled` flag** — repair skipped when flag is False
-- ✅ **Humanizer pipeline integration** — grammar repair applied in correct order within pipeline
-- ✅ **`show_humanizer_debug` flag** — debug output controlled by flag
-
----
-
 ### 🔍 Topic Enforcer Tests (41 tests)
 
 ```bash

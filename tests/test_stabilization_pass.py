@@ -1,15 +1,14 @@
 # tests/test_stabilization_pass.py
 """Tests for the full stabilization pass (v3.1+).
 
-Covers all 11 areas described in the stabilization problem statement:
+Covers areas described in the stabilization problem statement:
 1.  Topic anchoring in prompt
 2.  Memory topic relevance filtering
 3.  Self-replication topic gate
 4.  Fixy role-aware compliance
-5.  Humanizer grammar repair
-6.  Web research trigger multi-signal gate
-7.  Search query rewriting (concept-based, not prose)
-8.  Topic compliance sub-scores (cluster-only drift scored lower)
+5.  Web research trigger multi-signal gate
+6.  Search query rewriting (concept-based, not prose)
+7.  Topic compliance sub-scores (cluster-only drift scored lower)
 """
 
 from __future__ import annotations
@@ -31,10 +30,7 @@ from entelgia.topic_enforcer import (
     get_cluster_wallpaper_terms,
     get_topic_distinct_lexicon,
 )
-from entelgia.humanizer import TextHumanizer as Humanizer, HumanizerConfig
 
-# ---------------------------------------------------------------------------
-# Helpers
 # ---------------------------------------------------------------------------
 
 
@@ -367,62 +363,6 @@ class TestFixyRoleAwareCompliance:
         assert "new_domain_drift" in result
         assert "contamination_penalty" in result
         assert result["fixy_mode"] is True
-
-
-# ---------------------------------------------------------------------------
-# 5. Humanizer grammar repair
-# ---------------------------------------------------------------------------
-
-
-class TestHumanizerGrammarRepair:
-    """Verify the grammar repair pass fixes broken openings."""
-
-    def _repair(self, text):
-        """Test the _repair_grammar method directly (independent of score gate)."""
-        cfg = HumanizerConfig(grammar_repair_enabled=True, repair_broken_openings=True)
-        h = Humanizer(cfg)
-        repaired, fixes = h._repair_grammar(text, agent_name="Socrates")
-        return repaired
-
-    def test_consider_how_opening_repaired(self):
-        """'consider how...' opening gets a subject prepended."""
-        text = "consider how policy constraints shape decision-making in markets."
-        repaired = self._repair(text)
-        # Should not start with bare "consider how"
-        first_sentence = repaired.split(".")[0].lower()
-        assert not first_sentence.startswith(
-            "consider how"
-        ), f"Expected repaired opening, got: {first_sentence!r}"
-        assert len(repaired) > 0
-
-    def test_double_spaces_removed(self):
-        """Double spaces are collapsed to single spaces by _repair_grammar."""
-        text = "Risk  and  uncertainty  are  key."
-        repaired = self._repair(text)
-        assert "  " not in repaired
-
-    def test_grammar_repair_disabled_preserves_original(self):
-        """When grammar repair is disabled, broken openings are not repaired."""
-        text = "consider how policy constraints shape decision-making."
-        cfg = HumanizerConfig(
-            grammar_repair_enabled=False, repair_broken_openings=False
-        )
-        h = Humanizer(cfg)
-        result = h.humanize(text, agent_name="Socrates")
-        # Text should pass through without repair
-        assert "consider" in result.humanized_text.lower()
-
-    def test_output_non_empty(self):
-        """Output is non-empty for any reasonable input."""
-        text = "consider how utility functions work in expected value calculations."
-        repaired = self._repair(text)
-        assert len(repaired) > 0
-
-    def test_punctuation_spacing_fixed(self):
-        """Malformed punctuation spacing is cleaned up by _repair_grammar."""
-        text = "Risk and uncertainty matter ,but so does context."
-        repaired = self._repair(text)
-        assert " ," not in repaired
 
 
 # ---------------------------------------------------------------------------

@@ -1151,8 +1151,6 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 
 ### Output Quality Pipeline
 
-* `humanizer_grammar_repair_enabled` — Enable grammar repair in `TextHumanizer` (default: `True`)
-* `humanizer_repair_broken_openings` — Enable broken-opening repair specifically (default: `True`)
 * `topic_anchor_enabled` — Enable topic anchor injection into prompts (default: `True`)
 * `topic_anchor_include_forbidden_carryover` — Include forbidden carryover terms in anchor block (default: `True`)
 * `topic_anchor_max_forbidden_items` — Max carryover terms injected (default: `5`)
@@ -1178,7 +1176,7 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 * `show_fixy_compliance_debug` — Print Fixy compliance debug info (default: `False`)
 * `show_web_trigger_debug` — Print web trigger multi-signal gate debug info (default: `False`)
 
-> **Note**: `web_research_enabled` now defaults to `False` (env var `ENTELGIA_WEB_RESEARCH=1` to enable). `humanizer_enabled` now defaults to `False` (enable via `Config(humanizer_enabled=True)`).
+> **Note**: `web_research_enabled` now defaults to `False` (env var `ENTELGIA_WEB_RESEARCH=1` to enable).
 
 ### Energy & Drive (v2.5.0+)
 
