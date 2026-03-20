@@ -12,6 +12,7 @@ This guide helps you diagnose and resolve common issues when working with Entelg
 
 - [Installation Issues](#installation-issues)
 - [Ollama-Related Problems](#ollama-related-problems)
+- [Grok-Related Problems](#grok-related-problems)
 - [Model Loading Failures](#model-loading-failures)
 - [Configuration Errors](#configuration-errors)
 - [Runtime Failures](#runtime-failures)
@@ -145,6 +146,122 @@ curl -fsSL https://ollama.com/install.sh | sh
 - Ensure Ollama is in your PATH
 - Restart your terminal/PowerShell
 - Try running from a new terminal window
+
+---
+
+## Grok-Related Problems
+
+### Problem: Missing GROK_API_KEY
+
+**Symptoms:**
+```
+ValueError: grok_api_key must be set when llm_backend is 'grok'
+(set GROK_API_KEY in your .env or environment)
+```
+
+**Solution:**
+1. Obtain an API key from the xAI console:
+   - Visit [https://console.x.ai](https://console.x.ai) and sign in with your X (Twitter) account.
+   - In the left sidebar, click **API Keys**.
+   - Click **Create API Key**, give it a name, and copy the generated key.
+2. Add the key to your `.env` file:
+```
+GROK_API_KEY=xai-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+3. Restart Entelgia — the key is read at startup.
+
+---
+
+### Problem: Authentication failure / 401 Unauthorized
+
+**Symptoms:**
+```
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized
+```
+
+**Solution:**
+1. Verify that `GROK_API_KEY` in your `.env` file is correct and has not expired.
+2. Ensure there are no trailing spaces or newline characters in the key value.
+3. Regenerate the key at [https://console.x.ai](https://console.x.ai) if necessary and update your `.env` file.
+
+---
+
+### Problem: Grok API endpoint unreachable
+
+**Symptoms:**
+```
+requests.exceptions.ConnectionError: Failed to establish a new connection
+```
+
+**Solution:**
+1. Check your internet connection — Grok is a cloud API and requires network access.
+2. Verify that the default endpoint is correct in your config (or `.env`):
+```
+GROK_URL=https://api.x.ai/v1/responses
+```
+3. Check [https://status.x.ai](https://status.x.ai) for any ongoing xAI service outages.
+
+---
+
+### Problem: Grok model not available
+
+**Symptoms:**
+```
+requests.exceptions.HTTPError: 404 Client Error: Not Found
+```
+or the model name is rejected at startup.
+
+**Solution:**
+Select a supported Grok model at the interactive startup prompt. The currently available models are:
+
+| Model | Description |
+|---|---|
+| `grok-4.20-multi-agent` | Multi-agent capable, latest |
+| `grok-4-1-fast-reasoning` | Fast reasoning, high performance |
+
+If you are modifying `Config` directly, set the model names to one of the values above:
+```python
+config.model_socrates = "grok-4-1-fast-reasoning"
+config.model_athena   = "grok-4-1-fast-reasoning"
+config.model_fixy     = "grok-4-1-fast-reasoning"
+```
+
+---
+
+### Problem: Rate limiting or quota exceeded
+
+**Symptoms:**
+```
+requests.exceptions.HTTPError: 429 Client Error: Too Many Requests
+```
+
+**Solution:**
+1. Reduce the number of concurrent requests or slow down session turns:
+```python
+config.llm_timeout = 120  # Allow more time between retries
+```
+2. Check your xAI account quota at [https://console.x.ai](https://console.x.ai).
+3. Upgrade your xAI plan if you consistently hit rate limits during long sessions.
+
+---
+
+### Problem: LLM timeout when using Grok
+
+**Symptoms:**
+```
+Timeout waiting for LLM response
+```
+
+**Solution:**
+Cloud API calls may take longer than local Ollama calls on slow connections.
+
+1. Increase the timeout in `Config`:
+```python
+config.llm_timeout = 120  # seconds (default: 60)
+```
+2. Check your connection latency to `api.x.ai`.
+3. Switch to the faster `grok-4-1-fast-reasoning` model if timeouts are frequent.
 
 ---
 
@@ -610,7 +727,9 @@ Visit [GitHub Issues](https://github.com/sivanhavkin/Entelgia/issues) to see if 
 Before reporting a new issue, collect:
 - Python version: `python --version`
 - Operating system and version
-- Ollama version: `ollama --version`
+- LLM backend in use: Ollama or Grok
+- Ollama version (if applicable): `ollama --version`
+- Grok model name (if applicable)
 - Error messages (full traceback)
 - Steps to reproduce
 
