@@ -6024,7 +6024,7 @@ class Agent:
         # Update claims memory and log any new/changed claims
         _pe_new_claims = _pe_update_claims(self.name, out, _pe_move)
         if _pe_new_claims:
-            logger.info(
+            logger.debug(
                 "[CLAIMS] agent=%s added/updated=%s",
                 self.name,
                 _pe_new_claims,
