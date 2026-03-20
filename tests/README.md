@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **1043 tests** (1043 passed, 0 skipped) in 29 suites:
+Entelgia ships with comprehensive test coverage across **1127 tests** (1127 collected) in 30 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -341,7 +341,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 749 total tests (192 web research + 18 web tool + 30 context manager + 27 ablation study + 59 topic anchors + 39 topic style + 32 revise draft + 12 seed topic clusters + 11 dialogue + 35 energy + 43 LTM + 19 security + 28 drive correlations + 23 drive pressure + 29 behavioral rules + 58 dialogue metrics + 5 signing migration + 1 demo dialogue + 28 superego critique + 20 limbic hijack + 10 enable observer + 30 loop guard) |
+| **Unit Tests** | `pytest` | Runs 1127 total tests across 30 suites (web research, circularity guard, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
