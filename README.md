@@ -106,9 +106,8 @@ python scripts/install.py
 1. ✅ **Asks you to choose your backend** — Ollama (local) or Grok (xAI cloud) — before doing anything else
 2. ✅ **Ollama path only:** Detects/installs Ollama (macOS via Homebrew; provides instructions for Linux/Windows) and pulls the `qwen2.5:7b` model (or lets you skip)
 3. ✅ **Creates `.env` configuration** from template
-4. ✅ **Generates secure `MEMORY_SECRET_KEY`** (48-char cryptographic key)
-5. ✅ **Grok path only:** Prompts for your `GROK_API_KEY` and saves it to `.env`
-6. ✅ **Installs Python dependencies** from `requirements.txt`
+4. ✅ **Configures API keys in one step** — generates a secure `MEMORY_SECRET_KEY`; if Grok was chosen, also prompts for `GROK_API_KEY`
+5. ✅ **Installs Python dependencies** from `requirements.txt`
 
 ### After installation:
 

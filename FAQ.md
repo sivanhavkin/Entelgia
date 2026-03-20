@@ -75,9 +75,8 @@ The installer will:
 1. ✅ Ask you to choose your backend — **Ollama** (local) or **Grok** (xAI cloud) — before doing anything else
 2. ✅ **Ollama path only:** Detect and install Ollama (macOS via Homebrew; provides instructions for Linux/Windows) and pull the `qwen2.5:7b` model (or lets you skip)
 3. ✅ Create `.env` configuration from template
-4. ✅ Generate secure `MEMORY_SECRET_KEY` (48-char cryptographic key)
-5. ✅ **Grok path only:** Prompt for your `GROK_API_KEY` and save it to `.env`
-6. ✅ Install Python dependencies from `requirements.txt`
+4. ✅ Configure API keys in one step — generate a secure `MEMORY_SECRET_KEY`; if Grok was chosen, also prompt for `GROK_API_KEY`
+5. ✅ Install Python dependencies from `requirements.txt`
 
 For manual installation, see the [README.md](README.md) guide.
 

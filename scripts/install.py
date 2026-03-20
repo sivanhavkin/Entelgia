@@ -255,9 +255,13 @@ def generate_secure_key(length=48):
     return key
 
 
-def update_api_key():
-    """Prompt for API key and update .env file."""
-    print_step(3, "Configuring API key...")
+def update_api_key(backend="ollama"):
+    """Prompt for API keys and update .env file.
+
+    Always configures MEMORY_SECRET_KEY.
+    When backend is 'grok', also configures GROK_API_KEY in the same step.
+    """
+    print_step(3, "Configuring API keys...")
 
     # Get the parent directory (repository root)
     script_dir = Path(__file__).parent
@@ -268,6 +272,7 @@ def update_api_key():
         print_error(".env file does not exist")
         return False
 
+    # --- MEMORY_SECRET_KEY ---
     print("\nThe MEMORY_SECRET_KEY is used for cryptographic integrity protection.")
     print("It should be at least 32 characters long.")
 
@@ -288,116 +293,74 @@ def update_api_key():
         )
 
         if manual_response != "y":
-            print("Keeping existing configuration from .env.example")
-            return True
-
-        api_key = input("Enter your MEMORY_SECRET_KEY (min 32 characters): ").strip()
-
-        if len(api_key) < 32:
-            print_warning("Warning: Key is shorter than recommended 32 characters")
-            confirm = input("Continue anyway? (y/n): ").strip().lower()
-            if confirm != "y":
-                print("Keeping existing configuration from .env.example")
-                return True
-
-    try:
-        # Read the current .env file
-        with open(env_file, "r") as f:
-            lines = f.readlines()
-
-        # Update the MEMORY_SECRET_KEY line
-        updated = False
-        for i, line in enumerate(lines):
-            if line.strip().startswith("MEMORY_SECRET_KEY="):
-                lines[i] = f"MEMORY_SECRET_KEY={api_key}\n"
-                updated = True
-                break
-
-        # Write back to the file
-        with open(env_file, "w") as f:
-            f.writelines(lines)
-
-        if updated:
-            print_success("MEMORY_SECRET_KEY updated successfully")
+            print("Keeping existing MEMORY_SECRET_KEY from .env")
+            api_key = None
         else:
-            print_warning("MEMORY_SECRET_KEY line not found in .env")
+            api_key = input("Enter your MEMORY_SECRET_KEY (min 32 characters): ").strip()
 
-        return True
-    except Exception as e:
-        print_error(f"Failed to update .env file: {e}")
-        return False
+            if len(api_key) < 32:
+                print_warning("Warning: Key is shorter than recommended 32 characters")
+                confirm = input("Continue anyway? (y/n): ").strip().lower()
+                if confirm != "y":
+                    print("Keeping existing MEMORY_SECRET_KEY from .env")
+                    api_key = None
 
+    # --- GROK_API_KEY (only when Grok backend is chosen) ---
+    grok_api_key = None
+    if backend == "grok":
+        print("\nA GROK_API_KEY is required to use the Grok backend.")
+        print("\nHow to get a Grok API key:")
+        print("  1. Go to https://console.x.ai and sign in with your X (Twitter) account.")
+        print("  2. In the left sidebar click \"API Keys\".")
+        print("  3. Click \"Create API Key\", give it a name, and copy the generated key.")
+        print("\nAvailable Grok models (you will select at Entelgia startup):")
+        print("  - grok-4.20-multi-agent    (multi-agent capable, latest)")
+        print("  - grok-4-1-fast-reasoning  (fast reasoning, high performance)")
 
-def configure_grok_api_key(required=False):
-    """Show Grok API key instructions and prompt the user to enter their key.
-
-    Args:
-        required: When True the user must provide a key (Grok backend was chosen).
-    """
-    print_header("Grok (xAI) API Key Setup")
-
-    print("To use Entelgia with Grok you need an xAI API key.\n")
-    print("How to get a Grok API key:")
-    print("  1. Go to https://console.x.ai and sign in with your X (Twitter) account.")
-    print("  2. In the left sidebar click \"API Keys\".")
-    print("  3. Click \"Create API Key\", give it a name, and copy the generated key.")
-    print("  4. Paste the key when prompted below.\n")
-    print("Available Grok models (you will select at Entelgia startup):")
-    print("  - grok-4.20-multi-agent    (multi-agent capable, latest)")
-    print("  - grok-4-1-fast-reasoning  (fast reasoning, high performance)")
-
-    prompt = "\nEnter your Grok API key: " if required else "\nEnter your Grok API key (or press Enter to skip): "
-
-    while True:
-        grok_api_key = getpass.getpass(prompt).strip()
-
-        if grok_api_key:
-            return grok_api_key
-
-        if required:
+        while True:
+            grok_api_key = getpass.getpass("\nEnter your Grok API key: ").strip()
+            if grok_api_key:
+                break
             print_warning("A Grok API key is required when using the Grok backend.")
             retry = input("Try again? (y/n): ").strip().lower()
             if retry != "y":
                 print("Installation cancelled. Add GROK_API_KEY to .env manually and re-run.")
-                return None
-        else:
-            print_warning("Skipping Grok API key entry.")
-            print("Add GROK_API_KEY to your .env file before using Grok.")
-            return None
+                return False
 
-
-def update_grok_api_key_in_env(grok_api_key: str) -> bool:
-    """Write GROK_API_KEY into the .env file."""
-    script_dir = Path(__file__).parent
-    repo_root = script_dir.parent
-    env_file = repo_root / ".env"
-
-    if not env_file.exists():
-        print_error(".env file does not exist")
-        return False
-
+    # --- Write both keys to .env ---
     try:
         with open(env_file, "r") as f:
             lines = f.readlines()
 
-        key_updated = False
-        for i, line in enumerate(lines):
-            if line.strip().startswith("GROK_API_KEY="):
-                lines[i] = f"GROK_API_KEY={grok_api_key}\n"
-                key_updated = True
-                break
+        if api_key is not None:
+            for i, line in enumerate(lines):
+                if line.strip().startswith("MEMORY_SECRET_KEY="):
+                    lines[i] = f"MEMORY_SECRET_KEY={api_key}\n"
+                    break
 
-        if not key_updated:
-            lines.append(f"GROK_API_KEY={grok_api_key}\n")
+        if grok_api_key is not None:
+            key_updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith("GROK_API_KEY="):
+                    lines[i] = f"GROK_API_KEY={grok_api_key}\n"
+                    key_updated = True
+                    break
+            if not key_updated:
+                lines.append(f"GROK_API_KEY={grok_api_key}\n")
 
         with open(env_file, "w") as f:
             f.writelines(lines)
 
-        print_success("GROK_API_KEY saved to .env")
+        if api_key is not None:
+            print_success("MEMORY_SECRET_KEY updated successfully")
+        if grok_api_key is not None:
+            print_success("GROK_API_KEY saved to .env")
+
         return True
     except Exception as e:
         print_error(f"Failed to update .env file: {e}")
         return False
+
 
 def install_dependencies():
     """Install Python dependencies from requirements.txt."""
@@ -543,20 +506,10 @@ def main():
         print_error("Failed to setup .env file")
         sys.exit(1)
 
-    # Step 3: Update MEMORY_SECRET_KEY
-    if not update_api_key():
+    # Step 3: Update API keys (MEMORY_SECRET_KEY always; GROK_API_KEY when Grok is chosen)
+    if not update_api_key(backend):
         print_error("Failed to update API key")
         sys.exit(1)
-
-    # Step 3.5: Grok API key — required when Grok is chosen, skipped for Ollama
-    if backend == "grok":
-        print_step("3.5", "Grok API key setup (required for the Grok backend)...")
-        grok_api_key = configure_grok_api_key(required=True)
-        if not grok_api_key:
-            sys.exit(1)
-        if not update_grok_api_key_in_env(grok_api_key):
-            print_error("Failed to save GROK_API_KEY to .env")
-            sys.exit(1)
 
     # Step 4: Install dependencies
     if not install_dependencies():
