@@ -364,6 +364,20 @@ logger.info(
 # CONFIG (GLOBAL) WITH VALIDATION
 # ============================================
 
+# ── Supported LLM model lists ─────────────────────────────────────────────
+# Centralised here so they are never scattered across files.
+GROK_MODELS: list[str] = [
+    "grok-4.20-multi-agent",
+    "grok-2-latest",
+    "grok-vision-beta",
+]
+
+OLLAMA_MODELS: list[str] = [
+    "qwen2.5:7b",
+    "llama3.1:8b",
+    "mistral:latest",
+]
+
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 MAX_RESPONSE_WORDS = 150
@@ -7464,6 +7478,108 @@ class MainScript:
 # ============================================
 
 
+def _pick_from_list(prompt_header: str, options: list[str]) -> str | None:
+    """Display a numbered list and return the chosen item, or None if skipped/invalid.
+
+    Prints a warning inline when the user enters a non-empty but invalid value
+    so it is clear whether None means "skipped" or "bad input".
+    """
+    for idx, opt in enumerate(options, start=1):
+        print(f"  [{idx}] {opt}")
+    raw = input(f"{prompt_header} ").strip()
+    if not raw:
+        return None
+    try:
+        choice = int(raw)
+        if 1 <= choice <= len(options):
+            return options[choice - 1]
+    except ValueError:
+        pass
+    print(Fore.YELLOW + f"  [WARN] '{raw}' is not a valid selection – keeping defaults." + Style.RESET_ALL)
+    return None
+
+
+def select_llm_backend_and_models(cfg: "Config") -> None:
+    """Interactive startup selector for LLM backend and per-agent models.
+
+    Modifies *cfg* in-place as a runtime override only.
+    The config file and .env are never written to.
+    """
+    print()
+    print(Fore.CYAN + "Select backend:" + Style.RESET_ALL)
+    print("  [1] grok")
+    print("  [2] ollama")
+    print("  [0] defaults (keep config as-is)")
+    backend_raw = input("→ ").strip()
+
+    if backend_raw == "0" or backend_raw == "":
+        # Keep everything as configured – just print the summary and return.
+        _print_llm_config_summary(cfg)
+        return
+
+    if backend_raw == "1":
+        cfg.llm_backend = "grok"
+        available_models = GROK_MODELS
+        backend_label = "Grok"
+    elif backend_raw == "2":
+        cfg.llm_backend = "ollama"
+        available_models = OLLAMA_MODELS
+        backend_label = "Ollama"
+    else:
+        print(Fore.YELLOW + "[WARN] Invalid backend choice – keeping defaults." + Style.RESET_ALL)
+        _print_llm_config_summary(cfg)
+        return
+
+    print()
+    print(Fore.CYAN + f"Available {backend_label} models:" + Style.RESET_ALL)
+    print("  Use same model for all agents? (y/n): ", end="", flush=True)
+    same = input().strip().lower()
+
+    if same in ("y", "yes", ""):
+        print()
+        print(Fore.CYAN + "Choose model:" + Style.RESET_ALL)
+        model = _pick_from_list("→", available_models)
+        if model is None:
+            print(Fore.YELLOW + "[WARN] Invalid model choice – keeping defaults." + Style.RESET_ALL)
+            _print_llm_config_summary(cfg)
+            return
+        cfg.model_socrates = model
+        cfg.model_athena = model
+        cfg.model_fixy = model
+    else:
+        print()
+        print(Fore.CYAN + "Choose model for Socrates:" + Style.RESET_ALL)
+        model_s = _pick_from_list("→", available_models)
+        print()
+        print(Fore.CYAN + "Choose model for Athena:" + Style.RESET_ALL)
+        model_a = _pick_from_list("→", available_models)
+        print()
+        print(Fore.CYAN + "Choose model for Fixy:" + Style.RESET_ALL)
+        model_f = _pick_from_list("→", available_models)
+
+        if model_s is None or model_a is None or model_f is None:
+            print(Fore.YELLOW + "[WARN] Incomplete model selection – keeping defaults." + Style.RESET_ALL)
+            _print_llm_config_summary(cfg)
+            return
+
+        cfg.model_socrates = model_s
+        cfg.model_athena = model_a
+        cfg.model_fixy = model_f
+
+    _print_llm_config_summary(cfg)
+
+
+def _print_llm_config_summary(cfg: "Config") -> None:
+    """Print the active LLM configuration summary."""
+    print()
+    print(Fore.GREEN + "[LLM CONFIG]" + Style.RESET_ALL)
+    print(f"  Backend:   {cfg.llm_backend}")
+    print(f"  Socrates:  {cfg.model_socrates}")
+    print(f"  Athena:    {cfg.model_athena}")
+    print(f"  Fixy:      {cfg.model_fixy}")
+    print()
+
+
 def run_cli():
     """Run command line interface - 200-turn no-timeout dialogue."""
     global CFG
@@ -7476,6 +7592,9 @@ def run_cli():
         + Style.RESET_ALL
     )
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
+
+    select_llm_backend_and_models(CFG)
+
     print("\nConfiguration:")
     _SENSITIVE_KEYS = {"grok_api_key", "memory_secret_key"}
     config_dict = asdict(CFG)
