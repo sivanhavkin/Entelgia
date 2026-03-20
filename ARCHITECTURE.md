@@ -534,10 +534,6 @@ Per-agent behavioral contracts (`LLM_BEHAVIORAL_CONTRACT_SOCRATES`, `LLM_BEHAVIO
 
 `_strip_scaffold_labels(text)` is applied after all validation and critique steps. It removes numbered scaffold labels (e.g. `"1. Claim:"`, `"2. Supporting reason:"`, `"Implication:"`) that occasionally leak into LLM output, ensuring final responses read as natural prose.
 
-### Grammar Repair
-
-`TextHumanizer._repair_grammar()` detects broken sentence openings (e.g. sentences starting with a lowercase letter after a period, or with common broken patterns from `_build_broken_patterns()`) and corrects them. Controlled by `Config.humanizer_grammar_repair_enabled` and `Config.humanizer_repair_broken_openings`.
-
 ### Memory Topic Filter
 
 `Agent._score_memory_topic_relevance()` scores each retrieved LTM entry against the current topic using:

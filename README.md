@@ -549,7 +549,6 @@ Entelgia ships with comprehensive test coverage across **1043 tests** (1043 pass
 | Dialogue Metrics | 58 | `test_dialogue_metrics.py` |
 | Stabilization Pass | 55 | `test_stabilization_pass.py` |
 | Long-Term Memory | 43 | `test_long_term_memory.py` |
-| Text Humanizer Integration | 41 | `test_text_humanizer_integration.py` |
 | Topic Enforcer | 41 | `test_topic_enforcer.py` |
 | Topic Style | 39 | `test_topic_style.py` |
 | Energy Regulation | 35 | `test_energy_regulation.py` |

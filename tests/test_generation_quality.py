@@ -44,7 +44,6 @@ from entelgia.enhanced_personas import (
     format_persona_for_prompt,
     get_persona,
 )
-from entelgia.humanizer import TextHumanizer, HumanizerConfig
 from entelgia.context_manager import (
     ContextManager,
     _AGENT_BEHAVIORAL_CONTRACTS as CM_CONTRACTS,
@@ -473,75 +472,6 @@ class TestContextManagerContractInjection:
         assert "SOCRATES ROLE GOAL" not in ath_prompt and "SOCRATES CONTRACT" not in ath_prompt
         assert "FIXY" in fxy_prompt
         assert "SOCRATES ROLE GOAL" not in fxy_prompt and "SOCRATES CONTRACT" not in fxy_prompt
-
-
-# ---------------------------------------------------------------------------
-# 7. Grammar repair safety — repaired text never shorter than half original
-# ---------------------------------------------------------------------------
-
-
-class TestGrammarRepairSafety:
-    def _make_humanizer(self):
-        cfg = HumanizerConfig(
-            enabled=True,
-            grammar_repair_enabled=True,
-            repair_broken_openings=True,
-        )
-        return TextHumanizer(cfg)
-
-    def test_repair_does_not_produce_empty_result(self):
-        h = self._make_humanizer()
-        text = "Consider how the mind works and why it matters to us."
-        result, _ = h._repair_grammar(text)
-        assert result.strip() != ""
-
-    def test_repair_length_safety_keeps_long_original(self):
-        h = self._make_humanizer()
-        # A long sentence that should not be drastically shortened
-        text = (
-            "The assumption here is that consciousness requires continuity. "
-            "Memory structures the self across time. "
-            "Without that structure, identity collapses into mere sensation."
-        )
-        result, fixes = h._repair_grammar(text)
-        orig_words = len(text.split())
-        result_words = len(result.split())
-        # Result must be at least half of original word count
-        assert (
-            result_words >= orig_words // 2
-        ), f"Repair produced too-short result: {result_words} words from {orig_words}"
-
-    def test_repair_keeps_content_after_scaffold_removal(self):
-        h = self._make_humanizer()
-        text = "Consider how identity is constructed. Memory plays a central role."
-        result, _ = h._repair_grammar(text)
-        assert "identity" in result or "memory" in result.lower()
-
-    def test_repair_does_not_corrupt_clean_text(self):
-        h = self._make_humanizer()
-        clean = "The self is not a fixed thing. It is a process."
-        result, fixes = h._repair_grammar(clean)
-        # Clean text should come back unchanged or very close
-        assert "self" in result
-        assert "process" in result
-
-    def test_repair_capitalises_lowercase_start(self):
-        h = self._make_humanizer()
-        text = "the mind is not a container."
-        result, fixes = h._repair_grammar(text)
-        assert result[0].isupper(), f"Expected capitalised start, got: {result!r}"
-
-    def test_repair_fixes_duplicate_spaces(self):
-        h = self._make_humanizer()
-        text = "The  mind  is  complex."
-        result, fixes = h._repair_grammar(text)
-        assert "  " not in result
-
-    def test_repair_fixes_punctuation_space(self):
-        h = self._make_humanizer()
-        text = "The answer is clear ,or so it seems."
-        result, fixes = h._repair_grammar(text)
-        assert " ," not in result
 
 
 # ---------------------------------------------------------------------------
