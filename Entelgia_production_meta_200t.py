@@ -368,8 +368,7 @@ logger.info(
 # Centralised here so they are never scattered across files.
 GROK_MODELS: list[str] = [
     "grok-4.20-multi-agent",
-    "grok-2-latest",
-    "grok-vision-beta",
+    "grok-4-1-fast-reasoning",
 ]
 
 OLLAMA_MODELS: list[str] = [
