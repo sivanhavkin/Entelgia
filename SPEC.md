@@ -1101,7 +1101,7 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 ### LLM / Session
 
 * `ollama_url` — Ollama API endpoint (default: `http://localhost:11434/api/generate`)
-* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `phi3:latest`)
+* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `qwen2.5:7b`)
 * `max_turns` — Maximum dialogue turns (default: `200`)
 * `timeout_minutes` — Session wall-clock timeout in minutes (default: `30`)
 * `llm_timeout` — Per-request LLM timeout in seconds (default: `300`)

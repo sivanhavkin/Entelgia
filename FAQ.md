@@ -57,7 +57,7 @@ Unlike typical chatbots:
 
 - **Python**: 3.10 or newer
 - **Ollama**: Local LLM runtime
-- **Models**: At least one supported model (`phi3`, `mistral`, etc.)
+- **Models**: At least one supported model (`qwen2.5:7b`, `llama3.1:8b`, `mistral:latest`, etc.)
 - **RAM**: 8GB+ recommended (16GB+ for larger models)
 - **OS**: macOS, Linux, or Windows (with WSL2)
 
@@ -73,7 +73,7 @@ python scripts/install.py
 
 The installer will:
 1. Detect and install Ollama (macOS via Homebrew)
-2. Pull the `phi3` model automatically
+2. Pull the `qwen2.5:7b` model automatically
 3. Create `.env` configuration from template
 4. Generate secure `MEMORY_SECRET_KEY`
 5. Install Python dependencies
@@ -390,12 +390,12 @@ This is an advanced customization not officially supported.
 ### Can I use different LLM models?
 
 Yes! Entelgia supports any Ollama-compatible model. Specify the model in configuration:
-- `phi3` (default, recommended — practical minimum)
-- `mistral`
-- `llama2`
-- Other models available through Ollama
+- `qwen2.5:7b` (recommended default — strong reasoning and instruction following)
+- `llama3.1:8b` (excellent general-purpose performance)
+- `mistral:latest`
+- Other 7B+ models available through Ollama
 
-> ⚠️ **Practical minimum:** Entelgia should be run with **Phi-3 or stronger**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
+> ⚠️ **Practical minimum:** Entelgia requires a **7B-parameter or larger model**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 Different models will produce different dialogue qualities and require varying resources.
 
@@ -535,7 +535,7 @@ Keep this running in a separate terminal, then run Entelgia in another terminal.
 
 **Solution**:
 ```bash
-ollama pull phi3
+ollama pull qwen2.5:7b
 ```
 
 Or use the model name specified in your configuration.

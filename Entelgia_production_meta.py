@@ -1819,9 +1819,9 @@ class Config:
     """Global configuration object with validation."""
 
     ollama_url: str = "http://localhost:11434/api/generate"
-    model_socrates: str = "phi3:latest"
-    model_athena: str = "phi3:latest"
-    model_fixy: str = "phi3:latest"
+    model_socrates: str = "qwen2.5:7b"
+    model_athena: str = "qwen2.5:7b"
+    model_fixy: str = "qwen2.5:7b"
     data_dir: str = "entelgia_data"
     db_path: str = "entelgia_data/entelgia_memory.sqlite"
     csv_log_path: str = "entelgia_data/entelgia_log.csv"

@@ -344,7 +344,7 @@ The `scripts/install.py` utility provides:
 
 * **Platform detection** - macOS, Linux, Windows support
 * **Ollama auto-installation** - Homebrew integration on macOS
-* **Model pulling** - Automatic download of phi3 or selected models
+* **Model pulling** - Automatic download of qwen2.5:7b or selected models
 * **Environment configuration** - `.env` file generation from template
 * **Secure key generation** - Cryptographic 48-character secret keys
 * **Dependency installation** - One-command setup
@@ -419,9 +419,9 @@ Entelgia supports 4 configuration methods (priority order):
 * `show_pronoun: False` - Display agent pronouns (he/she)
 
 ### LLM Models
-* `model_socrates: "phi3:latest"` - Socrates model selection
-* `model_athena: "phi3:latest"` - Athena model selection
-* `model_fixy: "phi3:latest"` - Fixy model selection
+* `model_socrates: "qwen2.5:7b"` - Socrates model selection
+* `model_athena: "qwen2.5:7b"` - Athena model selection
+* `model_fixy: "qwen2.5:7b"` - Fixy model selection
 * `ollama_url` - Local LLM endpoint
 
 ## 12.3 Advanced Features
@@ -527,14 +527,13 @@ Automated pipeline runs on every commit:
 
 ## 17.2 Supported Models
 
-> ⚠️ **Practical minimum:** Entelgia should be run with **Phi-3 or stronger**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
+> ⚠️ **Practical minimum:** Entelgia requires a **7B-parameter or larger model**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 Via Ollama:
-* **phi3** (3.8B) - Practical minimum [default, recommended]
-* **mistral** (7B) - Balanced reasoning
-* **neural-chat** (7B) - Conversational coherence
-* **llama2** (7B+) - General purpose
-* **codellama** (7B+) - Code-aware reasoning
+* **qwen2.5:7b** - Recommended default; strong reasoning and instruction following
+* **llama3.1:8b** - Excellent general-purpose performance
+* **mistral:latest** - Balanced reasoning
+* **llama3.1:70b** or larger - Best results for deep philosophical dialogue
 
 ## 17.3 Runtime Modes
 
