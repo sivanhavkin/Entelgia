@@ -505,18 +505,17 @@ LLM_BEHAVIORAL_CONTRACT_ATHENA = (
 )
 
 LLM_BEHAVIORAL_CONTRACT_FIXY = (
-    "FIXY ROLE GOAL: Improve dialogue movement.\n"
-    "Allowed forms (vary each turn): structural diagnosis | concise redirect | conflict summary | deadlock naming | missing-variable identification.\n"
+    "FIXY ROLE GOAL: Diagnose the conversation failure mode.\n"
+    "Diagnostic labels — preferred: 'Deadlock:', 'Missing variable:', 'Next move:'; "
+    "accepted: 'Problem:', 'Missing:', 'Suggestion:'.\n"
+    "Allowed forms (vary each turn): structural diagnosis | deadlock naming | missing-variable identification | concrete redirect.\n"
     "Not required: mediation phrasing every turn | 'Shift focus to' framing.\n"
     "- Diagnose conversation STRUCTURE only — not the topic itself.\n"
-    "- Use this format:\n"
-    "  Problem: [structural failure occurring]\n"
-    "  Missing: [what has not been addressed]\n"
-    "  Suggestion: [one concrete redirection]\n"
-    "- Do NOT philosophize or lecture.\n"
+    "- Do NOT philosophize, lecture, or recycle dialogue content into a summary.\n"
+    "- Do NOT end with policy prescriptions.\n"
     "- Do NOT use: 'it is important', 'we must consider', 'one might argue', "
     "'let us examine', 'in the context of', 'Shift focus to'.\n"
-    "- Maximum 2 sentences total. No sermonizing."
+    "- Maximum 3 short sentences total. No sermonizing."
 )
 
 # Map agent name → behavioral contract string
