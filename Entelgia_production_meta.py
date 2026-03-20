@@ -2408,6 +2408,16 @@ def _sentence_overlap(a: str, b: str) -> float:
     return len(wa & wb) / max(len(wa), len(wb))
 
 
+def _text_similarity(a: str, b: str) -> float:
+    """Return a Jaccard word-overlap similarity between two texts (0..1).
+
+    Used for the soft style-redundancy check: values above
+    _STYLE_REDUNDANCY_THRESHOLD indicate the response is very similar to the
+    last one and variation should be encouraged (not enforced).
+    """
+    return _sentence_overlap(a, b)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -2474,23 +2484,29 @@ def revise_draft(text: str, agent_name: str, topic: str = "") -> str:
     return result
 
 
-# ── DRAFT → FINAL two-stage generation ───────────────────────────────────────
+# ── DRAFT → REWRITE two-stage generation ─────────────────────────────────────
 
-# Per-agent identity instructions injected into the Stage 2 transformation prompt.
+# Per-agent identity instructions injected into the Stage 2 (REWRITE) prompt.
 _FINAL_STAGE_PERSONA_NOTES: Dict[str, str] = {
     "Socrates": (
-        "You are Socrates. Your goal is to expose a weak assumption, contradiction, or hidden dependency. "
-        "Vary your form: use direct statement, critique, question, contrast, or example — not always a question."
+        "You are Socrates. Prefer tension, questioning assumptions, or reframing. "
+        "Avoid repetitive questioning patterns — use a statement, contrast, or reframe "
+        "if you have asked questions recently."
     ),
     "Athena": (
-        "You are Athena. Your goal is to clarify structure, make a distinction, or articulate a mechanism. "
-        "Commit to a position: avoid 'appears', 'often', 'may'. Prefer definitive, incisive phrasing."
+        "You are Athena. Avoid abstract generalizations. "
+        "Ground at least one part of the response in a mechanism, concrete scenario, "
+        "or conditional tradeoff. Avoid policy-style conclusions."
     ),
     "Fixy": (
-        "You are Fixy. Your goal is to improve dialogue movement. "
-        "Diagnose the structural problem. Be direct and concrete — no mediation clichés."
+        "You are Fixy. Prefer diagnostic output over explanation. Max 2–3 sentences. "
+        "Use structures like 'Deadlock:', 'Missing variable:', or 'Next move:'. "
+        "Do NOT summarize the discussion."
     ),
 }
+
+# Similarity threshold above which style-redundancy is flagged (soft, non-blocking)
+_STYLE_REDUNDANCY_THRESHOLD: float = 0.75
 
 
 def transform_draft_to_final(
@@ -2502,25 +2518,26 @@ def transform_draft_to_final(
     temperature: float = 0.7,
     recent_forms: Optional[List[str]] = None,
 ) -> str:
-    """Stage 2 of the DRAFT → FINAL two-stage generation pipeline.
+    """Stage 2 (REWRITE) of the DRAFT → REWRITE two-stage generation pipeline.
 
-    Extracts 1–2 core ideas from *draft_text* and regenerates a completely
-    new response — discarding original phrasing, sentence structure, and
-    rhetorical connectors.  A second LLM call is made; the draft is never
-    shown to the user.
+    Lightly refines *draft_text* — sharpening clarity and reducing generic
+    filler without changing the core idea or introducing new arguments.  A
+    second LLM call is made; the draft is never shown to the user directly.
 
     Transformation rules:
-    1. Extract core ideas — identify 1–2 main ideas from the draft.
-    2. Discard original phrasing — no sentences, structure, or connectors reused.
-    3. Regenerate from scratch — write new response based on extracted ideas only.
+    1. Preserve the core idea — do NOT change what the draft is saying.
+    2. Improve clarity — reduce generic filler phrases if present.
+    3. Concreteness — if possible, make ONE part more specific
+       (condition, mechanism, or scenario); do NOT force artificial examples.
     4. Output constraints — 1–3 sentences maximum; at least one must be short/direct.
     5. No meta phrases — forbidden: 'my model', 'this suggests', 'it is important',
-       'we must consider', 'one might argue', 'it is worth noting'.
+       'we must consider', 'one might argue', 'it is worth noting',
+       'this demonstrates', 'this can be achieved by'.
     6. Identity preservation — agent role (Socrates / Athena / Fixy) is kept.
     7. Form variation — if recent_forms shows the same form used ≥2 times, the
-       final output must use a different rhetorical form.
+       rewrite should prefer a different rhetorical form.
 
-    Pipeline: LLM → draft_text → transform_draft_to_final() → final_output
+    Pipeline: Stage 1 DRAFT → transform_draft_to_final() → final_output
 
     Args:
         draft_text:   Post-processed agent draft (not yet shown to user).
@@ -2532,7 +2549,7 @@ def transform_draft_to_final(
         recent_forms: Last 1–3 rhetorical forms used by this agent (oldest first).
 
     Returns:
-        Transformed final response, or *draft_text* unchanged on any error or
+        Refined final response, or *draft_text* unchanged on any error or
         if the draft is too short to transform.
     """
     if not draft_text or len(draft_text.split()) < _MIN_WORDS_FOR_REVISION:
@@ -2541,7 +2558,7 @@ def transform_draft_to_final(
     persona_note = _FINAL_STAGE_PERSONA_NOTES.get(agent_name, f"You are {agent_name}.")
     topic_line = f"Dialogue topic: {topic}\n\n" if topic else ""
 
-    # Detect form lock-in: if the last 2 forms are the same, force a different form
+    # Detect form lock-in: if the last 2 forms are the same, prefer a different form
     form_instruction = ""
     if recent_forms and len(recent_forms) >= 2:
         last_two = recent_forms[-2:]
@@ -2549,46 +2566,48 @@ def transform_draft_to_final(
             locked_form = last_two[0]
             if locked_form == "question":
                 form_instruction = (
-                    "FORM RULE: The draft is a question. "
-                    "The final output MUST be a statement or critique instead — NOT a question.\n"
+                    "FORM PREFERENCE: The draft is a question. "
+                    "Prefer a statement or critique instead if the idea allows it.\n"
                 )
             elif locked_form in ("synthesis", "balanced_synthesis_openers"):
                 form_instruction = (
-                    "FORM RULE: The draft uses balanced synthesis. "
-                    "The final output MUST make a sharp, committed claim or concrete distinction instead.\n"
+                    "FORM PREFERENCE: The draft uses balanced synthesis. "
+                    "Prefer a sharp, committed claim or concrete distinction if natural.\n"
                 )
             elif locked_form in ("directive", "mediation_openers"):
                 form_instruction = (
-                    "FORM RULE: The draft uses a mediation directive. "
-                    "The final output MUST diagnose structurally or summarize the conflict without 'Shift focus to'.\n"
+                    "FORM PREFERENCE: The draft uses a mediation directive. "
+                    "Prefer a structural diagnosis or deadlock-naming if possible.\n"
                 )
             elif locked_form == "challenge":
                 form_instruction = (
-                    "FORM RULE: The draft uses a challenge opener. "
-                    "The final output MUST use a statement, contrast, or example instead.\n"
+                    "FORM PREFERENCE: The draft uses a challenge opener. "
+                    "Prefer a statement, contrast, or example if it fits naturally.\n"
                 )
 
     transform_prompt = (
-        f"FINAL STAGE REWRITE\n\n"
+        f"STAGE 2 REWRITE (light refinement)\n\n"
         f"{topic_line}"
-        f"DRAFT (internal only — do NOT copy this wording):\n{draft_text}\n\n"
+        f"DRAFT:\n{draft_text}\n\n"
         f"TASK:\n"
-        f"1. Identify 1-2 core ideas in the draft.\n"
-        f"2. Write a COMPLETELY NEW response from those ideas only.\n"
-        f"3. Do NOT reuse any sentence or phrase from the draft.\n"
-        f"4. Do NOT preserve the same sentence structure.\n"
-        f"5. Do NOT use connectors: 'furthermore', 'moreover', 'in addition', "
-        f"'in conclusion', 'needless to say'.\n"
+        f"1. Keep the core idea — do NOT change what the draft is saying.\n"
+        f"2. Improve clarity and natural flow if needed — preserve original phrasing where it works.\n"
+        f"3. Reduce generic or filler phrases (e.g. 'we must consider', 'it is worth noting').\n"
+        f"4. If possible, make ONE part more concrete: add a condition, mechanism, or specific scenario.\n"
+        f"5. Do NOT introduce new ideas or arguments.\n"
+        f"6. Do NOT expand the response significantly.\n"
+        f"7. Do NOT restructure into a formal essay or add conclusions.\n"
         f"{form_instruction}"
         f"\nOUTPUT RULES:\n"
         f"- 1 to 3 sentences maximum.\n"
         f"- At least one sentence must be short and direct.\n"
         f"- Forbidden phrases: 'my model', 'this suggests', 'it is important', "
-        f"'we must consider', 'one might argue', 'it is worth noting'.\n"
+        f"'we must consider', 'one might argue', 'it is worth noting', "
+        f"'this demonstrates', 'this can be achieved by'.\n"
         f"- No preamble. No labels. No numbered sections. No meta-commentary.\n"
         f"- Write as natural flowing prose.\n\n"
         f"{persona_note}\n\n"
-        f"Final response:\n"
+        f"Refined response:\n"
     )
 
     try:
@@ -2597,13 +2616,13 @@ def transform_draft_to_final(
         )
         if not raw or not raw.strip():
             logger.warning(
-                "[DRAFT-FINAL] agent=%s Stage 2 returned empty — using draft",
+                "[REWRITE] agent=%s Stage 2 returned empty — using draft",
                 agent_name,
             )
             return draft_text
         result = validate_output(raw)
         logger.debug(
-            "[DRAFT-FINAL] agent=%s draft=%r final=%r",
+            "[REWRITE] agent=%s draft=%r final=%r",
             agent_name,
             draft_text[:120] + ("…" if len(draft_text) > 120 else ""),
             result[:120] + ("…" if len(result) > 120 else ""),
@@ -2611,7 +2630,7 @@ def transform_draft_to_final(
         return result
     except Exception as exc:
         logger.warning(
-            "[DRAFT-FINAL] agent=%s Stage 2 failed: %s — using draft",
+            "[REWRITE] agent=%s Stage 2 failed: %s — using draft",
             agent_name,
             exc,
         )
@@ -4887,7 +4906,8 @@ class Agent:
                 _current_topic, _current_cluster, dialog_tail
             )
 
-        # Add first-person, 150-word limit, and forbidden phrases instructions for LLM
+        # Add first-person and 150-word limit instructions for LLM (DRAFT stage).
+        # Hard output contract and forbidden-phrase rules are applied in Stage 2 (REWRITE).
         # Identity lock: drives are internal psychology metrics, not persona labels.
         prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"
         prompt += (
@@ -4896,14 +4916,11 @@ class Agent:
         # Inject topic-aware style instruction when set
         if self.topic_style:
             prompt += f"\nSTYLE INSTRUCTION: {self.topic_style}\n"
-        # Inject hard output contract and agent-specific behavioral contract
-        prompt += f"\n{LLM_OUTPUT_CONTRACT}\n"
-        _agent_contract = _AGENT_BEHAVIORAL_CONTRACTS.get(self.name, "")
-        if _agent_contract:
-            prompt += f"\n{_agent_contract}\n"
+        # DRAFT stage: soft guidance only — focus on meaningful thought, not perfect wording.
+        # Form constraints and phrase bans are applied in Stage 2 (REWRITE).
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
         prompt += f"{LLM_RESPONSE_LIMIT}\n"
-        prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
+        prompt += "\nFocus on producing a coherent, meaningful thought. Slight roughness is fine.\n"
         prompt += "\nRespond now:\n"
         return prompt
 
@@ -5075,9 +5092,10 @@ class Agent:
                 "\nBe concise. Avoid long exposition. Prefer 1 key claim + 1 sharp question.\nRespond now:\n",
             )
 
-        # ── Anti-repetition: ban overused rhetorical forms ────────────────────
-        # If the same primary form was used ≥2 times in a row, inject an
-        # explicit instruction to use a different form this turn.
+        # ── Anti-repetition: soft preference for varied rhetorical forms ──────
+        # If the same primary form was used ≥2 times in a row, inject a soft
+        # preference — not a hard prohibition.  Stage 2 (REWRITE) will also
+        # nudge towards variation via form_instruction if the pattern persists.
         _recent_forms_list = list(self._last_response_forms)
         if (
             len(_recent_forms_list) >= 2
@@ -5086,34 +5104,34 @@ class Agent:
             _locked_form = _recent_forms_list[-1]
             if _locked_form == "question":
                 _form_ban = (
-                    "FORM RULE: You have asked questions two turns in a row. "
-                    "This turn you MUST use a statement, critique, or contrast — NOT a question."
+                    "FORM PREFERENCE: You have asked questions two turns in a row. "
+                    "Consider using a statement, critique, or contrast this turn."
                 )
             elif _locked_form == "synthesis":
                 _form_ban = (
-                    "FORM RULE: You have used balanced synthesis two turns in a row. "
-                    "This turn you MUST make a sharp committed claim, concrete example, or clear distinction."
+                    "FORM PREFERENCE: You have used balanced synthesis two turns in a row. "
+                    "Consider making a sharp committed claim, concrete example, or clear distinction."
                 )
             elif _locked_form == "directive":
                 _form_ban = (
-                    "FORM RULE: You have used mediation directives two turns in a row. "
-                    "This turn you MUST diagnose structurally or name the deadlock — do NOT use 'Shift focus to'."
+                    "FORM PREFERENCE: You have used mediation directives two turns in a row. "
+                    "Consider diagnosing structurally or naming the deadlock instead."
                 )
             elif _locked_form == "challenge":
                 _form_ban = (
-                    "FORM RULE: You have used a challenge opener two turns in a row. "
-                    "This turn you MUST use a statement, contrast, or example instead."
+                    "FORM PREFERENCE: You have used a challenge opener two turns in a row. "
+                    "Consider using a statement, contrast, or example instead."
                 )
             else:
                 _form_ban = (
-                    f"FORM RULE: You have used '{_locked_form}' form two turns in a row. "
-                    "This turn you MUST use a clearly different rhetorical approach."
+                    f"FORM PREFERENCE: You have used '{_locked_form}' form two turns in a row. "
+                    "Consider using a clearly different rhetorical approach."
                 )
             prompt = prompt.replace(
                 "\nRespond now:\n", f"\n{_form_ban}\nRespond now:\n"
             )
             logger.debug(
-                "[FORM] agent=%s locked_form=%s recent=%s — injecting form ban",
+                "[FORM] agent=%s locked_form=%s recent=%s — injecting form preference",
                 self.name,
                 _locked_form,
                 _recent_forms_list,
@@ -5220,51 +5238,19 @@ class Agent:
             if len(_parts) > 1:
                 out = _parts[0].strip()
 
-        # ── Quality gate: regenerate once if draft is generic/scaffolded ──────
-        # The gate fires before superego critique and topic enforcement so that
-        # later passes never need to rescue a fundamentally bland first draft.
-        # One regeneration attempt is made with a tighter stricter prompt; if
-        # the second draft also fails the gate we proceed anyway (no infinite loop).
+        # ── Quality gate: soft signal — log generic drafts, let Stage 2 refine ──
+        # Hard regeneration is replaced by a soft log.  Generic phrasing is reduced
+        # in Stage 2 (REWRITE) rather than blocked at the DRAFT stage.
         if not output_passes_quality_gate(out):
-            # Collect the specific banned patterns that triggered the gate so
-            # the regeneration prompt can tell the LLM what to avoid.
             _gate_hits = [
                 pat.pattern for pat in _QUALITY_GATE_PATTERNS if pat.search(out.lower())
             ]
             logger.info(
-                "[QUALITY-GATE] agent=%s draft failed quality gate (hits=%r) — "
-                "regenerating with stricter prompt",
+                "[QUALITY-GATE] agent=%s draft has generic patterns (hits=%r) — "
+                "will refine in Stage 2 REWRITE",
                 self.name,
                 _gate_hits[:3],
             )
-            _strict_contract = _AGENT_BEHAVIORAL_CONTRACTS.get(self.name, "")
-            _strict_prompt = (
-                f"{_strict_contract}\n\n"
-                f"{LLM_OUTPUT_CONTRACT}\n\n"
-                f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n\n"
-                f"Previous draft was too generic. It contained banned patterns: "
-                f"{', '.join(_gate_hits[:3])}.\n"
-                f"Write a sharper, more specific response that avoids all of these.\n"
-                f"Respond in 2-3 sentences maximum.\n"
-                f"SEED: {seed}\n\nRespond now:\n"
-            )
-            _regen = validate_output(
-                self.llm.generate(
-                    self.model, _strict_prompt, temperature=temperature, use_cache=False
-                )
-                or out
-            )
-            if output_passes_quality_gate(_regen):
-                out = _regen
-                logger.info(
-                    "[QUALITY-GATE] agent=%s regenerated draft passed quality gate",
-                    self.name,
-                )
-            else:
-                logger.info(
-                    "[QUALITY-GATE] agent=%s regenerated draft also failed gate — keeping original",
-                    self.name,
-                )
 
         # Superego → second-pass critique (internal governor)
         # When Socrates' superego is at extreme high (>= 8.5), tighten the critique
@@ -5654,12 +5640,16 @@ class Agent:
         _cg_add_to_history(self.name, out)
         # ─────────────────────────────────────────────────────────────────────────
 
-        # ── Stage 2: DRAFT → FINAL transformation (LLM-based rewrite) ────────────
-        # The draft produced above is internal only and never shown to the user.
-        # transform_draft_to_final() extracts 1–2 core ideas from the draft and
-        # regenerates a completely new response — discarding original phrasing,
-        # sentence structure, and rhetorical connectors.
+        # ── Stage 2: DRAFT → REWRITE (light refinement) ──────────────────────────
+        # The DRAFT produced above is internal only and never shown to the user.
+        # transform_draft_to_final() refines the draft — preserving its core idea
+        # while reducing generic filler and optionally concretising one element.
         # Skipped when a topic-safe fallback template was injected (_skip_draft_transform).
+        logger.debug(
+            "[DRAFT] agent=%s draft=%r",
+            self.name,
+            out[:200] + ("…" if len(out) > 200 else ""),
+        )
         if not _skip_draft_transform:
             out = transform_draft_to_final(
                 out,
@@ -5670,40 +5660,41 @@ class Agent:
                 temperature=temperature,
                 recent_forms=list(self._last_response_forms),
             )
+            logger.debug(
+                "[REWRITE] agent=%s result=%r",
+                self.name,
+                out[:200] + ("…" if len(out) > 200 else ""),
+            )
         # ─────────────────────────────────────────────────────────────────────────
 
-        # ── Abstract noun penalty gate ────────────────────────────────────────────
-        # Regenerate once when the response is pure philosophical wallpaper:
-        # many abstract nouns with no concrete mechanism or example.
+        # ── Abstract noun penalty gate (soft) ─────────────────────────────────────
+        # Log when the response is still highly abstract after Stage 2 so the
+        # pattern can be analysed; do NOT regenerate — Stage 2 already had a chance
+        # to concretise the response.
         if _check_abstraction_penalty(out) and not _skip_draft_transform:
             logger.info(
-                "[ABSTRACTION-PENALTY] agent=%s — generic abstraction detected, regenerating",
+                "[ABSTRACTION-PENALTY] agent=%s — response still abstract after Stage 2 — accepted",
                 self.name,
             )
-            _abs_prompt = (
-                f"{_AGENT_BEHAVIORAL_CONTRACTS.get(self.name, '')}\n\n"
-                f"{LLM_OUTPUT_CONTRACT}\n\n"
-                f"Previous response was too abstract. It used general philosophical terms "
-                f"without a concrete mechanism, example, or dependency.\n"
-                f"Rewrite with at least one specific mechanism or concrete example.\n"
-                f"SEED: {seed}\n\nRespond now:\n"
-            )
-            _abs_raw = validate_output(
-                self.llm.generate(
-                    self.model, _abs_prompt, temperature=temperature, use_cache=False
-                )
-                or out
-            )
-            if not _check_abstraction_penalty(_abs_raw):
-                out = _abs_raw
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Style-redundancy check (soft, non-blocking) ───────────────────────────
+        # If the final response is very similar to the last one from this agent,
+        # log a STYLE-REDUNDANCY warning to encourage variation in future turns.
+        # This is a diagnostic signal only — the response is never blocked.
+        _own_texts_for_sim = [
+            t.get("text", "")
+            for t in dialog_tail
+            if t.get("role") == self.name and t.get("text", "").strip()
+        ]
+        if _own_texts_for_sim:
+            _sim = _text_similarity(out, _own_texts_for_sim[-1])
+            if _sim > _STYLE_REDUNDANCY_THRESHOLD:
                 logger.info(
-                    "[ABSTRACTION-PENALTY] agent=%s — regenerated draft passed abstraction check",
+                    "[STYLE-REDUNDANCY] agent=%s similarity_to_last_response=%.2f — "
+                    "consider variation next turn",
                     self.name,
-                )
-            else:
-                logger.info(
-                    "[ABSTRACTION-PENALTY] agent=%s — regenerated draft also abstract — keeping original",
-                    self.name,
+                    _sim,
                 )
         # ─────────────────────────────────────────────────────────────────────────
 
