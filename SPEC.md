@@ -896,7 +896,7 @@ which caused the system to repeat the same narrow set of topics indefinitely.
 
 ---
 
-## 17) Post-Generation Revision Layer — `revise_draft()` (v3.0.0) + DRAFT → FINAL Transform
+## 17) Post-Generation Revision Layer — `revise_draft()` (v3.0.0) + DRAFT → REWRITE Pipeline
 
 ### Overview
 
@@ -907,32 +907,33 @@ LLM draft  →  post-process  →  transform_draft_to_final()  →  revise_draft
 ```
 
 **Stage 1 — DRAFT (LLM output)**
-- The agent calls the LLM normally.
+- The agent calls the LLM with minimal constraints — a single soft guidance line: *"Focus on producing a coherent, meaningful thought. Slight roughness is fine."*
+- `LLM_OUTPUT_CONTRACT`, `LLM_FORBIDDEN_PHRASES_INSTRUCTION`, and `_AGENT_BEHAVIORAL_CONTRACTS` are NOT included in the DRAFT prompt.
 - The result is stored as `draft_text` (via `Agent._last_raw_draft`).
 - This text is NOT shown to the user; it is treated as raw material only.
 
-**Stage 2 — FINAL (LLM-based rewrite)**
+**Stage 2 — REWRITE (LLM-based soft refinement)**
 - `transform_draft_to_final()` makes a second LLM call.
-- It extracts 1–2 core ideas from the draft and regenerates a completely new response.
-- No sentences, phrasing, or connectors from the draft are reused.
-- Output is 1–3 sentences maximum; at least one must be short and direct.
-- Agent identity (Socrates / Athena / Fixy) is preserved.
+- It keeps the core idea from the draft, improves clarity, reduces filler, and optionally concretises one part.
+- Per-agent `_FINAL_STAGE_PERSONA_NOTES` preserve agent identity: Fixy uses diagnostic labels, Socrates prefers tension/reframing, Athena grounds in mechanism/scenario/tradeoff.
+- Form instructions are soft: `FORM PREFERENCE: Consider using <alternative>` (not hard enforcement).
+- Logged as `[REWRITE] agent=...` after Stage 2 completes.
 - Skipped automatically when a topic-safe fallback template is injected (hard recovery failure).
 
 After Stage 2, `revise_draft()` provides a final rule-based safety net.
 
 ---
 
-### `transform_draft_to_final()` — Stage 2 Transformation Rules
+### `transform_draft_to_final()` — Stage 2 REWRITE Rules
 
 | Rule | Detail |
 |---|---|
-| 1. Extract core ideas | Identify 1–2 main ideas from the draft |
-| 2. Discard original phrasing | No sentences, structure, or rhetorical connectors reused |
-| 3. Regenerate from scratch | Write a new response based on extracted ideas only |
-| 4. Output constraints | 1–3 sentences max; at least one must be short and direct |
-| 5. No meta phrases | Forbidden: `"my model"`, `"this suggests"`, `"it is important"`, `"we must consider"`, `"one might argue"`, `"it is worth noting"` |
-| 6. Identity preservation | Agent role (Socrates / Athena / Fixy) is kept |
+| 1. Keep core idea | Retain the central point of the draft |
+| 2. Improve clarity | Reduce filler, tighten phrasing |
+| 3. Optionally concretise | Ground one part in a mechanism, scenario, or example |
+| 4. Soft form preference | `FORM PREFERENCE: Consider using <alternative>` when form lock-in detected |
+| 5. No meta phrases | Forbidden: `"my model"`, `"this suggests"`, `"this demonstrates"`, `"this can be achieved by"`, `"we must consider"` |
+| 6. Identity preservation | Agent role (Socrates / Athena / Fixy) kept via `_FINAL_STAGE_PERSONA_NOTES` |
 
 Fallback: if the LLM returns empty or raises an exception, the draft is used unchanged.
 
@@ -1011,7 +1012,7 @@ def _sentence_overlap(a: str, b: str) -> float:
 self._last_raw_draft = out
 logger.debug("[%s] raw_draft: %s", self.name, out[:200] + ("…" if len(out) > 200 else ""))
 
-# Stage 2: DRAFT → FINAL (LLM-based rewrite — skipped for topic fallback templates)
+# Stage 2: DRAFT → REWRITE (LLM-based soft refinement — skipped for topic fallback templates)
 if not _skip_draft_transform:
     out = transform_draft_to_final(out, self.name, self.llm, self.model,
                                     topic=_active_topic or "", temperature=temperature)
@@ -1022,7 +1023,7 @@ out = revise_draft(out, self.name, topic=_active_topic or "")
 return out
 ```
 
-Pipeline: `LLM → draft_text → transform_draft_to_final() → revise_draft() → display / memory`
+Pipeline: `LLM → draft_text → transform_draft_to_final() [REWRITE] → revise_draft() → display / memory`
 
 ---
 
@@ -1100,8 +1101,11 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 
 ### LLM / Session
 
+* `llm_backend` — LLM backend selector: `"ollama"` (local) or `"grok"` (xAI cloud) (default: `"ollama"`). Selected interactively at startup via `select_llm_backend_and_models()`.
 * `ollama_url` — Ollama API endpoint (default: `http://localhost:11434/api/generate`)
-* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `qwen2.5:7b`)
+* `grok_url` — xAI Grok API endpoint (default: `https://api.x.ai/v1/responses`)
+* `grok_api_key` — xAI Grok API key; read from `GROK_API_KEY` env var (default: `""`). Required when `llm_backend="grok"`.
+* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `qwen2.5:7b`; Grok backend users typically select from `GROK_MODELS` at startup)
 * `max_turns` — Maximum dialogue turns (default: `200`)
 * `timeout_minutes` — Session wall-clock timeout in minutes (default: `30`)
 * `llm_timeout` — Per-request LLM timeout in seconds (default: `300`)
@@ -1134,7 +1138,7 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 
 ### Forgetting Policy
 
-* `forgetting_enabled` — Master switch; `False` disables all TTL expiry (default: `True`)
+* `forgetting_enabled` — Master switch; `False` disables all TTL expiry (default: `False`)
 * `forgetting_episodic_ttl` — Subconscious/episodic layer TTL in seconds (default: `604800` — 7 days)
 * `forgetting_semantic_ttl` — Conscious/semantic layer TTL in seconds (default: `7776000` — 90 days)
 * `forgetting_autobio_ttl` — Autobiographical layer TTL in seconds (default: `31536000` — 365 days)
