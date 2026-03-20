@@ -35,7 +35,11 @@ ACCEPT_THRESHOLD: float = 0.60
 
 SOFT_REANCHOR_THRESHOLD: float = 0.40
 """Responses in [SOFT_REANCHOR_THRESHOLD, ACCEPT_THRESHOLD) receive a
-soft re-anchor instruction and are regenerated once."""
+soft re-anchor hint injected into Stage 2 REWRITE (no full regeneration)."""
+
+PARTIAL_RECOVERY_THRESHOLD: float = 0.30
+"""Responses in [PARTIAL_RECOVERY_THRESHOLD, SOFT_REANCHOR_THRESHOLD) receive a
+targeted partial rewrite (medium drift recovery). Below this threshold → hard recovery."""
 
 # ---------------------------------------------------------------------------
 # Internal scoring constants
@@ -94,21 +98,40 @@ def _get_opening_sentences(text: str, n: int = 2) -> str:
     return " ".join(parts[:n])
 
 
+def _soft_anchor_match(anchor: str, text_lower: str) -> bool:
+    """Return True if a 5-character stem-prefix of *anchor* appears in *text_lower*.
+
+    Applies only to anchors with 7+ characters.  Uses a fixed 5-character prefix
+    (e.g. "alignment" → "align"), increasing tolerance for morphological variants
+    like "aligning", "aligned", "alignments" without over-matching short words.
+    """
+    a = anchor.lower()
+    if len(a) < 7:
+        return False
+    stem = a[:5]
+    return stem in text_lower
+
+
 def _semantic_relevance(text: str, anchors: list[str]) -> float:
     """Return a relevance score [0, 1] based on anchor-keyword presence.
 
-    Returns 1.0 when any anchor keyword is found in *text* (case-insensitive),
-    0.0 when none are found.
+    Scoring tiers:
+    - 1.0  when any anchor matches *exactly* (case-insensitive substring).
+    - 0.5  when no exact match but at least one anchor has a soft stem match.
+    - 0.0  when no anchor matches at all.
 
-    This binary approach is appropriate when using keyword matching as a proxy
-    for semantic similarity: mentioning any single topic concept in the opening
-    is sufficient evidence of on-topic engagement.  The contamination and
-    memory-hijack penalties then supply the gradient for borderline responses.
+    The two-tier design keeps the 0.0 case for genuinely off-topic text while
+    preventing relevant responses from collapsing to 0.00 purely due to
+    morphological variation (e.g. "aligning values" vs. "value alignment").
     """
     if not anchors:
         return 1.0
     text_lower = text.lower()
-    return 1.0 if any(a.lower() in text_lower for a in anchors) else 0.0
+    if any(a.lower() in text_lower for a in anchors):
+        return 1.0
+    if any(_soft_anchor_match(a, text_lower) for a in anchors):
+        return 0.5
+    return 0.0
 
 
 def _contamination_score(text: str, prev_anchors: list[str]) -> float:
@@ -599,3 +622,130 @@ def build_soft_reanchor_instruction(topic: str, anchors: list[str]) -> str:
         f"Memory from prior topics may appear later in your response but "
         f"must not dominate your opening sentence.\n"
     )
+
+
+# ---------------------------------------------------------------------------
+# Meta-framing opener detection
+# ---------------------------------------------------------------------------
+
+# Patterns that signal a meta-framing opener — the response opens by talking
+# ABOUT the dialogue or another agent rather than entering the topic directly.
+_META_FRAMING_OPENER_RE: re.Pattern = re.compile(
+    r"^("
+    r"(athena|socrates|fixy)\s+(believes?|thinks?|suggests?|argues?|assumes?|asserts?|contends?)\s+that"
+    r"|it\s+is\s+(important|necessary|worth noting|crucial|essential)\s+(to|that)"
+    r"|we\s+must\s+consider"
+    r"|given\s+(this|the|our|this discussion|these)"
+    r"|[A-Z][a-z]+\s+(believes?|assumes?|suggests?|argues?|contends?)\s+that"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def detect_meta_framing_opener(text: str) -> bool:
+    """Return True if *text* opens with a meta-framing pattern.
+
+    Meta-framing openers talk ABOUT the dialogue or another agent rather than
+    entering the topic directly.  Examples:
+
+    - "Athena believes that..."
+    - "It is important to..."
+    - "We must consider..."
+    - "Given this discussion..."
+
+    These patterns often produce low topic scores even when the rest of the
+    response is relevant.  Detecting them early allows the REWRITE stage to
+    strip the opener before the final compliance score is computed.
+    """
+    if not text:
+        return False
+    # Check only the first sentence (~first 120 chars) for efficiency
+    opening = text.strip()[:150]
+    return bool(_META_FRAMING_OPENER_RE.match(opening))
+
+
+# ---------------------------------------------------------------------------
+# Pre-generation anchoring helpers
+# ---------------------------------------------------------------------------
+
+
+def build_pre_generation_anchor_instruction(
+    topic: str, lexicon_items: list[str]
+) -> str:
+    """Return a compact one-line instruction to anchor generation to *topic*.
+
+    Injected into the DRAFT prompt.  The instruction is kept intentionally
+    short to avoid token bloat.  At most 2–3 lexicon items are included.
+    """
+    items = lexicon_items[:3] if lexicon_items else []
+    hint = f" Use one of: {', '.join(items)}." if items else ""
+    return (
+        f"Start directly inside the topic: {topic}."
+        f" Your first sentence must include at least one core concept from this topic.{hint}"
+    )
+
+
+def build_topic_continuity_hint(topic: str, key_concept: str) -> str:
+    """Return a compact one-line continuity hint for prompt injection.
+
+    Keeps the response within *topic* while anchoring to the key sub-concept
+    carried forward from the previous agent turn.
+    """
+    if key_concept:
+        return f"Continue within topic: {topic}. Last key concept: {key_concept}."
+    return f"Continue within topic: {topic}."
+
+
+def build_draft_topic_reanchor_instruction(
+    topic: str, anchors: list[str], *, strict: bool = False
+) -> str:
+    """Return a compact reanchor instruction to inject into Stage 2 REWRITE.
+
+    Asks Stage 2 to sharpen the opening toward *topic* when the DRAFT is
+    weakly anchored.  Keeps the core idea intact while improving the topic
+    entry point.  The instruction is compact to avoid prompt bloat.
+
+    Parameters
+    ----------
+    topic:
+        Active session topic label.
+    anchors:
+        Anchor keywords for *topic*.  At most 3 are used.
+    strict:
+        When True (medium drift), the instruction is firmer about replacing
+        the opener rather than just sharpening it.
+    """
+    top = anchors[:3] if anchors else []
+    concepts = f" ({', '.join(top)})" if top else ""
+    if strict:
+        return (
+            f"[TOPIC-REANCHOR] Remove any generic opener. "
+            f"Begin directly with a claim about: {topic}{concepts}. "
+            f"Keep the core idea but anchor the first sentence to the topic."
+        )
+    return (
+        f"[TOPIC-REANCHOR] Sharpen the opening to enter the topic: {topic}{concepts}. "
+        f"The first sentence should be inside the topic, not framing it."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Key-concept extraction helper
+# ---------------------------------------------------------------------------
+
+
+def extract_key_concept(text: str, anchors: list[str]) -> str:
+    """Return the most prominent anchor keyword found in *text*, or empty string.
+
+    Used to carry a sub-concept forward into the next turn's continuity hint.
+    Multi-word anchors are preferred over single-word ones.
+    """
+    if not anchors or not text:
+        return ""
+    text_lower = text.lower()
+    # Prefer multi-word anchors (more specific) over single-word ones
+    matched = [a for a in anchors if a.lower() in text_lower]
+    if not matched:
+        return ""
+    matched.sort(key=lambda a: (-len(a.split()), -text_lower.count(a.lower())))
+    return matched[0]

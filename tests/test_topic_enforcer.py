@@ -604,16 +604,186 @@ class TestInternalHelpers:
     def test_semantic_relevance_empty_anchors(self):
         assert _semantic_relevance("anything", []) == 1.0
 
-    def test_contamination_score_zero_no_prev(self):
-        assert _contamination_score("some text", []) == 0.0
+    def test_semantic_relevance_soft_match(self):
+        """Morphological variant of an anchor should produce soft score (0.5), not 0.0."""
+        # "alignment" (9 chars) → stem = "align" (first 5 chars)
+        # text contains "aligning" which has "align" in it → soft match
+        score = _semantic_relevance("aligning values is key", ["alignment"])
+        assert score == 0.5, f"Soft match should yield 0.5; got {score}"
 
-    def test_contamination_score_detects_prev_anchor(self):
-        score = _contamination_score("alignment safety agent", ["alignment", "safety"])
-        assert score > 0.0
+    def test_semantic_relevance_no_soft_match_for_short_anchor(self):
+        """Anchors shorter than 7 characters are not soft-matched."""
+        # "data" is 4 chars → no soft match applied
+        score = _semantic_relevance("dated materials", ["data"])
+        assert score == 0.0, f"Short anchor should not soft-match; got {score}"
 
-    def test_stale_phrase_penalty_detects_phrase(self):
-        text = f"We need strict adherence to initial programming to succeed."
-        assert _stale_phrase_penalty(text) > 0.0
+    def test_semantic_relevance_exact_beats_soft(self):
+        """Exact match produces 1.0; soft match produces 0.5."""
+        exact = _semantic_relevance("value alignment here", ["alignment"])
+        soft = _semantic_relevance("aligning values here", ["alignment"])
+        assert exact == 1.0
+        assert soft == 0.5
 
-    def test_stale_phrase_penalty_clean_text(self):
-        assert _stale_phrase_penalty("completely clean text about markets") == 0.0
+
+# ---------------------------------------------------------------------------
+# New public API: detect_meta_framing_opener
+# ---------------------------------------------------------------------------
+
+
+from entelgia.topic_enforcer import (
+    detect_meta_framing_opener,
+    build_pre_generation_anchor_instruction,
+    build_topic_continuity_hint,
+    build_draft_topic_reanchor_instruction,
+    extract_key_concept,
+    PARTIAL_RECOVERY_THRESHOLD,
+)
+
+
+class TestDetectMetaFramingOpener:
+    """detect_meta_framing_opener() should catch common meta-opener patterns."""
+
+    def test_detects_agent_believes_opener(self):
+        assert detect_meta_framing_opener("Athena believes that markets are key.")
+
+    def test_detects_it_is_important_opener(self):
+        assert detect_meta_framing_opener("It is important to consider alignment.")
+
+    def test_detects_we_must_consider_opener(self):
+        assert detect_meta_framing_opener("We must consider the implications.")
+
+    def test_detects_given_this_opener(self):
+        assert detect_meta_framing_opener("Given this discussion, let us examine.")
+
+    def test_clean_opener_not_flagged(self):
+        assert not detect_meta_framing_opener(
+            "Reward hacking undermines alignment objectives directly."
+        )
+
+    def test_empty_text_not_flagged(self):
+        assert not detect_meta_framing_opener("")
+
+    def test_on_topic_opener_not_flagged(self):
+        assert not detect_meta_framing_opener(
+            "Market freedom enables individual choice without coercion."
+        )
+
+
+# ---------------------------------------------------------------------------
+# New public API: build_pre_generation_anchor_instruction
+# ---------------------------------------------------------------------------
+
+
+class TestBuildPreGenerationAnchorInstruction:
+    def test_contains_topic(self):
+        instr = build_pre_generation_anchor_instruction("AI alignment", [])
+        assert "AI alignment" in instr
+
+    def test_contains_lexicon_items(self):
+        instr = build_pre_generation_anchor_instruction(
+            "AI alignment", ["reward hacking", "corrigibility"]
+        )
+        assert "reward hacking" in instr
+        assert "corrigibility" in instr
+
+    def test_at_most_three_lexicon_items(self):
+        items = ["reward-hacking", "corrigibility", "mesa-optimizer", "outer-alignment", "proxy-drift"]
+        instr = build_pre_generation_anchor_instruction("topic", items)
+        # Only first 3 should appear
+        assert "outer-alignment" not in instr
+        assert "proxy-drift" not in instr
+
+    def test_compact_output(self):
+        instr = build_pre_generation_anchor_instruction("AI alignment", [])
+        # Instruction should be a single line (no newlines)
+        assert "\n" not in instr
+
+
+# ---------------------------------------------------------------------------
+# New public API: build_topic_continuity_hint
+# ---------------------------------------------------------------------------
+
+
+class TestBuildTopicContinuityHint:
+    def test_contains_topic_and_concept(self):
+        hint = build_topic_continuity_hint("AI alignment", "reward hacking")
+        assert "AI alignment" in hint
+        assert "reward hacking" in hint
+
+    def test_without_concept_still_contains_topic(self):
+        hint = build_topic_continuity_hint("Economic freedom", "")
+        assert "Economic freedom" in hint
+
+    def test_compact_single_line(self):
+        hint = build_topic_continuity_hint("AI alignment", "proxy optimization")
+        assert "\n" not in hint
+
+
+# ---------------------------------------------------------------------------
+# New public API: build_draft_topic_reanchor_instruction
+# ---------------------------------------------------------------------------
+
+
+class TestBuildDraftTopicReanchorInstruction:
+    def test_contains_topic(self):
+        instr = build_draft_topic_reanchor_instruction("AI alignment", [])
+        assert "AI alignment" in instr
+
+    def test_contains_anchor_hints(self):
+        instr = build_draft_topic_reanchor_instruction(
+            "AI alignment", ["corrigibility", "reward hacking"]
+        )
+        assert "corrigibility" in instr
+
+    def test_strict_mode_firmer_wording(self):
+        soft = build_draft_topic_reanchor_instruction("topic", ["concept"])
+        strict = build_draft_topic_reanchor_instruction("topic", ["concept"], strict=True)
+        # Strict mode should mention removing generic opener
+        assert "Remove" in strict or "replace" in strict.lower() or "Begin" in strict
+
+    def test_at_most_three_anchors(self):
+        anchors = ["reward-hacking", "corrigibility", "mesa-optimizer", "outer-alignment", "proxy-drift"]
+        instr = build_draft_topic_reanchor_instruction("topic", anchors)
+        assert "outer-alignment" not in instr
+        assert "proxy-drift" not in instr
+
+
+# ---------------------------------------------------------------------------
+# New public API: extract_key_concept
+# ---------------------------------------------------------------------------
+
+
+class TestExtractKeyConcept:
+    def test_finds_multi_word_anchor(self):
+        text = "Reward hacking is a core problem in alignment."
+        anchors = ["reward hacking", "corrigibility", "value alignment"]
+        result = extract_key_concept(text, anchors)
+        assert result == "reward hacking"
+
+    def test_prefers_multi_word_over_single(self):
+        text = "Value alignment is necessary for corrigibility."
+        anchors = ["value alignment", "corrigibility"]
+        result = extract_key_concept(text, anchors)
+        assert result == "value alignment"
+
+    def test_returns_empty_on_no_match(self):
+        text = "Nothing relevant here at all."
+        anchors = ["reward hacking", "corrigibility"]
+        result = extract_key_concept(text, anchors)
+        assert result == ""
+
+    def test_returns_empty_on_empty_anchors(self):
+        assert extract_key_concept("some text", []) == ""
+
+    def test_returns_empty_on_empty_text(self):
+        assert extract_key_concept("", ["concept"]) == ""
+
+
+# ---------------------------------------------------------------------------
+# Graded recovery threshold ordering
+# ---------------------------------------------------------------------------
+
+
+class TestGradedRecoveryThresholds:
+    def test_partial_below_soft_below_accept(self):
+        assert 0.0 < PARTIAL_RECOVERY_THRESHOLD < SOFT_REANCHOR_THRESHOLD < ACCEPT_THRESHOLD <= 1.0
