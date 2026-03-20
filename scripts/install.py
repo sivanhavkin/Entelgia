@@ -296,7 +296,9 @@ def update_api_key(backend="ollama"):
             print("Keeping existing MEMORY_SECRET_KEY from .env")
             api_key = None
         else:
-            api_key = input("Enter your MEMORY_SECRET_KEY (min 32 characters): ").strip()
+            api_key = input(
+                "Enter your MEMORY_SECRET_KEY (min 32 characters): "
+            ).strip()
 
             if len(api_key) < 32:
                 print_warning("Warning: Key is shorter than recommended 32 characters")
@@ -310,9 +312,13 @@ def update_api_key(backend="ollama"):
     if backend == "grok":
         print("\nA GROK_API_KEY is required to use the Grok backend.")
         print("\nHow to get a Grok API key:")
-        print("  1. Go to https://console.x.ai and sign in with your X (Twitter) account.")
-        print("  2. In the left sidebar click \"API Keys\".")
-        print("  3. Click \"Create API Key\", give it a name, and copy the generated key.")
+        print(
+            "  1. Go to https://console.x.ai and sign in with your X (Twitter) account."
+        )
+        print('  2. In the left sidebar click "API Keys".')
+        print(
+            '  3. Click "Create API Key", give it a name, and copy the generated key.'
+        )
         print("\nAvailable Grok models (you will select at Entelgia startup):")
         print("  - grok-4.20-multi-agent    (multi-agent capable, latest)")
         print("  - grok-4-1-fast-reasoning  (fast reasoning, high performance)")
@@ -324,7 +330,9 @@ def update_api_key(backend="ollama"):
             print_warning("A Grok API key is required when using the Grok backend.")
             retry = input("Try again? (y/n): ").strip().lower()
             if retry != "y":
-                print("Installation cancelled. Add GROK_API_KEY to .env manually and re-run.")
+                print(
+                    "Installation cancelled. Add GROK_API_KEY to .env manually and re-run."
+                )
                 return False
 
     # --- Write both keys to .env ---
@@ -450,7 +458,9 @@ def print_next_steps(backend, model_pulled=False):
         print("   or")
         print("   python Entelgia_production_meta.py")
 
-        print("\n   Entelgia will ask you to confirm the Grok backend and model at startup.")
+        print(
+            "\n   Entelgia will ask you to confirm the Grok backend and model at startup."
+        )
 
     print("\n" + "=" * 60)
     print("For more information, see the README.md file")
@@ -467,7 +477,9 @@ def choose_backend():
     print("  2. Grok    — uses xAI's cloud API (requires a GROK_API_KEY)\n")
 
     while True:
-        choice = input("Which backend would you like to use? [1=Ollama / 2=Grok]: ").strip()
+        choice = input(
+            "Which backend would you like to use? [1=Ollama / 2=Grok]: "
+        ).strip()
         if choice in ("1", "ollama"):
             return "ollama"
         if choice in ("2", "grok"):
@@ -495,7 +507,9 @@ def main():
         # Step 1: Check/install Ollama
         ollama_installed = setup_ollama()
         if not ollama_installed:
-            print("\nInstallation paused. Please install Ollama and run this script again.")
+            print(
+                "\nInstallation paused. Please install Ollama and run this script again."
+            )
             sys.exit(1)
 
         # Step 1.5: Pull Ollama model

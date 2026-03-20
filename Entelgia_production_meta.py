@@ -17,7 +17,7 @@ Advanced Multi-Agent Dialogue System with:
 - 10-MINUTE AUTO-TIMEOUT
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 3.0.0.
+Version Note: Latest release: 4.0.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -3134,7 +3134,7 @@ class LLM:
                     result = ""
                     for item in output:
                         if item.get("type") == "message":
-                            for c in (item.get("content") or []):
+                            for c in item.get("content") or []:
                                 if c.get("type") == "output_text":
                                     result = c.get("text", "")
                                     break
@@ -6327,7 +6327,7 @@ class AsyncProcessor:
 # ============================================
 
 if FASTAPI_AVAILABLE:
-    app = FastAPI(title="Entelgia API", version="3.0.0")
+    app = FastAPI(title="Entelgia API", version="4.0.0")
 
     class DialogRequest(BaseModel):
         seed_topic: str = "what would you like to talk about?"
@@ -6385,7 +6385,7 @@ if FASTAPI_AVAILABLE:
     @app.get("/api/health")
     async def health_check():
         """Health check endpoint."""
-        return {"status": "ok", "version": "3.0.0"}
+        return {"status": "ok", "version": "4.0.0"}
 
 
 # ============================================
@@ -7529,7 +7529,11 @@ def _pick_from_list(prompt_header: str, options: list[str]) -> str | None:
             return options[choice - 1]
     except ValueError:
         pass
-    print(Fore.YELLOW + f"  [WARN] '{raw}' is not a valid selection – keeping defaults." + Style.RESET_ALL)
+    print(
+        Fore.YELLOW
+        + f"  [WARN] '{raw}' is not a valid selection – keeping defaults."
+        + Style.RESET_ALL
+    )
     return None
 
 
@@ -7560,7 +7564,11 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
         available_models = OLLAMA_MODELS
         backend_label = "Ollama"
     else:
-        print(Fore.YELLOW + "[WARN] Invalid backend choice – keeping defaults." + Style.RESET_ALL)
+        print(
+            Fore.YELLOW
+            + "[WARN] Invalid backend choice – keeping defaults."
+            + Style.RESET_ALL
+        )
         _print_llm_config_summary(cfg)
         return
 
@@ -7574,7 +7582,11 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
         print(Fore.CYAN + "Choose model:" + Style.RESET_ALL)
         model = _pick_from_list("→", available_models)
         if model is None:
-            print(Fore.YELLOW + "[WARN] Invalid model choice – keeping defaults." + Style.RESET_ALL)
+            print(
+                Fore.YELLOW
+                + "[WARN] Invalid model choice – keeping defaults."
+                + Style.RESET_ALL
+            )
             _print_llm_config_summary(cfg)
             return
         cfg.model_socrates = model
@@ -7592,7 +7604,11 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
         model_f = _pick_from_list("→", available_models)
 
         if model_s is None or model_a is None or model_f is None:
-            print(Fore.YELLOW + "[WARN] Incomplete model selection – keeping defaults." + Style.RESET_ALL)
+            print(
+                Fore.YELLOW
+                + "[WARN] Incomplete model selection – keeping defaults."
+                + Style.RESET_ALL
+            )
             _print_llm_config_summary(cfg)
             return
 

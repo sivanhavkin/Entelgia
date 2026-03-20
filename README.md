@@ -633,18 +633,19 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v3.0.0** | ✅ **Latest** | current |
-| **v2.8.1** | ⚠️ Superseded |  Use v3.0.0 instead |
-| **v2.8.0** | ⚠️ Superseded | Use v3.0.0 instead |
+| **v4.0.0** | ✅ **Latest** | current |
+| **v3.0.0** | ⚠️ Superseded | Use v4.0.0 instead |
+| **v2.8.1** | ⚠️ Superseded |  Use v4.0.0 instead |
+| **v2.8.0** | ⚠️ Superseded | Use v4.0.0 instead |
 | **v2.7.0** | ✅ **Stable** | previous stable release |
 | **v2.6.0** | ✅ **Stable** | previous stable release |
 | **v2.5.0** | ✅ **Stable** | previous stable release |
-| **v2.4.0** | ⚠️ Superseded | Use v3.0.0 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v3.0.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v3.0.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v3.0.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v3.0.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v3.0.0 instead |
+| **v2.4.0** | ⚠️ Superseded | Use v4.0.0 instead |
+| **v2.3.0** | ⚠️ Superseded | Use v4.0.0 instead |
+| **v2.2.0** | ⚠️ Superseded | Use v4.0.0 instead |
+| **v2.1.1** | ⚠️ Superseded | Use v4.0.0 instead |
+| v2.1.0 | ⚠️ Superseded | Use v4.0.0 instead |
+| v2.0.01 | ⚠️ Superseded | Use v4.0.0 instead |
 | v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
@@ -729,6 +730,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 3.0.0 
+* **Version:** 4.0.0 
 * **Last Updated:** 11 March 2026
 ---
