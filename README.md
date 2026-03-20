@@ -79,7 +79,7 @@ The project welcomes both researchers and developers building persistent, reflec
 
 * Python **3.10+**
 * **Ollama** (local LLM runtime)
-* At least one supported model (`phi3`, `mistral`, etc.)
+* At least one supported model (`qwen2.5:7b`, `llama3.1:8b`, `mistral:latest`, etc.)
 * **8GB+ RAM** recommended (16GB+ for larger models)
 
 For the complete dependency list, see [`requirements.txt`](requirements.txt).
@@ -104,7 +104,7 @@ python scripts/install.py
 ### What the installer does:
 
 1. ✅ **Detects and installs Ollama** (macOS via Homebrew; provides instructions for Linux/Windows)
-2. ✅ **Pulls the `phi3` model** automatically (or lets you skip)
+2. ✅ **Pulls the `qwen2.5:7b` model** automatically (or lets you skip)
 3. ✅ **Creates `.env` configuration** from template
 4. ✅ **Generates secure `MEMORY_SECRET_KEY`** (48-char cryptographic key)
 5. ✅ **Installs Python dependencies** from `requirements.txt`
@@ -153,16 +153,17 @@ curl -fsSL https://ollama.com/install.sh | sh
 ### 2️⃣ Pull an LLM Model
 
 ```bash
-ollama pull phi3
+ollama pull qwen2.5:7b
 ```
 
 Recommended models (8GB+ RAM recommended):
 
-> ⚠️ **Practical minimum:** Entelgia should be run with **Phi-3 or stronger**. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
+> ⚠️ **Practical minimum:** Entelgia requires a **7B-parameter or larger model** (e.g., `qwen2.5:7b`, `llama3.1:8b`, or `mistral:latest`). Smaller models may execute but do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
-* **phi3 (3.8B)** – Practical minimum [default, recommended]
-* **mistral (7B)** – Balanced reasoning
-* **neural-chat (7B)** – Strong conversational coherence
+* **qwen2.5:7b** – Recommended default; strong reasoning and instruction following
+* **llama3.1:8b** – Excellent general-purpose performance
+* **mistral:latest** – Balanced reasoning and conversational coherence
+* **llama3.1:70b** or larger – Best results for deep philosophical dialogue
 
 ### 3️⃣ Install Dependencies
 

@@ -151,7 +151,7 @@ def setup_ollama():
         return False
 
 
-def pull_ollama_model(model_name="phi3"):
+def pull_ollama_model(model_name="qwen2.5:7b"):
     """Pull an Ollama model."""
     print(f"\nAttempting to pull Ollama model: {model_name}")
     print("This may take several minutes depending on your internet speed...")
@@ -191,20 +191,20 @@ def setup_ollama_model():
     print_step("1.5", "Setting up Ollama model...")
 
     print("\nEntelgia requires an LLM model to run.")
-    print("Recommended models:")
-    print("  - phi3 (3.8B) - Fast & lightweight [RECOMMENDED]")
-    print("  - mistral (7B) - Balanced reasoning")
-    print("  - neural-chat (7B) - Strong conversational coherence")
+    print("Recommended models (7B+ required for reliable performance):")
+    print("  - qwen2.5:7b - Strong reasoning and instruction following [RECOMMENDED]")
+    print("  - llama3.1:8b - Excellent general-purpose performance")
+    print("  - mistral:latest - Balanced reasoning and conversational coherence")
 
     response = (
-        input("\nWould you like to pull the phi3 model now? (y/n): ").strip().lower()
+        input("\nWould you like to pull the qwen2.5:7b model now? (y/n): ").strip().lower()
     )
 
     if response == "y":
-        return pull_ollama_model("phi3")
+        return pull_ollama_model("qwen2.5:7b")
     else:
         print_warning("Skipping model download")
-        print("You can pull a model later with: ollama pull phi3")
+        print("You can pull a model later with: ollama pull qwen2.5:7b")
         return False  # Return False since model was not pulled
 
 
@@ -385,8 +385,8 @@ def print_next_steps(model_pulled=False):
     print("   ollama serve")
 
     if not model_pulled:
-        print("\n2. Pull a model if not pulled automatically  (e.g., phi3):")
-        print("   ollama pull phi3")
+        print("\n2. Pull a model if not pulled automatically (e.g., qwen2.5:7b):")
+        print("   ollama pull qwen2.5:7b")
         step_verify = "3"
         step_run = "4"
     else:
@@ -394,7 +394,7 @@ def print_next_steps(model_pulled=False):
         step_run = "3"
 
     print(f"\n{step_verify}. Verify Ollama is working:")
-    print('   ollama run phi3 "hello"')
+    print('   ollama run qwen2.5:7b "hello"')
 
     print(f"\n{step_run}. Run Entelgia:")
     print("   python examples/demo_enhanced_dialogue.py")

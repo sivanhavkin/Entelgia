@@ -150,17 +150,17 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ## Model Loading Failures
 
-### Problem: "Model not found" or "phi3 not available"
+### Problem: "Model not found" or model not available
 
 **Symptoms:**
 ```
-Error: model 'phi3' not found
+Error: model 'qwen2.5:7b' not found
 ```
 
 **Solution:**
 Pull the required model manually:
 ```bash
-ollama pull phi3
+ollama pull qwen2.5:7b
 ```
 
 Wait for the download to complete (this may take several minutes depending on your connection).
@@ -182,20 +182,20 @@ ollama list
 1. Check your internet connection
 2. Retry the download:
 ```bash
-ollama pull phi3
+ollama pull qwen2.5:7b
 ```
 
-3. Try an alternative model if phi3 continues to fail:
+3. Try an alternative model if download continues to fail:
 ```bash
-# Use mistral as an alternative
-ollama pull mistral
+# Use mistral:latest as an alternative
+ollama pull mistral:latest
 ```
 
-> ⚠️ **Note:** Do not substitute with models smaller than Phi-3. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
+> ⚠️ **Note:** Use only models with 7B parameters or larger. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 4. Update your `.env` file to use the alternative model:
 ```
-OLLAMA_MODEL=mistral
+OLLAMA_MODEL=mistral:latest
 ```
 
 ---
@@ -208,7 +208,7 @@ Error: not enough disk space
 ```
 
 **Solution:**
-- phi3 requires ~2.3GB of disk space
+- `qwen2.5:7b` requires ~5GB of disk space; `llama3.1:8b` requires ~5GB
 - Check available space: `df -h` (Linux/macOS) or `dir` (Windows)
 - Free up space if needed, or remove unused models: `ollama rm <model-name>`
 
@@ -231,7 +231,7 @@ cp .env.example .env
 
 2. Edit `.env` and configure required settings:
 ```bash
-OLLAMA_MODEL=phi3
+OLLAMA_MODEL=qwen2.5:7b
 MEMORY_SECRET_KEY=your_secret_key_here
 ```
 
@@ -304,12 +304,12 @@ ollama ps
 ollama serve
 ```
 
-4. Try a faster model if timeouts persist (use phi3 or stronger):
+4. Try a faster model if timeouts persist (use a 7B+ model):
 ```bash
-ollama pull phi3
+ollama pull qwen2.5:7b
 ```
 
-> ⚠️ **Note:** Do not substitute with models smaller than Phi-3. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
+> ⚠️ **Note:** Use only models with 7B parameters or larger. Smaller models may execute, but they do not reliably handle the architecture's reflective, memory-heavy, multi-layer reasoning demands.
 
 ---
 
@@ -328,7 +328,7 @@ Warning: Empty response from agent
 
 2. Verify the model is working:
 ```bash
-ollama run phi3 "Hello"
+ollama run qwen2.5:7b "Hello"
 ```
 
 3. Check for network issues between Python and Ollama
@@ -386,8 +386,9 @@ config.dream_every_n_turns = 5  # More frequent reflection
 
 **Solution:**
 1. Check model size - larger models need more RAM:
-   - `phi3` - ~4GB RAM (practical minimum)
-   - `mistral` - ~4GB RAM
+   - `qwen2.5:7b` - ~5GB RAM (recommended minimum)
+   - `llama3.1:8b` - ~6GB RAM
+   - `mistral:latest` - ~5GB RAM
 
 2. Reduce context size:
 ```python
@@ -395,7 +396,7 @@ config.max_turns = 100  # Reduce from default 200
 ```
 
 3. Close other applications
-4. Ensure you are using Phi-3 or stronger; smaller models are not recommended as they do not reliably handle Entelgia's multi-layer reasoning demands
+4. Ensure you are using a 7B-parameter or larger model; smaller models are not recommended as they do not reliably handle Entelgia's multi-layer reasoning demands
 
 ---
 
@@ -406,9 +407,9 @@ config.max_turns = 100  # Reduce from default 200
 - System feels sluggish
 
 **Solution:**
-1. Use a faster model:
+1. Use a faster model (while still staying at 7B+):
 ```bash
-ollama pull phi3:mini
+ollama pull qwen2.5:7b
 ```
 
 2. Check CPU usage:
@@ -642,7 +643,7 @@ These patterns help ensure Entelgia works reliably:
 
 ✅ **Start fresh** - When in doubt, restart Ollama and the application
 
-✅ **Use stable models** - `phi3` and `mistral` are well-tested; Phi-3 is the practical minimum
+✅ **Use stable models** - `qwen2.5:7b`, `llama3.1:8b`, and `mistral:latest` are well-tested and recommended (7B+ required)
 
 ✅ **Check logs** - Watch Ollama output for errors
 
