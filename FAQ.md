@@ -72,11 +72,12 @@ python scripts/install.py
 ```
 
 The installer will:
-1. Detect and install Ollama (macOS via Homebrew)
-2. Pull the `qwen2.5:7b` model automatically
-3. Create `.env` configuration from template
-4. Generate secure `MEMORY_SECRET_KEY`
-5. Install Python dependencies
+1. ✅ Detect and install Ollama (macOS via Homebrew; provides instructions for Linux/Windows)
+2. ✅ Pull the `qwen2.5:7b` model automatically (or lets you skip)
+3. ✅ Create `.env` configuration from template
+4. ✅ Generate secure `MEMORY_SECRET_KEY` (48-char cryptographic key)
+5. ✅ Optionally save your `GROK_API_KEY` to `.env` (needed only if you plan to use the Grok backend)
+6. ✅ Install Python dependencies from `requirements.txt`
 
 For manual installation, see the [README.md](README.md) guide.
 
