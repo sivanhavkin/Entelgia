@@ -2,15 +2,13 @@
 """
 Entelgia Installation Script
 
-This script automates the installation and setup process for Entelgia:
-- Checks for Ollama installation (installs on Mac via Homebrew)
-- Copies .env.example to .env if needed
-- Prompts for API key configuration (MEMORY_SECRET_KEY and optional GROK_API_KEY)
-- Installs Python dependencies
+This script automates the installation and setup process for Entelgia.
+At the start you will choose your LLM backend:
 
-NOTE: LLM backend (Ollama or Grok) and per-agent model names are selected
-      interactively at startup when Entelgia runs — not via environment
-      variables.  The only Grok-specific value needed in .env is GROK_API_KEY.
+  - Ollama  (local, open-source models)
+  - Grok    (xAI cloud API — requires a GROK_API_KEY)
+
+Only the steps relevant to your chosen backend are shown.
 
 Usage:
     python scripts/install.py
@@ -257,9 +255,13 @@ def generate_secure_key(length=48):
     return key
 
 
-def update_api_key():
-    """Prompt for API key and update .env file."""
-    print_step(3, "Configuring API key...")
+def update_api_key(backend="ollama"):
+    """Prompt for API keys and update .env file.
+
+    Always configures MEMORY_SECRET_KEY.
+    When backend is 'grok', also configures GROK_API_KEY in the same step.
+    """
+    print_step(3, "Configuring API keys...")
 
     # Get the parent directory (repository root)
     script_dir = Path(__file__).parent
@@ -270,6 +272,7 @@ def update_api_key():
         print_error(".env file does not exist")
         return False
 
+    # --- MEMORY_SECRET_KEY ---
     print("\nThe MEMORY_SECRET_KEY is used for cryptographic integrity protection.")
     print("It should be at least 32 characters long.")
 
@@ -290,104 +293,74 @@ def update_api_key():
         )
 
         if manual_response != "y":
-            print("Keeping existing configuration from .env.example")
-            return True
-
-        api_key = input("Enter your MEMORY_SECRET_KEY (min 32 characters): ").strip()
-
-        if len(api_key) < 32:
-            print_warning("Warning: Key is shorter than recommended 32 characters")
-            confirm = input("Continue anyway? (y/n): ").strip().lower()
-            if confirm != "y":
-                print("Keeping existing configuration from .env.example")
-                return True
-
-    try:
-        # Read the current .env file
-        with open(env_file, "r") as f:
-            lines = f.readlines()
-
-        # Update the MEMORY_SECRET_KEY line
-        updated = False
-        for i, line in enumerate(lines):
-            if line.strip().startswith("MEMORY_SECRET_KEY="):
-                lines[i] = f"MEMORY_SECRET_KEY={api_key}\n"
-                updated = True
-                break
-
-        # Write back to the file
-        with open(env_file, "w") as f:
-            f.writelines(lines)
-
-        if updated:
-            print_success("MEMORY_SECRET_KEY updated successfully")
+            print("Keeping existing MEMORY_SECRET_KEY from .env")
+            api_key = None
         else:
-            print_warning("MEMORY_SECRET_KEY line not found in .env")
+            api_key = input("Enter your MEMORY_SECRET_KEY (min 32 characters): ").strip()
 
-        return True
-    except Exception as e:
-        print_error(f"Failed to update .env file: {e}")
-        return False
+            if len(api_key) < 32:
+                print_warning("Warning: Key is shorter than recommended 32 characters")
+                confirm = input("Continue anyway? (y/n): ").strip().lower()
+                if confirm != "y":
+                    print("Keeping existing MEMORY_SECRET_KEY from .env")
+                    api_key = None
 
+    # --- GROK_API_KEY (only when Grok backend is chosen) ---
+    grok_api_key = None
+    if backend == "grok":
+        print("\nA GROK_API_KEY is required to use the Grok backend.")
+        print("\nHow to get a Grok API key:")
+        print("  1. Go to https://console.x.ai and sign in with your X (Twitter) account.")
+        print("  2. In the left sidebar click \"API Keys\".")
+        print("  3. Click \"Create API Key\", give it a name, and copy the generated key.")
+        print("\nAvailable Grok models (you will select at Entelgia startup):")
+        print("  - grok-4.20-multi-agent    (multi-agent capable, latest)")
+        print("  - grok-4-1-fast-reasoning  (fast reasoning, high performance)")
 
-def configure_grok_api_key():
-    """Show Grok API key instructions and prompt the user to enter their key."""
-    print_header("Grok (xAI) API Key Setup")
+        while True:
+            grok_api_key = getpass.getpass("\nEnter your Grok API key: ").strip()
+            if grok_api_key:
+                break
+            print_warning("A Grok API key is required when using the Grok backend.")
+            retry = input("Try again? (y/n): ").strip().lower()
+            if retry != "y":
+                print("Installation cancelled. Add GROK_API_KEY to .env manually and re-run.")
+                return False
 
-    print("To use Entelgia with Grok you need an xAI API key.\n")
-    print("How to get a Grok API key:")
-    print("  1. Go to https://console.x.ai and sign in with your X (Twitter) account.")
-    print("  2. In the left sidebar click \"API Keys\".")
-    print("  3. Click \"Create API Key\", give it a name, and copy the generated key.")
-    print("  4. Paste the key when prompted below.\n")
-    print("Once your API key is saved in .env, Entelgia will ask you to select")
-    print("the backend (Ollama or Grok) and model for each agent at startup.\n")
-    print("Available Grok models (you will choose at startup):")
-    print("  - grok-4.20-multi-agent    (multi-agent capable, latest)")
-    print("  - grok-4-1-fast-reasoning  (fast reasoning, high performance)")
-
-    grok_api_key = getpass.getpass("\nEnter your Grok API key (or press Enter to skip): ").strip()
-
-    if not grok_api_key:
-        print_warning("Skipping Grok API key entry.")
-        print("Add GROK_API_KEY to your .env file before selecting Grok at startup.")
-        return None
-
-    return grok_api_key
-
-
-def update_grok_api_key_in_env(grok_api_key: str) -> bool:
-    """Write GROK_API_KEY into the .env file."""
-    script_dir = Path(__file__).parent
-    repo_root = script_dir.parent
-    env_file = repo_root / ".env"
-
-    if not env_file.exists():
-        print_error(".env file does not exist")
-        return False
-
+    # --- Write both keys to .env ---
     try:
         with open(env_file, "r") as f:
             lines = f.readlines()
 
-        key_updated = False
-        for i, line in enumerate(lines):
-            if line.strip().startswith("GROK_API_KEY="):
-                lines[i] = f"GROK_API_KEY={grok_api_key}\n"
-                key_updated = True
-                break
+        if api_key is not None:
+            for i, line in enumerate(lines):
+                if line.strip().startswith("MEMORY_SECRET_KEY="):
+                    lines[i] = f"MEMORY_SECRET_KEY={api_key}\n"
+                    break
 
-        if not key_updated:
-            lines.append(f"GROK_API_KEY={grok_api_key}\n")
+        if grok_api_key is not None:
+            key_updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith("GROK_API_KEY="):
+                    lines[i] = f"GROK_API_KEY={grok_api_key}\n"
+                    key_updated = True
+                    break
+            if not key_updated:
+                lines.append(f"GROK_API_KEY={grok_api_key}\n")
 
         with open(env_file, "w") as f:
             f.writelines(lines)
 
-        print_success("GROK_API_KEY saved to .env")
+        if api_key is not None:
+            print_success("MEMORY_SECRET_KEY updated successfully")
+        if grok_api_key is not None:
+            print_success("GROK_API_KEY saved to .env")
+
         return True
     except Exception as e:
         print_error(f"Failed to update .env file: {e}")
         return False
+
 
 def install_dependencies():
     """Install Python dependencies from requirements.txt."""
@@ -442,39 +415,64 @@ def verify_python_version():
     return True
 
 
-def print_next_steps(model_pulled=False):
+def print_next_steps(backend, model_pulled=False):
     """Print instructions for next steps after installation."""
     print_header("Installation Complete!")
 
     print("Next steps:")
-    print("\n1. Start Ollama (if not already running):")
-    print("   ollama serve")
 
-    if not model_pulled:
-        print("\n2. Pull a model if not pulled automatically (e.g., qwen2.5:7b):")
-        print("   ollama pull qwen2.5:7b")
-        step_verify = "3"
-        step_run = "4"
-    else:
-        step_verify = "2"
-        step_run = "3"
+    if backend == "ollama":
+        print("\n1. Start Ollama (if not already running):")
+        print("   ollama serve")
 
-    print(f"\n{step_verify}. Verify Ollama is working:")
-    print('   ollama run qwen2.5:7b "hello"')
+        if not model_pulled:
+            print("\n2. Pull a model if not pulled automatically (e.g., qwen2.5:7b):")
+            print("   ollama pull qwen2.5:7b")
+            step_verify = "3"
+            step_run = "4"
+        else:
+            step_verify = "2"
+            step_run = "3"
 
-    print(f"\n{step_run}. (Optional) To use the Grok backend instead of Ollama:")
-    print("   - Make sure GROK_API_KEY is set in your .env file")
-    print("   - When Entelgia starts it will prompt you to select the backend")
-    print("     (Ollama or Grok) and the model for each agent interactively.")
+        print(f"\n{step_verify}. Verify Ollama is working:")
+        print('   ollama run qwen2.5:7b "hello"')
 
-    print(f"\n{int(step_run) + 1}. Run Entelgia:")
-    print("   python examples/demo_enhanced_dialogue.py")
-    print("   or")
-    print("   python Entelgia_production_meta.py")
+        print(f"\n{step_run}. Run Entelgia:")
+        print("   python examples/demo_enhanced_dialogue.py")
+        print("   or")
+        print("   python Entelgia_production_meta.py")
+
+    else:  # grok
+        print("\n1. Ensure your GROK_API_KEY is set in the .env file.")
+
+        print("\n2. Run Entelgia:")
+        print("   python examples/demo_enhanced_dialogue.py")
+        print("   or")
+        print("   python Entelgia_production_meta.py")
+
+        print("\n   Entelgia will ask you to confirm the Grok backend and model at startup.")
 
     print("\n" + "=" * 60)
     print("For more information, see the README.md file")
     print("=" * 60 + "\n")
+
+
+def choose_backend():
+    """Ask the user to choose between Ollama and Grok before anything else."""
+    print_header("Choose Your LLM Backend")
+
+    print("Entelgia supports two LLM backends:\n")
+    print("  1. Ollama  — runs models locally on your machine (free, private)")
+    print("               Requires Ollama to be installed.")
+    print("  2. Grok    — uses xAI's cloud API (requires a GROK_API_KEY)\n")
+
+    while True:
+        choice = input("Which backend would you like to use? [1=Ollama / 2=Grok]: ").strip()
+        if choice in ("1", "ollama"):
+            return "ollama"
+        if choice in ("2", "grok"):
+            return "grok"
+        print_warning("Please enter 1 (Ollama) or 2 (Grok).")
 
 
 def main():
@@ -488,49 +486,38 @@ def main():
 
     print_success("All checks passed\n")
 
-    # Step 1: Check/install Ollama (default backend)
-    ollama_installed = setup_ollama()
-    if not ollama_installed:
-        print("\nInstallation paused. Please install Ollama and run this script again.")
-        sys.exit(1)
+    # Step 0: Choose backend — shown before any backend-specific work
+    backend = choose_backend()
 
-    # Step 1.5: Pull Ollama model
-    model_pulled = setup_ollama_model()
+    model_pulled = False
+
+    if backend == "ollama":
+        # Step 1: Check/install Ollama
+        ollama_installed = setup_ollama()
+        if not ollama_installed:
+            print("\nInstallation paused. Please install Ollama and run this script again.")
+            sys.exit(1)
+
+        # Step 1.5: Pull Ollama model
+        model_pulled = setup_ollama_model()
 
     # Step 2: Setup .env file
     if not setup_env_file():
         print_error("Failed to setup .env file")
         sys.exit(1)
 
-    # Step 3: Update MEMORY_SECRET_KEY
-    if not update_api_key():
+    # Step 3: Update API keys (MEMORY_SECRET_KEY always; GROK_API_KEY when Grok is chosen)
+    if not update_api_key(backend):
         print_error("Failed to update API key")
         sys.exit(1)
-
-    # Step 3.5: Optional Grok API key setup
-    print_step("3.5", "Grok API key (optional — only needed if you plan to use Grok)...")
-    print("\nBackend and model selection happen interactively when Entelgia starts.")
-    print("The only thing needed here is your GROK_API_KEY so Entelgia can")
-    print("authenticate with xAI when you choose Grok at startup.")
-    want_grok = input("\nWould you like to set up a Grok API key now? (y/n): ").strip().lower()
-    if want_grok == "y":
-        grok_api_key = configure_grok_api_key()
-        if grok_api_key:
-            if not update_grok_api_key_in_env(grok_api_key):
-                print_error("Failed to save GROK_API_KEY to .env")
-                sys.exit(1)
-        else:
-            print_warning("No Grok API key saved. Add GROK_API_KEY to .env manually when ready.")
-    else:
-        print("Skipping Grok API key setup.")
 
     # Step 4: Install dependencies
     if not install_dependencies():
         print_error("Failed to install dependencies")
         sys.exit(1)
 
-    # Print next steps
-    print_next_steps(model_pulled)
+    # Print next steps (backend-specific)
+    print_next_steps(backend, model_pulled)
 
 
 if __name__ == "__main__":
