@@ -2420,7 +2420,11 @@ def _text_similarity(a: str, b: str) -> float:
     _STYLE_REDUNDANCY_THRESHOLD indicate the response is very similar to the
     last one and variation should be encouraged (not enforced).
     """
-    return _sentence_overlap(a, b)
+    wa = set(a.lower().split())
+    wb = set(b.lower().split())
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / max(len(wa), len(wb))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
