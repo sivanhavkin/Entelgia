@@ -107,7 +107,8 @@ python scripts/install.py
 2. ✅ **Pulls the `qwen2.5:7b` model** automatically (or lets you skip)
 3. ✅ **Creates `.env` configuration** from template
 4. ✅ **Generates secure `MEMORY_SECRET_KEY`** (48-char cryptographic key)
-5. ✅ **Installs Python dependencies** from `requirements.txt`
+5. ✅ **Optionally saves your `GROK_API_KEY`** to `.env` (needed only if you plan to use the Grok backend)
+6. ✅ **Installs Python dependencies** from `requirements.txt`
 
 ### After installation:
 
@@ -197,6 +198,48 @@ python Entelgia_production_meta.py
 # Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
 python Entelgia_production_meta_200t.py
 ```
+
+---
+
+## ☁️ Using the Grok Backend (xAI)
+
+Entelgia supports **Grok** (by xAI) as an alternative cloud-based LLM backend alongside the default Ollama local backend.
+
+### 1️⃣ Get a Grok API Key
+
+1. Go to [https://console.x.ai](https://console.x.ai) and sign in with your X (Twitter) account.
+2. In the left sidebar click **"API Keys"**.
+3. Click **"Create API Key"**, give it a name, and copy the generated key.
+
+### 2️⃣ Add the Key to `.env`
+
+During installation (`python scripts/install.py`) you will be prompted to enter your Grok API key — it is saved automatically.
+
+To add it manually, open your `.env` file and set:
+
+```
+GROK_API_KEY=your_key_here
+```
+
+### 3️⃣ Select Grok at Startup
+
+When you run Entelgia, it will interactively ask you to choose a backend:
+
+```
+Select backend:
+  [1] grok
+  [2] ollama
+  [0] defaults (keep config as-is)
+```
+
+Choose **[1] grok** and then select a model for each agent from the available Grok models:
+
+| Model | Description |
+|---|---|
+| `grok-4.20-multi-agent` | Multi-agent capable, latest |
+| `grok-4-1-fast-reasoning` | Fast reasoning, high performance |
+
+> 💡 The Grok backend requires an active internet connection and a valid `GROK_API_KEY` in `.env`. No local Ollama instance is needed when using Grok.
 
 ---
 
