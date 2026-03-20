@@ -161,6 +161,22 @@ try:
         SOFT_REANCHOR_THRESHOLD as _TOPIC_SOFT_REANCHOR_THRESHOLD,
         PARTIAL_RECOVERY_THRESHOLD as _TOPIC_PARTIAL_RECOVERY_THRESHOLD,
     )
+    from entelgia.progress_enforcer import (
+        classify_move as _pe_classify_move,
+        score_progress as _pe_score_progress,
+        detect_stagnation as _pe_detect_stagnation,
+        get_intervention_policy as _pe_intervention_policy,
+        get_regeneration_instruction as _pe_regen_instruction,
+        build_intervention_instruction as _pe_build_intervention,
+        update_claims_memory as _pe_update_claims,
+        get_claims_memory as _pe_get_claims_memory,
+        add_progress_score as _pe_add_score,
+        add_move_type as _pe_add_move,
+        get_recent_scores as _pe_get_scores,
+        get_recent_move_types as _pe_get_moves,
+        PROGRESS_SCORE_THRESHOLD as _PE_PROGRESS_THRESHOLD,
+        HIGH_VALUE_MOVES as _PE_HIGH_VALUE_MOVES,
+    )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -308,6 +324,56 @@ except ImportError:
 
     def _cg_new_angle():  # type: ignore[no-redef]
         return "Approach this from a completely different conceptual direction."
+
+    # No-op stubs for progress enforcer when entelgia package is absent
+    _PE_PROGRESS_THRESHOLD = 0.35
+    _PE_HIGH_VALUE_MOVES: list = []
+
+    class _DummyClaimsMemory:  # type: ignore[misc]
+        def state_changed_by(self, claims, move_type):
+            return True
+        def add(self, text, move_type="NEW_CLAIM"):
+            pass
+        def unresolved_claims(self):
+            return []
+        def summary(self):
+            return ""
+
+    def _pe_classify_move(text, history):  # type: ignore[no-redef]
+        return "NEW_CLAIM"
+
+    def _pe_score_progress(text, history, claims_memory):  # type: ignore[no-redef]
+        return 1.0
+
+    def _pe_detect_stagnation(recent_scores, recent_move_types):  # type: ignore[no-redef]
+        return False, ""
+
+    def _pe_intervention_policy(stagnation_reason):  # type: ignore[no-redef]
+        return "REQUIRE_COMMITMENT"
+
+    def _pe_regen_instruction():  # type: ignore[no-redef]
+        return ""
+
+    def _pe_build_intervention(policy, claims_memory):  # type: ignore[no-redef]
+        return ""
+
+    def _pe_update_claims(agent_name, text, move_type):  # type: ignore[no-redef]
+        return []
+
+    def _pe_get_claims_memory(agent_name):  # type: ignore[no-redef]
+        return _DummyClaimsMemory()
+
+    def _pe_add_score(agent_name, score):  # type: ignore[no-redef]
+        pass
+
+    def _pe_add_move(agent_name, move_type):  # type: ignore[no-redef]
+        pass
+
+    def _pe_get_scores(agent_name):  # type: ignore[no-redef]
+        return []
+
+    def _pe_get_moves(agent_name):  # type: ignore[no-redef]
+        return []
 
 
 # Optional: FastAPI for REST API
@@ -5939,6 +6005,98 @@ class Agent:
         # ─────────────────────────────────────────────────────────────────────────
 
         out = revise_draft(out, self.name, topic=_active_topic or "")
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Progress Enforcement layer ────────────────────────────────────────────
+        # Run after all draft post-processing, before final output.
+        # Ensures the response *advances* the argument — relevance alone is not
+        # sufficient.  Does NOT touch topic enforcement logic.
+        _history_texts = [t.get("text", "") for t in dialog_tail if t.get("text", "").strip()]
+        _pe_claims_mem = _pe_get_claims_memory(self.name)
+        _pe_move = _pe_classify_move(out, _history_texts)
+        _pe_score = _pe_score_progress(out, _history_texts, _pe_claims_mem)
+        logger.info(
+            "[PROGRESS] agent=%s score=%.2f move_type=%s",
+            self.name,
+            _pe_score,
+            _pe_move,
+        )
+        # Update claims memory and log any new/changed claims
+        _pe_new_claims = _pe_update_claims(self.name, out, _pe_move)
+        if _pe_new_claims:
+            logger.info(
+                "[CLAIMS] agent=%s added/updated=%s",
+                self.name,
+                _pe_new_claims,
+            )
+        # Record score and move type for stagnation tracking
+        _pe_add_score(self.name, _pe_score)
+        _pe_add_move(self.name, _pe_move)
+        # Stagnation detection
+        _pe_stagnant, _pe_stag_reason = _pe_detect_stagnation(
+            _pe_get_scores(self.name),
+            _pe_get_moves(self.name),
+        )
+        if _pe_stagnant:
+            _pe_policy = _pe_intervention_policy(_pe_stag_reason)
+            logger.info(
+                "[STAGNATION] agent=%s reason=%s",
+                self.name,
+                _pe_stag_reason,
+            )
+            logger.info(
+                "[INTERVENTION] agent=%s policy=%s",
+                self.name,
+                _pe_policy,
+            )
+            # Inject intervention instruction into the next prompt via regeneration
+            _pe_instr = _pe_build_intervention(_pe_policy, _pe_claims_mem)
+            _pe_prompt = prompt.replace(
+                "\nRespond now:\n",
+                f"\n{_pe_instr}\nRespond now:\n",
+            )
+            _pe_raw = (
+                self.llm.generate(
+                    self.model, _pe_prompt, temperature=temperature, use_cache=False
+                )
+                or out
+            )
+            out = validate_output(_pe_raw)
+            # Re-evaluate after regeneration
+            _pe_move = _pe_classify_move(out, _history_texts)
+            _pe_score = _pe_score_progress(out, _history_texts, _pe_claims_mem)
+            logger.info(
+                "[PROGRESS] agent=%s score=%.2f move_type=%s (post-intervention)",
+                self.name,
+                _pe_score,
+                _pe_move,
+            )
+        elif _pe_score < _PE_PROGRESS_THRESHOLD and _pe_move not in _PE_HIGH_VALUE_MOVES:
+            # Response is on-topic but low-progress: regenerate once with advancement instruction
+            _pe_regen_instr = _pe_regen_instruction()
+            _pe_regen_prompt = prompt.replace(
+                "\nRespond now:\n",
+                f"\n{_pe_regen_instr}\nRespond now:\n",
+            )
+            _pe_regen_raw = (
+                self.llm.generate(
+                    self.model,
+                    _pe_regen_prompt,
+                    temperature=temperature,
+                    use_cache=False,
+                )
+                or out
+            )
+            _pe_regen_out = validate_output(_pe_regen_raw)
+            _pe_regen_score = _pe_score_progress(_pe_regen_out, _history_texts, _pe_claims_mem)
+            if _pe_regen_score > _pe_score:
+                out = _pe_regen_out
+                logger.info(
+                    "[PROGRESS] agent=%s regenerated — score improved %.2f→%.2f",
+                    self.name,
+                    _pe_score,
+                    _pe_regen_score,
+                )
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Emotion inference (on final text, after all post-processing) ──────────
