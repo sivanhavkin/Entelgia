@@ -1824,6 +1824,13 @@ class Config:
     """Global configuration object with validation."""
 
     ollama_url: str = "http://localhost:11434/api/generate"
+    # ── LLM Backend Switch ─────────────────────────────────────────────────
+    # Set LLM_BACKEND=ollama (default, local) or LLM_BACKEND=grok (xAI cloud).
+    llm_backend: str = os.environ.get("LLM_BACKEND", "ollama")
+    grok_url: str = os.environ.get(
+        "GROK_URL", "https://api.x.ai/v1/chat/completions"
+    )
+    grok_api_key: str = os.environ.get("GROK_API_KEY", "")
     model_socrates: str = "qwen2.5:7b"
     model_athena: str = "qwen2.5:7b"
     model_fixy: str = "qwen2.5:7b"
@@ -1943,6 +1950,16 @@ class Config:
             raise ValueError("llm_timeout must be >= 5")
         if not self.ollama_url.startswith("http"):
             raise ValueError("ollama_url must be a valid URL")
+        if self.llm_backend not in ("ollama", "grok"):
+            raise ValueError("llm_backend must be 'ollama' or 'grok'")
+        if self.llm_backend == "grok":
+            if not self.grok_url.startswith("http"):
+                raise ValueError("grok_url must be a valid URL")
+            if not self.grok_api_key:
+                raise ValueError(
+                    "grok_api_key must be set when llm_backend is 'grok' "
+                    "(set GROK_API_KEY in your .env or environment)"
+                )
         if self.timeout_minutes < 0:
             raise ValueError("timeout_minutes must be >= 0 (0 = no time limit)")
         logging.getLogger().setLevel(logging.DEBUG if self.debug else logging.INFO)
@@ -3017,7 +3034,7 @@ def _is_too_similar(
 
 
 class LLM:
-    """HTTP wrapper for Ollama with error handling and caching."""
+    """HTTP wrapper for the configured LLM backend (Ollama or Grok) with error handling and caching."""
 
     def __init__(self, cfg: Config, metrics: MetricsTracker):
         self.cfg = cfg
@@ -3026,12 +3043,12 @@ class LLM:
         # Single-worker thread pool reused across all generate() calls so that
         # blocking requests.post() calls can be interrupted via _shutdown_event.
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        logger.info(f"LLM initialized: {cfg.ollama_url}")
+        logger.info(f"LLM initialized: backend={cfg.llm_backend}")
 
     def generate(
         self, model: str, prompt: str, temperature: float = 0.7, use_cache: bool = True
     ) -> str:
-        """Generate text using Ollama with retries."""
+        """Generate text using the configured LLM backend (Ollama or Grok)."""
         cache_key = sha256_text(prompt)[:16]
 
         if use_cache:
@@ -3048,21 +3065,36 @@ class LLM:
                 raise KeyboardInterrupt()
             try:
                 start_time = time.time()
-                payload = {
-                    "model": model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "keep_alive": "30m",
-                    "options": {"temperature": temperature},
-                }
                 # Run the blocking HTTP request in a daemon thread so that
                 # Ctrl+C (SIGINT) can interrupt it within ~0.5 seconds.
-                _future = self._executor.submit(
-                    requests.post,
-                    self.cfg.ollama_url,
-                    json=payload,
-                    timeout=(10, self.cfg.llm_timeout),
-                )
+                if self.cfg.llm_backend == "grok":
+                    _future = self._executor.submit(
+                        requests.post,
+                        self.cfg.grok_url,
+                        headers={
+                            "Authorization": f"Bearer {self.cfg.grok_api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": model,
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": temperature,
+                        },
+                        timeout=(10, self.cfg.llm_timeout),
+                    )
+                else:
+                    _future = self._executor.submit(
+                        requests.post,
+                        self.cfg.ollama_url,
+                        json={
+                            "model": model,
+                            "prompt": prompt,
+                            "stream": False,
+                            "keep_alive": "30m",
+                            "options": {"temperature": temperature},
+                        },
+                        timeout=(10, self.cfg.llm_timeout),
+                    )
                 try:
                     while True:
                         try:
@@ -3077,7 +3109,15 @@ class LLM:
                     raise
                 r.raise_for_status()
                 data = r.json()
-                result = (data.get("response") or "").strip()
+                if self.cfg.llm_backend == "grok":
+                    choices = data.get("choices") or []
+                    result = (
+                        (choices[0].get("message") or {}).get("content") or ""
+                        if choices
+                        else ""
+                    ).strip()
+                else:
+                    result = (data.get("response") or "").strip()
 
                 duration = time.time() - start_time
                 self.metrics.record_llm_call(duration, success=True)
