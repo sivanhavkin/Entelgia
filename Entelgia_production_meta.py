@@ -1823,7 +1823,7 @@ class Config:
     # Set LLM_BACKEND=ollama (default, local) or LLM_BACKEND=grok (xAI cloud).
     llm_backend: str = os.environ.get("LLM_BACKEND", "ollama")
     grok_url: str = os.environ.get(
-        "GROK_URL", "https://api.x.ai/v1/chat/completions"
+        "GROK_URL", "https://api.x.ai/v1/responses"
     )
     grok_api_key: str = os.environ.get("GROK_API_KEY", "")
     model_socrates: str = "qwen2.5:7b"
@@ -3085,7 +3085,7 @@ class LLM:
                         },
                         json={
                             "model": model,
-                            "messages": [{"role": "user", "content": prompt}],
+                            "input": [{"role": "user", "content": prompt}],
                             "temperature": temperature,
                         },
                         timeout=(10, self.cfg.llm_timeout),
@@ -3118,12 +3118,17 @@ class LLM:
                 r.raise_for_status()
                 data = r.json()
                 if self.cfg.llm_backend == "grok":
-                    choices = data.get("choices") or []
-                    result = (
-                        (choices[0].get("message") or {}).get("content") or ""
-                        if choices
-                        else ""
-                    ).strip()
+                    output = data.get("output") or []
+                    result = ""
+                    for item in output:
+                        if item.get("type") == "message":
+                            for c in (item.get("content") or []):
+                                if c.get("type") == "output_text":
+                                    result = c.get("text", "")
+                                    break
+                            if result:
+                                break
+                    result = result.strip()
                 else:
                     result = (data.get("response") or "").strip()
 
