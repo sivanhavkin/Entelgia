@@ -1820,12 +1820,11 @@ class Config:
 
     ollama_url: str = "http://localhost:11434/api/generate"
     # ── LLM Backend Switch ─────────────────────────────────────────────────
-    # Set LLM_BACKEND=ollama (default, local) or LLM_BACKEND=grok (xAI cloud).
-    llm_backend: str = os.environ.get("LLM_BACKEND", "ollama")
-    grok_url: str = os.environ.get(
-        "GROK_URL", "https://api.x.ai/v1/responses"
-    )
-    grok_api_key: str = os.environ.get("GROK_API_KEY", "")
+    # Edit llm_backend here in Config to switch backends:
+    # "ollama" (local, default) or "grok" (xAI cloud).
+    llm_backend: str = "ollama"
+    grok_url: str = "https://api.x.ai/v1/responses"
+    grok_api_key: str = ""
     model_socrates: str = "qwen2.5:7b"
     model_athena: str = "qwen2.5:7b"
     model_fixy: str = "qwen2.5:7b"
@@ -1953,7 +1952,7 @@ class Config:
             if not self.grok_api_key:
                 raise ValueError(
                     "grok_api_key must be set when llm_backend is 'grok' "
-                    "(set GROK_API_KEY in your .env or environment)"
+                    "(set grok_api_key in your Config)"
                 )
         if self.timeout_minutes < 1:
             raise ValueError("timeout_minutes must be >= 1")
