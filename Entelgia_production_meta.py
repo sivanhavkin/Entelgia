@@ -1877,7 +1877,7 @@ class Config:
     )
     # ── Forgetting Policy (Feature 1) ──────────────────────────────────────
     # TTL in seconds per memory layer.  Set to 0 to disable expiry for a layer.
-    forgetting_enabled: bool = True
+    forgetting_enabled: bool = False
     forgetting_episodic_ttl: int = 7 * 24 * 3600  # subconscious/episodic → 7 days
     forgetting_semantic_ttl: int = 90 * 24 * 3600  # conscious/semantic → 90 days
     forgetting_autobio_ttl: int = 365 * 24 * 3600  # autobiographical → 365 days

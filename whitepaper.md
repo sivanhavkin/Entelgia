@@ -148,7 +148,7 @@ Each LTM record receives an `expires_at` ISO timestamp at insertion time based o
 | `conscious` / `semantic` | 90 days | `forgetting_semantic_ttl` |
 | `autobiographical` | 365 days | `forgetting_autobio_ttl` |
 
-`MemoryCore.ltm_apply_forgetting_policy()` deletes expired rows. It is called automatically at the end of every `dream_cycle()`. Set `forgetting_enabled = False` to disable all expiry.
+`MemoryCore.ltm_apply_forgetting_policy()` deletes expired rows. It is called automatically at the end of every `dream_cycle()`. Set `forgetting_enabled = True` to enable expiry (disabled by default).
 
 ## 4.4 Affective Routing
 
