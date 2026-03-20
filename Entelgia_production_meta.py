@@ -7513,8 +7513,13 @@ def run_cli():
     )
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print("\nConfiguration:")
+    _SENSITIVE_KEYS = {"grok_api_key", "memory_secret_key"}
     config_dict = asdict(CFG)
-    config_display = {k: v for k, v in config_dict.items() if not k.startswith("_")}
+    config_display = {
+        k: ("***" if k in _SENSITIVE_KEYS else v)
+        for k, v in config_dict.items()
+        if not k.startswith("_")
+    }
     print(json.dumps(config_display, ensure_ascii=False, indent=2))
     print()
 
