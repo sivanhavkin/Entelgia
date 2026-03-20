@@ -7622,28 +7622,37 @@ class MainScript:
 
 
 def _pick_from_list(prompt_header: str, options: list[str]) -> str | None:
-    """Display a numbered list and return the chosen item, or None if skipped/invalid.
+    """Display a numbered list and return the chosen item.
 
-    Prints a warning inline when the user enters a non-empty but invalid value
-    so it is clear whether None means "skipped" or "bad input".
+    Loops until the user enters a valid number or enters '0' to skip.
+    Returns None only when the user explicitly enters '0'.
     """
     for idx, opt in enumerate(options, start=1):
         print(f"  [{idx}] {opt}")
-    raw = input(f"{prompt_header} ").strip()
-    if not raw:
-        return None
-    try:
-        choice = int(raw)
-        if 1 <= choice <= len(options):
-            return options[choice - 1]
-    except ValueError:
-        pass
-    print(
-        Fore.YELLOW
-        + f"  [WARN] '{raw}' is not a valid selection – keeping defaults."
-        + Style.RESET_ALL
-    )
-    return None
+    print(f"  [0] skip / keep default")
+    while True:
+        sys.stdout.flush()
+        raw = input(f"{prompt_header} ").strip()
+        if raw == "0":
+            return None
+        if not raw:
+            print(
+                Fore.YELLOW
+                + "  Please enter a number from the list above (or 0 to skip)."
+                + Style.RESET_ALL
+            )
+            continue
+        try:
+            choice = int(raw)
+            if 1 <= choice <= len(options):
+                return options[choice - 1]
+        except ValueError:
+            pass
+        print(
+            Fore.YELLOW
+            + f"  [WARN] '{raw}' is not a valid selection. Enter a number between 1 and {len(options)}, or 0 to skip."
+            + Style.RESET_ALL
+        )
 
 
 def select_llm_backend_and_models(cfg: "Config") -> None:
@@ -7657,9 +7666,26 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
     print("  [1] grok")
     print("  [2] ollama")
     print("  [0] defaults (keep config as-is)")
-    backend_raw = input("→ ").strip()
 
-    if backend_raw == "0" or backend_raw == "":
+    while True:
+        sys.stdout.flush()
+        backend_raw = input("Enter choice [0/1/2]: ").strip()
+        if backend_raw in ("0", "1", "2"):
+            break
+        if backend_raw == "":
+            print(
+                Fore.YELLOW
+                + "  Please enter 1 for grok, 2 for ollama, or 0 to keep defaults."
+                + Style.RESET_ALL
+            )
+        else:
+            print(
+                Fore.YELLOW
+                + f"  [WARN] '{backend_raw}' is not a valid choice. Please enter 0, 1, or 2."
+                + Style.RESET_ALL
+            )
+
+    if backend_raw == "0":
         # Keep everything as configured – just print the summary and return.
         _print_llm_config_summary(cfg)
         return
@@ -7668,32 +7694,32 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
         cfg.llm_backend = "grok"
         available_models = GROK_MODELS
         backend_label = "Grok"
-    elif backend_raw == "2":
+    else:  # backend_raw == "2"
         cfg.llm_backend = "ollama"
         available_models = OLLAMA_MODELS
         backend_label = "Ollama"
-    else:
-        print(
-            Fore.YELLOW
-            + "[WARN] Invalid backend choice – keeping defaults."
-            + Style.RESET_ALL
-        )
-        _print_llm_config_summary(cfg)
-        return
 
     print()
     print(Fore.CYAN + f"Available {backend_label} models:" + Style.RESET_ALL)
-    print("  Use same model for all agents? (y/n): ", end="", flush=True)
-    same = input().strip().lower()
+    while True:
+        sys.stdout.flush()
+        same = input("  Use same model for all agents? (y/n): ").strip().lower()
+        if same in ("y", "yes", "n", "no"):
+            break
+        print(
+            Fore.YELLOW
+            + "  Please enter 'y' for yes or 'n' for no."
+            + Style.RESET_ALL
+        )
 
-    if same in ("y", "yes", ""):
+    if same in ("y", "yes"):
         print()
         print(Fore.CYAN + "Choose model:" + Style.RESET_ALL)
-        model = _pick_from_list("→", available_models)
+        model = _pick_from_list("Enter choice:", available_models)
         if model is None:
             print(
                 Fore.YELLOW
-                + "[WARN] Invalid model choice – keeping defaults."
+                + "[WARN] Model selection skipped – keeping defaults."
                 + Style.RESET_ALL
             )
             _print_llm_config_summary(cfg)
@@ -7704,13 +7730,13 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
     else:
         print()
         print(Fore.CYAN + "Choose model for Socrates:" + Style.RESET_ALL)
-        model_s = _pick_from_list("→", available_models)
+        model_s = _pick_from_list("Enter choice:", available_models)
         print()
         print(Fore.CYAN + "Choose model for Athena:" + Style.RESET_ALL)
-        model_a = _pick_from_list("→", available_models)
+        model_a = _pick_from_list("Enter choice:", available_models)
         print()
         print(Fore.CYAN + "Choose model for Fixy:" + Style.RESET_ALL)
-        model_f = _pick_from_list("→", available_models)
+        model_f = _pick_from_list("Enter choice:", available_models)
 
         if model_s is None or model_a is None or model_f is None:
             print(
