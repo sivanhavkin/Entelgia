@@ -1824,7 +1824,7 @@ class Config:
     # "ollama" (local, default) or "grok" (xAI cloud).
     llm_backend: str = "ollama"
     grok_url: str = "https://api.x.ai/v1/responses"
-    grok_api_key: str = ""
+    grok_api_key: str = os.environ.get("GROK_API_KEY", "")
     model_socrates: str = "qwen2.5:7b"
     model_athena: str = "qwen2.5:7b"
     model_fixy: str = "qwen2.5:7b"
@@ -1952,7 +1952,7 @@ class Config:
             if not self.grok_api_key:
                 raise ValueError(
                     "grok_api_key must be set when llm_backend is 'grok' "
-                    "(set grok_api_key in your Config)"
+                    "(set GROK_API_KEY in your .env or environment)"
                 )
         if self.timeout_minutes < 1:
             raise ValueError("timeout_minutes must be >= 1")
