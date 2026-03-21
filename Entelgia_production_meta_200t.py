@@ -471,6 +471,12 @@ OPENAI_MODELS: list[str] = [
     "gpt-4.1",
 ]
 
+ANTHROPIC_MODELS: list[str] = [
+    "claude-3-7-sonnet-latest",
+    "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku-latest",
+]
+
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 MAX_RESPONSE_WORDS = 150
@@ -1933,7 +1939,8 @@ class Config:
     ollama_url: str = "http://localhost:11434/api/generate"
     # ── LLM Backend Switch ─────────────────────────────────────────────────
     # Edit llm_backend here in Config to switch backends:
-    # "ollama" (local, default), "grok" (xAI cloud), or "openai" (OpenAI cloud).
+    # "ollama" (local, default), "grok" (xAI cloud), "openai" (OpenAI cloud),
+    # or "anthropic" (Anthropic cloud).
     # Base URLs for each backend are configured here in Config (not in .env).
     # Only API keys are loaded from environment variables.
     llm_backend: str = "ollama"
@@ -1941,6 +1948,8 @@ class Config:
     grok_api_key: str = os.environ.get("GROK_API_KEY", "")
     openai_url: str = "https://api.openai.com/v1/chat/completions"
     openai_api_key: str = os.environ.get("OPENAI_API_KEY", "")
+    anthropic_url: str = "https://api.anthropic.com/v1/messages"
+    anthropic_api_key: str = os.environ.get("ANTHROPIC_API_KEY", "")
     model_socrates: str = "qwen2.5:7b"
     model_athena: str = "qwen2.5:7b"
     model_fixy: str = "qwen2.5:7b"
@@ -2060,8 +2069,8 @@ class Config:
             raise ValueError("llm_timeout must be >= 5")
         if not self.ollama_url.startswith("http"):
             raise ValueError("ollama_url must be a valid URL")
-        if self.llm_backend not in ("ollama", "grok", "openai"):
-            raise ValueError("llm_backend must be 'ollama', 'grok', or 'openai'")
+        if self.llm_backend not in ("ollama", "grok", "openai", "anthropic"):
+            raise ValueError("llm_backend must be 'ollama', 'grok', 'openai', or 'anthropic'")
         if self.llm_backend == "grok":
             if not self.grok_url.startswith("http"):
                 raise ValueError("grok_url must be a valid URL")
@@ -2077,6 +2086,14 @@ class Config:
                 raise ValueError(
                     "openai_api_key must be set when llm_backend is 'openai' "
                     "(set OPENAI_API_KEY in your .env or environment)"
+                )
+        if self.llm_backend == "anthropic":
+            if not self.anthropic_url.startswith("http"):
+                raise ValueError("anthropic_url must be a valid URL")
+            if not self.anthropic_api_key:
+                raise ValueError(
+                    "anthropic_api_key must be set when llm_backend is 'anthropic' "
+                    "(set ANTHROPIC_API_KEY in your .env or environment)"
                 )
         if self.timeout_minutes < 0:
             raise ValueError("timeout_minutes must be >= 0 (0 = no time limit)")
@@ -3225,6 +3242,22 @@ class LLM:
                         },
                         timeout=(10, self.cfg.llm_timeout),
                     )
+                elif self.cfg.llm_backend == "anthropic":
+                    _future = self._executor.submit(
+                        requests.post,
+                        self.cfg.anthropic_url,
+                        headers={
+                            "x-api-key": self.cfg.anthropic_api_key,
+                            "anthropic-version": "2023-06-01",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": model,
+                            "max_tokens": 1024,
+                            "messages": [{"role": "user", "content": prompt}],
+                        },
+                        timeout=(10, self.cfg.llm_timeout),
+                    )
                 else:
                     _future = self._executor.submit(
                         requests.post,
@@ -3267,6 +3300,9 @@ class LLM:
                 elif self.cfg.llm_backend == "openai":
                     choices = data.get("choices") or []
                     result = ((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
+                elif self.cfg.llm_backend == "anthropic":
+                    content = data.get("content") or []
+                    result = (content[0].get("text") or "").strip() if content else ""
                 else:
                     result = (data.get("response") or "").strip()
 
@@ -7823,23 +7859,24 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
     print("  [1] grok")
     print("  [2] ollama")
     print("  [3] openai")
+    print("  [4] anthropic")
     print("  [0] defaults (keep config as-is)")
 
     while True:
         sys.stdout.flush()
-        backend_raw = input("Enter choice [0/1/2/3]: ").strip()
-        if backend_raw in ("0", "1", "2", "3"):
+        backend_raw = input("Enter choice [0/1/2/3/4]: ").strip()
+        if backend_raw in ("0", "1", "2", "3", "4"):
             break
         if backend_raw == "":
             print(
                 Fore.YELLOW
-                + "  Please enter 1 for grok, 2 for ollama, 3 for openai, or 0 to keep defaults."
+                + "  Please enter 1 for grok, 2 for ollama, 3 for openai, 4 for anthropic, or 0 to keep defaults."
                 + Style.RESET_ALL
             )
         else:
             print(
                 Fore.YELLOW
-                + f"  [WARN] '{backend_raw}' is not a valid choice. Please enter 0, 1, 2, or 3."
+                + f"  [WARN] '{backend_raw}' is not a valid choice. Please enter 0, 1, 2, 3, or 4."
                 + Style.RESET_ALL
             )
 
@@ -7856,6 +7893,10 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
         cfg.llm_backend = "openai"
         available_models = OPENAI_MODELS
         backend_label = "OpenAI"
+    elif backend_raw == "4":
+        cfg.llm_backend = "anthropic"
+        available_models = ANTHROPIC_MODELS
+        backend_label = "Anthropic"
     else:  # backend_raw == "2"
         cfg.llm_backend = "ollama"
         available_models = OLLAMA_MODELS
