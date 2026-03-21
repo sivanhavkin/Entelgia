@@ -367,9 +367,9 @@ def update_api_key(backend="ollama"):
         print('  2. In the left sidebar click "API Keys".')
         print('  3. Click "Create Key", give it a name, and copy the generated key.')
         print("\nAvailable Anthropic models (you will select at Entelgia startup):")
-        print("  - claude-3-7-sonnet-latest  (latest Claude 3.7 Sonnet)")
-        print("  - claude-3-5-sonnet-latest  (Claude 3.5 Sonnet)")
-        print("  - claude-3-5-haiku-latest   (Claude 3.5 Haiku, fastest)")
+        print("  - claude-opus-4-6    (Claude Opus 4.6, most capable)")
+        print("  - claude-sonnet-4-6  (Claude Sonnet 4.6, balanced)")
+        print("  - claude-haiku-4-5   (Claude Haiku 4.5, fastest)")
 
         while True:
             anthropic_api_key = getpass.getpass("\nEnter your Anthropic API key: ").strip()
