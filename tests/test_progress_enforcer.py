@@ -25,7 +25,6 @@ import pytest
 
 import entelgia.progress_enforcer as pe
 
-
 # ---------------------------------------------------------------------------
 # Fixture: reset module-level state before each test
 # ---------------------------------------------------------------------------
@@ -106,7 +105,9 @@ class TestClassifyMove:
         assert move == pe.BALANCED_RESTATEMENT
 
     def test_direct_attack_detected(self):
-        text = "This argument is wrong and overlooks the fundamental problem of induction."
+        text = (
+            "This argument is wrong and overlooks the fundamental problem of induction."
+        )
         move = pe.classify_move(text, [])
         assert move == pe.DIRECT_ATTACK
 
@@ -116,7 +117,9 @@ class TestClassifyMove:
         assert move == pe.DIRECT_DEFENSE
 
     def test_forced_choice_detected(self):
-        text = "There are only two options: either you accept determinism or you do not."
+        text = (
+            "There are only two options: either you accept determinism or you do not."
+        )
         move = pe.classify_move(text, [])
         assert move == pe.FORCED_CHOICE
 
@@ -143,7 +146,9 @@ class TestClassifyMove:
 
     def test_paraphrase_detected_with_high_similarity(self):
         base = "consciousness depends on physical brain states and nothing else"
-        similar = "consciousness depends on physical brain states and nothing else here too"
+        similar = (
+            "consciousness depends on physical brain states and nothing else here too"
+        )
         # paraphrase signal + high similarity
         text = "In other words, consciousness depends on physical brain states and nothing else."
         move = pe.classify_move(text, [base, base, base])
@@ -204,7 +209,9 @@ class TestScoreProgress:
         mem = self._mem()
         text = "I argue that determinism is incompatible with moral responsibility."
         score_with = pe.score_progress(text, [], mem)
-        hedged = "Perhaps determinism might be somewhat relevant to moral responsibility."
+        hedged = (
+            "Perhaps determinism might be somewhat relevant to moral responsibility."
+        )
         score_without = pe.score_progress(hedged, [], mem)
         assert score_with >= score_without
 
@@ -245,20 +252,26 @@ class TestClaimsMemory:
     def test_update_status_challenged(self):
         mem = pe.ClaimsMemory()
         mem.add("Free will exists.")
-        updated = mem.update_status("Free will exists.", pe.STATUS_CHALLENGED, pe.DIRECT_ATTACK)
+        updated = mem.update_status(
+            "Free will exists.", pe.STATUS_CHALLENGED, pe.DIRECT_ATTACK
+        )
         assert updated
         assert mem.claims[0].status == pe.STATUS_CHALLENGED
 
     def test_update_status_defended(self):
         mem = pe.ClaimsMemory()
         mem.add("The mind is non-physical.")
-        mem.update_status("The mind is non-physical.", pe.STATUS_DEFENDED, pe.DIRECT_DEFENSE)
+        mem.update_status(
+            "The mind is non-physical.", pe.STATUS_DEFENDED, pe.DIRECT_DEFENSE
+        )
         assert mem.claims[0].status == pe.STATUS_DEFENDED
 
     def test_update_status_resolved(self):
         mem = pe.ClaimsMemory()
         mem.add("Both views share common ground.")
-        mem.update_status("Both views share common ground.", pe.STATUS_RESOLVED, pe.RESOLUTION_ATTEMPT)
+        mem.update_status(
+            "Both views share common ground.", pe.STATUS_RESOLVED, pe.RESOLUTION_ATTEMPT
+        )
         assert mem.claims[0].status == pe.STATUS_RESOLVED
 
     def test_has_unresolved(self):
@@ -270,7 +283,9 @@ class TestClaimsMemory:
         mem = pe.ClaimsMemory()
         mem.add("Unresolved claim one.")
         mem.add("Resolved claim two.")
-        mem.update_status("Resolved claim two.", pe.STATUS_RESOLVED, pe.RESOLUTION_ATTEMPT)
+        mem.update_status(
+            "Resolved claim two.", pe.STATUS_RESOLVED, pe.RESOLUTION_ATTEMPT
+        )
         unresolved = mem.unresolved_claims()
         assert len(unresolved) == 1
 
@@ -315,7 +330,9 @@ class TestClaimsMemory:
 
 class TestDetectStagnation:
     def test_no_stagnation_with_insufficient_history(self):
-        stagnant, reason = pe.detect_stagnation([0.1, 0.1], ["PARAPHRASE", "PARAPHRASE"])
+        stagnant, reason = pe.detect_stagnation(
+            [0.1, 0.1], ["PARAPHRASE", "PARAPHRASE"]
+        )
         assert stagnant is False
 
     def test_low_scores_trigger_stagnation(self):
@@ -443,7 +460,9 @@ class TestUpdateClaimsMemory:
         assert any(c.status == pe.STATUS_CHALLENGED for c in mem.claims)
 
     def test_returns_list(self):
-        result = pe.update_claims_memory("Fixy", "A test claim sentence here.", pe.NEW_CLAIM)
+        result = pe.update_claims_memory(
+            "Fixy", "A test claim sentence here.", pe.NEW_CLAIM
+        )
         assert isinstance(result, list)
 
 

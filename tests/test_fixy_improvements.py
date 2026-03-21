@@ -77,9 +77,9 @@ class TestPairGatingLoopDetector:
             roles=["Socrates"] * 5,
         )
         modes = detector.detect(turns, turn_count=5)
-        assert modes == [], (
-            f"[FIXY-GATE] Must skip when only Socrates present; got {modes}"
-        )
+        assert (
+            modes == []
+        ), f"[FIXY-GATE] Must skip when only Socrates present; got {modes}"
 
     def test_only_athena_turns_no_loop(self):
         """Loop must not be declared when dialog contains only Athena turns."""
@@ -89,9 +89,9 @@ class TestPairGatingLoopDetector:
             roles=["Athena"] * 5,
         )
         modes = detector.detect(turns, turn_count=5)
-        assert modes == [], (
-            f"[FIXY-GATE] Must skip when only Athena present; got {modes}"
-        )
+        assert (
+            modes == []
+        ), f"[FIXY-GATE] Must skip when only Athena present; got {modes}"
 
     def test_pair_present_loop_detected(self):
         """Loop should be detected once both agents have spoken and conditions are met."""
@@ -99,9 +99,9 @@ class TestPairGatingLoopDetector:
         turns = _make_turns(_repetitive_texts(5))
         modes = detector.detect(turns, turn_count=5)
         # Both agents present in alternating turns; loop conditions should fire
-        assert LOOP_REPETITION in modes, (
-            f"Expected loop_repetition with both agents; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION in modes
+        ), f"Expected loop_repetition with both agents; got {modes}"
 
     def test_single_socrates_turn_no_loop(self):
         """Single Socrates turn must not trigger any loop mode."""
@@ -140,9 +140,9 @@ class TestPairGatingInteractiveFixy:
             {"role": "Socrates", "text": "What is the nature of freedom?"},
         ]
         result, reason = fixy.should_intervene(dialog, turn_count=1)
-        assert result is False, (
-            f"[FIXY-GATE] Must not intervene after single Socrates turn; got reason={reason!r}"
-        )
+        assert (
+            result is False
+        ), f"[FIXY-GATE] Must not intervene after single Socrates turn; got reason={reason!r}"
 
     def test_no_intervention_after_single_athena_turn(self):
         """should_intervene must return False when only Athena has spoken."""
@@ -151,33 +151,27 @@ class TestPairGatingInteractiveFixy:
             {"role": "Athena", "text": "Society determines freedom through law."},
         ]
         result, reason = fixy.should_intervene(dialog, turn_count=1)
-        assert result is False, (
-            f"[FIXY-GATE] Must not intervene after single Athena turn; got reason={reason!r}"
-        )
+        assert (
+            result is False
+        ), f"[FIXY-GATE] Must not intervene after single Athena turn; got reason={reason!r}"
 
     def test_no_intervention_socrates_only_many_turns(self):
         """should_intervene must return False even with many Socrates-only turns."""
         fixy = self._make_fixy()
-        dialog = [
-            {"role": "Socrates", "text": t}
-            for t in _repetitive_texts(6)
-        ]
+        dialog = [{"role": "Socrates", "text": t} for t in _repetitive_texts(6)]
         result, reason = fixy.should_intervene(dialog, turn_count=6)
-        assert result is False, (
-            f"[FIXY-GATE] Must not intervene with only Socrates; got reason={reason!r}"
-        )
+        assert (
+            result is False
+        ), f"[FIXY-GATE] Must not intervene with only Socrates; got reason={reason!r}"
 
     def test_no_intervention_athena_only_many_turns(self):
         """should_intervene must return False even with many Athena-only turns."""
         fixy = self._make_fixy()
-        dialog = [
-            {"role": "Athena", "text": t}
-            for t in _repetitive_texts(6)
-        ]
+        dialog = [{"role": "Athena", "text": t} for t in _repetitive_texts(6)]
         result, reason = fixy.should_intervene(dialog, turn_count=6)
-        assert result is False, (
-            f"[FIXY-GATE] Must not intervene with only Athena; got reason={reason!r}"
-        )
+        assert (
+            result is False
+        ), f"[FIXY-GATE] Must not intervene with only Athena; got reason={reason!r}"
 
     def test_intervention_allowed_after_pair(self, caplog):
         """should_intervene may trigger once both agents have spoken (loop conditions met)."""
@@ -199,9 +193,9 @@ class TestPairGatingInteractiveFixy:
         dialog = _make_turns(_repetitive_texts(6))
         result, reason = fixy.should_intervene(dialog, turn_count=6)
         if result:
-            assert fixy._pending_rewrite_mode is not None, (
-                "_pending_rewrite_mode must be set when intervention is triggered"
-            )
+            assert (
+                fixy._pending_rewrite_mode is not None
+            ), "_pending_rewrite_mode must be set when intervention is triggered"
 
     def test_pending_rewrite_mode_cleared_on_no_intervention(self):
         """_pending_rewrite_mode must be None when no intervention is triggered."""
@@ -239,9 +233,9 @@ class TestNoveltySuppressionLoopDetector:
             ]
         )
         modes = detector.detect(turns, turn_count=5)
-        assert LOOP_REPETITION not in modes, (
-            f"[FIXY-SUPPRESS] Loop must not fire when new metric is present; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION not in modes
+        ), f"[FIXY-SUPPRESS] Loop must not fire when new metric is present; got {modes}"
 
     def test_no_loop_when_concrete_case_present(self):
         """Loop must not be declared when a concrete case is introduced."""
@@ -257,9 +251,9 @@ class TestNoveltySuppressionLoopDetector:
             ]
         )
         modes = detector.detect(turns, turn_count=5)
-        assert LOOP_REPETITION not in modes, (
-            f"[FIXY-SUPPRESS] Loop must not fire when concrete case is present; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION not in modes
+        ), f"[FIXY-SUPPRESS] Loop must not fire when concrete case is present; got {modes}"
 
     def test_no_loop_when_forced_choice_present(self):
         """Loop must not be declared when a binary choice is introduced."""
@@ -275,9 +269,9 @@ class TestNoveltySuppressionLoopDetector:
             ]
         )
         modes = detector.detect(turns, turn_count=5)
-        assert LOOP_REPETITION not in modes, (
-            f"[FIXY-SUPPRESS] Loop must not fire when forced choice is present; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION not in modes
+        ), f"[FIXY-SUPPRESS] Loop must not fire when forced choice is present; got {modes}"
 
     def test_no_loop_when_testable_claim_present(self):
         """Loop must not be declared when a testable, falsifiable claim appears."""
@@ -293,9 +287,9 @@ class TestNoveltySuppressionLoopDetector:
             ]
         )
         modes = detector.detect(turns, turn_count=5)
-        assert LOOP_REPETITION not in modes, (
-            f"[FIXY-SUPPRESS] Loop must not fire when testable claim is present; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION not in modes
+        ), f"[FIXY-SUPPRESS] Loop must not fire when testable claim is present; got {modes}"
 
     def test_no_loop_when_operational_definition_present(self):
         """Loop must not be declared when an operational definition is provided."""
@@ -311,18 +305,18 @@ class TestNoveltySuppressionLoopDetector:
             ]
         )
         modes = detector.detect(turns, turn_count=5)
-        assert LOOP_REPETITION not in modes, (
-            f"[FIXY-SUPPRESS] Loop must not fire with operational definition; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION not in modes
+        ), f"[FIXY-SUPPRESS] Loop must not fire with operational definition; got {modes}"
 
     def test_structural_loop_fires_without_novelty(self):
         """A true structural loop (no novelty) must still be detected."""
         detector = DialogueLoopDetector()
         turns = _make_turns(_repetitive_texts(6))
         modes = detector.detect(turns, turn_count=6)
-        assert LOOP_REPETITION in modes, (
-            f"Structural loop without novelty must be detected; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION in modes
+        ), f"Structural loop without novelty must be detected; got {modes}"
 
     def test_novelty_check_returns_clusters(self):
         """_check_novelty_present must return the correct active cluster names."""
@@ -348,9 +342,9 @@ class TestNoveltySuppressionLoopDetector:
             ]
         )
         clusters, count = detector._check_novelty_present(turns)
-        assert count == 0 or ("metric" not in clusters and "case" not in clusters), (
-            f"Repetitive turns must not show metric/case novelty; got {clusters}"
-        )
+        assert count == 0 or (
+            "metric" not in clusters and "case" not in clusters
+        ), f"Repetitive turns must not show metric/case novelty; got {clusters}"
 
 
 # ---------------------------------------------------------------------------
@@ -364,37 +358,37 @@ class TestRewriteModeSelection:
     def test_loop_repetition_maps_to_force_case(self):
         """loop_repetition should default to force_case rewrite mode."""
         mode = _LOOP_REWRITE_MODE_POLICY.get("loop_repetition")
-        assert mode == FixyMode.FORCE_CASE, (
-            f"loop_repetition should map to FORCE_CASE; got {mode!r}"
-        )
+        assert (
+            mode == FixyMode.FORCE_CASE
+        ), f"loop_repetition should map to FORCE_CASE; got {mode!r}"
 
     def test_weak_conflict_maps_to_force_choice(self):
         """weak_conflict should map to force_choice rewrite mode."""
         mode = _LOOP_REWRITE_MODE_POLICY.get("weak_conflict")
-        assert mode == FixyMode.FORCE_CHOICE, (
-            f"weak_conflict should map to FORCE_CHOICE; got {mode!r}"
-        )
+        assert (
+            mode == FixyMode.FORCE_CHOICE
+        ), f"weak_conflict should map to FORCE_CHOICE; got {mode!r}"
 
     def test_premature_synthesis_maps_to_force_test(self):
         """premature_synthesis should map to force_test rewrite mode."""
         mode = _LOOP_REWRITE_MODE_POLICY.get("premature_synthesis")
-        assert mode == FixyMode.FORCE_TEST, (
-            f"premature_synthesis should map to FORCE_TEST; got {mode!r}"
-        )
+        assert (
+            mode == FixyMode.FORCE_TEST
+        ), f"premature_synthesis should map to FORCE_TEST; got {mode!r}"
 
     def test_topic_stagnation_maps_to_force_metric(self):
         """topic_stagnation should map to force_metric rewrite mode."""
         mode = _LOOP_REWRITE_MODE_POLICY.get("topic_stagnation")
-        assert mode == FixyMode.FORCE_METRIC, (
-            f"topic_stagnation should map to FORCE_METRIC; got {mode!r}"
-        )
+        assert (
+            mode == FixyMode.FORCE_METRIC
+        ), f"topic_stagnation should map to FORCE_METRIC; got {mode!r}"
 
     def test_shallow_discussion_maps_to_force_test(self):
         """shallow_discussion should map to force_test rewrite mode."""
         mode = _LOOP_REWRITE_MODE_POLICY.get("shallow_discussion")
-        assert mode == FixyMode.FORCE_TEST, (
-            f"shallow_discussion should map to FORCE_TEST; got {mode!r}"
-        )
+        assert (
+            mode == FixyMode.FORCE_TEST
+        ), f"shallow_discussion should map to FORCE_TEST; got {mode!r}"
 
     def test_all_rewrite_modes_have_prompts(self):
         """Every structural rewrite mode must have a prompt template."""
@@ -406,9 +400,9 @@ class TestRewriteModeSelection:
             FixyMode.FORCE_DEFINITION,
         ]
         for mode in rewrite_modes:
-            assert mode in _MODE_PROMPTS, (
-                f"FixyMode.{mode!r} must have a prompt in _MODE_PROMPTS"
-            )
+            assert (
+                mode in _MODE_PROMPTS
+            ), f"FixyMode.{mode!r} must have a prompt in _MODE_PROMPTS"
 
     def test_rewrite_mode_constants_correct_values(self):
         """Structural rewrite FixyMode constants must match their string values."""
@@ -442,9 +436,9 @@ class TestRewriteHintGeneration:
             rewrite_mode=FixyMode.FORCE_CASE,
             target_agent="Athena",
         )
-        assert "FIXY STRUCTURAL REWRITE DIRECTIVE" in hint, (
-            f"Hint must contain structural header; got: {hint[:200]}"
-        )
+        assert (
+            "FIXY STRUCTURAL REWRITE DIRECTIVE" in hint
+        ), f"Hint must contain structural header; got: {hint[:200]}"
 
     def test_hint_contains_rewrite_mode(self):
         """Rewrite hint must include the selected mode name."""
@@ -454,9 +448,9 @@ class TestRewriteHintGeneration:
             rewrite_mode=FixyMode.FORCE_METRIC,
             target_agent="Socrates",
         )
-        assert "force_metric" in hint.lower(), (
-            f"Hint must name the rewrite mode; got: {hint[:200]}"
-        )
+        assert (
+            "force_metric" in hint.lower()
+        ), f"Hint must name the rewrite mode; got: {hint[:200]}"
 
     def test_hint_contains_target_agent(self):
         """Rewrite hint must reference the target agent."""
@@ -466,9 +460,9 @@ class TestRewriteHintGeneration:
             rewrite_mode=FixyMode.FORCE_CHOICE,
             target_agent="Socrates",
         )
-        assert "Socrates" in hint, (
-            f"Hint must include target agent name; got: {hint[:200]}"
-        )
+        assert (
+            "Socrates" in hint
+        ), f"Hint must include target agent name; got: {hint[:200]}"
 
     def test_hint_is_structural_not_cosmetic_force_metric(self):
         """force_metric hint must include measurable/criterion/benchmark language."""
@@ -479,9 +473,10 @@ class TestRewriteHintGeneration:
             target_agent="Athena",
         )
         lower = hint.lower()
-        assert any(w in lower for w in ("measur", "criterion", "benchmark", "quantif", "indicator")), (
-            f"force_metric hint must include metric language; got: {hint}"
-        )
+        assert any(
+            w in lower
+            for w in ("measur", "criterion", "benchmark", "quantif", "indicator")
+        ), f"force_metric hint must include metric language; got: {hint}"
 
     def test_hint_is_structural_not_cosmetic_force_choice(self):
         """force_choice hint must demand a committed binary decision."""
@@ -492,9 +487,9 @@ class TestRewriteHintGeneration:
             target_agent="Athena",
         )
         lower = hint.lower()
-        assert any(w in lower for w in ("pick", "commit", "side", "binary", "hedge", "choose")), (
-            f"force_choice hint must demand binary commitment; got: {hint}"
-        )
+        assert any(
+            w in lower for w in ("pick", "commit", "side", "binary", "hedge", "choose")
+        ), f"force_choice hint must demand binary commitment; got: {hint}"
 
     def test_hint_is_structural_not_cosmetic_force_test(self):
         """force_test hint must demand a falsifiable claim."""
@@ -505,9 +500,9 @@ class TestRewriteHintGeneration:
             target_agent="Socrates",
         )
         lower = hint.lower()
-        assert any(w in lower for w in ("falsif", "testable", "predict", "observable", "refut")), (
-            f"force_test hint must demand falsifiable claim; got: {hint}"
-        )
+        assert any(
+            w in lower for w in ("falsif", "testable", "predict", "observable", "refut")
+        ), f"force_test hint must demand falsifiable claim; got: {hint}"
 
     def test_hint_is_structural_not_cosmetic_force_case(self):
         """force_case hint must demand a specific real-world case."""
@@ -518,9 +513,17 @@ class TestRewriteHintGeneration:
             target_agent="Athena",
         )
         lower = hint.lower()
-        assert any(w in lower for w in ("case", "real-world", "instance", "scenario", "historical", "specific")), (
-            f"force_case hint must demand specific case; got: {hint}"
-        )
+        assert any(
+            w in lower
+            for w in (
+                "case",
+                "real-world",
+                "instance",
+                "scenario",
+                "historical",
+                "specific",
+            )
+        ), f"force_case hint must demand specific case; got: {hint}"
 
     def test_hint_is_structural_not_cosmetic_force_definition(self):
         """force_definition hint must demand an operational definition."""
@@ -531,9 +534,10 @@ class TestRewriteHintGeneration:
             target_agent="Socrates",
         )
         lower = hint.lower()
-        assert any(w in lower for w in ("definition", "operational", "precisely", "define", "counts as")), (
-            f"force_definition hint must demand operational definition; got: {hint}"
-        )
+        assert any(
+            w in lower
+            for w in ("definition", "operational", "precisely", "define", "counts as")
+        ), f"force_definition hint must demand operational definition; got: {hint}"
 
     def test_hint_sets_pending_rewrite_hint(self):
         """get_rewrite_hint must update _pending_rewrite_hint."""
@@ -543,9 +547,9 @@ class TestRewriteHintGeneration:
             rewrite_mode=FixyMode.FORCE_CASE,
             target_agent="Athena",
         )
-        assert fixy._pending_rewrite_hint is not None, (
-            "_pending_rewrite_hint must be set after get_rewrite_hint"
-        )
+        assert (
+            fixy._pending_rewrite_hint is not None
+        ), "_pending_rewrite_hint must be set after get_rewrite_hint"
 
     def test_empty_hint_when_no_modes(self):
         """get_rewrite_hint must return '' when no modes and no rewrite_mode."""
@@ -598,9 +602,9 @@ class TestDialogueRewriterStructuralMode:
             rewrite_mode=FixyMode.FORCE_METRIC,
             target_agent="Athena",
         )
-        assert "force_metric" in block.lower(), (
-            f"Rewrite block must include mode label; got snippet: {block[:300]}"
-        )
+        assert (
+            "force_metric" in block.lower()
+        ), f"Rewrite block must include mode label; got snippet: {block[:300]}"
 
     def test_rewrite_includes_target_agent(self):
         """Rewrite block must include the target agent name when provided."""
@@ -612,9 +616,9 @@ class TestDialogueRewriterStructuralMode:
             rewrite_mode=FixyMode.FORCE_CHOICE,
             target_agent="Socrates",
         )
-        assert "Socrates" in block, (
-            f"Rewrite block must include target agent; got snippet: {block[:300]}"
-        )
+        assert (
+            "Socrates" in block
+        ), f"Rewrite block must include target agent; got snippet: {block[:300]}"
 
     def test_rewrite_mode_rule_takes_priority(self):
         """The rewrite_mode's novelty rule must appear in the block."""
@@ -627,9 +631,9 @@ class TestDialogueRewriterStructuralMode:
         )
         lower = block.lower()
         # force_choice rule: "binary" or "pick" or "commit" or "hedge"
-        assert any(w in lower for w in ("binary", "pick", "commit", "side", "hedge")), (
-            f"force_choice rule must appear in rewrite block; got: {block[:500]}"
-        )
+        assert any(
+            w in lower for w in ("binary", "pick", "commit", "side", "hedge")
+        ), f"force_choice rule must appear in rewrite block; got: {block[:500]}"
 
     def test_no_rewrite_mode_still_works(self):
         """build() must still work when rewrite_mode is omitted (backward compat)."""
@@ -673,17 +677,17 @@ class TestFalsePositiveReduction:
         """A dialog with novelty must not be flagged as a structural loop."""
         detector = DialogueLoopDetector()
         modes = detector.detect(self._advancing_dialog(), turn_count=5)
-        assert LOOP_REPETITION not in modes, (
-            f"Advancing dialog (with case + metric) must not trigger loop_repetition; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION not in modes
+        ), f"Advancing dialog (with case + metric) must not trigger loop_repetition; got {modes}"
 
     def test_stagnant_dialog_still_detected(self):
         """A dialog without novelty must still be detected as a structural loop."""
         detector = DialogueLoopDetector()
         modes = detector.detect(self._stagnant_dialog(), turn_count=6)
-        assert LOOP_REPETITION in modes, (
-            f"Pure stagnation must still be flagged; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION in modes
+        ), f"Pure stagnation must still be flagged; got {modes}"
 
     def test_advancement_keywords_regression(self):
         """'therefore', 'consequently', 'it follows' are advancement markers."""
@@ -698,9 +702,9 @@ class TestFalsePositiveReduction:
             ]
         )
         modes = detector.detect(turns, turn_count=5)
-        assert LOOP_REPETITION not in modes, (
-            f"'therefore/consequently/it follows' must suppress loop; got {modes}"
-        )
+        assert (
+            LOOP_REPETITION not in modes
+        ), f"'therefore/consequently/it follows' must suppress loop; got {modes}"
 
 
 # ---------------------------------------------------------------------------
