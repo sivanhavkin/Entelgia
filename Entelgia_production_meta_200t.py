@@ -3266,8 +3266,7 @@ class LLM:
                     result = result.strip()
                 elif self.cfg.llm_backend == "openai":
                     choices = data.get("choices") or []
-                    result = (choices[0].get("message") or {}).get("content", "") if choices else ""
-                    result = result.strip()
+                    result = ((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
                 else:
                     result = (data.get("response") or "").strip()
 
