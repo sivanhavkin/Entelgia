@@ -7325,6 +7325,10 @@ class MainScript:
             if self.cfg.timeout_minutes > 0
             else float("inf")
         )
+        # Fixy rewrite hint: set by Fixy's intervention and consumed on the
+        # next agent's turn.  Cleared after use so it does not persist.
+        _fixy_rewrite_hint: Optional[str] = None
+        _fixy_rewrite_mode: Optional[str] = None
 
         _timeout_label = (
             f"{self.cfg.timeout_minutes}-minute"
@@ -7493,6 +7497,8 @@ class MainScript:
                     active_modes=_active_loop_modes,
                     current_topic=topic_label,
                     banned_phrases=_banned_phrases,
+                    rewrite_mode=_fixy_rewrite_mode,
+                    target_agent=speaker.name,
                 )
                 if _rewrite_block:
                     seed = _rewrite_block + "\n\n" + seed
@@ -7500,6 +7506,20 @@ class MainScript:
                         "loop_guard: rewrite block prepended to seed for %s",
                         speaker.name,
                     )
+
+            # ── v4.0.0: Inject Fixy rewrite hint from previous intervention ──
+            # When Fixy intervened last turn, it computed a structural directive;
+            # prepend it to this agent's seed so generation is forced to advance.
+            if _fixy_rewrite_hint and speaker.name != "Fixy":
+                seed = _fixy_rewrite_hint + "\n\n" + seed
+                logger.info(
+                    "[FIXY-REWRITE] mode=%s injected into seed for agent=%s",
+                    _fixy_rewrite_mode,
+                    speaker.name,
+                )
+                # Consume the hint: do not repeat it on the next turn
+                _fixy_rewrite_hint = None
+                _fixy_rewrite_mode = None
 
             logger.debug(
                 "MainScript.run: turn=%d speaker=%s final seed_text=%r",
@@ -7650,6 +7670,27 @@ class MainScript:
                             + Style.RESET_ALL
                             + "\n"
                         )
+                    # ── v4.0.0: Capture structural rewrite hint for next agent ─
+                    # Compute and store the hint so the NEXT agent's seed will
+                    # include a structural directive, not only Fixy's spoken text.
+                    if hasattr(self.interactive_fixy, "get_rewrite_hint"):
+                        _pending_mode = getattr(
+                            self.interactive_fixy, "_pending_rewrite_mode", None
+                        )
+                        # Determine the target: next agent in alternation
+                        _next_agent_name = (
+                            self.athena.name
+                            if speaker.name == "Socrates"
+                            else self.socrates.name
+                        )
+                        _hint = self.interactive_fixy.get_rewrite_hint(
+                            active_modes=[reason],
+                            rewrite_mode=_pending_mode,
+                            target_agent=_next_agent_name,
+                        )
+                        if _hint:
+                            _fixy_rewrite_hint = _hint
+                            _fixy_rewrite_mode = _pending_mode
 
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)

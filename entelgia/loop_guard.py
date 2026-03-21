@@ -62,6 +62,140 @@ _SYNTHESIS_PHRASES: frozenset = frozenset(
 )
 
 # ---------------------------------------------------------------------------
+# Novelty / advancement indicators — presence suppresses false-positive loops
+# ---------------------------------------------------------------------------
+# These keyword roots signal that the dialogue has introduced something
+# genuinely new: a metric, a concrete case, a forced decision, a testable
+# claim, or a shift in abstraction level.  When any cluster is well-represented
+# in the most recent two turns, a loop declaration is suppressed.
+
+_NOVELTY_METRIC_KEYWORDS: frozenset = frozenset(
+    {
+        "measur",
+        "quantif",
+        "metric",
+        "criterion",
+        "benchmark",
+        "threshold",
+        "percent",
+        "ratio",
+        "rate",
+        "index",
+        "statistic",
+        "indicator",
+        "scale",
+        "score",
+    }
+)
+
+_NOVELTY_CASE_KEYWORDS: frozenset = frozenset(
+    {
+        "example",
+        "instance",
+        "scenario",
+        "case",
+        "illustrat",
+        "specific",
+        "concret",
+        "real-world",
+        "historical",
+        "empiric",
+        "data",
+        "evidence",
+        "study",
+        "experiment",
+    }
+)
+
+_NOVELTY_DECISION_KEYWORDS: frozenset = frozenset(
+    {
+        "either",
+        "choose",
+        "decision",
+        "must decide",
+        "binary",
+        "one or the other",
+        "pick",
+        "commit",
+        "force",
+        "trade-off",
+        "tradeoff",
+        "priority",
+        "versus",
+    }
+)
+
+_NOVELTY_TEST_KEYWORDS: frozenset = frozenset(
+    {
+        "testable",
+        "falsif",
+        "predict",
+        "verif",
+        "observable",
+        "operationally",
+        "empirically",
+        "experiment",
+        "hypothesis",
+        "refut",
+    }
+)
+
+_NOVELTY_DEFINITION_KEYWORDS: frozenset = frozenset(
+    {
+        "defined as",
+        "definition",
+        "operationalized",
+        "distinction",
+        "precisely",
+        "specifically means",
+        "what counts as",
+        "exactly what",
+        "clarif",
+    }
+)
+
+_NOVELTY_ABSTRACTION_KEYWORDS: frozenset = frozenset(
+    {
+        "concretely",
+        "in practice",
+        "applied to",
+        "practical",
+        "abstract",
+        "theoretical",
+        "in principle",
+        "at the level of",
+        "translation",
+        "implementat",
+    }
+)
+
+_NOVELTY_ADVANCEMENT_KEYWORDS: frozenset = frozenset(
+    {
+        "therefore",
+        "it follows",
+        "which means",
+        "this implies",
+        "consequently",
+        "we can conclude",
+        "leads to",
+        "entails",
+        "new claim",
+        "different from",
+        "distinct from",
+        "contrast",
+        "unlike",
+        "novel",
+        "introduce",
+    }
+)
+
+# Minimum keyword hits in the novelty check to count a cluster as "present"
+_NOVELTY_CLUSTER_HIT_THRESHOLD: int = 1
+
+# Number of active novelty clusters required to suppress a loop declaration
+_NOVELTY_SUPPRESS_THRESHOLD: int = 1
+
+# ---------------------------------------------------------------------------
 # Generic mediation phrases Fixy must avoid when loop conditions exist
 # ---------------------------------------------------------------------------
 FIXY_BANNED_OPENERS: frozenset = frozenset(
@@ -307,6 +441,17 @@ class DialogueLoopDetector:
         agent_turns = [t for t in dialog if t.get("role") not in ("Fixy", "seed")]
         recent = agent_turns[-self.window :] if agent_turns else []
 
+        # ── Pair requirement: both main agents must be present in the window ──
+        # A loop cannot be confirmed from a single agent's output.
+        present_roles = {t.get("role") for t in recent}
+        if "Socrates" not in present_roles or "Athena" not in present_roles:
+            logger.info(
+                "[FIXY-GATE] skipped: waiting for both agents (have=%s) at turn %d",
+                sorted(present_roles),
+                turn_count,
+            )
+            return []
+
         if current_topic:
             self._topic_history.append(current_topic)
 
@@ -357,21 +502,45 @@ class DialogueLoopDetector:
             )
             return []
 
+        # ── Novelty / advancement suppressor ──────────────────────────────
+        # Linguistic repetition alone does not constitute a structural loop.
+        # If the most recent turns introduce a new metric, case, decision,
+        # testable claim, or abstraction shift, suppress the loop declaration.
+        novelty_clusters, novelty_count = self._check_novelty_present(recent)
+        if novelty_count >= _NOVELTY_SUPPRESS_THRESHOLD:
+            logger.info(
+                "[FIXY-SUPPRESS] semantic overlap only; no structural loop — "
+                "novelty clusters present: %s at turn %d",
+                novelty_clusters,
+                turn_count,
+            )
+            return []
+
         # ── Determine specific failure modes ───────────────────────────────
         modes: List[str] = []
 
         if sig_phrase_rep:
             modes.append(LOOP_REPETITION)
-            logger.debug("loop_guard: loop_repetition detected at turn %d", turn_count)
+            logger.info(
+                "[FIXY-LOOP] detected: repeated contradiction without new variable "
+                "at turn %d (phrase_rep=True, role_lock=%s, text_sim=%s)",
+                turn_count,
+                sig_role_lock,
+                sig_text_sim,
+            )
 
         if sig_weak_conflict:
             modes.append(WEAK_CONFLICT)
-            logger.debug("loop_guard: weak_conflict detected at turn %d", turn_count)
+            logger.info(
+                "[FIXY-LOOP] detected: weak_conflict at turn %d",
+                turn_count,
+            )
 
         if sig_premature_synth:
             modes.append(PREMATURE_SYNTHESIS)
-            logger.debug(
-                "loop_guard: premature_synthesis detected at turn %d", turn_count
+            logger.info(
+                "[FIXY-LOOP] detected: premature_synthesis at turn %d",
+                turn_count,
             )
 
         if (
@@ -380,7 +549,10 @@ class DialogueLoopDetector:
             and self._check_topic_stagnation(recent)
         ):
             modes.append(TOPIC_STAGNATION)
-            logger.debug("loop_guard: topic_stagnation detected at turn %d", turn_count)
+            logger.info(
+                "[FIXY-LOOP] detected: topic_stagnation at turn %d",
+                turn_count,
+            )
 
         return modes
 
@@ -596,10 +768,57 @@ class DialogueLoopDetector:
         )
         return mediation_count >= self.fixy_mediation_min_turns
 
+    def _check_novelty_present(
+        self, turns: List[Dict[str, str]]
+    ) -> Tuple[List[str], int]:
+        """Detect whether the most recent turns introduce genuine novelty.
 
-# ============================================================
-# PhraseBanList
-# ============================================================
+        Novelty suppresses false-positive loop declarations: linguistic
+        repetition of themes does NOT constitute a structural loop when
+        the dialogue is simultaneously advancing via a new metric, case,
+        forced decision, testable claim, abstraction shift, or definitional
+        clarification.
+
+        Checks 6 novelty clusters across the two most recent agent turns:
+          1. metric       — measurable criterion / benchmark / score
+          2. case         — concrete example / scenario / historical instance
+          3. decision     — forced choice / trade-off / commitment
+          4. test         — testable / falsifiable / empirical prediction
+          5. definition   — operational definition / clarification / distinction
+          6. advancement  — logical entailment / conclusion / contrast marker
+
+        Parameters
+        ----------
+        turns:
+            Recent agent turns (Fixy excluded).
+
+        Returns
+        -------
+        A ``(List[str], int)`` tuple: list of active novelty cluster names
+        and the count of active clusters.
+        """
+        # Examine only the two most recent turns to catch fresh novelty
+        inspection = turns[-2:] if len(turns) >= 2 else turns
+        combined_text = " ".join(t.get("text", "").lower() for t in inspection)
+
+        _clusters: Dict[str, frozenset] = {
+            "metric": _NOVELTY_METRIC_KEYWORDS,
+            "case": _NOVELTY_CASE_KEYWORDS,
+            "decision": _NOVELTY_DECISION_KEYWORDS,
+            "test": _NOVELTY_TEST_KEYWORDS,
+            "definition": _NOVELTY_DEFINITION_KEYWORDS,
+            "advancement": _NOVELTY_ADVANCEMENT_KEYWORDS,
+        }
+
+        active: List[str] = []
+        for cluster_name, keywords in _clusters.items():
+            hits = sum(1 for kw in keywords if kw in combined_text)
+            if hits >= _NOVELTY_CLUSTER_HIT_THRESHOLD:
+                active.append(cluster_name)
+
+        return active, len(active)
+
+
 
 
 class PhraseBanList:
@@ -687,7 +906,7 @@ class DialogueRewriter:
     # Templates for the rewrite header
     _HEADER = "DIALOGUE STATE REWRITE"
 
-    # Novelty requirements per failure mode
+    # Novelty requirements per failure mode (legacy loop-guard modes)
     _NOVELTY_RULES: Dict[str, str] = {
         LOOP_REPETITION: (
             "next response MUST introduce a concrete example, counterexample, "
@@ -705,6 +924,27 @@ class DialogueRewriter:
             "next response MUST pivot to a new conceptual domain — stay connected "
             "to the thread but introduce a genuinely different angle"
         ),
+        # Structural rewrite modes — injected when Fixy selects a targeted mode
+        "force_metric": (
+            "next response MUST introduce a measurable criterion, benchmark, or "
+            "quantifiable indicator — do not argue without a metric"
+        ),
+        "force_choice": (
+            "next response MUST make a forced binary choice between the two positions "
+            "— pick one side and defend it; do NOT hedge or synthesize"
+        ),
+        "force_test": (
+            "next response MUST propose a testable, falsifiable claim or empirical "
+            "prediction — do NOT stay in the abstract"
+        ),
+        "force_case": (
+            "next response MUST ground the argument in one specific real-world case, "
+            "scenario, or historical instance — do NOT generalize"
+        ),
+        "force_definition": (
+            "next response MUST provide an operational definition for the central "
+            "contested concept — define precisely what counts as an instance"
+        ),
     }
 
     def build(
@@ -713,6 +953,8 @@ class DialogueRewriter:
         active_modes: List[str],
         current_topic: str,
         banned_phrases: Optional[List[str]] = None,
+        rewrite_mode: Optional[str] = None,
+        target_agent: Optional[str] = None,
     ) -> str:
         """Build the rewrite block string.
 
@@ -726,6 +968,12 @@ class DialogueRewriter:
             The current topic label.
         banned_phrases:
             Optional list of overused phrases that must be suppressed.
+        rewrite_mode:
+            Optional Fixy rewrite mode (e.g. ``"force_metric"``).  When
+            provided, its novelty rule is prepended first as the primary
+            requirement.
+        target_agent:
+            Optional name of the agent the rewrite is directed at.
 
         Returns
         -------
@@ -773,15 +1021,24 @@ class DialogueRewriter:
         # Build contradiction statement
         contradiction = _extract_contradiction(agent_claims)
 
-        # Assemble novelty requirements for active modes
-        novelty_lines = [
-            self._NOVELTY_RULES[m] for m in active_modes if m in self._NOVELTY_RULES
-        ]
+        # Assemble novelty requirements: Fixy rewrite_mode takes priority
+        novelty_lines: List[str] = []
+        if rewrite_mode and rewrite_mode in self._NOVELTY_RULES:
+            novelty_lines.append(self._NOVELTY_RULES[rewrite_mode])
+        for m in active_modes:
+            rule = self._NOVELTY_RULES.get(m)
+            if rule and rule not in novelty_lines:
+                novelty_lines.append(rule)
 
         lines: List[str] = [
             f"--- {self._HEADER} ---",
             f"Topic: {current_topic}",
             f"Active failure modes: {', '.join(active_modes)}",
+        ]
+        if rewrite_mode:
+            target_label = f" → {target_agent}" if target_agent else ""
+            lines.append(f"Rewrite mode: {rewrite_mode}{target_label}")
+        lines += [
             "",
             "Core claims so far:",
         ]
@@ -813,6 +1070,7 @@ class DialogueRewriter:
         lines.append(f"--- END {self._HEADER} ---")
 
         return "\n".join(lines)
+
 
 
 # ---------------------------------------------------------------------------
