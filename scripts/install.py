@@ -358,6 +358,31 @@ def update_api_key(backend="ollama"):
                 )
                 return False
 
+    # --- ANTHROPIC_API_KEY (only when Anthropic backend is chosen) ---
+    anthropic_api_key = None
+    if backend == "anthropic":
+        print("\nAn ANTHROPIC_API_KEY is required to use the Anthropic backend.")
+        print("\nHow to get an Anthropic API key:")
+        print("  1. Go to https://console.anthropic.com and sign in.")
+        print('  2. In the left sidebar click "API Keys".')
+        print('  3. Click "Create Key", give it a name, and copy the generated key.')
+        print("\nAvailable Anthropic models (you will select at Entelgia startup):")
+        print("  - claude-3-7-sonnet-latest  (latest Claude 3.7 Sonnet)")
+        print("  - claude-3-5-sonnet-latest  (Claude 3.5 Sonnet)")
+        print("  - claude-3-5-haiku-latest   (Claude 3.5 Haiku, fastest)")
+
+        while True:
+            anthropic_api_key = getpass.getpass("\nEnter your Anthropic API key: ").strip()
+            if anthropic_api_key:
+                break
+            print_warning("An Anthropic API key is required when using the Anthropic backend.")
+            retry = input("Try again? (y/n): ").strip().lower()
+            if retry != "y":
+                print(
+                    "Installation cancelled. Add ANTHROPIC_API_KEY to .env manually and re-run."
+                )
+                return False
+
     # --- Write all keys to .env ---
     try:
         with open(env_file, "r") as f:
@@ -389,6 +414,16 @@ def update_api_key(backend="ollama"):
             if not key_updated:
                 lines.append(f"OPENAI_API_KEY={openai_api_key}\n")
 
+        if anthropic_api_key is not None:
+            key_updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith("ANTHROPIC_API_KEY="):
+                    lines[i] = f"ANTHROPIC_API_KEY={anthropic_api_key}\n"
+                    key_updated = True
+                    break
+            if not key_updated:
+                lines.append(f"ANTHROPIC_API_KEY={anthropic_api_key}\n")
+
         with open(env_file, "w") as f:
             f.writelines(lines)
 
@@ -398,6 +433,8 @@ def update_api_key(backend="ollama"):
             print_success("GROK_API_KEY saved to .env")
         if openai_api_key is not None:
             print_success("OPENAI_API_KEY saved to .env")
+        if anthropic_api_key is not None:
+            print_success("ANTHROPIC_API_KEY saved to .env")
 
         return True
     except Exception as e:
@@ -509,24 +546,37 @@ def print_next_steps(backend, model_pulled=False):
             "\n   Entelgia will ask you to confirm the OpenAI backend and model at startup."
         )
 
+    if backend == "anthropic":
+        print("\n1. Ensure your ANTHROPIC_API_KEY is set in the .env file.")
+
+        print("\n2. Run Entelgia:")
+        print("   python examples/demo_enhanced_dialogue.py")
+        print("   or")
+        print("   python Entelgia_production_meta.py")
+
+        print(
+            "\n   Entelgia will ask you to confirm the Anthropic backend and model at startup."
+        )
+
     print("\n" + "=" * 60)
     print("For more information, see the README.md file")
     print("=" * 60 + "\n")
 
 
 def choose_backend():
-    """Ask the user to choose between Ollama, Grok, and OpenAI before anything else."""
+    """Ask the user to choose between Ollama, Grok, OpenAI, and Anthropic before anything else."""
     print_header("Choose Your LLM Backend")
 
-    print("Entelgia supports three LLM backends:\n")
-    print("  1. Ollama  — runs models locally on your machine (free, private)")
-    print("               Requires Ollama to be installed.")
-    print("  2. Grok    — uses xAI's cloud API (requires a GROK_API_KEY)")
-    print("  3. OpenAI  — uses OpenAI's cloud API (requires an OPENAI_API_KEY)\n")
+    print("Entelgia supports four LLM backends:\n")
+    print("  1. Ollama    — runs models locally on your machine (free, private)")
+    print("                 Requires Ollama to be installed.")
+    print("  2. Grok      — uses xAI's cloud API (requires a GROK_API_KEY)")
+    print("  3. OpenAI    — uses OpenAI's cloud API (requires an OPENAI_API_KEY)")
+    print("  4. Anthropic — uses Anthropic's cloud API (requires an ANTHROPIC_API_KEY)\n")
 
     while True:
         choice = input(
-            "Which backend would you like to use? [1=Ollama / 2=Grok / 3=OpenAI]: "
+            "Which backend would you like to use? [1=Ollama / 2=Grok / 3=OpenAI / 4=Anthropic]: "
         ).strip()
         if choice in ("1", "ollama"):
             return "ollama"
@@ -534,7 +584,9 @@ def choose_backend():
             return "grok"
         if choice in ("3", "openai"):
             return "openai"
-        print_warning("Please enter 1 (Ollama), 2 (Grok), or 3 (OpenAI).")
+        if choice in ("4", "anthropic"):
+            return "anthropic"
+        print_warning("Please enter 1 (Ollama), 2 (Grok), 3 (OpenAI), or 4 (Anthropic).")
 
 
 def main():
