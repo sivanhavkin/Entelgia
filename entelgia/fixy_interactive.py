@@ -45,6 +45,13 @@ class FixyMode:
     FORCE_TOPIC_RETURN = "FORCE_TOPIC_RETURN"
     FORCE_SHORT_ANSWER = "FORCE_SHORT_ANSWER"
     FORCE_NEW_DOMAIN = "FORCE_NEW_DOMAIN"
+    # Structural rewrite modes — select the rewrite instruction injected into
+    # the next agent's generation (issue requirement §7 / §8).
+    FORCE_METRIC = "force_metric"
+    FORCE_CHOICE = "force_choice"
+    FORCE_TEST = "force_test"
+    FORCE_CASE = "force_case"
+    FORCE_DEFINITION = "force_definition"
 
 
 # Policy: loop failure mode → preferred Fixy mode
@@ -69,9 +76,93 @@ _LOOP_BREAKING_MODES: List[str] = [
     FixyMode.CONTRADICT,
     FixyMode.PIVOT,
     FixyMode.FORCE_TOPIC_RETURN,
+    FixyMode.FORCE_METRIC,
+    FixyMode.FORCE_CHOICE,
+    FixyMode.FORCE_TEST,
+    FixyMode.FORCE_CASE,
+    FixyMode.FORCE_DEFINITION,
 ]
 
-# Concepts Fixy must NEVER repeat — they signal a semantic attractor
+# Mapping from loop failure mode → rewrite mode for next-agent injection
+# Each loop type has a preferred structural rewrite mode that forces
+# the next agent to advance along a specific dimension.
+_LOOP_REWRITE_MODE_POLICY: Dict[str, str] = {
+    "loop_repetition": FixyMode.FORCE_CASE,       # break repetition with a grounded case
+    "weak_conflict": FixyMode.FORCE_CHOICE,        # resolve soft conflict with binary pick
+    "premature_synthesis": FixyMode.FORCE_TEST,    # challenge synthesis with a testable claim
+    "topic_stagnation": FixyMode.FORCE_METRIC,     # break stagnation with a new criterion
+    "fixy_mediation_loop": FixyMode.FORCE_DEFINITION,  # clarify what's being argued
+    "circular_reasoning": FixyMode.FORCE_CASE,
+    "high_conflict_no_resolution": FixyMode.FORCE_CHOICE,
+    "shallow_discussion": FixyMode.FORCE_TEST,
+    "synthesis_opportunity": FixyMode.FORCE_METRIC,
+}
+
+# Structural rewrite directives — one per FORCE_* mode.
+# Injected verbatim into the next agent's seed to force structural advancement.
+# Defined at module level so it is not recreated on every get_rewrite_hint call.
+_REWRITE_DIRECTIVES: Dict[str, str] = {
+    FixyMode.FORCE_METRIC: (
+        "Your next response MUST introduce a measurable criterion, benchmark, "
+        "or quantifiable indicator. Do NOT argue without a metric."
+    ),
+    FixyMode.FORCE_CHOICE: (
+        "Your next response MUST commit to one side of the binary. "
+        "Pick a position and state exactly why the other fails. Do NOT hedge."
+    ),
+    FixyMode.FORCE_TEST: (
+        "Your next response MUST propose a testable, falsifiable prediction. "
+        "State what observable outcome would refute the claim."
+    ),
+    FixyMode.FORCE_CASE: (
+        "Your next response MUST ground the argument in one specific real-world "
+        "case, scenario, or historical instance. Do NOT generalize."
+    ),
+    FixyMode.FORCE_DEFINITION: (
+        "Your next response MUST provide an operational definition for the "
+        "central contested term. Define precisely what counts as an instance."
+    ),
+}
+
+# Condition-based output label instructions — maps each intervention reason to
+# the diagnostic labels that are appropriate for it.  Defined at module level
+# so it is not recreated on every generate_intervention call.
+_REASON_LABEL_MAP: Dict[str, str] = {
+    "loop_repetition": (
+        "Use 'Loop:' label only. "
+        "Omit 'Deadlock:' unless positions are genuinely locked."
+    ),
+    "weak_conflict": (
+        "Use 'Deadlock:' label. "
+        "Include 'Missing variable:' only if a position is genuinely absent."
+    ),
+    "premature_synthesis": (
+        "Use 'Deadlock:' label to expose what the synthesis hides. "
+        "Omit 'Loop:' unless repetition exists."
+    ),
+    "topic_stagnation": (
+        "Use 'Drift:' label. Do NOT use 'Loop:' or 'Deadlock:'."
+    ),
+    "circular_reasoning": (
+        "Use 'Loop:' label. Include 'Next move:' with a concrete demand."
+    ),
+    "high_conflict_no_resolution": (
+        "Use 'Deadlock:' label. "
+        "Include 'Missing variable:' only if genuinely absent."
+    ),
+    "shallow_discussion": (
+        "Use 'Loop:' label for surface repetition. Include 'Next move:'."
+    ),
+    "synthesis_opportunity": (
+        "Use 'Deadlock:' to name hidden tension. "
+        "Omit 'Missing variable:' if not needed."
+    ),
+    "fixy_mediation_loop": (
+        "Use 'Loop:' label only. Do NOT repeat mediation language."
+    ),
+}
+
+
 _FIXY_FORBIDDEN_CONCEPTS: List[str] = [
     "ethics",
     "monitoring",
@@ -181,6 +272,41 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Example: 'Drift: stuck in [cluster]. Missing variable: a different domain. Next move: [domain question].'\n"
         "Max 3 short sentences. Do NOT stay in philosophy or abstract reasoning."
     ),
+    FixyMode.FORCE_METRIC: (
+        "You are Fixy. Failure mode: unmeasured claim — argument lacks any criterion or benchmark.\n"
+        "Name the unmeasured claim. Demand a concrete measurable indicator.\n"
+        "Example: 'Loop: [claim] argued without metric. Missing variable: a measurable criterion. "
+        "Next move: define what would count as evidence.'\n"
+        "Max 3 short sentences. Do NOT accept abstract assertions."
+    ),
+    FixyMode.FORCE_CHOICE: (
+        "You are Fixy. Failure mode: undecided fork — both positions held without commitment.\n"
+        "Name the binary choice. Demand one side be chosen and defended.\n"
+        "Example: 'Deadlock: [X] vs [Y] unresolved. Missing variable: a committed position. "
+        "Next move: pick one and state why the other fails.'\n"
+        "Max 3 short sentences. Do NOT allow hedging."
+    ),
+    FixyMode.FORCE_TEST: (
+        "You are Fixy. Failure mode: unfalsifiable claim — no empirical test proposed.\n"
+        "Name the untestable claim. Demand a falsifiable prediction.\n"
+        "Example: 'Loop: [claim] asserted. Missing variable: a testable prediction. "
+        "Next move: state what observable outcome would refute it.'\n"
+        "Max 3 short sentences. Do NOT accept claims without tests."
+    ),
+    FixyMode.FORCE_CASE: (
+        "You are Fixy. Failure mode: ungrounded abstraction — no real-world case anchors the claim.\n"
+        "Name the abstract claim. Demand one specific named case or scenario.\n"
+        "Example: 'Loop: [claim] generalised. Missing variable: a specific grounded case. "
+        "Next move: name a real historical or current instance.'\n"
+        "Max 3 short sentences. Do NOT accept purely theoretical assertions."
+    ),
+    FixyMode.FORCE_DEFINITION: (
+        "You are Fixy. Failure mode: undefined concept — a central term is contested but never defined.\n"
+        "Name the undefined term. Demand an operational definition.\n"
+        "Example: 'Loop: [term] used differently by each side. Missing variable: an operational definition. "
+        "Next move: define precisely what counts as an instance.'\n"
+        "Max 3 short sentences. Do NOT allow the term to remain ambiguous."
+    ),
 }
 
 # ---------------------------------------------------------------------------
@@ -267,7 +393,15 @@ class InteractiveFixy:
     CONTRADICT / CONCRETIZE / EXPOSE_SYNTHESIS / PIVOT / FORCE_MECHANISM)
     instead of the default mediating style.  Modes rotate so Fixy never repeats
     the same breaking strategy in consecutive interventions.
+
+    v4.0.0: Added pair gating (both Socrates and Athena must have spoken before
+    evaluation), structural rewrite hint injection, and condition-based output.
     """
+
+    # Minimum number of distinct main-agent turns required before Fixy may
+    # evaluate.  This enforces the pair requirement without relying solely on
+    # turn_count.
+    _MIN_CONTEXT_TURNS: int = 2
 
     def __init__(self, llm, model: str):
         """
@@ -288,6 +422,11 @@ class InteractiveFixy:
         self._recent_interventions: deque[str] = deque(
             maxlen=_INTERVENTION_DEDUP_WINDOW
         )
+        # Last rewrite hint computed during should_intervene — consumed by the
+        # caller to inject into the next agent's seed.
+        self._pending_rewrite_hint: Optional[str] = None
+        # Rewrite mode chosen for the pending hint.
+        self._pending_rewrite_mode: Optional[str] = None
 
         # Lazy import to avoid circular dependency (loop_guard → no imports from fixy)
         try:
@@ -296,6 +435,16 @@ class InteractiveFixy:
             self._loop_detector = DialogueLoopDetector()
         except ImportError:  # pragma: no cover
             self._loop_detector = None
+
+    # ------------------------------------------------------------------
+    # Pair-gating helper
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _both_agents_present(dialog: List[Dict[str, str]]) -> bool:
+        """Return True when both Socrates and Athena have spoken in *dialog*."""
+        roles = {t.get("role") for t in dialog if t.get("role") not in ("Fixy", "seed")}
+        return "Socrates" in roles and "Athena" in roles
 
     def should_intervene(
         self,
@@ -309,6 +458,10 @@ class InteractiveFixy:
         v2.9.0: First checks explicit loop failure modes via DialogueLoopDetector.
         Falls back to the existing heuristic patterns when no loop is active.
 
+        v4.0.0: Added mandatory pair gating — Fixy will never evaluate after a
+        single agent's turn.  Both Socrates AND Athena must have spoken.  Also
+        clears the pending rewrite hint on each call.
+
         Args:
             dialog: Full dialogue history
             turn_count: Current turn number
@@ -317,8 +470,30 @@ class InteractiveFixy:
         Returns:
             Tuple of (should_intervene, reason)
         """
-        # Don't intervene too early
-        if turn_count < 3:
+        # Reset pending rewrite hint from the previous turn
+        self._pending_rewrite_hint = None
+        self._pending_rewrite_mode = None
+
+        # ── Pair gating: require both main agents to have spoken ────────────
+        # Fixy must not intervene after a single agent's message.
+        if not self._both_agents_present(dialog):
+            logger.info(
+                "[FIXY-GATE] skipped: waiting for both agents at turn %d",
+                turn_count,
+            )
+            return (False, "")
+
+        # ── Minimum context window ──────────────────────────────────────────
+        agent_turns_all = [
+            t for t in dialog if t.get("role") not in ("Fixy", "seed")
+        ]
+        if len(agent_turns_all) < self._MIN_CONTEXT_TURNS:
+            logger.info(
+                "[FIXY-GATE] skipped: insufficient context (have %d agent turns, need %d) at turn %d",
+                len(agent_turns_all),
+                self._MIN_CONTEXT_TURNS,
+                turn_count,
+            )
             return (False, "")
 
         # ── Loop-guard checks (new v2.9.0) ─────────────────────────────────
@@ -328,6 +503,11 @@ class InteractiveFixy:
             )
             if active_modes:
                 primary = active_modes[0]
+                # Select structural rewrite mode for the next agent's seed
+                rewrite_mode = _LOOP_REWRITE_MODE_POLICY.get(
+                    primary, FixyMode.FORCE_CASE
+                )
+                self._pending_rewrite_mode = rewrite_mode
                 logger.info(
                     "[FIXY-LOOP] Loop detected: modes=%s turn=%d topic=%r → Fixy will break loop",
                     active_modes,
@@ -336,29 +516,37 @@ class InteractiveFixy:
                 )
                 # Use the first (highest-priority) failure mode as the reason
                 return (True, primary)
+            else:
+                logger.debug(
+                    "[FIXY-GATE] skipped: insufficient structural repetition at turn %d",
+                    turn_count,
+                )
 
         # ── Legacy heuristic patterns (preserved for backward compat) ───────
         # Only analyse main-agent turns; excluding Fixy's own past interventions
         # prevents a feedback loop where Fixy's meta-commentary (which references
         # the dialogue topic and therefore has high semantic similarity) inflates
         # the repetition score and triggers yet more Fixy interventions.
-        agent_turns = [t for t in dialog if t.get("role") != "Fixy"]
-        last_10 = agent_turns[-10:] if len(agent_turns) >= 10 else agent_turns
+        last_10 = agent_turns_all[-10:] if len(agent_turns_all) >= 10 else agent_turns_all
 
         # Pattern 1: Circular reasoning (repetition)
         if self._detect_repetition(last_10):
+            self._pending_rewrite_mode = FixyMode.FORCE_CASE
             return (True, "circular_reasoning")
 
         # Pattern 2: High conflict without synthesis (check every 6+ turns)
         if turn_count >= 6 and self._detect_high_conflict(last_10):
+            self._pending_rewrite_mode = FixyMode.FORCE_CHOICE
             return (True, "high_conflict_no_resolution")
 
         # Pattern 3: Surface-level discussion for too long
         if turn_count >= 10 and self._detect_shallow_discussion(last_10):
+            self._pending_rewrite_mode = FixyMode.FORCE_TEST
             return (True, "shallow_discussion")
 
         # Pattern 4: Missed synthesis opportunity
         if turn_count >= 5 and self._detect_synthesis_opportunity(last_10):
+            self._pending_rewrite_mode = FixyMode.FORCE_METRIC
             return (True, "synthesis_opportunity")
 
         # Pattern 5: Meta-reflection needed (every 15 turns)
@@ -394,6 +582,79 @@ class InteractiveFixy:
             return mode
         return _LOOP_MODE_POLICY.get(reason, FixyMode.MEDIATE)
 
+    def get_rewrite_hint(
+        self,
+        active_modes: List[str],
+        rewrite_mode: Optional[str],
+        target_agent: Optional[str],
+    ) -> str:
+        """Return a structural rewrite hint to inject into the next agent's seed.
+
+        This is the companion to ``generate_intervention``: while the
+        intervention is Fixy's spoken commentary appended to the dialogue,
+        the rewrite hint is a silent directive prepended to the *next*
+        agent's generation prompt.  It forces structural advancement (new
+        metric, forced choice, concrete test, etc.) rather than allowing the
+        agent to restate the same idea.
+
+        The hint is consumed by the caller (MainScript.run) immediately after
+        Fixy's intervention and stored in ``self._pending_rewrite_hint`` so it
+        survives until the next agent's seed is built.
+
+        Parameters
+        ----------
+        active_modes:
+            Loop failure modes active during this intervention.
+        rewrite_mode:
+            One of the ``FORCE_*`` FixyMode constants (e.g. ``"force_metric"``).
+            When ``None``, the hint selects a default based on ``active_modes``.
+        target_agent:
+            Name of the next agent to receive the hint (for logging).
+
+        Returns
+        -------
+        A multi-line directive string or ``""`` when no rewrite is needed.
+        """
+        if not active_modes and not rewrite_mode:
+            return ""
+
+        effective_mode = rewrite_mode
+        if effective_mode is None and active_modes:
+            effective_mode = _LOOP_REWRITE_MODE_POLICY.get(
+                active_modes[0], FixyMode.FORCE_CASE
+            )
+
+        logger.info(
+            "[FIXY-REWRITE] mode=%s target=%s active_modes=%s",
+            effective_mode,
+            target_agent,
+            active_modes,
+        )
+
+        directive = _REWRITE_DIRECTIVES.get(
+            effective_mode or "",
+            "Your next response MUST introduce something genuinely new: a new variable, "
+            "forced decision, or concrete test. Do NOT restate the same idea.",
+        )
+
+        lines = [
+            "--- FIXY STRUCTURAL REWRITE DIRECTIVE ---",
+            f"Rewrite mode: {effective_mode}",
+        ]
+        if target_agent:
+            lines.append(f"Target: {target_agent}")
+        lines += [
+            "",
+            directive,
+            "",
+            "This directive takes priority over your default framing.",
+            "--- END FIXY REWRITE DIRECTIVE ---",
+        ]
+
+        hint = "\n".join(lines)
+        self._pending_rewrite_hint = hint
+        return hint
+
     def generate_intervention(
         self,
         dialog: List[Dict[str, str]],
@@ -412,6 +673,11 @@ class InteractiveFixy:
         active dialogue topic, reducing TOPIC-MISMATCH failures.  Also
         tracks recent intervention texts to avoid repeating the same
         examples or framings across consecutive calls.
+
+        v4.0.0: Output is condition-based: labels ('Loop:', 'Deadlock:',
+        'Missing variable:') appear only when the corresponding failure is
+        present.  The output type instruction now reflects the active reason
+        so Fixy does not produce a fixed template regardless of context.
 
         Args:
             dialog: Dialogue history
@@ -454,6 +720,14 @@ class InteractiveFixy:
                 reason, _MODE_PROMPTS[FixyMode.MEDIATE]
             )
 
+        # Build condition-based output instruction using the module-level map.
+        # Only include diagnostic labels that match the actual failure type.
+        output_instruction = _REASON_LABEL_MAP.get(
+            reason,
+            "Use only the diagnostic labels that apply to the actual failure. "
+            "Do NOT produce all labels by default.",
+        )
+
         # Build topic anchor instruction when a topic is active
         topic_instruction = ""
         if current_topic:
@@ -481,7 +755,8 @@ class InteractiveFixy:
             f"{topic_instruction}"
             f"{dedup_instruction}"
             f"RECENT DIALOGUE:\n{context}\n\n"
-            f"Max 3 short sentences. Use diagnostic labels ('Deadlock:', 'Missing variable:', 'Next move:'). Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
+            f"Output rule: {output_instruction}\n"
+            f"Max 3 short sentences. Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
             f"{LLM_RESPONSE_LIMIT}\n"
         )
