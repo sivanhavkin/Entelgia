@@ -56,11 +56,13 @@ Unlike typical chatbots:
 ### What are the system requirements?
 
 - **Python**: 3.10 or newer
-- **LLM backend**: Ollama (local) **or** Grok (xAI cloud)
+- **LLM backend**: Ollama (local), Grok (xAI cloud), OpenAI (cloud), or Anthropic (cloud)
   - **Ollama**: local LLM runtime; free and private; requires ~8GB+ RAM and 5–8GB disk per model
   - **Grok**: xAI cloud API; requires a `GROK_API_KEY` and an internet connection; no local GPU/RAM needed for inference
-- **Models**: At least one supported model (`qwen2.5:7b`, `llama3.1:8b`, `mistral:latest`, etc. for Ollama; `grok-4.20-multi-agent` or `grok-4-1-fast-reasoning` for Grok)
-- **RAM**: 8GB+ recommended for Ollama (16GB+ for larger models); not required for Grok cloud inference
+  - **OpenAI**: OpenAI cloud API; requires an `OPENAI_API_KEY` and an internet connection; no local GPU/RAM needed for inference
+  - **Anthropic**: Anthropic cloud API; requires an `ANTHROPIC_API_KEY` and an internet connection; no local GPU/RAM needed for inference
+- **Models**: At least one supported model (`qwen2.5:7b`, `llama3.1:8b`, `mistral:latest`, etc. for Ollama; `grok-4.20-multi-agent` or `grok-4-1-fast-reasoning` for Grok; `gpt-4.1` for OpenAI; `claude-opus-4-6`, `claude-sonnet-4-6`, or `claude-haiku-4-5` for Anthropic)
+- **RAM**: 8GB+ recommended for Ollama (16GB+ for larger models); not required for cloud inference backends
 - **OS**: macOS, Linux, or Windows (with WSL2)
 
 ### How do I install Entelgia?
@@ -95,12 +97,14 @@ If you choose the **Grok backend** instead, Ollama is not required — agent res
 
 ### Can I use OpenAI or other LLM providers?
 
-Currently, Entelgia officially supports two backends:
+Currently, Entelgia officially supports four backends:
 
 - **Ollama** — local LLM runtime (default). Works with any Ollama-compatible model.
 - **Grok (xAI)** — cloud API using the `GROK_API_KEY`. Available models: `grok-4.20-multi-agent`, `grok-4-1-fast-reasoning`.
+- **OpenAI** — cloud API using the `OPENAI_API_KEY`. Available model: `gpt-4.1`.
+- **Anthropic** — cloud API using the `ANTHROPIC_API_KEY`. Available models: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`.
 
-You choose the backend interactively at startup. Other providers (e.g. OpenAI, Anthropic) are not officially supported and would require custom code modifications.
+You choose the backend interactively at startup. All four backends are natively integrated — no custom code modifications are required.
 
 ### What is the MEMORY_SECRET_KEY?
 
@@ -246,7 +250,7 @@ python Entelgia_production_meta.py
 python Entelgia_production_meta_200t.py
 ```
 
-At startup you will be prompted to choose your LLM backend (**Ollama** or **Grok**) and then select per-agent model names. If you choose Grok, ensure `GROK_API_KEY` is set in your `.env` file before running.
+At startup you will be prompted to choose your LLM backend (**Ollama**, **Grok**, **OpenAI**, or **Anthropic**) and then select per-agent model names. If you choose a cloud backend, ensure the corresponding API key (`GROK_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) is set in your `.env` file before running.
 
 ### What happens during a typical session?
 
@@ -384,10 +388,15 @@ Key settings include:
 At startup, Entelgia prompts you to choose your backend interactively:
 
 ```
-Which backend would you like to use? [1=Ollama / 2=Grok]:
+Select backend:
+  [1] grok
+  [2] ollama
+  [3] openai
+  [4] anthropic
+  [0] defaults (keep config as-is)
 ```
 
-Enter `2` (or type `grok`) to use the Grok backend. You will then be prompted to select a Grok model from the available list.
+Enter `1` to use the Grok backend. You will then be prompted to select a Grok model from the available list.
 
 To pre-configure Grok without the interactive prompt, add `GROK_API_KEY` to your `.env` file:
 ```
@@ -419,6 +428,62 @@ GROK_API_KEY=xai-xxxxxxxxxxxxxxxxxxxxxxxx
 
 The installer (`python scripts/install.py`) also prompts for this key automatically when you choose the Grok backend.
 
+### How do I switch to the OpenAI backend?
+
+Enter `3` at the startup backend menu to use the OpenAI backend. You will be prompted to select a model from the available OpenAI models.
+
+To pre-configure OpenAI without the interactive prompt, add `OPENAI_API_KEY` to your `.env` file:
+```
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### What OpenAI models does Entelgia support?
+
+| Model | Description |
+|---|---|
+| `gpt-4.1` | Latest GPT-4.1 model |
+
+### How do I get an OpenAI API key?
+
+1. Visit [https://platform.openai.com](https://platform.openai.com) and sign in.
+2. In the left sidebar, click **API keys**.
+3. Click **Create new secret key**, give it a name, and copy the generated key.
+4. Add it to your `.env` file:
+```
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+The installer (`python scripts/install.py`) also prompts for this key automatically when you choose the OpenAI backend.
+
+### How do I switch to the Anthropic backend?
+
+Enter `4` at the startup backend menu to use the Anthropic backend. You will be prompted to select a Claude model from the available Anthropic models.
+
+To pre-configure Anthropic without the interactive prompt, add `ANTHROPIC_API_KEY` to your `.env` file:
+```
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### What Anthropic models does Entelgia support?
+
+| Model | Description |
+|---|---|
+| `claude-opus-4-6` | Most capable Claude model |
+| `claude-sonnet-4-6` | Balanced performance and speed |
+| `claude-haiku-4-5` | Fast and lightweight |
+
+### How do I get an Anthropic API key?
+
+1. Visit [https://console.anthropic.com](https://console.anthropic.com) and sign in.
+2. In the left sidebar, click **API Keys**.
+3. Click **Create Key**, give it a name, and copy the generated key.
+4. Add it to your `.env` file:
+```
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+The installer (`python scripts/install.py`) also prompts for this key automatically when you choose the Anthropic backend.
+
 ### Can I change agent personas?
 
 Yes! Agent personas are defined in:
@@ -443,7 +508,7 @@ This is an advanced customization not officially supported.
 
 ### Can I use different LLM models?
 
-Yes! Entelgia supports two backends, each with its own model set.
+Yes! Entelgia supports four backends, each with its own model set.
 
 **Ollama models** (selected at startup):
 - `qwen2.5:7b` (recommended default — strong reasoning and instruction following)
@@ -456,6 +521,14 @@ Yes! Entelgia supports two backends, each with its own model set.
 **Grok (xAI) models** (selected at startup when the Grok backend is chosen):
 - `grok-4.20-multi-agent` — multi-agent capable, latest
 - `grok-4-1-fast-reasoning` — fast reasoning, high performance
+
+**OpenAI models** (selected at startup when the OpenAI backend is chosen):
+- `gpt-4.1` — latest GPT-4.1 model
+
+**Anthropic models** (selected at startup when the Anthropic backend is chosen):
+- `claude-opus-4-6` — most capable Claude model
+- `claude-sonnet-4-6` — balanced performance and speed
+- `claude-haiku-4-5` — fast and lightweight
 
 Different models will produce different dialogue qualities and require varying resources.
 
@@ -529,6 +602,10 @@ Yes! Entelgia can run on modern laptops.
 
 **Grok backend**: An active internet connection is required on every turn, because agent responses are generated by the xAI cloud API at `https://api.x.ai/v1/responses`. Ensure your connection is stable and that `GROK_API_KEY` is set in `.env`.
 
+**OpenAI backend**: An active internet connection is required on every turn, because agent responses are generated by the OpenAI cloud API at `https://api.openai.com/v1/chat/completions`. Ensure your connection is stable and that `OPENAI_API_KEY` is set in `.env`.
+
+**Anthropic backend**: An active internet connection is required on every turn, because agent responses are generated by the Anthropic cloud API at `https://api.anthropic.com/v1/messages`. Ensure your connection is stable and that `ANTHROPIC_API_KEY` is set in `.env`.
+
 The optional **Web Research Module** (`entelgia/web_research.py`) also makes outbound HTTP requests when Fixy decides a search is needed, regardless of backend. It can be completely ignored if you prefer to skip external web access — the module fails gracefully and returns an empty string when the network is unavailable.
 
 ### What is the Web Research Module?
@@ -592,6 +669,18 @@ responses are mocked).  Pass any query as an argument.
 - **Memory storage**: Grows over time (typically < 100MB)
 - Total: ~300MB (no local model download needed)
 
+**OpenAI backend:**
+- **Entelgia code**: < 50MB
+- **Python dependencies**: ~100-200MB
+- **Memory storage**: Grows over time (typically < 100MB)
+- Total: ~300MB (no local model download needed)
+
+**Anthropic backend:**
+- **Entelgia code**: < 50MB
+- **Python dependencies**: ~100-200MB
+- **Memory storage**: Grows over time (typically < 100MB)
+- Total: ~300MB (no local model download needed)
+
 ---
 
 ## Troubleshooting
@@ -609,6 +698,10 @@ Keep this running in a separate terminal, then run Entelgia in another terminal.
 
 **Note**: If you are using the **Grok backend**, a "connection refused" error means the xAI API endpoint is unreachable. Check your internet connection and verify that `GROK_URL` in your `.env` is set to `https://api.x.ai/v1/responses`.
 
+**Note**: If you are using the **OpenAI backend**, a "connection refused" error means the OpenAI API endpoint is unreachable. Check your internet connection.
+
+**Note**: If you are using the **Anthropic backend**, a "connection refused" error means the Anthropic API endpoint is unreachable. Check your internet connection.
+
 ### "Authentication failed" or "401 Unauthorized" error (Grok)
 
 **Cause**: Invalid or missing `GROK_API_KEY`.
@@ -619,6 +712,28 @@ Keep this running in a separate terminal, then run Entelgia in another terminal.
 3. Regenerate the key at [https://console.x.ai](https://console.x.ai) if needed.
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#grok-related-problems) for a full list of Grok-specific issues.
+
+### "Authentication failed" or "401 Unauthorized" error (OpenAI)
+
+**Cause**: Invalid or missing `OPENAI_API_KEY`.
+
+**Solution**:
+1. Ensure `OPENAI_API_KEY` is set in your `.env` file.
+2. Check for trailing spaces or newlines around the key value.
+3. Regenerate the key at [https://platform.openai.com](https://platform.openai.com) if needed.
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#openai-related-problems) for a full list of OpenAI-specific issues.
+
+### "Authentication failed" or "401 Unauthorized" error (Anthropic)
+
+**Cause**: Invalid or missing `ANTHROPIC_API_KEY`.
+
+**Solution**:
+1. Ensure `ANTHROPIC_API_KEY` is set in your `.env` file.
+2. Check for trailing spaces or newlines around the key value.
+3. Regenerate the key at [https://console.anthropic.com](https://console.anthropic.com) if needed.
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#anthropic-related-problems) for a full list of Anthropic-specific issues.
 
 ### "Model not found" error
 

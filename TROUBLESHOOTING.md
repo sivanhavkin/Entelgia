@@ -13,6 +13,8 @@ This guide helps you diagnose and resolve common issues when working with Entelg
 - [Installation Issues](#installation-issues)
 - [Ollama-Related Problems](#ollama-related-problems)
 - [Grok-Related Problems](#grok-related-problems)
+- [OpenAI-Related Problems](#openai-related-problems)
+- [Anthropic-Related Problems](#anthropic-related-problems)
 - [Model Loading Failures](#model-loading-failures)
 - [Configuration Errors](#configuration-errors)
 - [Runtime Failures](#runtime-failures)
@@ -262,6 +264,226 @@ config.llm_timeout = 120  # seconds (default: 60)
 ```
 2. Check your connection latency to `api.x.ai`.
 3. Switch to the faster `grok-4-1-fast-reasoning` model if timeouts are frequent.
+
+---
+
+## OpenAI-Related Problems
+
+### Problem: Missing OPENAI_API_KEY
+
+**Symptoms:**
+```
+ValueError: openai_api_key must be set when llm_backend is 'openai' (set OPENAI_API_KEY in your .env or environment)
+```
+
+**Cause**: You selected the OpenAI backend but `OPENAI_API_KEY` is not set in your `.env` file.
+
+**Solution**:
+1. Open your `.env` file (copy from `.env.example` if it does not exist).
+2. Add your OpenAI API key:
+```
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+3. Save the file and restart Entelgia.
+
+To obtain an API key:
+1. Go to [https://platform.openai.com](https://platform.openai.com) and sign in.
+2. Click **API keys** in the left sidebar.
+3. Click **Create new secret key**, give it a name, and copy the generated key.
+
+### Problem: Authentication failure / 401 Unauthorized
+
+**Symptoms:**
+```
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized
+```
+
+**Cause**: The `OPENAI_API_KEY` in `.env` is invalid or expired.
+
+**Solution**:
+1. Verify `OPENAI_API_KEY` is set correctly in `.env` (no extra spaces or newlines).
+2. Test the key directly:
+```bash
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer $OPENAI_API_KEY"
+```
+3. If the test fails, regenerate the key at [https://platform.openai.com](https://platform.openai.com).
+
+### Problem: OpenAI API endpoint unreachable
+
+**Symptoms:**
+```
+requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.openai.com', port=443)
+```
+
+**Cause**: No internet connection, or the OpenAI API is temporarily unavailable.
+
+**Solution**:
+1. Check your internet connection — OpenAI is a cloud API and requires network access.
+2. Verify the endpoint in your `.env` or Config is `https://api.openai.com/v1/chat/completions`.
+3. Check the OpenAI status page at [https://status.openai.com](https://status.openai.com).
+4. If the issue persists, switch to the Ollama backend for offline operation.
+
+### Problem: OpenAI model not available
+
+**Symptoms:**
+```
+openai.error.InvalidRequestError: The model 'gpt-4.1' does not exist
+```
+
+**Cause**: The selected model is not available on your OpenAI account or tier.
+
+**Solution**:
+Select a supported OpenAI model at the interactive startup prompt. The currently available model is:
+
+| Model | Description |
+|---|---|
+| `gpt-4.1` | Latest GPT-4.1 model |
+
+Ensure your OpenAI account has access to the selected model tier.
+
+### Problem: Rate limiting or quota exceeded
+
+**Symptoms:**
+```
+openai.error.RateLimitError: You exceeded your current quota
+```
+
+**Cause**: Your OpenAI account has hit its API usage limit or rate limit.
+
+**Solution**:
+1. Wait a few minutes and try again.
+2. Check your usage and limits at [https://platform.openai.com/usage](https://platform.openai.com/usage).
+3. Upgrade your OpenAI plan if needed.
+4. Alternatively, switch to the Ollama backend (free, local) for unlimited turns.
+
+### Problem: LLM timeout when using OpenAI
+
+**Symptoms:**
+```
+LLM timeout after N seconds
+```
+
+**Cause**: Slow internet connection, high API load, or a very long prompt.
+
+**Solution**:
+1. Increase `llm_timeout` in your Config (default: 120 seconds):
+```python
+config.llm_timeout = 180
+```
+2. Check your connection latency to `api.openai.com`.
+
+---
+
+## Anthropic-Related Problems
+
+### Problem: Missing ANTHROPIC_API_KEY
+
+**Symptoms:**
+```
+ValueError: anthropic_api_key must be set when llm_backend is 'anthropic' (set ANTHROPIC_API_KEY in your .env or environment)
+```
+
+**Cause**: You selected the Anthropic backend but `ANTHROPIC_API_KEY` is not set in your `.env` file.
+
+**Solution**:
+1. Open your `.env` file (copy from `.env.example` if it does not exist).
+2. Add your Anthropic API key:
+```
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+3. Save the file and restart Entelgia.
+
+To obtain an API key:
+1. Go to [https://console.anthropic.com](https://console.anthropic.com) and sign in.
+2. Click **API Keys** in the left sidebar.
+3. Click **Create Key**, give it a name, and copy the generated key.
+
+### Problem: Authentication failure / 401 Unauthorized
+
+**Symptoms:**
+```
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized
+```
+
+**Cause**: The `ANTHROPIC_API_KEY` in `.env` is invalid or expired.
+
+**Solution**:
+1. Verify `ANTHROPIC_API_KEY` is set correctly in `.env` (no extra spaces or newlines).
+2. Test the key directly:
+```bash
+curl https://api.anthropic.com/v1/models \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01"
+```
+3. If the test fails, regenerate the key at [https://console.anthropic.com](https://console.anthropic.com).
+
+### Problem: Anthropic API endpoint unreachable
+
+**Symptoms:**
+```
+requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.anthropic.com', port=443)
+```
+
+**Cause**: No internet connection, or the Anthropic API is temporarily unavailable.
+
+**Solution**:
+1. Check your internet connection — Anthropic is a cloud API and requires network access.
+2. Verify the endpoint in your Config is `https://api.anthropic.com/v1/messages`.
+3. Check the Anthropic status page at [https://status.anthropic.com](https://status.anthropic.com).
+4. If the issue persists, switch to the Ollama backend for offline operation.
+
+### Problem: Anthropic model not available
+
+**Symptoms:**
+```
+anthropic.BadRequestError: model: claude-opus-4-6 not found
+```
+
+**Cause**: The selected Claude model is not available on your Anthropic account or tier.
+
+**Solution**:
+Select a supported Anthropic model at the interactive startup prompt. The currently available models are:
+
+| Model | Description |
+|---|---|
+| `claude-opus-4-6` | Most capable Claude model |
+| `claude-sonnet-4-6` | Balanced performance and speed |
+| `claude-haiku-4-5` | Fast and lightweight |
+
+Ensure your Anthropic account has access to the selected model tier.
+
+### Problem: Rate limiting or quota exceeded
+
+**Symptoms:**
+```
+anthropic.RateLimitError: rate_limit_error
+```
+
+**Cause**: Your Anthropic account has hit its API usage limit or rate limit.
+
+**Solution**:
+1. Wait a few minutes and try again.
+2. Check your usage at [https://console.anthropic.com](https://console.anthropic.com).
+3. Upgrade your Anthropic plan if needed.
+4. Alternatively, switch to the Ollama backend (free, local) for unlimited turns.
+
+### Problem: LLM timeout when using Anthropic
+
+**Symptoms:**
+```
+LLM timeout after N seconds
+```
+
+**Cause**: Slow internet connection, high API load, or a very long prompt.
+
+**Solution**:
+1. Increase `llm_timeout` in your Config (default: 120 seconds):
+```python
+config.llm_timeout = 180
+```
+2. Check your connection latency to `api.anthropic.com`.
+3. Switch to `claude-haiku-4-5` for faster responses.
 
 ---
 
