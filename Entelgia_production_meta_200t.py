@@ -1939,7 +1939,7 @@ class Config:
     llm_backend: str = "ollama"
     grok_url: str = "https://api.x.ai/v1/responses"
     grok_api_key: str = os.environ.get("GROK_API_KEY", "")
-    openai_url: str = "https://api.openai.com/v1/responses"
+    openai_url: str = "https://api.openai.com/v1/chat/completions"
     openai_api_key: str = os.environ.get("OPENAI_API_KEY", "")
     model_socrates: str = "qwen2.5:7b"
     model_athena: str = "qwen2.5:7b"
@@ -3220,7 +3220,7 @@ class LLM:
                         },
                         json={
                             "model": model,
-                            "input": [{"role": "user", "content": prompt}],
+                            "messages": [{"role": "user", "content": prompt}],
                             "temperature": temperature,
                         },
                         timeout=(10, self.cfg.llm_timeout),
@@ -3252,7 +3252,7 @@ class LLM:
                     raise
                 r.raise_for_status()
                 data = r.json()
-                if self.cfg.llm_backend in ("grok", "openai"):
+                if self.cfg.llm_backend == "grok":
                     output = data.get("output") or []
                     result = ""
                     for item in output:
@@ -3263,6 +3263,10 @@ class LLM:
                                     break
                             if result:
                                 break
+                    result = result.strip()
+                elif self.cfg.llm_backend == "openai":
+                    choices = data.get("choices") or []
+                    result = (choices[0].get("message") or {}).get("content", "") if choices else ""
                     result = result.strip()
                 else:
                     result = (data.get("response") or "").strip()
