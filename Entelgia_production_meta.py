@@ -462,6 +462,10 @@ OLLAMA_MODELS: list[str] = [
     "mistral:latest",
 ]
 
+OPENAI_MODELS: list[str] = [
+    "text-davinci-003",
+]
+
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 MAX_RESPONSE_WORDS = 150
@@ -1924,10 +1928,14 @@ class Config:
     ollama_url: str = "http://localhost:11434/api/generate"
     # ── LLM Backend Switch ─────────────────────────────────────────────────
     # Edit llm_backend here in Config to switch backends:
-    # "ollama" (local, default) or "grok" (xAI cloud).
+    # "ollama" (local, default), "grok" (xAI cloud), or "openai" (OpenAI cloud).
+    # Base URLs for each backend are configured here in Config (not in .env).
+    # Only API keys are loaded from environment variables.
     llm_backend: str = "ollama"
     grok_url: str = "https://api.x.ai/v1/responses"
     grok_api_key: str = os.environ.get("GROK_API_KEY", "")
+    openai_url: str = "https://api.openai.com/v1/responses"
+    openai_api_key: str = os.environ.get("OPENAI_API_KEY", "")
     model_socrates: str = "qwen2.5:7b"
     model_athena: str = "qwen2.5:7b"
     model_fixy: str = "qwen2.5:7b"
@@ -2047,8 +2055,8 @@ class Config:
             raise ValueError("llm_timeout must be >= 5")
         if not self.ollama_url.startswith("http"):
             raise ValueError("ollama_url must be a valid URL")
-        if self.llm_backend not in ("ollama", "grok"):
-            raise ValueError("llm_backend must be 'ollama' or 'grok'")
+        if self.llm_backend not in ("ollama", "grok", "openai"):
+            raise ValueError("llm_backend must be 'ollama', 'grok', or 'openai'")
         if self.llm_backend == "grok":
             if not self.grok_url.startswith("http"):
                 raise ValueError("grok_url must be a valid URL")
@@ -2056,6 +2064,14 @@ class Config:
                 raise ValueError(
                     "grok_api_key must be set when llm_backend is 'grok' "
                     "(set GROK_API_KEY in your .env or environment)"
+                )
+        if self.llm_backend == "openai":
+            if not self.openai_url.startswith("http"):
+                raise ValueError("openai_url must be a valid URL")
+            if not self.openai_api_key:
+                raise ValueError(
+                    "openai_api_key must be set when llm_backend is 'openai' "
+                    "(set OPENAI_API_KEY in your .env or environment)"
                 )
         if self.timeout_minutes < 1:
             raise ValueError("timeout_minutes must be >= 1")
@@ -3202,6 +3218,21 @@ class LLM:
                         },
                         timeout=(10, self.cfg.llm_timeout),
                     )
+                elif self.cfg.llm_backend == "openai":
+                    _future = self._executor.submit(
+                        requests.post,
+                        self.cfg.openai_url,
+                        headers={
+                            "Authorization": f"Bearer {self.cfg.openai_api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": model,
+                            "input": [{"role": "user", "content": prompt}],
+                            "temperature": temperature,
+                        },
+                        timeout=(10, self.cfg.llm_timeout),
+                    )
                 else:
                     _future = self._executor.submit(
                         requests.post,
@@ -3229,7 +3260,7 @@ class LLM:
                     raise
                 r.raise_for_status()
                 data = r.json()
-                if self.cfg.llm_backend == "grok":
+                if self.cfg.llm_backend in ("grok", "openai"):
                     output = data.get("output") or []
                     result = ""
                     for item in output:
@@ -7823,23 +7854,24 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
     print(Fore.CYAN + "Select backend:" + Style.RESET_ALL)
     print("  [1] grok")
     print("  [2] ollama")
+    print("  [3] openai")
     print("  [0] defaults (keep config as-is)")
 
     while True:
         sys.stdout.flush()
-        backend_raw = input("Enter choice [0/1/2]: ").strip()
-        if backend_raw in ("0", "1", "2"):
+        backend_raw = input("Enter choice [0/1/2/3]: ").strip()
+        if backend_raw in ("0", "1", "2", "3"):
             break
         if backend_raw == "":
             print(
                 Fore.YELLOW
-                + "  Please enter 1 for grok, 2 for ollama, or 0 to keep defaults."
+                + "  Please enter 1 for grok, 2 for ollama, 3 for openai, or 0 to keep defaults."
                 + Style.RESET_ALL
             )
         else:
             print(
                 Fore.YELLOW
-                + f"  [WARN] '{backend_raw}' is not a valid choice. Please enter 0, 1, or 2."
+                + f"  [WARN] '{backend_raw}' is not a valid choice. Please enter 0, 1, 2, or 3."
                 + Style.RESET_ALL
             )
 
@@ -7852,6 +7884,10 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
         cfg.llm_backend = "grok"
         available_models = GROK_MODELS
         backend_label = "Grok"
+    elif backend_raw == "3":
+        cfg.llm_backend = "openai"
+        available_models = OPENAI_MODELS
+        backend_label = "OpenAI"
     else:  # backend_raw == "2"
         cfg.llm_backend = "ollama"
         available_models = OLLAMA_MODELS
@@ -7939,7 +7975,7 @@ def run_cli():
     select_llm_backend_and_models(CFG)
 
     print("\nConfiguration:")
-    _SENSITIVE_KEYS = {"grok_api_key", "memory_secret_key"}
+    _SENSITIVE_KEYS = {"grok_api_key", "openai_api_key", "memory_secret_key"}
     config_dict = asdict(CFG)
     config_display = {
         k: ("***" if k in _SENSITIVE_KEYS else v)

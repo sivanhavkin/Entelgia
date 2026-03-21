@@ -335,7 +335,30 @@ def update_api_key(backend="ollama"):
                 )
                 return False
 
-    # --- Write both keys to .env ---
+    # --- OPENAI_API_KEY (only when OpenAI backend is chosen) ---
+    openai_api_key = None
+    if backend == "openai":
+        print("\nAn OPENAI_API_KEY is required to use the OpenAI backend.")
+        print("\nHow to get an OpenAI API key:")
+        print("  1. Go to https://platform.openai.com and sign in.")
+        print('  2. In the left sidebar click "API keys".')
+        print('  3. Click "Create new secret key", give it a name, and copy the key.')
+        print("\nOpenAI model used by Entelgia:")
+        print("  - text-davinci-003  (GPT-3 completion model)")
+
+        while True:
+            openai_api_key = getpass.getpass("\nEnter your OpenAI API key: ").strip()
+            if openai_api_key:
+                break
+            print_warning("An OpenAI API key is required when using the OpenAI backend.")
+            retry = input("Try again? (y/n): ").strip().lower()
+            if retry != "y":
+                print(
+                    "Installation cancelled. Add OPENAI_API_KEY to .env manually and re-run."
+                )
+                return False
+
+    # --- Write all keys to .env ---
     try:
         with open(env_file, "r") as f:
             lines = f.readlines()
@@ -356,6 +379,16 @@ def update_api_key(backend="ollama"):
             if not key_updated:
                 lines.append(f"GROK_API_KEY={grok_api_key}\n")
 
+        if openai_api_key is not None:
+            key_updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith("OPENAI_API_KEY="):
+                    lines[i] = f"OPENAI_API_KEY={openai_api_key}\n"
+                    key_updated = True
+                    break
+            if not key_updated:
+                lines.append(f"OPENAI_API_KEY={openai_api_key}\n")
+
         with open(env_file, "w") as f:
             f.writelines(lines)
 
@@ -363,6 +396,8 @@ def update_api_key(backend="ollama"):
             print_success("MEMORY_SECRET_KEY updated successfully")
         if grok_api_key is not None:
             print_success("GROK_API_KEY saved to .env")
+        if openai_api_key is not None:
+            print_success("OPENAI_API_KEY saved to .env")
 
         return True
     except Exception as e:
@@ -462,29 +497,44 @@ def print_next_steps(backend, model_pulled=False):
             "\n   Entelgia will ask you to confirm the Grok backend and model at startup."
         )
 
+    if backend == "openai":
+        print("\n1. Ensure your OPENAI_API_KEY is set in the .env file.")
+
+        print("\n2. Run Entelgia:")
+        print("   python examples/demo_enhanced_dialogue.py")
+        print("   or")
+        print("   python Entelgia_production_meta.py")
+
+        print(
+            "\n   Entelgia will ask you to confirm the OpenAI backend and model at startup."
+        )
+
     print("\n" + "=" * 60)
     print("For more information, see the README.md file")
     print("=" * 60 + "\n")
 
 
 def choose_backend():
-    """Ask the user to choose between Ollama and Grok before anything else."""
+    """Ask the user to choose between Ollama, Grok, and OpenAI before anything else."""
     print_header("Choose Your LLM Backend")
 
-    print("Entelgia supports two LLM backends:\n")
+    print("Entelgia supports three LLM backends:\n")
     print("  1. Ollama  — runs models locally on your machine (free, private)")
     print("               Requires Ollama to be installed.")
-    print("  2. Grok    — uses xAI's cloud API (requires a GROK_API_KEY)\n")
+    print("  2. Grok    — uses xAI's cloud API (requires a GROK_API_KEY)")
+    print("  3. OpenAI  — uses OpenAI's cloud API (requires an OPENAI_API_KEY)\n")
 
     while True:
         choice = input(
-            "Which backend would you like to use? [1=Ollama / 2=Grok]: "
+            "Which backend would you like to use? [1=Ollama / 2=Grok / 3=OpenAI]: "
         ).strip()
         if choice in ("1", "ollama"):
             return "ollama"
         if choice in ("2", "grok"):
             return "grok"
-        print_warning("Please enter 1 (Ollama) or 2 (Grok).")
+        if choice in ("3", "openai"):
+            return "openai"
+        print_warning("Please enter 1 (Ollama), 2 (Grok), or 3 (OpenAI).")
 
 
 def main():
