@@ -78,9 +78,13 @@ The project welcomes both researchers and developers building persistent, reflec
 ## 📋 Requirements
 
 * Python **3.10+**
-* **Ollama** (local LLM runtime)
-* At least one supported model (`qwen2.5:7b`, `llama3.1:8b`, `mistral:latest`, etc.)
-* **8GB+ RAM** recommended (16GB+ for larger models)
+* **LLM backend** — choose one:
+  * **Ollama** (local, free) — requires ~8GB+ RAM and a 7B+ model download
+  * **Grok** (xAI cloud) — requires `GROK_API_KEY` and internet access
+  * **OpenAI** (cloud) — requires `OPENAI_API_KEY` and internet access
+  * **Anthropic** (cloud) — requires `ANTHROPIC_API_KEY` and internet access
+* At least one supported model (see backend-specific sections below)
+* **8GB+ RAM** recommended for Ollama (16GB+ for larger models); not required for cloud backends
 
 For the complete dependency list, see [`requirements.txt`](requirements.txt).
 
@@ -103,10 +107,10 @@ python scripts/install.py
 
 ### What the installer does:
 
-1. ✅ **Asks you to choose your backend** — Ollama (local) or Grok (xAI cloud) — before doing anything else
+1. ✅ **Asks you to choose your backend** — Ollama (local), Grok (xAI cloud), OpenAI (cloud), or Anthropic (cloud) — before doing anything else
 2. ✅ **Ollama path only:** Detects/installs Ollama (macOS via Homebrew; provides instructions for Linux/Windows) and pulls the `qwen2.5:7b` model (or lets you skip)
 3. ✅ **Creates `.env` configuration** from template
-4. ✅ **Configures API keys in one step** — generates a secure `MEMORY_SECRET_KEY`; if Grok was chosen, also prompts for `GROK_API_KEY`
+4. ✅ **Configures API keys in one step** — generates a secure `MEMORY_SECRET_KEY`; if a cloud backend was chosen, also prompts for the corresponding API key (`GROK_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`)
 5. ✅ **Installs Python dependencies** from `requirements.txt`
 
 ### After installation:
@@ -228,6 +232,8 @@ When you run Entelgia, it will interactively ask you to choose a backend:
 Select backend:
   [1] grok
   [2] ollama
+  [3] openai
+  [4] anthropic
   [0] defaults (keep config as-is)
 ```
 
@@ -239,6 +245,72 @@ Choose **[1] grok** and then select a model for each agent from the available Gr
 | `grok-4-1-fast-reasoning` | Fast reasoning, high performance |
 
 > 💡 The Grok backend requires an active internet connection and a valid `GROK_API_KEY` in `.env`. No local Ollama instance is needed when using Grok.
+
+---
+
+## 🤖 Using the OpenAI Backend
+
+Entelgia supports **OpenAI** as a cloud-based LLM backend. No local Ollama instance is needed when using OpenAI.
+
+### 1️⃣ Get an OpenAI API Key
+
+1. Go to [https://platform.openai.com](https://platform.openai.com) and sign in.
+2. In the left sidebar click **"API keys"**.
+3. Click **"Create new secret key"**, give it a name, and copy the generated key.
+
+### 2️⃣ Add the Key to `.env`
+
+During installation (`python scripts/install.py`) you will be prompted to enter your OpenAI API key — it is saved automatically.
+
+To add it manually, open your `.env` file and set:
+
+```
+OPENAI_API_KEY=your_key_here
+```
+
+### 3️⃣ Select OpenAI at Startup
+
+When you run Entelgia, choose **[3] openai** from the backend menu. You will then be prompted to select an OpenAI model:
+
+| Model | Description |
+|---|---|
+| `gpt-4.1` | Latest GPT-4.1 model |
+
+> 💡 The OpenAI backend requires an active internet connection and a valid `OPENAI_API_KEY` in `.env`. No local Ollama instance is needed when using OpenAI.
+
+---
+
+## 🧬 Using the Anthropic Backend
+
+Entelgia supports **Anthropic** (Claude) as a cloud-based LLM backend. No local Ollama instance is needed when using Anthropic.
+
+### 1️⃣ Get an Anthropic API Key
+
+1. Go to [https://console.anthropic.com](https://console.anthropic.com) and sign in.
+2. In the left sidebar click **"API Keys"**.
+3. Click **"Create Key"**, give it a name, and copy the generated key.
+
+### 2️⃣ Add the Key to `.env`
+
+During installation (`python scripts/install.py`) you will be prompted to enter your Anthropic API key — it is saved automatically.
+
+To add it manually, open your `.env` file and set:
+
+```
+ANTHROPIC_API_KEY=your_key_here
+```
+
+### 3️⃣ Select Anthropic at Startup
+
+When you run Entelgia, choose **[4] anthropic** from the backend menu. You will then be prompted to select a Claude model:
+
+| Model | Description |
+|---|---|
+| `claude-opus-4-6` | Most capable Claude model |
+| `claude-sonnet-4-6` | Balanced performance and speed |
+| `claude-haiku-4-5` | Fast and lightweight |
+
+> 💡 The Anthropic backend requires an active internet connection and a valid `ANTHROPIC_API_KEY` in `.env`. No local Ollama instance is needed when using Anthropic.
 
 ---
 

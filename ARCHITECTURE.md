@@ -562,3 +562,65 @@ Generic cluster-level vocabulary that appears repeatedly within a `Config.cluste
 `_HIGH_VALUE_KEYWORDS` (e.g. `"studies"`, `"research"`, `"data"`) qualify as strong concept hits regardless of the rhetorical-framing filter.
 
 ---
+
+## LLM Backend Architecture
+
+Entelgia supports four interchangeable LLM backends, all selected interactively at startup through `select_llm_backend_and_models()`. The backend choice is a runtime-only override — the `.env` file and disk config are never modified by the selector.
+
+### Supported Backends
+
+| Backend | Provider | Auth | Endpoint |
+|---------|----------|------|----------|
+| `ollama` | Local (default) | None | `http://localhost:11434/api/generate` |
+| `grok` | xAI cloud | `GROK_API_KEY` | `https://api.x.ai/v1/responses` |
+| `openai` | OpenAI cloud | `OPENAI_API_KEY` | `https://api.openai.com/v1/chat/completions` |
+| `anthropic` | Anthropic cloud | `ANTHROPIC_API_KEY` | `https://api.anthropic.com/v1/messages` |
+
+### Startup Backend Selector
+
+```
+Select backend:
+  [1] grok
+  [2] ollama
+  [3] openai
+  [4] anthropic
+  [0] defaults (keep config as-is)
+```
+
+After choosing a backend, the user selects per-agent or uniform model names from the backend's available model list. All overrides apply to the in-memory `Config` object for that run only.
+
+### Available Models per Backend
+
+| Backend | Models |
+|---------|--------|
+| Ollama | `qwen2.5:7b`, `llama3.1:8b`, `mistral:latest` (any 7B+ Ollama model) |
+| Grok | `grok-4.20-multi-agent`, `grok-4-1-fast-reasoning` |
+| OpenAI | `gpt-4.1` |
+| Anthropic | `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5` |
+
+### LLM.generate() Dispatch
+
+`LLM.generate()` branches on `cfg.llm_backend`:
+
+- **Ollama**: `POST /api/generate` with `prompt` field; response extracted from `data["response"]`.
+- **Grok**: `POST /v1/responses` with `input` field and `Authorization: Bearer` header; response extracted from `output[].content[].text`.
+- **OpenAI**: `POST /v1/chat/completions` with `messages` field and `Authorization: Bearer` header; response extracted from `choices[0].message.content`.
+- **Anthropic**: `POST /v1/messages` with `messages` field, `x-api-key` header, and `anthropic-version: 2023-06-01`; response extracted from `content[0].text`.
+
+All backends share the same timeout, retry, and caching infrastructure. HTTP requests run in a daemon thread to allow Ctrl+C interruption within ~0.5 seconds.
+
+### Config Fields
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `llm_backend` | `"ollama"` | Active backend (`"ollama"`, `"grok"`, `"openai"`, `"anthropic"`) |
+| `grok_api_key` | `$GROK_API_KEY` | API key for Grok backend |
+| `grok_url` | `https://api.x.ai/v1/responses` | Grok endpoint URL |
+| `openai_api_key` | `$OPENAI_API_KEY` | API key for OpenAI backend |
+| `openai_url` | `https://api.openai.com/v1/chat/completions` | OpenAI endpoint URL |
+| `anthropic_api_key` | `$ANTHROPIC_API_KEY` | API key for Anthropic backend |
+| `anthropic_url` | `https://api.anthropic.com/v1/messages` | Anthropic endpoint URL |
+
+All API keys are read from environment variables (`.env` file) and never hard-coded.
+
+---
