@@ -21,11 +21,15 @@ def reset_trigger_cooldown():
     blacklist in web_tool for the same reason.
     Also clears the circularity guard per-agent response history and rotation
     index so that previous test responses cannot influence circularity detection.
+    Also clears the progress enforcer per-agent state (claims memory, progress
+    scores, move types) so that stagnation detection cannot fire spuriously
+    due to accumulated state from earlier tests.
     """
     from entelgia.fixy_research_trigger import clear_trigger_cooldown
     from entelgia.web_research import clear_research_caches
     from entelgia.web_tool import clear_failed_urls
     from entelgia.circularity_guard import clear_history as _cg_clear_history
+    from entelgia.progress_enforcer import clear_agent_state as _pe_clear
     import entelgia.circularity_guard as _cg
 
     clear_trigger_cooldown()
@@ -33,12 +37,14 @@ def reset_trigger_cooldown():
     clear_failed_urls()
     _cg_clear_history()
     _cg._new_angle_index = 0
+    _pe_clear()
     yield
     clear_trigger_cooldown()
     clear_research_caches()
     clear_failed_urls()
     _cg_clear_history()
     _cg._new_angle_index = 0
+    _pe_clear()
 
 
 @pytest.fixture
