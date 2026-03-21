@@ -467,9 +467,9 @@ OPENAI_MODELS: list[str] = [
 ]
 
 ANTHROPIC_MODELS: list[str] = [
-    "claude-3-7-sonnet-latest",
-    "claude-3-5-sonnet-latest",
-    "claude-3-5-haiku-latest",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
 ]
 
 # LLM Response Length Instruction - used in all agent prompts
