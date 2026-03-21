@@ -468,7 +468,7 @@ OLLAMA_MODELS: list[str] = [
 ]
 
 OPENAI_MODELS: list[str] = [
-    "text-davinci-003",
+    "gpt-4.1",
 ]
 
 # LLM Response Length Instruction - used in all agent prompts

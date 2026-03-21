@@ -344,7 +344,7 @@ def update_api_key(backend="ollama"):
         print('  2. In the left sidebar click "API keys".')
         print('  3. Click "Create new secret key", give it a name, and copy the key.')
         print("\nOpenAI model used by Entelgia:")
-        print("  - text-davinci-003  (GPT-3 completion model)")
+        print("  - gpt-4.1  (GPT-4.1 model)")
 
         while True:
             openai_api_key = getpass.getpass("\nEnter your OpenAI API key: ").strip()
