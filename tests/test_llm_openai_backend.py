@@ -24,7 +24,6 @@ from unittest.mock import MagicMock, patch
 import Entelgia_production_meta as _meta
 from Entelgia_production_meta import LLM, Config, MetricsTracker
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -72,11 +71,16 @@ class TestOpenAINormalResponse:
     def test_returns_content_string(self):
         cfg = _make_openai_cfg()
         llm = _make_llm(cfg)
-        resp = _mock_response({
-            "choices": [
-                {"message": {"role": "assistant", "content": "  Hello world  "}, "finish_reason": "stop"}
-            ]
-        })
+        resp = _mock_response(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "  Hello world  "},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
         with patch.object(llm._executor, "submit", return_value=_future(resp)):
             result = llm.generate("gpt-4.1", "Say hello.", use_cache=False)
         assert result == "Hello world"
@@ -84,11 +88,19 @@ class TestOpenAINormalResponse:
     def test_strips_whitespace(self):
         cfg = _make_openai_cfg()
         llm = _make_llm(cfg)
-        resp = _mock_response({
-            "choices": [
-                {"message": {"role": "assistant", "content": "\n  Padded response.\n\n"}, "finish_reason": "stop"}
-            ]
-        })
+        resp = _mock_response(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "\n  Padded response.\n\n",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
         with patch.object(llm._executor, "submit", return_value=_future(resp)):
             result = llm.generate("gpt-4.1", "Test.", use_cache=False)
         assert result == "Padded response."
@@ -105,11 +117,16 @@ class TestOpenAINoneContent:
         return '' rather than crashing with AttributeError on None.strip()."""
         cfg = _make_openai_cfg()
         llm = _make_llm(cfg)
-        resp = _mock_response({
-            "choices": [
-                {"message": {"role": "assistant", "content": None}, "finish_reason": "tool_calls"}
-            ]
-        })
+        resp = _mock_response(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": None},
+                        "finish_reason": "tool_calls",
+                    }
+                ]
+            }
+        )
         with patch.object(llm._executor, "submit", return_value=_future(resp)):
             result = llm.generate("gpt-4.1", "Use a tool.", use_cache=False)
         assert result == ""
@@ -148,11 +165,16 @@ class TestOpenAIEdgeCases:
     def test_empty_content_string(self):
         cfg = _make_openai_cfg()
         llm = _make_llm(cfg)
-        resp = _mock_response({
-            "choices": [
-                {"message": {"role": "assistant", "content": ""}, "finish_reason": "stop"}
-            ]
-        })
+        resp = _mock_response(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": ""},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
         with patch.object(llm._executor, "submit", return_value=_future(resp)):
             result = llm.generate("gpt-4.1", "Test.", use_cache=False)
         assert result == ""
@@ -168,9 +190,16 @@ class TestOpenAIRequestShape:
         """The request must go to /v1/chat/completions, not /v1/responses."""
         cfg = _make_openai_cfg()
         llm = _make_llm(cfg)
-        resp = _mock_response({
-            "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]
-        })
+        resp = _mock_response(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "ok"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
 
         captured = {}
 
@@ -190,9 +219,16 @@ class TestOpenAIRequestShape:
         """The JSON body must use 'messages', not 'input' (Responses API key)."""
         cfg = _make_openai_cfg()
         llm = _make_llm(cfg)
-        resp = _mock_response({
-            "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]
-        })
+        resp = _mock_response(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "ok"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
 
         captured = {}
 
@@ -205,16 +241,25 @@ class TestOpenAIRequestShape:
 
         body = captured["json"]
         assert "messages" in body, "Request body must contain 'messages' key"
-        assert "input" not in body, "Request body must NOT contain 'input' key (Responses API)"
+        assert (
+            "input" not in body
+        ), "Request body must NOT contain 'input' key (Responses API)"
         assert body["messages"] == [{"role": "user", "content": "hello"}]
 
     def test_authorization_header_uses_openai_api_key(self):
         """Bearer token must be the openai_api_key."""
         cfg = _make_openai_cfg()
         llm = _make_llm(cfg)
-        resp = _mock_response({
-            "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]
-        })
+        resp = _mock_response(
+            {
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "ok"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        )
 
         captured = {}
 
@@ -237,6 +282,7 @@ class TestOpenAIRequestShape:
 def _future(value):
     """Return a concurrent.futures.Future that is already resolved with *value*."""
     import concurrent.futures
+
     f = concurrent.futures.Future()
     f.set_result(value)
     return f

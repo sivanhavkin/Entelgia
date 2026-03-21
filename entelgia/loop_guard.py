@@ -819,8 +819,6 @@ class DialogueLoopDetector:
         return active, len(active)
 
 
-
-
 class PhraseBanList:
     """Tracks overused n-grams from recent turns and temporarily bans them.
 
@@ -1070,7 +1068,6 @@ class DialogueRewriter:
         lines.append(f"--- END {self._HEADER} ---")
 
         return "\n".join(lines)
-
 
 
 # ---------------------------------------------------------------------------

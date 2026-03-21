@@ -87,10 +87,10 @@ _LOOP_BREAKING_MODES: List[str] = [
 # Each loop type has a preferred structural rewrite mode that forces
 # the next agent to advance along a specific dimension.
 _LOOP_REWRITE_MODE_POLICY: Dict[str, str] = {
-    "loop_repetition": FixyMode.FORCE_CASE,       # break repetition with a grounded case
-    "weak_conflict": FixyMode.FORCE_CHOICE,        # resolve soft conflict with binary pick
-    "premature_synthesis": FixyMode.FORCE_TEST,    # challenge synthesis with a testable claim
-    "topic_stagnation": FixyMode.FORCE_METRIC,     # break stagnation with a new criterion
+    "loop_repetition": FixyMode.FORCE_CASE,  # break repetition with a grounded case
+    "weak_conflict": FixyMode.FORCE_CHOICE,  # resolve soft conflict with binary pick
+    "premature_synthesis": FixyMode.FORCE_TEST,  # challenge synthesis with a testable claim
+    "topic_stagnation": FixyMode.FORCE_METRIC,  # break stagnation with a new criterion
     "fixy_mediation_loop": FixyMode.FORCE_DEFINITION,  # clarify what's being argued
     "circular_reasoning": FixyMode.FORCE_CASE,
     "high_conflict_no_resolution": FixyMode.FORCE_CHOICE,
@@ -140,9 +140,7 @@ _REASON_LABEL_MAP: Dict[str, str] = {
         "Use 'Deadlock:' label to expose what the synthesis hides. "
         "Omit 'Loop:' unless repetition exists."
     ),
-    "topic_stagnation": (
-        "Use 'Drift:' label. Do NOT use 'Loop:' or 'Deadlock:'."
-    ),
+    "topic_stagnation": ("Use 'Drift:' label. Do NOT use 'Loop:' or 'Deadlock:'."),
     "circular_reasoning": (
         "Use 'Loop:' label. Include 'Next move:' with a concrete demand."
     ),
@@ -484,9 +482,7 @@ class InteractiveFixy:
             return (False, "")
 
         # ── Minimum context window ──────────────────────────────────────────
-        agent_turns_all = [
-            t for t in dialog if t.get("role") not in ("Fixy", "seed")
-        ]
+        agent_turns_all = [t for t in dialog if t.get("role") not in ("Fixy", "seed")]
         if len(agent_turns_all) < self._MIN_CONTEXT_TURNS:
             logger.info(
                 "[FIXY-GATE] skipped: insufficient context (have %d agent turns, need %d) at turn %d",
@@ -527,7 +523,9 @@ class InteractiveFixy:
         # prevents a feedback loop where Fixy's meta-commentary (which references
         # the dialogue topic and therefore has high semantic similarity) inflates
         # the repetition score and triggers yet more Fixy interventions.
-        last_10 = agent_turns_all[-10:] if len(agent_turns_all) >= 10 else agent_turns_all
+        last_10 = (
+            agent_turns_all[-10:] if len(agent_turns_all) >= 10 else agent_turns_all
+        )
 
         # Pattern 1: Circular reasoning (repetition)
         if self._detect_repetition(last_10):

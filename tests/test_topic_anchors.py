@@ -353,7 +353,8 @@ class TestTopicMismatchPersistWarning:
         recovery_msgs = [
             r.message
             for r in caplog.records
-            if "TOPIC-RECOVERY" in r.message and "level=" in r.message
+            if "TOPIC-RECOVERY" in r.message
+            and "level=" in r.message
             and r.levelno >= logging.WARNING
         ]
         assert recovery_msgs, (
@@ -589,7 +590,8 @@ class TestTopicMismatchFirstTurn:
         recovery_msgs = [
             r.message
             for r in caplog.records
-            if "TOPIC-RECOVERY" in r.message and "level=" in r.message
+            if "TOPIC-RECOVERY" in r.message
+            and "level=" in r.message
             and r.levelno >= logging.WARNING
         ]
         assert recovery_msgs, (

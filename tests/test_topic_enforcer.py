@@ -687,7 +687,13 @@ class TestBuildPreGenerationAnchorInstruction:
         assert "corrigibility" in instr
 
     def test_at_most_three_lexicon_items(self):
-        items = ["reward-hacking", "corrigibility", "mesa-optimizer", "outer-alignment", "proxy-drift"]
+        items = [
+            "reward-hacking",
+            "corrigibility",
+            "mesa-optimizer",
+            "outer-alignment",
+            "proxy-drift",
+        ]
         instr = build_pre_generation_anchor_instruction("topic", items)
         # Only first 3 should appear
         assert "outer-alignment" not in instr
@@ -737,12 +743,20 @@ class TestBuildDraftTopicReanchorInstruction:
 
     def test_strict_mode_firmer_wording(self):
         soft = build_draft_topic_reanchor_instruction("topic", ["concept"])
-        strict = build_draft_topic_reanchor_instruction("topic", ["concept"], strict=True)
+        strict = build_draft_topic_reanchor_instruction(
+            "topic", ["concept"], strict=True
+        )
         # Strict mode should mention removing generic opener
         assert "Remove" in strict or "replace" in strict.lower() or "Begin" in strict
 
     def test_at_most_three_anchors(self):
-        anchors = ["reward-hacking", "corrigibility", "mesa-optimizer", "outer-alignment", "proxy-drift"]
+        anchors = [
+            "reward-hacking",
+            "corrigibility",
+            "mesa-optimizer",
+            "outer-alignment",
+            "proxy-drift",
+        ]
         instr = build_draft_topic_reanchor_instruction("topic", anchors)
         assert "outer-alignment" not in instr
         assert "proxy-drift" not in instr
@@ -786,4 +800,10 @@ class TestExtractKeyConcept:
 
 class TestGradedRecoveryThresholds:
     def test_partial_below_soft_below_accept(self):
-        assert 0.0 < PARTIAL_RECOVERY_THRESHOLD < SOFT_REANCHOR_THRESHOLD < ACCEPT_THRESHOLD <= 1.0
+        assert (
+            0.0
+            < PARTIAL_RECOVERY_THRESHOLD
+            < SOFT_REANCHOR_THRESHOLD
+            < ACCEPT_THRESHOLD
+            <= 1.0
+        )

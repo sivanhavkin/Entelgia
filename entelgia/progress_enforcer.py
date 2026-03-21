@@ -130,17 +130,29 @@ STATUS_RESOLVED = "resolved"
 
 # Patterns that strongly suggest a DIRECT_ATTACK move
 _ATTACK_PATTERNS: List[re.Pattern] = [
-    re.compile(r"\b(wrong|incorrect|false|mistaken|flawed|error|fails to|ignores?|overlooks?|misses?|contradicts?)\b", re.I),
-    re.compile(r"\b(but (this|that) (is|ignores?|fails?|misses?|contradicts?))\b", re.I),
-    re.compile(r"\b(counter(argument|example|claim|point|evidence)|refut(e|es|ing|ation))\b", re.I),
+    re.compile(
+        r"\b(wrong|incorrect|false|mistaken|flawed|error|fails to|ignores?|overlooks?|misses?|contradicts?)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(but (this|that) (is|ignores?|fails?|misses?|contradicts?))\b", re.I
+    ),
+    re.compile(
+        r"\b(counter(argument|example|claim|point|evidence)|refut(e|es|ing|ation))\b",
+        re.I,
+    ),
     re.compile(r"\b(not the case|no[,.]?\s+(?:actually|in fact|rather))\b", re.I),
     re.compile(r"\b(disagree|reject[s]?|deny|denies|oppose[s]?)\b", re.I),
 ]
 
 # Patterns that suggest a DIRECT_DEFENSE move
 _DEFENSE_PATTERNS: List[re.Pattern] = [
-    re.compile(r"\b(precisely because|exactly right|correct(ly)?|exactly (so|this))\b", re.I),
-    re.compile(r"\b(this (confirms?|supports?|validates?|shows?|demonstrates?))\b", re.I),
+    re.compile(
+        r"\b(precisely because|exactly right|correct(ly)?|exactly (so|this))\b", re.I
+    ),
+    re.compile(
+        r"\b(this (confirms?|supports?|validates?|shows?|demonstrates?))\b", re.I
+    ),
     re.compile(r"\b(in (support|defense|favour|favor) of)\b", re.I),
     re.compile(r"\b(holds?\s+(true|up|firm)|stands?\s+(correct|firm))\b", re.I),
     re.compile(r"\b(strengthens?|reinforce[s]?|corroborates?)\b", re.I),
@@ -150,7 +162,10 @@ _DEFENSE_PATTERNS: List[re.Pattern] = [
 _FORCED_CHOICE_PATTERNS: List[re.Pattern] = [
     re.compile(r"\b(either\s+.{3,60}\s+or\s+.{3,60})\b", re.I),
     re.compile(r"\b(choose\s+between|must\s+(choose|decide|pick|commit))\b", re.I),
-    re.compile(r"\b(there\s+(are|is)\s+(only\s+)?(two|2)\s+(options?|choices?|paths?|positions?))\b", re.I),
+    re.compile(
+        r"\b(there\s+(are|is)\s+(only\s+)?(two|2)\s+(options?|choices?|paths?|positions?))\b",
+        re.I,
+    ),
     re.compile(r"\b(a\s+or\s+b\b|option\s+[ab]\b)", re.I),
     re.compile(r"\b(which\s+(is\s+it|do\s+you\s+choose|will\s+you\s+accept))\b", re.I),
 ]
@@ -161,32 +176,58 @@ _REFRAME_PATTERNS: List[re.Pattern] = [
     re.compile(r"\b(mis(framed?|framing|understood|characteriz(ed|ing)))\b", re.I),
     re.compile(r"\b(better\s+(framed?|understood|described|conceived)\s+as)\b", re.I),
     re.compile(r"\b(actually\s+(about|a\s+question\s+of|depends?\s+on))\b", re.I),
-    re.compile(r"\b(the\s+distinction\s+is|what\s+matters?\s+(here|is)|what\s+is\s+at\s+stake)\b", re.I),
-    re.compile(r"\b(not\s+(about|a\s+matter\s+of)\s+.{3,40},?\s+but\s+(about|rather))\b", re.I),
+    re.compile(
+        r"\b(the\s+distinction\s+is|what\s+matters?\s+(here|is)|what\s+is\s+at\s+stake)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(not\s+(about|a\s+matter\s+of)\s+.{3,40},?\s+but\s+(about|rather))\b", re.I
+    ),
 ]
 
 # Patterns that suggest a RESOLUTION_ATTEMPT move
 _RESOLUTION_PATTERNS: List[re.Pattern] = [
-    re.compile(r"\b(resolv(e|es|ing|ed)|resolution|settle[s]?|reconcil(e|es|ing|iation))\b", re.I),
-    re.compile(r"\b(common\s+ground|both\s+(sides?|positions?)\s+(can|agree|accept))\b", re.I),
+    re.compile(
+        r"\b(resolv(e|es|ing|ed)|resolution|settle[s]?|reconcil(e|es|ing|iation))\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(common\s+ground|both\s+(sides?|positions?)\s+(can|agree|accept))\b", re.I
+    ),
     re.compile(r"\b(synthesis|synthesiz(e|es|ing))\b", re.I),
     re.compile(r"\b(the\s+answer\s+is|the\s+solution\s+(is|lies))\b", re.I),
-    re.compile(r"\b(therefore[,:]?\s+we\s+(can|should|must)|this\s+means\s+that\s+we)\b", re.I),
+    re.compile(
+        r"\b(therefore[,:]?\s+we\s+(can|should|must)|this\s+means\s+that\s+we)\b", re.I
+    ),
 ]
 
 # Patterns that suggest an ESCALATION move
 _ESCALATION_PATTERNS: List[re.Pattern] = [
-    re.compile(r"\b(sharper|stricter|stronger|harder|more\s+(demanding|precise|rigorous|exacting))\b", re.I),
-    re.compile(r"\b(prove\s+it|demonstrate\s+it|show\s+me|give\s+(an?\s+)?(example|counterexample|instance|evidence))\b", re.I),
-    re.compile(r"\b(the\s+(real|harder|deeper|further|ultimate)\s+(test|challenge|question|constraint))\b", re.I),
-    re.compile(r"\b(even\s+if\s+.{3,50},?\s+it\s+(still|does\s+not|cannot|fails?))\b", re.I),
+    re.compile(
+        r"\b(sharper|stricter|stronger|harder|more\s+(demanding|precise|rigorous|exacting))\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(prove\s+it|demonstrate\s+it|show\s+me|give\s+(an?\s+)?(example|counterexample|instance|evidence))\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(the\s+(real|harder|deeper|further|ultimate)\s+(test|challenge|question|constraint))\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(even\s+if\s+.{3,50},?\s+it\s+(still|does\s+not|cannot|fails?))\b", re.I
+    ),
     re.compile(r"\b(what\s+if\s+.{3,60}\?)\b", re.I),
     re.compile(r"\b(push\s+further|go\s+further|take\s+it\s+further)\b", re.I),
 ]
 
 # Patterns that suggest a PARAPHRASE / recycling move
 _PARAPHRASE_PATTERNS: List[re.Pattern] = [
-    re.compile(r"\b(as\s+(i|you|we)\s+(said|mentioned|noted|argued|stated|pointed\s+out))\b", re.I),
+    re.compile(
+        r"\b(as\s+(i|you|we)\s+(said|mentioned|noted|argued|stated|pointed\s+out))\b",
+        re.I,
+    ),
     re.compile(r"\b(in\s+other\s+words|to\s+put\s+it\s+(another|differently))\b", re.I),
     re.compile(r"\b(essentially|fundamentally|at\s+(bottom|its\s+core))\b", re.I),
     re.compile(r"\b(simply\s+(put|stated|said)|to\s+repeat\b)\b", re.I),
@@ -195,28 +236,53 @@ _PARAPHRASE_PATTERNS: List[re.Pattern] = [
 
 # Patterns that suggest a BALANCED_RESTATEMENT move
 _BALANCED_PATTERNS: List[re.Pattern] = [
-    re.compile(r"\b(on\s+(one|the\s+one)\s+hand.{1,80}on\s+the\s+other\s+hand)\b", re.I),
-    re.compile(r"\b(both\s+.{3,50}\s+and\s+.{3,50}\s+(are\s+valid|matter|have\s+merit))\b", re.I),
+    re.compile(
+        r"\b(on\s+(one|the\s+one)\s+hand.{1,80}on\s+the\s+other\s+hand)\b", re.I
+    ),
+    re.compile(
+        r"\b(both\s+.{3,50}\s+and\s+.{3,50}\s+(are\s+valid|matter|have\s+merit))\b",
+        re.I,
+    ),
     re.compile(r"\b(it\s+depends|that\s+depends|depends\s+on\s+the)\b", re.I),
-    re.compile(r"\b(each\s+(side|position|view)\s+has\s+(a\s+)?(point|merit|validity))\b", re.I),
+    re.compile(
+        r"\b(each\s+(side|position|view)\s+has\s+(a\s+)?(point|merit|validity))\b", re.I
+    ),
     re.compile(r"\b(trade.?off|balance\s+between|weigh\s+(the|both|all))\b", re.I),
 ]
 
 # Patterns that suggest FILLER
 _FILLER_PATTERNS: List[re.Pattern] = [
-    re.compile(r"\b(great\s+(question|point)|interesting\s+(question|point|perspective))\b", re.I),
-    re.compile(r"\b(you\s+(raise|make)\s+a\s+(good|valid|fair|interesting|important)\s+point)\b", re.I),
-    re.compile(r"\b(thank\s+you\s+for|thanks?\s+for\s+(raising|bringing|sharing))\b", re.I),
-    re.compile(r"\b(i\s+(appreciate|acknowledge|recognize|understand)\s+(your|that|this)\s+(concern|point|perspective))\b", re.I),
-    re.compile(r"\b(as\s+i\s+reflect|upon\s+reflection|reflecting\s+on\s+this)\b", re.I),
+    re.compile(
+        r"\b(great\s+(question|point)|interesting\s+(question|point|perspective))\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(you\s+(raise|make)\s+a\s+(good|valid|fair|interesting|important)\s+point)\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(thank\s+you\s+for|thanks?\s+for\s+(raising|bringing|sharing))\b", re.I
+    ),
+    re.compile(
+        r"\b(i\s+(appreciate|acknowledge|recognize|understand)\s+(your|that|this)\s+(concern|point|perspective))\b",
+        re.I,
+    ),
+    re.compile(
+        r"\b(as\s+i\s+reflect|upon\s+reflection|reflecting\s+on\s+this)\b", re.I
+    ),
 ]
 
 # Phrases that strongly signal commitment (raises progress score)
 _COMMITMENT_PHRASES: List[re.Pattern] = [
-    re.compile(r"\b(i\s+(claim|assert|argue|maintain|insist|hold|believe)\s+that)\b", re.I),
+    re.compile(
+        r"\b(i\s+(claim|assert|argue|maintain|insist|hold|believe)\s+that)\b", re.I
+    ),
     re.compile(r"\b(my\s+(claim|position|thesis|argument|view)\s+is)\b", re.I),
     re.compile(r"\b(specifically[,:]|concretely[,:]|definitively[,:])\b", re.I),
-    re.compile(r"\b(must\s+(be|accept|reject|choose|commit)|cannot\s+(be|avoid|escape|deny))\b", re.I),
+    re.compile(
+        r"\b(must\s+(be|accept|reject|choose|commit)|cannot\s+(be|avoid|escape|deny))\b",
+        re.I,
+    ),
     re.compile(r"\b(the\s+answer\s+is\s+(yes|no|clear|simple))\b", re.I),
 ]
 
@@ -237,10 +303,15 @@ _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 # Strong declarative structures that suggest a claim sentence
 _CLAIM_INDICATORS: List[re.Pattern] = [
-    re.compile(r"\b(is|are|must|cannot|will|does|shows?|proves?|implies?|entails?)\b", re.I),
+    re.compile(
+        r"\b(is|are|must|cannot|will|does|shows?|proves?|implies?|entails?)\b", re.I
+    ),
     re.compile(r"\b(i\s+(claim|argue|hold|maintain|assert|believe)\s+that)\b", re.I),
     re.compile(r"\b(therefore|thus|hence|consequently|it\s+follows\s+that)\b", re.I),
-    re.compile(r"\b(the\s+(key|main|core|central|fundamental)\s+(claim|point|assertion|fact|truth)\s+is)\b", re.I),
+    re.compile(
+        r"\b(the\s+(key|main|core|central|fundamental)\s+(claim|point|assertion|fact|truth)\s+is)\b",
+        re.I,
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -378,12 +449,63 @@ def clear_agent_state(agent_name: Optional[str] = None) -> None:
 def _tokenize(text: str) -> set:
     """Return a lowercase set of word tokens (stop-words excluded)."""
     _STOP = {
-        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "shall",
-        "should", "may", "might", "must", "can", "could", "to", "of", "in",
-        "on", "at", "by", "for", "with", "about", "that", "this", "these",
-        "those", "it", "its", "i", "you", "we", "they", "he", "she", "or",
-        "and", "but", "not", "no", "so", "if", "as", "than", "then", "when",
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "must",
+        "can",
+        "could",
+        "to",
+        "of",
+        "in",
+        "on",
+        "at",
+        "by",
+        "for",
+        "with",
+        "about",
+        "that",
+        "this",
+        "these",
+        "those",
+        "it",
+        "its",
+        "i",
+        "you",
+        "we",
+        "they",
+        "he",
+        "she",
+        "or",
+        "and",
+        "but",
+        "not",
+        "no",
+        "so",
+        "if",
+        "as",
+        "than",
+        "then",
+        "when",
     }
     tokens = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
     return {t for t in tokens if t not in _STOP}
@@ -672,14 +794,13 @@ def build_intervention_instruction(policy: str, claims_memory: ClaimsMemory) -> 
     unresolved = claims_memory.unresolved_claims()
     claim_hint = ""
     if unresolved:
-        claim_hint = f" Specifically, address this unresolved claim: \"{unresolved[-1].text[:120]}\""
+        claim_hint = f' Specifically, address this unresolved claim: "{unresolved[-1].text[:120]}"'
 
     if policy == "REQUIRE_COMMITMENT":
         return (
             "INTERVENTION — REQUIRE COMMITMENT: "
             "You must choose one position explicitly. "
-            "Do not balance or hedge. State which side you take and why."
-            + claim_hint
+            "Do not balance or hedge. State which side you take and why." + claim_hint
         )
     if policy == "REQUIRE_ATTACK":
         return (
@@ -692,8 +813,7 @@ def build_intervention_instruction(policy: str, claims_memory: ClaimsMemory) -> 
         return (
             "INTERVENTION — REQUIRE EVIDENCE: "
             "You must support or refute a claim with a concrete example or counterexample. "
-            "Generalities are not acceptable — give a specific case."
-            + claim_hint
+            "Generalities are not acceptable — give a specific case." + claim_hint
         )
     return get_regeneration_instruction()
 

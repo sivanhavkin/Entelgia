@@ -350,7 +350,9 @@ def update_api_key(backend="ollama"):
             openai_api_key = getpass.getpass("\nEnter your OpenAI API key: ").strip()
             if openai_api_key:
                 break
-            print_warning("An OpenAI API key is required when using the OpenAI backend.")
+            print_warning(
+                "An OpenAI API key is required when using the OpenAI backend."
+            )
             retry = input("Try again? (y/n): ").strip().lower()
             if retry != "y":
                 print(
@@ -372,10 +374,14 @@ def update_api_key(backend="ollama"):
         print("  - claude-haiku-4-5   (Claude Haiku 4.5, fastest)")
 
         while True:
-            anthropic_api_key = getpass.getpass("\nEnter your Anthropic API key: ").strip()
+            anthropic_api_key = getpass.getpass(
+                "\nEnter your Anthropic API key: "
+            ).strip()
             if anthropic_api_key:
                 break
-            print_warning("An Anthropic API key is required when using the Anthropic backend.")
+            print_warning(
+                "An Anthropic API key is required when using the Anthropic backend."
+            )
             retry = input("Try again? (y/n): ").strip().lower()
             if retry != "y":
                 print(
@@ -572,7 +578,9 @@ def choose_backend():
     print("                 Requires Ollama to be installed.")
     print("  2. Grok      — uses xAI's cloud API (requires a GROK_API_KEY)")
     print("  3. OpenAI    — uses OpenAI's cloud API (requires an OPENAI_API_KEY)")
-    print("  4. Anthropic — uses Anthropic's cloud API (requires an ANTHROPIC_API_KEY)\n")
+    print(
+        "  4. Anthropic — uses Anthropic's cloud API (requires an ANTHROPIC_API_KEY)\n"
+    )
 
     while True:
         choice = input(
@@ -586,7 +594,9 @@ def choose_backend():
             return "openai"
         if choice in ("4", "anthropic"):
             return "anthropic"
-        print_warning("Please enter 1 (Ollama), 2 (Grok), 3 (OpenAI), or 4 (Anthropic).")
+        print_warning(
+            "Please enter 1 (Ollama), 2 (Grok), 3 (OpenAI), or 4 (Anthropic)."
+        )
 
 
 def main():

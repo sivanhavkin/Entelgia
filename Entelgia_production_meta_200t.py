@@ -337,10 +337,13 @@ except ImportError:
     class _DummyClaimsMemory:  # type: ignore[misc]
         def state_changed_by(self, claims, move_type):
             return True
+
         def add(self, text, move_type="NEW_CLAIM"):
             pass
+
         def unresolved_claims(self):
             return []
+
         def summary(self):
             return ""
 
@@ -2070,7 +2073,9 @@ class Config:
         if not self.ollama_url.startswith("http"):
             raise ValueError("ollama_url must be a valid URL")
         if self.llm_backend not in ("ollama", "grok", "openai", "anthropic"):
-            raise ValueError("llm_backend must be 'ollama', 'grok', 'openai', or 'anthropic'")
+            raise ValueError(
+                "llm_backend must be 'ollama', 'grok', 'openai', or 'anthropic'"
+            )
         if self.llm_backend == "grok":
             if not self.grok_url.startswith("http"):
                 raise ValueError("grok_url must be a valid URL")
@@ -3299,7 +3304,11 @@ class LLM:
                     result = result.strip()
                 elif self.cfg.llm_backend == "openai":
                     choices = data.get("choices") or []
-                    result = ((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
+                    result = (
+                        ((choices[0].get("message") or {}).get("content") or "").strip()
+                        if choices
+                        else ""
+                    )
                 elif self.cfg.llm_backend == "anthropic":
                     content = data.get("content") or []
                     result = (content[0].get("text") or "").strip() if content else ""
@@ -5913,7 +5922,12 @@ class Agent:
         # ── Post-Stage-2 topic compliance log ─────────────────────────────────────
         # Log the final compliance score after Stage 2 has had a chance to apply
         # any reanchor hint.  This is diagnostic only — no further regeneration.
-        if own_texts and _active_topic and _active_anchors and not _skip_draft_transform:
+        if (
+            own_texts
+            and _active_topic
+            and _active_anchors
+            and not _skip_draft_transform
+        ):
             _final_compliance = compute_topic_compliance_score(
                 out,
                 _active_topic,
@@ -6036,7 +6050,9 @@ class Agent:
         # Run after all draft post-processing, before final output.
         # Ensures the response *advances* the argument — relevance alone is not
         # sufficient.  Does NOT touch topic enforcement logic.
-        _history_texts = [t.get("text", "") for t in dialog_tail if t.get("text", "").strip()]
+        _history_texts = [
+            t.get("text", "") for t in dialog_tail if t.get("text", "").strip()
+        ]
         _pe_claims_mem = _pe_get_claims_memory(self.name)
         _pe_move = _pe_classify_move(out, _history_texts)
         _pe_score = _pe_score_progress(out, _history_texts, _pe_claims_mem)
@@ -6096,7 +6112,9 @@ class Agent:
                 _pe_score,
                 _pe_move,
             )
-        elif _pe_score < _PE_PROGRESS_THRESHOLD and _pe_move not in _PE_HIGH_VALUE_MOVES:
+        elif (
+            _pe_score < _PE_PROGRESS_THRESHOLD and _pe_move not in _PE_HIGH_VALUE_MOVES
+        ):
             # Response is on-topic but low-progress: regenerate once with advancement instruction
             _pe_regen_instr = _pe_regen_instruction()
             _pe_regen_prompt = prompt.replace(
@@ -6113,7 +6131,9 @@ class Agent:
                 or out
             )
             _pe_regen_out = validate_output(_pe_regen_raw)
-            _pe_regen_score = _pe_score_progress(_pe_regen_out, _history_texts, _pe_claims_mem)
+            _pe_regen_score = _pe_score_progress(
+                _pe_regen_out, _history_texts, _pe_claims_mem
+            )
             if _pe_regen_score > _pe_score:
                 out = _pe_regen_out
                 logger.info(
@@ -7951,9 +7971,7 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
         if same in ("y", "yes", "n", "no"):
             break
         print(
-            Fore.YELLOW
-            + "  Please enter 'y' for yes or 'n' for no."
-            + Style.RESET_ALL
+            Fore.YELLOW + "  Please enter 'y' for yes or 'n' for no." + Style.RESET_ALL
         )
 
     if same in ("y", "yes"):
