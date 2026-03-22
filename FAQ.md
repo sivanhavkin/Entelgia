@@ -61,7 +61,7 @@ Unlike typical chatbots:
   - **Grok**: xAI cloud API; requires a `GROK_API_KEY` and an internet connection; no local GPU/RAM needed for inference
   - **OpenAI**: OpenAI cloud API; requires an `OPENAI_API_KEY` and an internet connection; no local GPU/RAM needed for inference
   - **Anthropic**: Anthropic cloud API; requires an `ANTHROPIC_API_KEY` and an internet connection; no local GPU/RAM needed for inference
-- **Models**: At least one supported model (`qwen2.5:7b`, `llama3.1:8b`, `mistral:latest`, etc. for Ollama; `grok-4.20-multi-agent` or `grok-4-1-fast-reasoning` for Grok; `gpt-4.1` for OpenAI; `claude-opus-4-6`, `claude-sonnet-4-6`, or `claude-haiku-4-5` for Anthropic)
+- **Models**: At least one supported model (`qwen2.5:7b`, `llama3.1:8b`, `mistral:latest`, etc. for Ollama; `grok-4.20-multi-agent` or `grok-4-1-fast-reasoning` for Grok; `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`, or `gpt-4.1-mini` for OpenAI; `claude-opus-4-6`, `claude-sonnet-4-6`, or `claude-haiku-4-5` for Anthropic)
 - **RAM**: 8GB+ recommended for Ollama (16GB+ for larger models); not required for cloud inference backends
 - **OS**: macOS, Linux, or Windows (with WSL2)
 
@@ -101,7 +101,7 @@ Currently, Entelgia officially supports four backends:
 
 - **Ollama** — local LLM runtime (default). Works with any Ollama-compatible model.
 - **Grok (xAI)** — cloud API using the `GROK_API_KEY`. Available models: `grok-4.20-multi-agent`, `grok-4-1-fast-reasoning`.
-- **OpenAI** — cloud API using the `OPENAI_API_KEY`. Available model: `gpt-4.1`.
+- **OpenAI** — cloud API using the `OPENAI_API_KEY`. Available models: `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-mini`.
 - **Anthropic** — cloud API using the `ANTHROPIC_API_KEY`. Available models: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`.
 
 You choose the backend interactively at startup. All four backends are natively integrated — no custom code modifications are required.
@@ -442,6 +442,9 @@ OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
 | Model | Description |
 |---|---|
 | `gpt-4.1` | Latest GPT-4.1 model |
+| `gpt-4o` | GPT-4o multimodal model |
+| `gpt-4o-mini` | Fast and affordable GPT-4o variant |
+| `gpt-4.1-mini` | Compact GPT-4.1 model |
 
 ### How do I get an OpenAI API key?
 
@@ -524,6 +527,9 @@ Yes! Entelgia supports four backends, each with its own model set.
 
 **OpenAI models** (selected at startup when the OpenAI backend is chosen):
 - `gpt-4.1` — latest GPT-4.1 model
+- `gpt-4o` — GPT-4o multimodal model
+- `gpt-4o-mini` — fast and affordable GPT-4o variant
+- `gpt-4.1-mini` — compact GPT-4.1 model
 
 **Anthropic models** (selected at startup when the Anthropic backend is chosen):
 - `claude-opus-4-6` — most capable Claude model

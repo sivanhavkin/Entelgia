@@ -275,6 +275,9 @@ When you run Entelgia, choose **[3] openai** from the backend menu. You will the
 | Model | Description |
 |---|---|
 | `gpt-4.1` | Latest GPT-4.1 model |
+| `gpt-4o` | GPT-4o multimodal model |
+| `gpt-4o-mini` | Fast and affordable GPT-4o variant |
+| `gpt-4.1-mini` | Compact GPT-4.1 model |
 
 > 💡 The OpenAI backend requires an active internet connection and a valid `OPENAI_API_KEY` in `.env`. No local Ollama instance is needed when using OpenAI.
 
