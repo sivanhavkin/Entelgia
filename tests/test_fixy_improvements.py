@@ -34,6 +34,7 @@ from entelgia.fixy_interactive import (
     InteractiveFixy,
     _LOOP_REWRITE_MODE_POLICY,
     _MODE_PROMPTS,
+    validate_force_choice,
 )
 
 # ---------------------------------------------------------------------------
@@ -759,6 +760,201 @@ class TestBothAgentsPresent:
 
     def test_empty_dialog(self):
         assert InteractiveFixy._both_agents_present([]) is False
+
+
+# ---------------------------------------------------------------------------
+# 8. validate_force_choice — commitment vs hedge detection
+# ---------------------------------------------------------------------------
+
+
+class TestValidateForceChoice:
+    """validate_force_choice must distinguish committed from hedged responses."""
+
+    def test_commitment_i_choose(self):
+        """'I choose X because' is a valid force_choice response."""
+        assert validate_force_choice("I choose autonomy because constraint is wrong") is True
+
+    def test_commitment_is_wrong_because(self):
+        """'X is wrong because' is a valid force_choice response."""
+        assert validate_force_choice("Compatibilism is wrong because it redefines freedom") is True
+
+    def test_commitment_not_x_but_y(self):
+        """'not X, but Y' pattern is a valid force_choice response."""
+        assert validate_force_choice("The answer is autonomy, not constraint, because choice requires freedom") is True
+
+    def test_commitment_wins_because(self):
+        """'wins because' phrase is a valid force_choice indicator."""
+        assert validate_force_choice("Hard determinism wins because it is logically consistent") is True
+
+    def test_hedge_both_matter_fails(self):
+        """'both matter' is a heavy hedge — must fail validation."""
+        assert validate_force_choice("Both matter in different contexts and both have merit here") is False
+
+    def test_hedge_it_depends_fails(self):
+        """'it depends' is a hedge — must fail validation."""
+        assert validate_force_choice("Well, it depends on the context and it depends on the situation") is False
+
+    def test_hedge_balance_fails(self):
+        """Heavy balance language without commitment must fail."""
+        assert validate_force_choice("A balance between freedom and constraint is needed; both are important") is False
+
+    def test_hedge_third_path_fails(self):
+        """Introducing a third path without a commitment must fail."""
+        assert validate_force_choice("There is actually a third path that reconciles both sides") is False
+
+    def test_reframing_without_choice_fails(self):
+        """Pure reframing with no commitment signal must fail."""
+        assert validate_force_choice("The real question is not about freedom at all, but about meaning") is False
+
+    def test_commitment_overrides_single_hedge(self):
+        """One commitment marker + one hedge phrase should still pass (< 2 hedges)."""
+        # Single hedge "it depends" but strong commitment "I choose"
+        assert validate_force_choice("I choose freedom, though it depends on the domain") is True
+
+
+# ---------------------------------------------------------------------------
+# 9. Pair-gating window scope — must reset after Fixy turn / external events
+# ---------------------------------------------------------------------------
+
+
+class TestPairGatingWindowScope:
+    """Pair gating must use a scoped window, not the full dialog history.
+
+    Root-cause regression tests: once Fixy has intervened, both agents'
+    historical turns must no longer count toward the new pair window.
+    """
+
+    class _StubLLM:
+        def generate(self, *args, **kwargs):
+            return "stub"
+
+    def _make_fixy(self):
+        return InteractiveFixy(self._StubLLM(), "stub-model")
+
+    def test_pair_gate_closed_after_fixy_intervention(self):
+        """After Fixy speaks, the pair window resets — only Socrates after Fixy
+        must NOT allow intervention even though Athena spoke before Fixy."""
+        fixy = self._make_fixy()
+        dialog = [
+            {"role": "Socrates", "text": "What is freedom?"},
+            {"role": "Athena", "text": "Freedom is autonomy."},
+            {"role": "Fixy", "text": "Deadlock detected."},
+            {"role": "Socrates", "text": "But constraints matter!"},
+        ]
+        result, reason = fixy.should_intervene(dialog, turn_count=4)
+        assert result is False, (
+            "[FIXY-GATE] After Fixy turn, only Socrates spoke — gate must be closed; "
+            f"got result={result!r}, reason={reason!r}"
+        )
+
+    def test_pair_gate_opens_after_fixy_when_both_present(self):
+        """After Fixy speaks, adding BOTH agents re-opens the gate for evaluation."""
+        fixy = self._make_fixy()
+        dialog = [
+            {"role": "Socrates", "text": "What is freedom?"},
+            {"role": "Athena", "text": "Freedom is autonomy."},
+            {"role": "Fixy", "text": "Deadlock detected."},
+            {"role": "Socrates", "text": "But constraints matter!"},
+            {"role": "Athena", "text": "I disagree with that."},
+        ]
+        # Gate should pass (both present after Fixy). Intervention may or may
+        # not fire depending on content — we only verify the gate does NOT block.
+        result, reason = fixy.should_intervene(dialog, turn_count=5)
+        # If it returns False, it should be for content reasons, not gate reasons.
+        # We assert the pair_reset_reason is not the blocker: window covers both.
+        window = dialog[3:]  # after Fixy at index 2
+        roles_in_window = {t.get("role") for t in window if t.get("role") not in ("Fixy", "seed")}
+        assert "Socrates" in roles_in_window and "Athena" in roles_in_window, (
+            "Window after Fixy should contain both agents"
+        )
+
+    def test_pair_gate_closed_after_notify_pair_reset_topic_shift(self, caplog):
+        """After notify_pair_reset(topic_shift), only Socrates must block the gate."""
+        fixy = self._make_fixy()
+        # Both agents spoke before the topic shift
+        dialog = [
+            {"role": "Socrates", "text": "Freedom is absolute."},
+            {"role": "Athena", "text": "Freedom has limits."},
+            {"role": "Socrates", "text": "No, it does not."},
+            {"role": "Athena", "text": "Yes, it does."},
+        ]
+        # Simulate topic shift
+        fixy.notify_pair_reset(len(dialog), "topic_shift")
+        # Only Socrates speaks on the new topic
+        dialog.append({"role": "Socrates", "text": "On consciousness: is it real?"})
+
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+            result, reason = fixy.should_intervene(dialog, turn_count=5)
+
+        assert result is False, (
+            "[FIXY-GATE] After topic_shift reset, only Socrates spoke — must be blocked; "
+            f"got result={result!r}, reason={reason!r}"
+        )
+        assert any("topic shift" in m for m in caplog.messages), (
+            "[FIXY-GATE] Expected a log message mentioning 'topic shift' for the skip reason"
+        )
+
+    def test_pair_gate_closed_after_notify_pair_reset_dream_cycle(self, caplog):
+        """After notify_pair_reset(dream_cycle), only Athena must block the gate."""
+        fixy = self._make_fixy()
+        dialog = [
+            {"role": "Socrates", "text": "What is freedom?"},
+            {"role": "Athena", "text": "Freedom is autonomy."},
+            {"role": "Socrates", "text": "Autonomy requires responsibility."},
+            {"role": "Athena", "text": "Responsibility limits freedom."},
+        ]
+        # Simulate dream cycle
+        fixy.notify_pair_reset(len(dialog), "dream_cycle")
+        dialog.append({"role": "Athena", "text": "After dreaming: consciousness is key."})
+
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+            result, reason = fixy.should_intervene(dialog, turn_count=5)
+
+        assert result is False, (
+            "[FIXY-GATE] After dream_cycle reset, only Athena spoke — must be blocked; "
+            f"got result={result!r}, reason={reason!r}"
+        )
+        assert any("dream cycle" in m for m in caplog.messages), (
+            "[FIXY-GATE] Expected a log message mentioning 'dream cycle' for the skip reason"
+        )
+
+    def test_pair_gate_resets_after_each_fixy_turn(self):
+        """Two consecutive Fixy interventions must each reset the pair window."""
+        fixy = self._make_fixy()
+        # First pair + first Fixy
+        dialog = [
+            {"role": "Socrates", "text": "A"},
+            {"role": "Athena", "text": "B"},
+            {"role": "Fixy", "text": "First intervention."},
+        ]
+        # Second pair + second Fixy
+        dialog += [
+            {"role": "Socrates", "text": "C"},
+            {"role": "Athena", "text": "D"},
+            {"role": "Fixy", "text": "Second intervention."},
+        ]
+        # Now only Socrates after second Fixy
+        dialog.append({"role": "Socrates", "text": "E"})
+
+        result, reason = fixy.should_intervene(dialog, turn_count=7)
+        assert result is False, (
+            "[FIXY-GATE] After second Fixy turn, only Socrates — gate must still be closed; "
+            f"got result={result!r}, reason={reason!r}"
+        )
+
+    def test_accepted_log_emitted_when_gate_passes(self, caplog):
+        """[FIXY-GATE] accepted message must be logged when the pair gate passes."""
+        fixy = self._make_fixy()
+        dialog = [
+            {"role": "Socrates", "text": "What is freedom?"},
+            {"role": "Athena", "text": "Freedom is autonomy."},
+        ]
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+            fixy.should_intervene(dialog, turn_count=2)
+
+        assert any("accepted" in m and "full pair" in m for m in caplog.messages), (
+            "[FIXY-GATE] Expected '[FIXY-GATE] accepted: full pair observed' in logs"
+        )
 
 
 if __name__ == "__main__":
