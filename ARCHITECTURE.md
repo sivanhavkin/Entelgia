@@ -595,7 +595,7 @@ After choosing a backend, the user selects per-agent or uniform model names from
 |---------|--------|
 | Ollama | `qwen2.5:7b`, `llama3.1:8b`, `mistral:latest` (any 7B+ Ollama model) |
 | Grok | `grok-4.20-multi-agent`, `grok-4-1-fast-reasoning` |
-| OpenAI | `gpt-4.1` |
+| OpenAI | `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-mini` |
 | Anthropic | `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5` |
 
 ### LLM.generate() Dispatch

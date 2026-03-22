@@ -334,11 +334,14 @@ openai.error.InvalidRequestError: The model 'gpt-4.1' does not exist
 **Cause**: The selected model is not available on your OpenAI account or tier.
 
 **Solution**:
-Select a supported OpenAI model at the interactive startup prompt. The currently available model is:
+Select a supported OpenAI model at the interactive startup prompt. The currently available models are:
 
 | Model | Description |
 |---|---|
 | `gpt-4.1` | Latest GPT-4.1 model |
+| `gpt-4o` | GPT-4o multimodal model |
+| `gpt-4o-mini` | Fast and affordable GPT-4o variant |
+| `gpt-4.1-mini` | Compact GPT-4.1 model |
 
 Ensure your OpenAI account has access to the selected model tier.
 
