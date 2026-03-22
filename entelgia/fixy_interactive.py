@@ -218,8 +218,9 @@ _FC_COMMITMENT_MARKERS: List[str] = [
     "clearly right",
     "clearly superior",
     "clearly inferior",
-    ", not ",
-    " not because",
+    ", not because",
+    ", not the",
+    "rather than",
 ]
 
 # Heavy hedge markers: signal that the agent avoided making a real choice.
@@ -600,10 +601,10 @@ class InteractiveFixy:
 
         if not self._both_agents_present(window):
             # Determine the most descriptive skip reason for logging.
-            if self._pair_reset_reason == "dream_cycle":
-                skip_detail = "pair window not complete after dream cycle"
-            elif self._pair_reset_reason in ("topic_shift", "rewrite_injection"):
-                skip_detail = f"pair window not complete after {self._pair_reset_reason}"
+            # Use a consistent human-readable format: underscores replaced by spaces.
+            if self._pair_reset_reason:
+                readable_reason = self._pair_reset_reason.replace("_", " ")
+                skip_detail = f"pair window not complete after {readable_reason}"
             elif last_fixy_idx >= 0:
                 skip_detail = "waiting for both agents"
             else:

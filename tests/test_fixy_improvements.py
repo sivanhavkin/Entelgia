@@ -34,6 +34,7 @@ from entelgia.fixy_interactive import (
     InteractiveFixy,
     _LOOP_REWRITE_MODE_POLICY,
     _MODE_PROMPTS,
+    validate_force_choice,
 )
 
 # ---------------------------------------------------------------------------
@@ -769,61 +770,46 @@ class TestBothAgentsPresent:
 class TestValidateForceChoice:
     """validate_force_choice must distinguish committed from hedged responses."""
 
-    def _import(self):
-        from entelgia.fixy_interactive import validate_force_choice
-
-        return validate_force_choice
-
     def test_commitment_i_choose(self):
         """'I choose X because' is a valid force_choice response."""
-        v = self._import()
-        assert v("I choose autonomy because constraint is wrong") is True
+        assert validate_force_choice("I choose autonomy because constraint is wrong") is True
 
     def test_commitment_is_wrong_because(self):
         """'X is wrong because' is a valid force_choice response."""
-        v = self._import()
-        assert v("Compatibilism is wrong because it redefines freedom") is True
+        assert validate_force_choice("Compatibilism is wrong because it redefines freedom") is True
 
     def test_commitment_not_x_but_y(self):
         """'not X, but Y' pattern is a valid force_choice response."""
-        v = self._import()
-        assert v("The answer is autonomy, not constraint, because choice requires freedom") is True
+        assert validate_force_choice("The answer is autonomy, not constraint, because choice requires freedom") is True
 
     def test_commitment_wins_because(self):
         """'wins because' phrase is a valid force_choice indicator."""
-        v = self._import()
-        assert v("Hard determinism wins because it is logically consistent") is True
+        assert validate_force_choice("Hard determinism wins because it is logically consistent") is True
 
     def test_hedge_both_matter_fails(self):
         """'both matter' is a heavy hedge — must fail validation."""
-        v = self._import()
-        assert v("Both matter in different contexts and both have merit here") is False
+        assert validate_force_choice("Both matter in different contexts and both have merit here") is False
 
     def test_hedge_it_depends_fails(self):
         """'it depends' is a hedge — must fail validation."""
-        v = self._import()
-        assert v("Well, it depends on the context and it depends on the situation") is False
+        assert validate_force_choice("Well, it depends on the context and it depends on the situation") is False
 
     def test_hedge_balance_fails(self):
         """Heavy balance language without commitment must fail."""
-        v = self._import()
-        assert v("A balance between freedom and constraint is needed; both are important") is False
+        assert validate_force_choice("A balance between freedom and constraint is needed; both are important") is False
 
     def test_hedge_third_path_fails(self):
         """Introducing a third path without a commitment must fail."""
-        v = self._import()
-        assert v("There is actually a third path that reconciles both sides") is False
+        assert validate_force_choice("There is actually a third path that reconciles both sides") is False
 
     def test_reframing_without_choice_fails(self):
         """Pure reframing with no commitment signal must fail."""
-        v = self._import()
-        assert v("The real question is not about freedom at all, but about meaning") is False
+        assert validate_force_choice("The real question is not about freedom at all, but about meaning") is False
 
     def test_commitment_overrides_single_hedge(self):
         """One commitment marker + one hedge phrase should still pass (< 2 hedges)."""
-        v = self._import()
         # Single hedge "it depends" but strong commitment "I choose"
-        assert v("I choose freedom, though it depends on the domain") is True
+        assert validate_force_choice("I choose freedom, though it depends on the domain") is True
 
 
 # ---------------------------------------------------------------------------
@@ -904,8 +890,8 @@ class TestPairGatingWindowScope:
             "[FIXY-GATE] After topic_shift reset, only Socrates spoke — must be blocked; "
             f"got result={result!r}, reason={reason!r}"
         )
-        assert any("topic_shift" in m for m in caplog.messages), (
-            "[FIXY-GATE] Expected a log message mentioning 'topic_shift' for the skip reason"
+        assert any("topic shift" in m for m in caplog.messages), (
+            "[FIXY-GATE] Expected a log message mentioning 'topic shift' for the skip reason"
         )
 
     def test_pair_gate_closed_after_notify_pair_reset_dream_cycle(self, caplog):
@@ -928,8 +914,8 @@ class TestPairGatingWindowScope:
             "[FIXY-GATE] After dream_cycle reset, only Athena spoke — must be blocked; "
             f"got result={result!r}, reason={reason!r}"
         )
-        assert any("dream_cycle" in m or "dream cycle" in m for m in caplog.messages), (
-            "[FIXY-GATE] Expected a log message mentioning 'dream_cycle' for the skip reason"
+        assert any("dream cycle" in m for m in caplog.messages), (
+            "[FIXY-GATE] Expected a log message mentioning 'dream cycle' for the skip reason"
         )
 
     def test_pair_gate_resets_after_each_fixy_turn(self):
