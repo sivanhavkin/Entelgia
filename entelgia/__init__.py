@@ -20,7 +20,7 @@ from .enhanced_personas import (
     is_global_show_pronouns,
 )
 from .context_manager import ContextManager, EnhancedMemoryIntegration
-from .fixy_interactive import InteractiveFixy, FixyMode
+from .fixy_interactive import InteractiveFixy, FixyMode, validate_force_choice
 from .energy_regulation import FixyRegulator, EntelgiaAgent
 from .long_term_memory import DefenseMechanism, FreudianSlip, SelfReplication
 from .dialogue_metrics import (
@@ -86,6 +86,7 @@ __all__ = [
     "EnhancedMemoryIntegration",
     "InteractiveFixy",
     "FixyMode",
+    "validate_force_choice",
     "is_global_show_pronouns",
     "FixyRegulator",
     "EntelgiaAgent",

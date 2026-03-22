@@ -191,6 +191,81 @@ _ROTATION_TRIGGER_REASONS: frozenset = frozenset(
 # used in the last _INTERVENTION_DEDUP_WINDOW interventions.
 _INTERVENTION_DEDUP_WINDOW: int = 4
 
+# ---------------------------------------------------------------------------
+# force_choice response validation
+# ---------------------------------------------------------------------------
+# Commitment markers: signal that the agent has explicitly chosen one side.
+_FC_COMMITMENT_MARKERS: List[str] = [
+    "i choose",
+    "i pick",
+    "i select",
+    "is wrong because",
+    "is false because",
+    "is incorrect because",
+    "i reject",
+    "i dismiss",
+    "wins because",
+    "fails because",
+    "is stronger because",
+    "is better because",
+    "is weaker because",
+    "is worse because",
+    "not the answer",
+    "the answer is",
+    "my position is",
+    "i commit to",
+    "clearly wrong",
+    "clearly right",
+    "clearly superior",
+    "clearly inferior",
+    ", not ",
+    " not because",
+]
+
+# Heavy hedge markers: signal that the agent avoided making a real choice.
+_FC_HEDGE_MARKERS: List[str] = [
+    "both matter",
+    "both are important",
+    "both are valid",
+    "both have merit",
+    "both contribute",
+    "it depends",
+    "depends on context",
+    "we need both",
+    "balance between",
+    "balanced approach",
+    "third path",
+    "third option",
+    "third way",
+    "neither extreme",
+]
+
+
+def validate_force_choice(text: str) -> bool:
+    """Return True when *text* contains a genuine commitment structure.
+
+    A valid force_choice response must:
+      1. Contain at least one explicit commitment marker, AND
+      2. Not be dominated by heavy hedging (fewer than 2 hedge markers).
+
+    This is a lightweight heuristic; it does not require semantic parsing.
+
+    Parameters
+    ----------
+    text:
+        The agent response to validate.
+
+    Returns
+    -------
+    ``True`` when the response satisfies the force_choice requirement.
+    """
+    t = text.lower()
+    has_commitment = any(m in t for m in _FC_COMMITMENT_MARKERS)
+    hedge_count = sum(1 for m in _FC_HEDGE_MARKERS if m in t)
+    # Fail if no commitment found, or if two or more distinct hedge phrases
+    # are present (suggesting the agent blended rather than chose).
+    return has_commitment and hedge_count < 2
+
 # Mode-specific prompt templates
 # {context} is replaced with the last 6 turns of dialogue
 _MODE_PROMPTS: Dict[str, str] = {
@@ -426,6 +501,16 @@ class InteractiveFixy:
         # Rewrite mode chosen for the pending hint.
         self._pending_rewrite_mode: Optional[str] = None
 
+        # ── Pair-window tracking ──────────────────────────────────────────────
+        # The pair gate must be evaluated only over the window since the last
+        # boundary event (Fixy intervention, dream cycle, topic shift, or rewrite
+        # injection).  _pair_window_start stores the dialog index (len of dialog
+        # at the moment of the last external reset) for non-Fixy boundaries.
+        # Fixy boundaries are detected automatically via dialog entries.
+        self._pair_window_start: int = 0
+        # Human-readable label of the most recent reset trigger (for logging).
+        self._pair_reset_reason: str = ""
+
         # Lazy import to avoid circular dependency (loop_guard → no imports from fixy)
         try:
             from entelgia.loop_guard import DialogueLoopDetector
@@ -444,6 +529,31 @@ class InteractiveFixy:
         roles = {t.get("role") for t in dialog if t.get("role") not in ("Fixy", "seed")}
         return "Socrates" in roles and "Athena" in roles
 
+    def notify_pair_reset(self, dialog_length: int, reason: str = "") -> None:
+        """Signal a pair-window boundary from an external event.
+
+        Call this after dream cycles, topic shifts, or rewrite-hint injection
+        so that Fixy waits for a fresh Socrates+Athena pair before evaluating
+        again.  Fixy-intervention boundaries are detected automatically via
+        Fixy dialog entries and do not require this call.
+
+        Parameters
+        ----------
+        dialog_length:
+            Current ``len(dialog)`` at the time of the event.  Turns at
+            indices below this value are excluded from the current pair window.
+        reason:
+            Human-readable label for the triggering event (e.g.
+            ``"dream_cycle"``, ``"topic_shift"``, ``"rewrite_injection"``).
+        """
+        self._pair_window_start = dialog_length
+        self._pair_reset_reason = reason
+        logger.info(
+            "[FIXY-GATE] pair window reset: reason=%s dialog_idx=%d",
+            reason or "external",
+            dialog_length,
+        )
+
     def should_intervene(
         self,
         dialog: List[Dict[str, str]],
@@ -460,6 +570,12 @@ class InteractiveFixy:
         single agent's turn.  Both Socrates AND Athena must have spoken.  Also
         clears the pending rewrite hint on each call.
 
+        v4.0.1: Fixed pair-gating bug — the window is now scoped to turns
+        since the last Fixy dialog entry OR the most recent external reset
+        (dream cycle, topic shift, rewrite injection), whichever is later.
+        This prevents the gate from being permanently open once both agents
+        have spoken at any historical point.
+
         Args:
             dialog: Full dialogue history
             turn_count: Current turn number
@@ -472,11 +588,29 @@ class InteractiveFixy:
         self._pending_rewrite_hint = None
         self._pending_rewrite_mode = None
 
-        # ── Pair gating: require both main agents to have spoken ────────────
-        # Fixy must not intervene after a single agent's message.
-        if not self._both_agents_present(dialog):
+        # ── Pair gating: require both main agents to have spoken since last reset ──
+        # Compute the pair-window boundary: the later of (a) the index just after
+        # the last Fixy dialog entry, and (b) the last external reset point.
+        last_fixy_idx = -1
+        for i, t in enumerate(dialog):
+            if t.get("role") == "Fixy":
+                last_fixy_idx = i
+        window_start = max(last_fixy_idx + 1, self._pair_window_start)
+        window = dialog[window_start:]
+
+        if not self._both_agents_present(window):
+            # Determine the most descriptive skip reason for logging.
+            if self._pair_reset_reason == "dream_cycle":
+                skip_detail = "pair window not complete after dream cycle"
+            elif self._pair_reset_reason in ("topic_shift", "rewrite_injection"):
+                skip_detail = f"pair window not complete after {self._pair_reset_reason}"
+            elif last_fixy_idx >= 0:
+                skip_detail = "waiting for both agents"
+            else:
+                skip_detail = "waiting for both agents"
             logger.info(
-                "[FIXY-GATE] skipped: waiting for both agents at turn %d",
+                "[FIXY-GATE] skipped: %s at turn %d",
+                skip_detail,
                 turn_count,
             )
             return (False, "")
@@ -491,6 +625,8 @@ class InteractiveFixy:
                 turn_count,
             )
             return (False, "")
+
+        logger.info("[FIXY-GATE] accepted: full pair observed at turn %d", turn_count)
 
         # ── Loop-guard checks (new v2.9.0) ─────────────────────────────────
         if self._loop_detector is not None:

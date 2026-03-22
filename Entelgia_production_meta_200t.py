@@ -122,6 +122,8 @@ try:
         ContextManager,
         EnhancedMemoryIntegration,
         InteractiveFixy,
+        FixyMode,
+        validate_force_choice,
         format_persona_for_prompt,
         get_persona,
         DefenseMechanism,
@@ -7350,6 +7352,16 @@ class MainScript:
         _fixy_rewrite_hint: Optional[str] = None
         _fixy_rewrite_mode: Optional[str] = None
 
+        # ── Topic-lock and force_choice tracking ─────────────────────────────
+        # Number of turns within which a high_conflict_no_resolution intervention
+        # blocks topic shifts.
+        _TOPIC_LOCK_WINDOW = 4
+        # Turn index of the most recent high_conflict_no_resolution intervention.
+        # 0 means no such intervention has occurred yet.
+        _last_high_conflict_turn: int = 0
+        # True when a force_choice rewrite was injected but not yet validated.
+        _force_choice_pending: bool = False
+
         _timeout_label = (
             f"{self.cfg.timeout_minutes}-minute"
             if self.cfg.timeout_minutes > 0
@@ -7530,7 +7542,9 @@ class MainScript:
             # ── v4.0.0: Inject Fixy rewrite hint from previous intervention ──
             # When Fixy intervened last turn, it computed a structural directive;
             # prepend it to this agent's seed so generation is forced to advance.
+            _current_turn_rewrite_mode: Optional[str] = None
             if _fixy_rewrite_hint and speaker.name != "Fixy":
+                _current_turn_rewrite_mode = _fixy_rewrite_mode  # capture before consuming
                 seed = _fixy_rewrite_hint + "\n\n" + seed
                 logger.info(
                     "[FIXY-REWRITE] mode=%s injected into seed for agent=%s",
@@ -7540,6 +7554,15 @@ class MainScript:
                 # Consume the hint: do not repeat it on the next turn
                 _fixy_rewrite_hint = None
                 _fixy_rewrite_mode = None
+                # Reset the pair window: after rewrite injection Fixy must wait
+                # for a fresh Socrates+Athena pair before intervening again.
+                if self.interactive_fixy:
+                    self.interactive_fixy.notify_pair_reset(
+                        len(self.dialog), "rewrite_injection"
+                    )
+                # Track pending force_choice constraint for post-generation validation
+                if _current_turn_rewrite_mode == FixyMode.FORCE_CHOICE:
+                    _force_choice_pending = True
 
             logger.debug(
                 "MainScript.run: turn=%d speaker=%s final seed_text=%r",
@@ -7548,6 +7571,56 @@ class MainScript:
                 seed,
             )
             out = speaker.speak(seed, self.dialog)
+
+            # ── force_choice post-generation validation ───────────────────────
+            # When the injected rewrite mode was force_choice, verify that the
+            # agent actually committed to one side.  Regenerate once with a
+            # stricter instruction if the response is hedged or blended.
+            if (
+                _current_turn_rewrite_mode == FixyMode.FORCE_CHOICE
+                and speaker.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                if not validate_force_choice(out):
+                    logger.warning(
+                        "[FORCE-CHOICE] validation failed for agent=%s", speaker.name
+                    )
+                    logger.info(
+                        "[FORCE-CHOICE] regeneration triggered for agent=%s",
+                        speaker.name,
+                    )
+                    _strict_seed = (
+                        "FORCE-CHOICE REGENERATION: Your previous response did not make "
+                        "a clear, committed choice. You MUST now explicitly pick ONE side.\n"
+                        "Use one of these structures:\n"
+                        "  - 'I choose X because...'\n"
+                        "  - 'X is wrong because...'\n"
+                        "  - 'The answer is X, not Y, because...'\n"
+                        "Do NOT hedge. Do NOT blend. Do NOT say 'both matter' or "
+                        "'it depends'. Do NOT introduce a third path.\n\n"
+                    ) + seed
+                    out = speaker.speak(_strict_seed, self.dialog)
+                    if validate_force_choice(out):
+                        logger.info(
+                            "[FORCE-CHOICE] accepted after regeneration for agent=%s",
+                            speaker.name,
+                        )
+                    else:
+                        logger.warning(
+                            "[FORCE-CHOICE] regeneration still did not produce clear choice "
+                            "for agent=%s; accepting best-effort response",
+                            speaker.name,
+                        )
+                        logger.info(
+                            "[FORCE-CHOICE] accepted (best effort) for agent=%s",
+                            speaker.name,
+                        )
+                else:
+                    logger.info(
+                        "[FORCE-CHOICE] accepted for agent=%s", speaker.name
+                    )
+                _force_choice_pending = False
+
             self.dialog.append({"role": speaker.name, "text": out})
 
             speaker.store_turn(out, topic_label, source="stm")
@@ -7711,10 +7784,20 @@ class MainScript:
                         if _hint:
                             _fixy_rewrite_hint = _hint
                             _fixy_rewrite_mode = _pending_mode
+                    # Track when high_conflict_no_resolution was last triggered
+                    # so the topic-lock can suppress topic shifts until cooled.
+                    if reason == "high_conflict_no_resolution":
+                        _last_high_conflict_turn = self.turn_index
 
             if self.turn_index % self.cfg.dream_every_n_turns == 0:
                 self.dream_cycle(self.socrates, topic_label)
                 self.dream_cycle(self.athena, topic_label)
+                # Reset pair window: Fixy must wait for a fresh pair after
+                # each dream cycle before it may evaluate again.
+                if self.interactive_fixy:
+                    self.interactive_fixy.notify_pair_reset(
+                        len(self.dialog), "dream_cycle"
+                    )
                 if self.cfg.show_meta:
                     print(
                         Fore.WHITE
@@ -7728,6 +7811,11 @@ class MainScript:
             for _agent in (self.socrates, self.athena):
                 if _agent.energy_level <= self.cfg.energy_safety_threshold:
                     self.dream_cycle(_agent, topic_label)
+                    # Reset pair window after energy-triggered dream cycle too.
+                    if self.interactive_fixy:
+                        self.interactive_fixy.notify_pair_reset(
+                            len(self.dialog), "dream_cycle"
+                        )
                     if self.cfg.show_meta:
                         print(
                             Fore.WHITE
@@ -7756,63 +7844,95 @@ class MainScript:
                 break
 
             if self.turn_index % 5 == 0:
-                # Collect agent proposals for the next topic (Part A & B)
-                # Each agent proposes based on their recent memory and the current cluster.
-                _current_cluster = getattr(self.socrates, "topic_cluster", "") or ""
-                _recent_topics = topicman.recent_topics(n=5)
-                _soc_stm = self.socrates.memory.stm_load(self.socrates.name)
-                _ath_stm = self.athena.memory.stm_load(self.athena.name)
-                _soc_mem_texts = [m.get("content", "") for m in _soc_stm[-3:]]
-                _ath_mem_texts = [m.get("content", "") for m in _ath_stm[-3:]]
-                _soc_proposal = propose_next_topic(
-                    "Socrates",
-                    topic_label,
-                    _current_cluster,
-                    _recent_topics,
-                    _soc_mem_texts,
+                # ── Topic-lock guard ─────────────────────────────────────────
+                # Do not allow a topic shift while the dialogue is in an
+                # unresolved high-conflict window or while a force_choice
+                # constraint has been injected but not yet satisfied.
+                _hc_recently = (
+                    _last_high_conflict_turn > 0
+                    and (self.turn_index - _last_high_conflict_turn)
+                    <= _TOPIC_LOCK_WINDOW
                 )
-                _ath_proposal = propose_next_topic(
-                    "Athena",
-                    topic_label,
-                    _current_cluster,
-                    _recent_topics,
-                    _ath_mem_texts,
-                )
-                _proposals = [_soc_proposal, _ath_proposal]
-                logger.info(
-                    "[TOPIC-PROPOSE] Socrates=%r Athena=%r cluster=%r",
-                    _soc_proposal,
-                    _ath_proposal,
-                    _current_cluster,
-                )
-                # Advance using scoring-based selection instead of sequential rotation
-                _recent_frames = [
-                    t.get("text", "")
-                    for t in self.dialog[-6:]
-                    if t.get("role") not in ("seed", "Fixy")
-                ]
-                topicman.advance_with_proposals(
-                    _proposals, _current_cluster, recent_agent_frames=_recent_frames
-                )
-                # Update topic_style for all agents to match the advanced topic
-                _adv_topic = topicman.current()
-                _adv_cluster, _adv_style_str = get_style_for_topic(
-                    _adv_topic, TOPIC_CLUSTERS
-                )
-                for _aa in [self.socrates, self.athena, self.fixy_agent]:
-                    _aa.topic_style = build_style_instruction(
-                        _adv_style_str, _aa.name, _adv_cluster
+                _topic_locked = _hc_recently or _force_choice_pending
+                if _topic_locked:
+                    if _force_choice_pending:
+                        logger.info(
+                            "[TOPIC-LOCK] blocked topic shift due to pending force_choice"
+                            " at turn %d",
+                            self.turn_index,
+                        )
+                    else:
+                        logger.info(
+                            "[TOPIC-LOCK] blocked topic shift due to unresolved conflict"
+                            " at turn %d (last_hc_turn=%d)",
+                            self.turn_index,
+                            _last_high_conflict_turn,
+                        )
+                else:
+                    # Collect agent proposals for the next topic (Part A & B)
+                    # Each agent proposes based on their recent memory and the current cluster.
+                    _current_cluster = getattr(self.socrates, "topic_cluster", "") or ""
+                    _recent_topics = topicman.recent_topics(n=5)
+                    _soc_stm = self.socrates.memory.stm_load(self.socrates.name)
+                    _ath_stm = self.athena.memory.stm_load(self.athena.name)
+                    _soc_mem_texts = [m.get("content", "") for m in _soc_stm[-3:]]
+                    _ath_mem_texts = [m.get("content", "") for m in _ath_stm[-3:]]
+                    _soc_proposal = propose_next_topic(
+                        "Socrates",
+                        topic_label,
+                        _current_cluster,
+                        _recent_topics,
+                        _soc_mem_texts,
                     )
-                    _aa.topic_cluster = _adv_cluster
-                logger.info(
-                    "Topic style refreshed: %s (%s) for topic '%s'",
-                    _adv_style_str,
-                    _adv_cluster,
-                    _adv_topic,
-                )
-                logger.debug(
-                    "topic_style updated after advance_with_proposals → %r", _adv_topic
-                )
+                    _ath_proposal = propose_next_topic(
+                        "Athena",
+                        topic_label,
+                        _current_cluster,
+                        _recent_topics,
+                        _ath_mem_texts,
+                    )
+                    _proposals = [_soc_proposal, _ath_proposal]
+                    logger.info(
+                        "[TOPIC-PROPOSE] Socrates=%r Athena=%r cluster=%r",
+                        _soc_proposal,
+                        _ath_proposal,
+                        _current_cluster,
+                    )
+                    # Advance using scoring-based selection instead of sequential rotation
+                    _recent_frames = [
+                        t.get("text", "")
+                        for t in self.dialog[-6:]
+                        if t.get("role") not in ("seed", "Fixy")
+                    ]
+                    topicman.advance_with_proposals(
+                        _proposals, _current_cluster, recent_agent_frames=_recent_frames
+                    )
+                    # Update topic_style for all agents to match the advanced topic
+                    _adv_topic = topicman.current()
+                    _adv_cluster, _adv_style_str = get_style_for_topic(
+                        _adv_topic, TOPIC_CLUSTERS
+                    )
+                    for _aa in [self.socrates, self.athena, self.fixy_agent]:
+                        _aa.topic_style = build_style_instruction(
+                            _adv_style_str, _aa.name, _adv_cluster
+                        )
+                        _aa.topic_cluster = _adv_cluster
+                    logger.info(
+                        "Topic style refreshed: %s (%s) for topic '%s'",
+                        _adv_style_str,
+                        _adv_cluster,
+                        _adv_topic,
+                    )
+                    logger.debug(
+                        "topic_style updated after advance_with_proposals → %r",
+                        _adv_topic,
+                    )
+                    # Reset the pair window after a topic shift so Fixy waits
+                    # for a fresh Socrates+Athena pair on the new topic.
+                    if self.interactive_fixy:
+                        self.interactive_fixy.notify_pair_reset(
+                            len(self.dialog), "topic_shift"
+                        )
 
             elapsed = time.time() - self.start_time
             if elapsed >= timeout_seconds:
