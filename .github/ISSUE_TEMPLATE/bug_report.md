@@ -1,52 +1,38 @@
-<div style="display: flex; align-items: center; justify-content: space-between;">
-  <img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120" style="margin: 0;"/>
-  <h1 style="flex-grow: 1; text-align: center; font-size: 2.5em; font-weight: bold; margin: 0;">Bug Report</h1>
-  <div style="width: 120px;" aria-hidden="true"></div>
-</div>
-
 ---
-name: Bug Report
-about: Report a bug or issue
-title: '[BUG] '
-labels: bug
+name: Bug report
+about: Create a report to help us improve
+title: ''
+labels: ''
 assignees: ''
+
 ---
 
-<img src="../../Assets/entelgia-logo.png" alt="Entelgia Logo" width="120"/> # 🐛 Bug Description
+**Describe the bug**
+A clear and concise description of what the bug is.
 
-A clear description of the bug.
-
-## 🔄 Steps to Reproduce
-
+**To Reproduce**
+Steps to reproduce the behavior:
 1. Go to '...'
-2. Run '...'
-3. See error
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
 
-## ✅ Expected Behavior
+**Expected behavior**
+A clear and concise description of what you expected to happen.
 
-What should happen?
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
 
-## ❌ Actual Behavior
+**Desktop (please complete the following information):**
+ - OS: [e.g. iOS]
+ - Browser [e.g. chrome, safari]
+ - Version [e.g. 22]
 
-What actually happens?
+**Smartphone (please complete the following information):**
+ - Device: [e.g. iPhone6]
+ - OS: [e.g. iOS8.1]
+ - Browser [e.g. stock browser, safari]
+ - Version [e.g. 22]
 
-## 💻 Environment
-
-- OS: [e.g., Windows 11, macOS 14, Ubuntu 22.04]
-- Python Version: [e.g., 3.10.5]
-- Entelgia Version: [e.g., 2.0.1]
-- Ollama Version: [e.g., 0.1.23]
-
-## 📋 Additional Context
-
-Add any other context, screenshots, or logs.
-
-## 🌐 Web Research Module
-
-_If the bug involves the Web Research Module, please confirm:_
-- [ ] Web search returns no results
-- [ ] Page text extraction fails
-- [ ] Credibility scoring is incorrect
-- [ ] Context not injected into prompt
-- [ ] Memory storage not working
-- [ ] Network timeout / error handling
+**Additional context**
+Add any other context about the problem here.
