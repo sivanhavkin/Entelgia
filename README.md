@@ -513,18 +513,8 @@ pytest tests/ -v
 | **v3.0.0** | ⚠️ Superseded | Use v4.1.0 instead |
 | **v2.8.1** | ⚠️ Superseded | Use v4.1.0 instead |
 | **v2.8.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.7.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.6.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.5.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.4.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.3.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.2.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.1.1** | ⚠️ Superseded | Use v4.1.0 instead |
-| v2.1.0 | ⚠️ Superseded | Use v4.1.0 instead |
-| v2.0.01 | ⚠️ Superseded | Use v4.1.0 instead |
-| v1.5 | 📦 Legacy | Production v2.0+ recommended |
 
-💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version.
+💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version. For the full version history, see [Changelog.md](Changelog.md).
 
 ---
 
