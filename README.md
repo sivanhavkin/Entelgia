@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-1127%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-1274%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -657,13 +657,15 @@ python entelgia_research_demo.py "latest research on artificial intelligence"
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **1127 tests** (1127 collected) in 30 suites.
+Entelgia ships with comprehensive test coverage across **1274 tests** (1274 collected) in 33 suites.
 
 | Category | Tests | Suite |
 |---|---|---|
 | Web Research | 202 | `test_web_research.py` |
 | Circularity Guard | 92 | `test_circularity_guard.py` |
 | Behavioral Rules | 71 | `test_behavioral_rules.py` |
+| Progress Enforcer | 69 | `test_progress_enforcer.py` |
+| Fixy Improvements | 68 | `test_fixy_improvements.py` |
 | Generation Quality | 68 | `test_generation_quality.py` |
 | Topic Anchors | 60 | `test_topic_anchors.py` |
 | Dialogue Metrics | 58 | `test_dialogue_metrics.py` |
@@ -688,6 +690,7 @@ Entelgia ships with comprehensive test coverage across **1127 tests** (1127 coll
 | Seed Topic Clusters | 12 | `test_seed_topic_clusters.py` |
 | Enhanced Dialogue | 11 | `test_enhanced_dialogue.py` |
 | Enable Observer | 10 | `test_enable_observer.py` |
+| LLM OpenAI Backend | 10 | `test_llm_openai_backend.py` |
 | Memory Signing Migration | 5 | `test_memory_signing_migration.py` |
 | Demo Dialogue | 1 | `test_demo_dialogue.py` |
 | Text Humanizer Integration | 0 | `test_text_humanizer_integration.py` (placeholder) |

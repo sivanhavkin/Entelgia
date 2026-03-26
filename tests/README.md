@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **1127 tests** (1127 collected) in 30 suites:
+Entelgia ships with comprehensive test coverage across **1274 tests** (1274 collected) in 33 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -341,7 +341,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 1127 total tests across 30 suites (web research, circularity guard, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue) |
+| **Unit Tests** | `pytest` | Runs 1274 total tests across 33 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -676,7 +676,99 @@ Tests verify `entelgia/topic_enforcer.py` compliance scoring and vocabulary func
 
 ---
 
-## Running All Tests
+### 🔄 Circularity Guard Tests (92 tests)
+
+```bash
+pytest tests/test_circularity_guard.py -v
+```
+
+Tests verify `entelgia/circularity_guard.py` pre-generation circularity detection:
+
+- ✅ **`detect_semantic_repetition` (Jaccard path)** — empty history returns false, below-min-history returns false, identical texts flagged, diverse texts not flagged, delta score uses max over history, delta reduces score for consistently similar history
+- ✅ **`detect_semantic_repetition` (embeddings path)** — high similarity flagged, low similarity not flagged, model failure falls back to Jaccard, threshold boundary respected
+- ✅ **`detect_structural_templates`** — no templates not flagged, single template not flagged, two rhetorical patterns flagged, tradeoff variants not counted as rhetorical alone, system constraint not rhetorical, duplicated speaker prefix detected, case-insensitive matching
+- ✅ **`detect_cross_topic_contamination`** — clean text not flagged, generic carryover phrases (Option A/B, "in the previous topic") flagged, leaked template phrases ("forgiveness", "peace and harmony") flagged, topic-specific carryover flagged, multiple carryover phrases detected, case-insensitive matching
+- ✅ **`compute_circularity_score`** — empty history gives low score, all result fields present, score in valid range, high semantic repetition raises score, contamination raises score, `is_circular` flag matches threshold, `reasons` populated when circular
+- ✅ **Adaptive threshold** — zero-history threshold, threshold grows with history size, threshold capped at 0.70, higher threshold means fewer false positives, dynamic threshold used in compute
+- ✅ **First-turn-after-topic-change leniency** — first turn score reduced, first turn less likely to be flagged, no leniency when flag is false
+- ✅ **`CircularityResult` fields** — `threshold` field present and matches explicit value, `semantic_score` is delta not raw max, all fields have correct types, score in valid range, `is_circular` consistent with score and threshold
+
+---
+
+### 🔧 Fixy Improvements Tests (68 tests)
+
+```bash
+pytest tests/test_fixy_improvements.py -v
+```
+
+Tests verify improved Fixy intervention logic in `entelgia/loop_guard.py` and `entelgia/fixy_interactive.py`:
+
+- ✅ **Pair gating (`DialogueLoopDetector`)** — loop not declared when only Socrates turns present, loop not declared when only Athena turns present, pair required for loop detection, single turns never trigger
+- ✅ **Pair gating (`InteractiveFixy`)** — no intervention after single Socrates or Athena turn, no intervention when only one agent appears many times, intervention allowed after both agents have spoken, `pending_rewrite_mode` set on intervention and cleared on no-intervention
+- ✅ **Novelty suppression** — loop not declared when new metric, concrete case, forced choice, testable claim, or operational definition is present; structural loop fires without novelty; novelty check returns clusters; no novelty in pure repetition
+- ✅ **Rewrite mode selection** — loop repetition → `force_case`, weak conflict → `force_choice`, premature synthesis → `force_test`, topic stagnation → `force_metric`, shallow discussion → `force_test`; all rewrite modes have prompts; rewrite mode constants have correct values
+- ✅ **Rewrite hint generation** — hint contains rewrite header, rewrite mode, and target agent; hint is structural for each mode (`force_metric`, `force_choice`, `force_test`, `force_case`, `force_definition`); hint sets `pending_rewrite_hint`; empty hint when no modes; hint infers mode from active modes
+- ✅ **`DialogueRewriter` structural mode** — rewrite includes mode label and target agent; rewrite-mode rule takes priority; no rewrite mode still works
+- ✅ **False positive reduction** — advancing dialogue suppressed, stagnant dialogue still detected, advancement keywords regression
+- ✅ **Both-agents-present check** — true with both, false when only one, correct for Fixy combinations
+- ✅ **`validate_force_choice`** — commitment phrases accepted (`"I choose"`, `"is wrong because"`, `"not X but Y"`, `"wins because"`), hedge phrases rejected (`"both matter"`, `"it depends"`, `"balance"`, `"third path"`, `"reframing without choice"`), commitment overrides single hedge
+- ✅ **Pair gating window scope** — gate closed after Fixy intervention, opens after Fixy when both present, resets after topic shift, resets after dream cycle, resets after each Fixy turn, accepted log emitted when gate passes
+
+---
+
+### ✍️ Transform Draft to Final Tests (28 tests)
+
+```bash
+pytest tests/test_transform_draft_to_final.py -v
+```
+
+Tests verify the `transform_draft_to_final()` Stage 2 generation function:
+
+- ✅ **Short / empty input passthrough** — empty string, single-word, and two-word texts returned unchanged without calling the LLM
+- ✅ **Normal LLM call** — LLM output is returned, `generate()` called exactly once, draft text included in prompt, topic included in prompt when provided, no topic line when topic is empty, correct model and temperature passed
+- ✅ **Fallback behaviour** — empty LLM response returns draft, `None` response returns draft, LLM exception returns draft
+- ✅ **Persona notes** — Socrates, Athena, and Fixy personas present in prompt; all three agents have notes in `_FINAL_STAGE_PERSONA_NOTES`; unknown agent uses generic persona
+- ✅ **Prompt contract** — max 3 sentences enforced, banned phrases blocked (`"my model"`, `"this suggests"`, `"it is important"`, `"one might argue"`), no preamble, natural prose required
+- ✅ **`Agent.speak()` integration** — `speak()` calls `transform_draft_to_final()` as Stage 2, passes draft to transform, uses transform output (not draft) as final response
+
+---
+
+### 🤖 LLM OpenAI Backend Tests (10 tests)
+
+```bash
+pytest tests/test_llm_openai_backend.py -v
+```
+
+Tests verify `LLM.generate()` with the OpenAI backend:
+
+- ✅ **Normal response** — `choices[0].message.content` is returned and whitespace-stripped
+- ✅ **`None` content** — tool-call response with `None` content returns empty string without crashing
+- ✅ **Edge cases** — empty `choices` list, missing `choices` key, missing `message` key all return empty string safely
+- ✅ **Empty content string** — empty string in content returns empty string
+- ✅ **Correct endpoint** — Chat Completions URL is used (`/v1/chat/completions`), not the Responses API
+- ✅ **Request body format** — `messages` field used (not `input`), `Authorization: Bearer` header uses `openai_api_key`
+
+---
+
+### 📈 Progress Enforcer Tests (69 tests)
+
+```bash
+pytest tests/test_progress_enforcer.py -v
+```
+
+Tests verify `entelgia/progress_enforcer.py` dialogue progress tracking:
+
+- ✅ **`extract_claims`** — returns list, excludes questions, declarative sentences included, max-claims limit respected, empty text returns empty, short text excluded, commitment phrase boosts ranking
+- ✅ **`classify_move`** — all move types detected: filler, balanced restatement, direct attack, direct defense, forced choice, reframe, resolution attempt, escalation, new claim (low similarity), paraphrase (high similarity), soft nuance
+- ✅ **`score_progress`** — returns string, score in range, high score for attack move, low score for filler, high similarity penalises score, commitment raises score, no state change penalty
+- ✅ **`ClaimsMemory`** — add and retrieve claims, deduplication, `update_status` challenged and defended, `state_changed_by` detection
+- ✅ **`detect_stagnation`** — low scores trigger commitment intervention, repeated moves trigger attack intervention, no state change triggers evidence intervention, unknown reason returns commitment
+- ✅ **`get_intervention_policy`** — all reason → policy mappings correct
+- ✅ **`build_intervention_instruction`** — commitment, attack, and evidence instruction content; unresolved claim hint included; no hint when memory empty; returns string
+- ✅ **`update_claims_memory`** — adds new claims, attack move challenges existing claim, returns list
+- ✅ **Module-level state** — add/get scores and moves, clear specific agent, clear all agents, deque max size enforced
+- ✅ **`get_regeneration_instruction`** — returns non-empty string, mentions key concepts
+- ✅ **End-to-end scenario** — stagnation triggers after multiple low-progress turns, high-value move prevents stagnation
 
 ```bash
 # Run the full suite
