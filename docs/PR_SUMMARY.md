@@ -59,7 +59,7 @@ Test Coverage:
 
 ### Version Information
 - Feature version: v2.2.0 
-- Latest official release: v4.0.0
+- Latest official release: v4.1.0
 - All version markers updated throughout codebase
 
 ---

@@ -17,7 +17,7 @@ Advanced Multi-Agent Dialogue System with:
 - 10-MINUTE AUTO-TIMEOUT
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 4.0.0.
+Version Note: Latest release: 4.1.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -6689,7 +6689,7 @@ class AsyncProcessor:
 # ============================================
 
 if FASTAPI_AVAILABLE:
-    app = FastAPI(title="Entelgia API", version="4.0.0")
+    app = FastAPI(title="Entelgia API", version="4.1.0")
 
     class DialogRequest(BaseModel):
         seed_topic: str = "what would you like to talk about?"
@@ -6747,7 +6747,7 @@ if FASTAPI_AVAILABLE:
     @app.get("/api/health")
     async def health_check():
         """Health check endpoint."""
-        return {"status": "ok", "version": "4.0.0"}
+        return {"status": "ok", "version": "4.1.0"}
 
 
 # ============================================
@@ -8201,7 +8201,7 @@ def run_cli():
     select_llm_backend_and_models(CFG)
 
     print("\nConfiguration:")
-    _SENSITIVE_KEYS = {"grok_api_key", "openai_api_key", "memory_secret_key"}
+    _SENSITIVE_KEYS = {"grok_api_key", "openai_api_key", "anthropic_api_key", "memory_secret_key"}
     config_dict = asdict(CFG)
     config_display = {
         k: ("***" if k in _SENSITIVE_KEYS else v)

@@ -8,17 +8,21 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
-## [Unreleased]
+## [4.1.0] - 2026-03-26
 
 ### Added
 
-- **OpenAI LLM backend** — `Config` gains `openai_url` (default `https://api.openai.com/v1/chat/completions`) and `openai_api_key` (from `OPENAI_API_KEY` env var). `LLM.generate()` branches on `llm_backend == "openai"`: sends a `POST /v1/chat/completions` request with `Authorization: Bearer` header and `messages` field; extracts the response from `choices[0].message.content`. Available models: `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-mini`. `__post_init__` validates the `openai_url` format and raises `ValueError` if `OPENAI_API_KEY` is not set when the OpenAI backend is selected.
-- **Anthropic LLM backend** — `Config` gains `anthropic_url` (default `https://api.anthropic.com/v1/messages`) and `anthropic_api_key` (from `ANTHROPIC_API_KEY` env var). `LLM.generate()` branches on `llm_backend == "anthropic"`: sends a `POST /v1/messages` request with `x-api-key` and `anthropic-version: 2023-06-01` headers and `messages` field; extracts the response from `content[0].text`. Available models: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`. `__post_init__` validates the `anthropic_url` format and raises `ValueError` if `ANTHROPIC_API_KEY` is not set when the Anthropic backend is selected.
-- **`OPENAI_MODELS` module-level constant** — list of supported OpenAI models driving the interactive backend/model selection menu: `["gpt-4.1", "gpt-4o", "gpt-4o-mini", "gpt-4.1-mini"]`.
-- **`ANTHROPIC_MODELS` module-level constant** — list of supported Anthropic models driving the interactive backend/model selection menu: `["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"]`.
-- **Extended interactive startup selector** — `select_llm_backend_and_models()` now offers four backend choices (`[1] grok`, `[2] ollama`, `[3] openai`, `[4] anthropic`) in addition to `[0] defaults`. Selecting `[3] openai` routes to `OPENAI_MODELS`; selecting `[4] anthropic` routes to `ANTHROPIC_MODELS`.
-- **`.env.example` updated** — added `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` sections with inline documentation covering how to obtain each key and which models are available.
-- **Documentation updated** — `README.md`, `FAQ.md`, `TROUBLESHOOTING.md`, and `ARCHITECTURE.md` updated to document the OpenAI and Anthropic backends: setup instructions, API key acquisition, model tables, troubleshooting sections, and architecture notes.
+- **OpenAI LLM backend** — `Config` gains two new fields: `openai_url: str` (default `"https://api.openai.com/v1/chat/completions"`) and `openai_api_key: str` (read from `OPENAI_API_KEY` env var). `LLM.generate()` branches on `llm_backend == "openai"`: submits a `POST` request to `openai_url` with an `Authorization: Bearer` header and a `messages` payload; extracts the reply from `choices[0].message.content`. `Config.__post_init__` validates that `openai_url` starts with `"http"` and that `openai_api_key` is non-empty, raising `ValueError` with a descriptive message if either check fails when the OpenAI backend is selected. Supported models: `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-mini`.
+- **Anthropic LLM backend** — `Config` gains two new fields: `anthropic_url: str` (default `"https://api.anthropic.com/v1/messages"`) and `anthropic_api_key: str` (read from `ANTHROPIC_API_KEY` env var). `LLM.generate()` branches on `llm_backend == "anthropic"`: submits a `POST` request to `anthropic_url` with `x-api-key`, `anthropic-version: 2023-06-01`, and `Content-Type: application/json` headers; payload includes `model`, `max_tokens: 1024`, and a `messages` list; extracts the reply from `content[0].text`. `Config.__post_init__` validates `anthropic_url` format and non-empty `anthropic_api_key`, raising `ValueError` if either check fails. Supported models: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`.
+- **`OPENAI_MODELS` module-level constant** — new `list[str]` constant driving the interactive backend/model selection menu for the OpenAI backend: `["gpt-4.1", "gpt-4o", "gpt-4o-mini", "gpt-4.1-mini"]`. Selecting `[3] openai` at startup routes model selection through this list.
+- **`ANTHROPIC_MODELS` module-level constant** — new `list[str]` constant driving the interactive backend/model selection menu for the Anthropic backend: `["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"]`. Selecting `[4] anthropic` at startup routes model selection through this list.
+- **Extended interactive startup selector** — `select_llm_backend_and_models()` now offers four backend choices: `[1] grok`, `[2] ollama`, `[3] openai`, `[4] anthropic`, in addition to `[0] defaults (keep config as-is)`. Selecting `[3]` sets `cfg.llm_backend = "openai"` and uses `OPENAI_MODELS`; selecting `[4]` sets `cfg.llm_backend = "anthropic"` and uses `ANTHROPIC_MODELS`. Per-agent or uniform model overrides continue to work identically for all backends. `Config.__post_init__` now accepts `"openai"` and `"anthropic"` as valid `llm_backend` values alongside `"ollama"` and `"grok"`.
+- **`.env.example` updated** — added `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` sections with step-by-step inline documentation covering API key acquisition from `platform.openai.com` and `console.anthropic.com`, respectively, and notes on which models are available for each backend.
+- **Documentation updated** — `README.md`, `FAQ.md`, `TROUBLESHOOTING.md`, and `ARCHITECTURE.md` updated to document the OpenAI and Anthropic backends: setup instructions, API key acquisition steps, model reference tables, troubleshooting sections for common auth errors, and architecture notes on how the new backends slot into the existing `LLM.generate()` branching logic.
+
+### Fixed
+
+- **`anthropic_api_key` now masked in startup config display** — `_SENSITIVE_KEYS` in `run_cli()` extended to include `"anthropic_api_key"`, preventing the Anthropic API key from being printed in plain text in the startup JSON configuration block. Previously only `grok_api_key`, `openai_api_key`, and `memory_secret_key` were redacted; `anthropic_api_key` was inadvertently exposed. Fix applied to both `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`.
 
 ---
 
@@ -1027,7 +1031,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v4.0.0
+- ✅ **Latest stable:** v4.1.0
+- 🔒 **Previous stable:** v4.0.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -1038,7 +1043,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v4.0.0** | 2026-03-20 | Major | ✅ **Current** | Version bump to 4.0.0; two-stage DRAFT→FINAL pipeline, proposal-aware topic selection, query rewriting improvements |
+| **v4.1.0** | 2026-03-26 | Minor | ✅ **Current** | OpenAI and Anthropic LLM backends, extended interactive startup selector |
+| **v4.0.0** | 2026-03-20 | Major | ✅ **Stable** | Version bump to 4.0.0; two-stage DRAFT→FINAL pipeline, proposal-aware topic selection, query rewriting improvements |
 | **v3.0.0** | 2026-03-12 | Minor | ⚠️ Superseded | Topic-aware style selection, forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |
 | **v2.8.1** | 2026-03-07 | Patch | ✅ **Stable** | Version bump across all documentation |
 | **v2.8.0** | 2026-03-06 | Minor | ⚠️ Superseded | Web Research Module — Fixy-triggered external knowledge pipeline |
