@@ -119,7 +119,7 @@ When you run `ollama serve`, it starts a small local server (by default on `http
 * **Choose Ollama** if you want privacy, zero ongoing cost, or offline use. A machine with 16 GB RAM and a GPU will give the best experience.
 * **Choose a cloud API** (Grok, OpenAI, Anthropic) if you want the highest model quality with minimal local setup, and you are comfortable sharing prompts with a third-party provider.
 
-Both backends are fully supported and can be switched at any time via the `LLM_BACKEND` variable in your `.env` file.
+Both backends are fully supported and can be switched at each startup.
 
 ---
 
