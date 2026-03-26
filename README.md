@@ -90,6 +90,39 @@ For the complete dependency list, see [`requirements.txt`](requirements.txt).
 
 ---
 
+## 🧠 LLM Backends Explained
+
+Before installing, it helps to understand the two ways Entelgia can talk to a language model: **locally via Ollama** or **remotely via a cloud API**.
+
+### What is Ollama?
+
+[Ollama](https://ollama.com) is a free, open-source tool that lets you download and run large language models (LLMs) entirely on your own machine — no internet connection required after the initial model download, and no API key needed.
+
+When you run `ollama serve`, it starts a small local server (by default on `http://localhost:11434`) that Entelgia connects to exactly the same way it would connect to a remote API — except everything stays on your hardware.
+
+**Why Ollama exists:** cloud-hosted LLMs charge per token and send your prompts to third-party servers. Ollama gives you a private, cost-free alternative.
+
+### Local LLM (Ollama) vs. Cloud API — Key Differences
+
+| | **Local (Ollama)** | **Cloud API (Grok / OpenAI / Anthropic)** |
+|---|---|---|
+| **Cost** | Free (electricity only) | Pay-per-token (or subscription) |
+| **Privacy** | Fully local — prompts never leave your machine | Prompts sent to the provider's servers |
+| **Internet** | Not required after model download | Always required |
+| **Setup** | Install Ollama + download model (~4–15 GB) | Get an API key, set env variable |
+| **Speed** | Depends on your hardware (CPU/GPU) | Fast, runs on provider's infrastructure |
+| **Model quality** | Good — 7B–34B models rival smaller cloud models | Typically state-of-the-art |
+| **RAM needed** | 8 GB+ (16 GB+ recommended for best results) | None on your machine |
+
+### Which should I choose?
+
+* **Choose Ollama** if you want privacy, zero ongoing cost, or offline use. A machine with 16 GB RAM and a GPU will give the best experience.
+* **Choose a cloud API** (Grok, OpenAI, Anthropic) if you want the highest model quality with minimal local setup, and you are comfortable sharing prompts with a third-party provider.
+
+Both backends are fully supported and can be switched at any time via the `LLM_BACKEND` variable in your `.env` file.
+
+---
+
 ## 🚀 **AUTOMATIC INSTALL** (Recommended)
 
 > **⚡ Get started fast with our automated installer!**
