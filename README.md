@@ -395,146 +395,38 @@ What would you like to delete?
 * ❓ **[FAQ](FAQ.md)** - Frequently asked questions and answers
 * 🔧 **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Common issues and solutions
 * 🧪 **[Test Suite (tests/README.md)](tests/README.md)** - Full test documentation and CI/CD details
+* ⚙️ **[Configuration (docs/CONFIGURATION.md)](docs/CONFIGURATION.md)** - All configuration options
 
 ---
 
 ## ✨ Core Features
 
-* **Multi-agent dialogue system** (Socrates · Athena · Fixy)
+* **Multi-agent dialogue** (Socrates · Athena · Fixy)
 * **Persistent memory** — short-term (JSON) + long-term (SQLite) with 🔐 HMAC-SHA256 integrity
-* **Enhanced Dialogue Engine** — dynamic speaker selection, 6+ seed strategies, rich context enrichment; `AgentMode` constants (`CONTRADICT`, `CONCRETIZE`, `INVERT`, `MECHANIZE`, `PIVOT`) shape per-turn behaviour
-* **🎨 Topic-Aware Style Selection** — `topic_style.py` maps seed topic clusters to domain-specific reasoning styles; agents adapt tone (analytical, scientific, pragmatic, etc.) instead of defaulting to philosophical language
-* **🎨 Two-Layer Tone Enforcement** — `TOPIC_TONE_POLICY` adds a mandatory register-control block (`allowed_registers`, `forbidden_phrases`, `preferred_cues`) on top of style selection; `scrub_rhetorical_openers()` strips legacy theatrical openers from generated responses
-* **🔁 Dialogue Loop Guard** — `loop_guard.py` exposes `DialogueLoopDetector` (4 failure modes: `loop_repetition`, `weak_conflict`, `premature_synthesis`, `topic_stagnation`), `PhraseBanList` (overused n-gram suppression), and `DialogueRewriter` (stale dialogue compression); Fixy maps each failure mode to a targeted `FixyMode` action
-* **🔍 Semantic Repetition Detection** — `InteractiveFixy` combines Jaccard keyword overlap with sentence-embedding cosine similarity (`sentence-transformers/all-MiniLM-L6-v2`) when available, catching paraphrased repetition that keyword overlap alone misses; gracefully degrades to Jaccard-only when the library is absent
-* **🚫 Observer Toggle** — `Config.enable_observer` (env: `ENTELGIA_ENABLE_OBSERVER`) completely excludes Fixy from the dialogue when set to `False`; Socrates and Athena are unaffected
-* **⚡ Energy-Based Regulation** — FixyRegulator, dream cycle consolidation, hallucination-risk detection
-* **🧠 Personal Long-Term Memory** — DefenseMechanism, FreudianSlip (rate-limited + deduplicated), SelfReplication
+* **Enhanced Dialogue Engine** — dynamic speaker selection, seed strategies, `AgentMode` constants
+* **🎨 Topic-Aware Style Selection**
+* **🎨 Two-Layer Tone Enforcement**
+* **🔁 Dialogue Loop Guard**
+* **🔍 Semantic Repetition Detection**
+* **🚫 Observer Toggle**
+* **⚡ Energy-Based Regulation** — dream cycle consolidation, hallucination-risk detection
+* **🧠 Personal Long-Term Memory** — DefenseMechanism, FreudianSlip, SelfReplication
 * **🎛️ Drive-Aware Cognition** — dynamic LLM temperature, superego critique, ego-driven memory depth
-* **🧠 Limbic Hijack** — Id-dominant emotional override: reduces Superego influence, forces impulsive responses, auto-exits after 3 turns or when intensity drops
-* **🔥 Drive Pressure** — per-agent urgency scalar with conciseness + decisiveness thresholds
-* **📊 Dialogue Quality Metrics** — `circularity_rate`, `progress_rate`, `intervention_utility`
-* **🔬 Ablation Study** — 4 reproducible conditions, fully deterministic
+* **🧠 Limbic Hijack**
+* **🔥 Drive Pressure**
+* **📊 Dialogue Quality Metrics**
+* **🔬 Ablation Study**
 * **🛡️ Safety & Quality** — PII redaction, output artifact cleanup, memory poisoning protection
-* **🌐 Web Research Module** — Fixy-triggered DuckDuckGo search, credibility scoring, and external knowledge injection into agent dialogue
-* **🗂️ Forgetting Policy** — per-layer TTL expiry purges stale LTM memories each dream cycle (7 d / 90 d / 365 d defaults; configurable)
-* **💡 Affective Routing** — `ltm_search_affective()` ranks memories by a blended importance + emotional-intensity score, surfacing emotionally salient memories first
-* **🏷️ Confidence Metadata** — every LTM row can carry an optional `confidence` (0–1) and `provenance` label; `dream_cycle()` tags its insertions automatically
+* **🌐 Web Research Module**
+* **🗂️ Forgetting Policy**
+* **💡 Affective Routing**
+* **🏷️ Confidence Metadata**
 
 ---
 
 ## ⚙️ Configuration
 
-Entelgia can be customized through the `Config` class in `Entelgia_production_meta.py`. Key configuration options:
-
-### Core Session Settings
-
-```python
-config = Config()
-
-config.max_turns = 200              # Maximum dialogue turns (default: 200)
-config.timeout_minutes = 30         # Session timeout in minutes (set to 9999 to disable)
-config.dream_every_n_turns = 7      # Dream cycle frequency (default: 7)
-config.llm_max_retries = 3          # LLM request retry count (default: 3)
-config.llm_timeout = 300            # LLM request timeout in seconds (default: 300)
-config.show_pronoun = False         # Show agent pronouns in output (default: False)
-config.show_meta = False            # Show meta-state after each turn (default: False)
-config.debug = True                 # Enable DEBUG-level logging (default: True)
-config.stm_max_entries = 10000      # Short-term memory capacity (default: 10000)
-config.stm_trim_batch = 500         # Entries pruned per trim pass (default: 500)
-config.promote_importance_threshold = 0.72  # Min importance to promote to LTM (default: 0.72)
-config.promote_emotion_threshold = 0.65     # Min emotion score to promote to LTM (default: 0.65)
-config.store_raw_stm = False        # Store un-redacted text in STM (default: False)
-config.store_raw_subconscious_ltm = False   # Store un-redacted text in LTM (default: False)
-config.enable_observer = True       # Include Fixy in dialogue (env: ENTELGIA_ENABLE_OBSERVER; default: True)
-```
-
-### 🔁 FreudianSlip Settings
-
-```python
-config.slip_probability = 0.05        # Per-turn probability a slip fires (env: ENTELGIA_SLIP_PROBABILITY)
-config.slip_cooldown_turns = 10       # Min turns between two successful slips (env: ENTELGIA_SLIP_COOLDOWN)
-config.slip_dedup_window = 10         # Recent slip hashes remembered to block repeats (env: ENTELGIA_SLIP_DEDUP_WINDOW)
-```
-
-### Response Quality Settings
-
-> **Note:** Response length is controlled by the module-level constant `MAX_RESPONSE_WORDS = 150`
-> in `Entelgia_production_meta.py` (not a `Config` field). The LLM prompt instructs the model
-> to answer in maximum 150 words; responses are never truncated by the runtime.
-> `validate_output()` removes control characters and normalizes newlines, without any length limits.
-
-### ⚡ Energy & Dream Cycle Settings
-
-```python
-config.energy_safety_threshold = 35.0  # Energy level that triggers a dream cycle (default: 35.0)
-config.energy_drain_min = 8.0           # Minimum energy drained per step (default: 8.0)
-config.energy_drain_max = 15.0          # Maximum energy drained per step (default: 15.0)
-config.self_replicate_every_n_turns = 10  # Turns between self-replication scans (default: 10)
-```
-
-### Drive-Aware Cognition Settings
-
-These `Config` fields control how Freudian drives evolve and influence LLM behaviour at runtime:
-
-```python
-config.drive_mean_reversion_rate = 0.04   # Rate drives revert toward 5.0 each turn (default: 0.04)
-config.drive_oscillation_range = 0.15     # ±random noise added to drives per turn (default: 0.15)
-
-# LLM temperature is computed automatically from drive values:
-# temperature = max(0.25, min(0.95, 0.60 + 0.03*(id - ego) - 0.02*(effective_sup - ego)))
-# During limbic hijack, effective_sup = superego * LIMBIC_HIJACK_SUPEREGO_MULTIPLIER (0.3)
-
-# Superego critique (second-pass rewrite) fires when superego_strength >= 7.5
-# During limbic hijack, effective_sup is reduced to 30% — suppressing the critique.
-# Memory depth scales automatically:
-#   ltm_limit = max(2, min(10, int(2 + ego/2 + self_awareness*4)))
-#   stm_tail  = max(3, min(12, int(3 + ego/2)))
-```
-
-
-**META block output** (when `show_meta=True`):
-```
-Pressure: 6.42  Unresolved: 2  Stagnation: 0.75
-```
-
-**Sample log showing pressure rising, then output shortening:**
-```
-[META: Socrates]
-  Id: 5.8  Ego: 5.1  SuperEgo: 6.4  SA: 0.57
-  Energy: 72.0  Conflict: 1.50
-  Pressure: 2.12  Unresolved: 0  Stagnation: 0.00    ← turn 1, baseline
-...
-[META: Socrates]
-  Pressure: 5.71  Unresolved: 2  Stagnation: 0.75    ← turn 5, rising
-...
-[META: Socrates]
-  Pressure: 8.03  Unresolved: 3  Stagnation: 1.00    ← turn 8, high pressure
-  → output trimmed to 80 words, decisive question forced
-```
-
-For the complete list of configuration options, see the `Config` class definition in `Entelgia_production_meta.py`.
-
-### 🗂️ Forgetting Policy Settings
-
-```python
-config.forgetting_enabled = False             # Master switch; False disables all TTL expiry (default: False)
-config.forgetting_episodic_ttl = 604800       # Subconscious / episodic layer TTL in seconds (default: 7 days)
-config.forgetting_semantic_ttl = 7776000      # Conscious / semantic layer TTL in seconds (default: 90 days)
-config.forgetting_autobio_ttl = 31536000      # Autobiographical layer TTL in seconds (default: 365 days)
-```
-
-`MemoryCore.ltm_apply_forgetting_policy()` is called automatically at the end of every `dream_cycle()`.
-Set a TTL to `0` to disable expiry for a specific layer without disabling the feature globally.
-
-### 💡 Affective Routing Settings
-
-```python
-config.affective_emotion_weight = 0.4   # Weight of emotion_intensity vs importance (default: 0.4)
-                                         # Score = importance*(1-w) + emotion_intensity*w
-```
-
-Use `memory.ltm_search_affective(agent, emotion_weight=0.7)` for more emotion-biased retrieval.
+For all configuration options, see **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)**.
 
 ---
 
@@ -600,43 +492,7 @@ Entelgia_production_meta_200t.py # 200-turn session, no time-based stopping
 
 ## 🧪 Test Suite
 
-Entelgia ships with comprehensive test coverage across **1274 tests** (1274 collected) in 33 suites.
-
-| Category | Tests | Suite |
-|---|---|---|
-| Web Research | 202 | `test_web_research.py` |
-| Circularity Guard | 92 | `test_circularity_guard.py` |
-| Behavioral Rules | 71 | `test_behavioral_rules.py` |
-| Progress Enforcer | 69 | `test_progress_enforcer.py` |
-| Fixy Improvements | 68 | `test_fixy_improvements.py` |
-| Generation Quality | 68 | `test_generation_quality.py` |
-| Topic Anchors | 60 | `test_topic_anchors.py` |
-| Dialogue Metrics | 58 | `test_dialogue_metrics.py` |
-| Stabilization Pass | 50 | `test_stabilization_pass.py` |
-| Long-Term Memory | 43 | `test_long_term_memory.py` |
-| Topic Enforcer | 41 | `test_topic_enforcer.py` |
-| Topic Style | 39 | `test_topic_style.py` |
-| Energy Regulation | 35 | `test_energy_regulation.py` |
-| Revise Draft | 32 | `test_revise_draft.py` |
-| Context Manager | 30 | `test_context_manager.py` |
-| Loop Guard | 30 | `test_loop_guard.py` |
-| Transform Draft to Final | 28 | `test_transform_draft_to_final.py` |
-| SuperEgo Critique | 28 | `test_superego_critique.py` |
-| Ablation Study | 28 | `test_ablation_study.py` |
-| Web Tool | 26 | `test_web_tool.py` |
-| Affective LTM Integration | 24 | `test_affective_ltm_integration.py` |
-| Drive Correlations | 28 | `test_drive_correlations.py` |
-| Drive Pressure | 23 | `test_drive_pressure.py` |
-| Limbic Hijack | 20 | `test_limbic_hijack.py` |
-| Memory Security | 19 | `test_memory_security.py` |
-| Semantic Repetition | 13 | `test_detect_repetition_semantic.py` |
-| Seed Topic Clusters | 12 | `test_seed_topic_clusters.py` |
-| Enhanced Dialogue | 11 | `test_enhanced_dialogue.py` |
-| Enable Observer | 10 | `test_enable_observer.py` |
-| LLM OpenAI Backend | 10 | `test_llm_openai_backend.py` |
-| Memory Signing Migration | 5 | `test_memory_signing_migration.py` |
-| Demo Dialogue | 1 | `test_demo_dialogue.py` |
-| Text Humanizer Integration | 0 | `test_text_humanizer_integration.py` (placeholder) |
+Entelgia ships with **1274 tests** across 33 suites.
 
 For full test documentation, per-suite details, CI/CD pipeline information, and sample output, see the **[Test Suite README (tests/README.md)](tests/README.md)**.
 
@@ -645,8 +501,6 @@ To run all tests:
 ```bash
 pytest tests/ -v
 ```
-
----
 
 ---
 
