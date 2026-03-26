@@ -8201,7 +8201,12 @@ def run_cli():
     select_llm_backend_and_models(CFG)
 
     print("\nConfiguration:")
-    _SENSITIVE_KEYS = {"grok_api_key", "openai_api_key", "anthropic_api_key", "memory_secret_key"}
+    _SENSITIVE_KEYS = {
+        "grok_api_key",
+        "openai_api_key",
+        "anthropic_api_key",
+        "memory_secret_key",
+    }
     config_dict = asdict(CFG)
     config_display = {
         k: ("***" if k in _SENSITIVE_KEYS else v)
