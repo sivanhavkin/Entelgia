@@ -511,11 +511,11 @@ pytest tests/ -v
 | **v4.1.0** | ✅ **Latest** | current |
 | **v4.0.0** | ✅ **Stable** | previous stable release |
 | **v3.0.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.8.1** | ⚠️ Superseded |  Use v4.1.0 instead |
+| **v2.8.1** | ⚠️ Superseded | Use v4.1.0 instead |
 | **v2.8.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.7.0** | ✅ **Stable** | previous stable release |
-| **v2.6.0** | ✅ **Stable** | previous stable release |
-| **v2.5.0** | ✅ **Stable** | previous stable release |
+| **v2.7.0** | ⚠️ Superseded | Use v4.1.0 instead |
+| **v2.6.0** | ⚠️ Superseded | Use v4.1.0 instead |
+| **v2.5.0** | ⚠️ Superseded | Use v4.1.0 instead |
 | **v2.4.0** | ⚠️ Superseded | Use v4.1.0 instead |
 | **v2.3.0** | ⚠️ Superseded | Use v4.1.0 instead |
 | **v2.2.0** | ⚠️ Superseded | Use v4.1.0 instead |
