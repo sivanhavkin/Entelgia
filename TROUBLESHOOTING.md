@@ -1000,4 +1000,4 @@ These patterns help ensure Entelgia works reliably:
 ---
 
 **Last Updated:** 07 March 2026  
-**Version:** 4.0.0
+**Version:** 4.1.0

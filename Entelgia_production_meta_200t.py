@@ -21,7 +21,7 @@ Advanced Multi-Agent Dialogue System with:
 - NO AUTO-TIMEOUT (turn-based stop only)
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 4.0.0.
+Version Note: Latest release: 4.1.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -6644,7 +6644,7 @@ class AsyncProcessor:
 # ============================================
 
 if FASTAPI_AVAILABLE:
-    app = FastAPI(title="Entelgia API", version="4.0.0")
+    app = FastAPI(title="Entelgia API", version="4.1.0")
 
     class DialogRequest(BaseModel):
         seed_topic: str = "what would you like to talk about?"
@@ -6702,7 +6702,7 @@ if FASTAPI_AVAILABLE:
     @app.get("/api/health")
     async def health_check():
         """Health check endpoint."""
-        return {"status": "ok", "version": "4.0.0"}
+        return {"status": "ok", "version": "4.1.0"}
 
 
 # ============================================
