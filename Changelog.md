@@ -24,6 +24,11 @@ All notable changes to this project will be documented in this file. The format 
 
 - **`anthropic_api_key` now masked in startup config display** — `_SENSITIVE_KEYS` in `run_cli()` extended to include `"anthropic_api_key"`, preventing the Anthropic API key from being printed in plain text in the startup JSON configuration block. Previously only `grok_api_key`, `openai_api_key`, and `memory_secret_key` were redacted; `anthropic_api_key` was inadvertently exposed. Fix applied to both `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`.
 
+### Tests
+
+- **`tests/test_llm_openai_backend.py`** — new suite with **10 tests** covering `LLM.generate()` with the OpenAI backend: normal response extraction from `choices[0].message.content`, whitespace stripping, `None` content (tool-call response), empty `choices` list, missing `choices` key, missing `message` key, empty content string, correct Chat Completions endpoint URL, `messages` request body format, and `Authorization: Bearer` header using `openai_api_key`.
+- **Total test count**: **1274 tests** (1274 collected) across **33 suites**.
+
 ---
 
 ## [4.0.0] - 2026-03-20
@@ -119,7 +124,9 @@ All notable changes to this project will be documented in this file. The format 
 - **`tests/test_drive_correlations.py`** — **28 tests** covering biased drive reversion with extreme boost.
 - **`tests/test_ablation_study.py`** — **28 tests**.
 - **`tests/test_text_humanizer_integration.py`** — replaced with an empty placeholder (humanizer feature removed).
-- **Total test count**: **1127 tests** (1127 collected) across **30 suites**.
+- **`tests/test_fixy_improvements.py`** — new suite with **68 tests** covering improved Fixy intervention logic: pair gating (`DialogueLoopDetector` must not fire when only one agent has spoken), novelty suppression (loop not declared when genuine novelty exists), structural rewrite mode selection based on loop type (`force_case`, `force_choice`, `force_test`, `force_metric`, `force_definition`), rewrite hint content and injection, `validate_force_choice` commitment/hedge detection, both-agents-present check, false positive reduction, and pair-gate window scope (resets after Fixy turn, topic shift, or dream cycle).
+- **`tests/test_progress_enforcer.py`** — new suite with **69 tests** covering `entelgia/progress_enforcer.py`: `extract_claims` (declarative sentences, question exclusion, max-claims limit, commitment-phrase boosting), `classify_move` (all move types: filler, restatement, attack, defense, forced choice, reframe, resolution, escalation, paraphrase, soft nuance), `score_progress` (attack/commitment bonuses, similarity/filler penalties), `ClaimsMemory` (add, deduplication, `update_status`), `detect_stagnation` (low scores, repeated moves, no state change), `get_intervention_policy`, `build_intervention_instruction` (claim hint injection), module-level state helpers, and end-to-end stagnation/high-value-move scenarios.
+- **Total test count**: **1264 tests** (1264 collected) across **32 suites**.
 
 ---
 
