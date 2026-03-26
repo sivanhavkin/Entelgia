@@ -593,56 +593,11 @@ The system runs via two executable entry points:
 ```
 Entelgia_production_meta.py      # Standard 30-minute session (time-bounded)
 Entelgia_production_meta_200t.py # 200-turn session, no time-based stopping
+
 ```
 
 ---
 
-## 🌐 Web Research Module (v2.8.0)
-
-Entelgia can retrieve up-to-date information from the web and inject it directly into the internal agent dialogue.
-
-### How It Works
-
-```
-User Input
-↓
-Fixy detects research keywords (fixy_research_trigger)
-↓
-Web Research Module (DuckDuckGo search + BeautifulSoup extraction)
-↓
-Source credibility evaluation & ranking
-↓
-Context injected into agent prompts
-↓
-Agents discuss with External Knowledge Context
-↓
-High-credibility sources stored in long-term memory
-```
-
-### Modules
-
-| Module | Description |
-|--------|-------------|
-| `entelgia/web_tool.py` | `web_search`, `fetch_page_text` (with failed-URL blacklist), `search_and_fetch` |
-| `entelgia/source_evaluator.py` | Heuristic credibility scoring (`.edu`, `.gov`, trusted domains) |
-| `entelgia/research_context_builder.py` | Formats ranked sources as LLM-ready context block |
-| `entelgia/fixy_research_trigger.py` | Keyword-based trigger with per-trigger **and** per-query cooldown |
-| `entelgia/web_research.py` | `maybe_add_web_context` — full pipeline + memory persistence |
-
-### Quick Start
-
-```python
-from entelgia.web_research import maybe_add_web_context
-
-context = maybe_add_web_context("latest research on quantum computing")
-# Returns formatted "External Research:" block or "" if no search needed
-```
-
-### Demo
-
-```bash
-python entelgia_research_demo.py "latest research on artificial intelligence"
-```
 
 ### Safety
 
