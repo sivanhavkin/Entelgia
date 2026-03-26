@@ -142,6 +142,7 @@ python scripts/install.py
 
 1. ✅ **Asks you to choose your backend** — Ollama (local), Grok (xAI cloud), OpenAI (cloud), or Anthropic (cloud) — before doing anything else
 2. ✅ **Ollama path only:** Detects/installs Ollama (macOS via Homebrew; provides instructions for Linux/Windows) and pulls the `qwen2.5:7b` model (or lets you skip)
+   > ⚠️ **Note:** If you choose Ollama, automatic installation may not work on all platforms. Please check the [Manual Installation — Install Ollama](#1️⃣-install-ollama) section below to install Ollama manually if needed.
 3. ✅ **Creates `.env` configuration** from template
 4. ✅ **Configures API keys in one step** — generates a secure `MEMORY_SECRET_KEY`; if a cloud backend was chosen, also prompts for the corresponding API key (`GROK_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`)
 5. ✅ **Installs Python dependencies** from `requirements.txt`
