@@ -459,34 +459,7 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 
 ### 📦 Package Structure
 
-```
-entelgia/
-├── __init__.py              # Package exports (v3.0.0)
-├── dialogue_engine.py       # Dynamic speaker & seed generation
-├── enhanced_personas.py     # Rich character definitions
-├── context_manager.py       # Smart context enrichment
-├── topic_style.py           # Topic-cluster → reasoning style mapping (v3.0.0)
-├── fixy_interactive.py      # Need-based interventions
-├── energy_regulation.py     # FixyRegulator & EntelgiaAgent (v2.5.0)
-├── long_term_memory.py      # DefenseMechanism, FreudianSlip, SelfReplication (v2.5.0)
-├── memory_security.py       # HMAC-SHA256 signature helpers
-├── dialogue_metrics.py      # Circularity, progress & intervention utility metrics (v2.6.0)
-├── ablation_study.py        # 4-condition reproducible ablation study (v2.6.0)
-├── web_tool.py              # DuckDuckGo search + BeautifulSoup page extraction (v2.8.0)
-├── source_evaluator.py      # Heuristic credibility scoring for web sources (v2.8.0)
-├── research_context_builder.py  # Format research bundle as LLM context (v2.8.0)
-├── fixy_research_trigger.py # Keyword-based search trigger detection (v2.8.0)
-├── loop_guard.py            # DialogueLoopDetector, PhraseBanList, DialogueRewriter (v3.0.0)
-└── web_research.py          # maybe_add_web_context integration + memory storage (v2.8.0)
-```
-
-The system runs via two executable entry points:
-
-```
-Entelgia_production_meta.py      # Standard 30-minute session (time-bounded)
-Entelgia_production_meta_200t.py # 200-turn session, no time-based stopping
-
-```
+For the complete file and module layout — including all `entelgia/` modules, entry points, scripts, tests, and docs — see **[PACKAGE_STRUCTURE.md](PACKAGE_STRUCTURE.md)**.
 
 ---
 
