@@ -149,8 +149,6 @@ python scripts/install.py
 ### After installation:
 
 ```bash
-# Start Ollama service
-ollama serve
 
 # run the full system (30 minutes, stops when time limit is reached)
 python Entelgia_production_meta.py
