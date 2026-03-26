@@ -772,44 +772,88 @@ class TestValidateForceChoice:
 
     def test_commitment_i_choose(self):
         """'I choose X because' is a valid force_choice response."""
-        assert validate_force_choice("I choose autonomy because constraint is wrong") is True
+        assert (
+            validate_force_choice("I choose autonomy because constraint is wrong")
+            is True
+        )
 
     def test_commitment_is_wrong_because(self):
         """'X is wrong because' is a valid force_choice response."""
-        assert validate_force_choice("Compatibilism is wrong because it redefines freedom") is True
+        assert (
+            validate_force_choice("Compatibilism is wrong because it redefines freedom")
+            is True
+        )
 
     def test_commitment_not_x_but_y(self):
         """'not X, but Y' pattern is a valid force_choice response."""
-        assert validate_force_choice("The answer is autonomy, not constraint, because choice requires freedom") is True
+        assert (
+            validate_force_choice(
+                "The answer is autonomy, not constraint, because choice requires freedom"
+            )
+            is True
+        )
 
     def test_commitment_wins_because(self):
         """'wins because' phrase is a valid force_choice indicator."""
-        assert validate_force_choice("Hard determinism wins because it is logically consistent") is True
+        assert (
+            validate_force_choice(
+                "Hard determinism wins because it is logically consistent"
+            )
+            is True
+        )
 
     def test_hedge_both_matter_fails(self):
         """'both matter' is a heavy hedge — must fail validation."""
-        assert validate_force_choice("Both matter in different contexts and both have merit here") is False
+        assert (
+            validate_force_choice(
+                "Both matter in different contexts and both have merit here"
+            )
+            is False
+        )
 
     def test_hedge_it_depends_fails(self):
         """'it depends' is a hedge — must fail validation."""
-        assert validate_force_choice("Well, it depends on the context and it depends on the situation") is False
+        assert (
+            validate_force_choice(
+                "Well, it depends on the context and it depends on the situation"
+            )
+            is False
+        )
 
     def test_hedge_balance_fails(self):
         """Heavy balance language without commitment must fail."""
-        assert validate_force_choice("A balance between freedom and constraint is needed; both are important") is False
+        assert (
+            validate_force_choice(
+                "A balance between freedom and constraint is needed; both are important"
+            )
+            is False
+        )
 
     def test_hedge_third_path_fails(self):
         """Introducing a third path without a commitment must fail."""
-        assert validate_force_choice("There is actually a third path that reconciles both sides") is False
+        assert (
+            validate_force_choice(
+                "There is actually a third path that reconciles both sides"
+            )
+            is False
+        )
 
     def test_reframing_without_choice_fails(self):
         """Pure reframing with no commitment signal must fail."""
-        assert validate_force_choice("The real question is not about freedom at all, but about meaning") is False
+        assert (
+            validate_force_choice(
+                "The real question is not about freedom at all, but about meaning"
+            )
+            is False
+        )
 
     def test_commitment_overrides_single_hedge(self):
         """One commitment marker + one hedge phrase should still pass (< 2 hedges)."""
         # Single hedge "it depends" but strong commitment "I choose"
-        assert validate_force_choice("I choose freedom, though it depends on the domain") is True
+        assert (
+            validate_force_choice("I choose freedom, though it depends on the domain")
+            is True
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -863,10 +907,12 @@ class TestPairGatingWindowScope:
         # If it returns False, it should be for content reasons, not gate reasons.
         # We assert the pair_reset_reason is not the blocker: window covers both.
         window = dialog[3:]  # after Fixy at index 2
-        roles_in_window = {t.get("role") for t in window if t.get("role") not in ("Fixy", "seed")}
-        assert "Socrates" in roles_in_window and "Athena" in roles_in_window, (
-            "Window after Fixy should contain both agents"
-        )
+        roles_in_window = {
+            t.get("role") for t in window if t.get("role") not in ("Fixy", "seed")
+        }
+        assert (
+            "Socrates" in roles_in_window and "Athena" in roles_in_window
+        ), "Window after Fixy should contain both agents"
 
     def test_pair_gate_closed_after_notify_pair_reset_topic_shift(self, caplog):
         """After notify_pair_reset(topic_shift), only Socrates must block the gate."""
@@ -890,9 +936,9 @@ class TestPairGatingWindowScope:
             "[FIXY-GATE] After topic_shift reset, only Socrates spoke — must be blocked; "
             f"got result={result!r}, reason={reason!r}"
         )
-        assert any("topic shift" in m for m in caplog.messages), (
-            "[FIXY-GATE] Expected a log message mentioning 'topic shift' for the skip reason"
-        )
+        assert any(
+            "topic shift" in m for m in caplog.messages
+        ), "[FIXY-GATE] Expected a log message mentioning 'topic shift' for the skip reason"
 
     def test_pair_gate_closed_after_notify_pair_reset_dream_cycle(self, caplog):
         """After notify_pair_reset(dream_cycle), only Athena must block the gate."""
@@ -905,7 +951,9 @@ class TestPairGatingWindowScope:
         ]
         # Simulate dream cycle
         fixy.notify_pair_reset(len(dialog), "dream_cycle")
-        dialog.append({"role": "Athena", "text": "After dreaming: consciousness is key."})
+        dialog.append(
+            {"role": "Athena", "text": "After dreaming: consciousness is key."}
+        )
 
         with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
             result, reason = fixy.should_intervene(dialog, turn_count=5)
@@ -914,9 +962,9 @@ class TestPairGatingWindowScope:
             "[FIXY-GATE] After dream_cycle reset, only Athena spoke — must be blocked; "
             f"got result={result!r}, reason={reason!r}"
         )
-        assert any("dream cycle" in m for m in caplog.messages), (
-            "[FIXY-GATE] Expected a log message mentioning 'dream cycle' for the skip reason"
-        )
+        assert any(
+            "dream cycle" in m for m in caplog.messages
+        ), "[FIXY-GATE] Expected a log message mentioning 'dream cycle' for the skip reason"
 
     def test_pair_gate_resets_after_each_fixy_turn(self):
         """Two consecutive Fixy interventions must each reset the pair window."""
@@ -952,9 +1000,9 @@ class TestPairGatingWindowScope:
         with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
             fixy.should_intervene(dialog, turn_count=2)
 
-        assert any("accepted" in m and "full pair" in m for m in caplog.messages), (
-            "[FIXY-GATE] Expected '[FIXY-GATE] accepted: full pair observed' in logs"
-        )
+        assert any(
+            "accepted" in m and "full pair" in m for m in caplog.messages
+        ), "[FIXY-GATE] Expected '[FIXY-GATE] accepted: full pair observed' in logs"
 
 
 if __name__ == "__main__":

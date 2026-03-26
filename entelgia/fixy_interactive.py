@@ -267,6 +267,7 @@ def validate_force_choice(text: str) -> bool:
     # are present (suggesting the agent blended rather than chose).
     return has_commitment and hedge_count < 2
 
+
 # Mode-specific prompt templates
 # {context} is replaced with the last 6 turns of dialogue
 _MODE_PROMPTS: Dict[str, str] = {

@@ -7582,7 +7582,9 @@ class MainScript:
             # prepend it to this agent's seed so generation is forced to advance.
             _current_turn_rewrite_mode: Optional[str] = None
             if _fixy_rewrite_hint and speaker.name != "Fixy":
-                _current_turn_rewrite_mode = _fixy_rewrite_mode  # capture before consuming
+                _current_turn_rewrite_mode = (
+                    _fixy_rewrite_mode  # capture before consuming
+                )
                 seed = _fixy_rewrite_hint + "\n\n" + seed
                 logger.info(
                     "[FIXY-REWRITE] mode=%s injected into seed for agent=%s",
@@ -7654,9 +7656,7 @@ class MainScript:
                             speaker.name,
                         )
                 else:
-                    logger.info(
-                        "[FORCE-CHOICE] accepted for agent=%s", speaker.name
-                    )
+                    logger.info("[FORCE-CHOICE] accepted for agent=%s", speaker.name)
                 _force_choice_pending = False
 
             self.dialog.append({"role": speaker.name, "text": out})
