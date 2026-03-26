@@ -598,18 +598,6 @@ Entelgia_production_meta_200t.py # 200-turn session, no time-based stopping
 
 ---
 
-
-### Safety
-
-- All network requests use a 10-second timeout
-- Network errors never crash the main dialogue system
-- Results are capped at 5 sources by default
-- High-credibility threshold: score > 0.6 for memory storage
-- **Failed-URL blacklist** — 403/404 URLs are remembered and skipped on retries
-- **Per-query cooldown** — same query suppressed for 5 turns to prevent redundant searches
-
----
-
 ## 🧪 Test Suite
 
 Entelgia ships with comprehensive test coverage across **1274 tests** (1274 collected) in 33 suites.
