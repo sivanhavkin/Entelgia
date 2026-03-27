@@ -1035,9 +1035,9 @@ class TestPairGatingWindowScope:
         fixy.notify_pair_reset(len(dialog), "topic_shift")
         dialog.append({"role": "Socrates", "text": "New topic: consciousness."})
         fixy.should_intervene(dialog, turn_count=4)
-        assert fixy.consecutive_full_pair_count == 0, (
-            "Counter must reset to 0 when pair gate fails"
-        )
+        assert (
+            fixy.consecutive_full_pair_count == 0
+        ), "Counter must reset to 0 when pair gate fails"
 
     def test_consecutive_full_pair_count_resets_on_context_gate_failure(self):
         """Counter must reset to 0 when a gate fails on the same instance."""
@@ -1056,9 +1056,9 @@ class TestPairGatingWindowScope:
         fixy.notify_pair_reset(len(dialog), "topic_shift")
         dialog.append({"role": "Socrates", "text": "New topic."})
         fixy.should_intervene(dialog, turn_count=3)
-        assert fixy.consecutive_full_pair_count == 0, (
-            "Counter must reset to 0 when the gate fails (same instance)"
-        )
+        assert (
+            fixy.consecutive_full_pair_count == 0
+        ), "Counter must reset to 0 when the gate fails (same instance)"
 
 
 # ---------------------------------------------------------------------------
@@ -1090,8 +1090,7 @@ class TestTopicsDisabledSuppression:
 
         # The INFO-level pair-window reset must NOT appear.
         assert not any(
-            "pair window reset" in m and "topic_shift" in m
-            for m in caplog.messages
+            "pair window reset" in m and "topic_shift" in m for m in caplog.messages
         ), (
             "notify_pair_reset('topic_shift') must not log an INFO pair window "
             "reset message when topics_enabled=False"
@@ -1106,12 +1105,12 @@ class TestTopicsDisabledSuppression:
 
         fixy.notify_pair_reset(10, "topic_shift")
 
-        assert fixy._pair_window_start == initial_start, (
-            "_pair_window_start must not change when topic_shift is suppressed"
-        )
-        assert fixy._pair_reset_reason == initial_reason, (
-            "_pair_reset_reason must not change when topic_shift is suppressed"
-        )
+        assert (
+            fixy._pair_window_start == initial_start
+        ), "_pair_window_start must not change when topic_shift is suppressed"
+        assert (
+            fixy._pair_reset_reason == initial_reason
+        ), "_pair_reset_reason must not change when topic_shift is suppressed"
 
     def test_non_topic_reset_still_works_when_topics_disabled(self, caplog):
         """dream_cycle and rewrite_injection resets must still fire when topics_enabled=False."""
@@ -1120,8 +1119,7 @@ class TestTopicsDisabledSuppression:
             fixy.notify_pair_reset(4, "dream_cycle")
 
         assert any(
-            "pair window reset" in m and "dream_cycle" in m
-            for m in caplog.messages
+            "pair window reset" in m and "dream_cycle" in m for m in caplog.messages
         ), "notify_pair_reset('dream_cycle') must still log when topics_enabled=False"
         assert fixy._pair_window_start == 4
         assert fixy._pair_reset_reason == "dream_cycle"
@@ -1133,32 +1131,31 @@ class TestTopicsDisabledSuppression:
             fixy.notify_pair_reset(6, "topic_shift")
 
         assert any(
-            "pair window reset" in m and "topic_shift" in m
-            for m in caplog.messages
+            "pair window reset" in m and "topic_shift" in m for m in caplog.messages
         ), "notify_pair_reset('topic_shift') must log normally when topics_enabled=True"
         assert fixy._pair_window_start == 6
         assert fixy._pair_reset_reason == "topic_shift"
 
     # ── should_intervene — current_topic discarded ───────────────────────
 
-    def test_should_intervene_discards_current_topic_when_topics_disabled(
-        self, caplog
-    ):
+    def test_should_intervene_discards_current_topic_when_topics_disabled(self, caplog):
         """should_intervene must not log or use current_topic when topics_enabled=False."""
         fixy = self._make_fixy(topics_enabled=False)
         dialog = [
             {"role": "Socrates", "text": "Wealth inequality is structural."},
-            {"role": "Athena", "text": "Structural causes require structural remedies."},
+            {
+                "role": "Athena",
+                "text": "Structural causes require structural remedies.",
+            },
         ]
         with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
-            fixy.should_intervene(dialog, turn_count=2, current_topic="Wealth inequality")
+            fixy.should_intervene(
+                dialog, turn_count=2, current_topic="Wealth inequality"
+            )
 
         # No log entry should mention the topic label in a way that implies it
         # was used for active reasoning (e.g. the FIXY-LOOP topic= field).
-        topic_log_entries = [
-            m for m in caplog.messages
-            if "Wealth inequality" in m
-        ]
+        topic_log_entries = [m for m in caplog.messages if "Wealth inequality" in m]
         assert not topic_log_entries, (
             "should_intervene must not emit log messages referencing the "
             f"current_topic when topics_enabled=False; found: {topic_log_entries}"
@@ -1187,12 +1184,12 @@ class TestTopicsDisabledSuppression:
 
         assert prompts_seen, "LLM.generate must have been called"
         combined = "\n".join(prompts_seen)
-        assert "ACTIVE TOPIC" not in combined, (
-            "generate_intervention must not inject ACTIVE TOPIC when topics_enabled=False"
-        )
-        assert "Wealth inequality" not in combined, (
-            "generate_intervention must not reference the topic label when topics_enabled=False"
-        )
+        assert (
+            "ACTIVE TOPIC" not in combined
+        ), "generate_intervention must not inject ACTIVE TOPIC when topics_enabled=False"
+        assert (
+            "Wealth inequality" not in combined
+        ), "generate_intervention must not reference the topic label when topics_enabled=False"
 
     def test_generate_intervention_includes_topic_anchor_when_topics_enabled(self):
         """With topics_enabled=True, ACTIVE TOPIC must appear in the prompt."""
@@ -1213,12 +1210,12 @@ class TestTopicsDisabledSuppression:
         )
 
         combined = "\n".join(prompts_seen)
-        assert "ACTIVE TOPIC" in combined, (
-            "generate_intervention must inject ACTIVE TOPIC when topics_enabled=True"
-        )
-        assert "Wealth inequality" in combined, (
-            "generate_intervention must reference the topic label when topics_enabled=True"
-        )
+        assert (
+            "ACTIVE TOPIC" in combined
+        ), "generate_intervention must inject ACTIVE TOPIC when topics_enabled=True"
+        assert (
+            "Wealth inequality" in combined
+        ), "generate_intervention must reference the topic label when topics_enabled=True"
 
 
 # ---------------------------------------------------------------------------
@@ -1475,9 +1472,9 @@ class TestGenerateFixyAnalysis:
             "suggested_vector",
             "urgency",
         }
-        assert set(result.keys()) == required_keys, (
-            f"generate_fixy_analysis must return {required_keys!r}; got {set(result.keys())!r}"
-        )
+        assert (
+            set(result.keys()) == required_keys
+        ), f"generate_fixy_analysis must return {required_keys!r}; got {set(result.keys())!r}"
 
     def test_intervention_mode_preserved(self):
         """intervention_mode in output must match the supplied mode."""
@@ -1499,9 +1496,9 @@ class TestGenerateFixyAnalysis:
             intervention_mode=FixyMode.SOFT_REFLECTION,
             turn_count=2,  # below 8//2 = 4
         )
-        assert result["urgency"] == "low", (
-            f"Expected 'low' urgency at turn 2; got {result['urgency']!r}"
-        )
+        assert (
+            result["urgency"] == "low"
+        ), f"Expected 'low' urgency at turn 2; got {result['urgency']!r}"
 
     def test_urgency_medium_mid_turns(self):
         """Urgency must be 'medium' when turn count is at or above half the threshold."""
@@ -1514,9 +1511,9 @@ class TestGenerateFixyAnalysis:
             intervention_mode=FixyMode.GENTLE_NUDGE,
             turn_count=5,  # 5 >= 8//2 = 4, but pairs=1 < 3
         )
-        assert result["urgency"] == "medium", (
-            f"Expected 'medium' urgency at turn 5, pairs=1; got {result['urgency']!r}"
-        )
+        assert (
+            result["urgency"] == "medium"
+        ), f"Expected 'medium' urgency at turn 5, pairs=1; got {result['urgency']!r}"
 
     def test_urgency_high_above_thresholds(self):
         """Urgency must be 'high' when both turn and pair thresholds are met."""
@@ -1528,9 +1525,9 @@ class TestGenerateFixyAnalysis:
             intervention_mode=FixyMode.STRUCTURED_MEDIATION,
             turn_count=10,  # above turn threshold
         )
-        assert result["urgency"] == "high", (
-            f"Expected 'high' urgency when thresholds met; got {result['urgency']!r}"
-        )
+        assert (
+            result["urgency"] == "high"
+        ), f"Expected 'high' urgency when thresholds met; got {result['urgency']!r}"
 
     def test_dialogue_read_non_empty(self):
         """dialogue_read must be a non-empty string."""
@@ -1578,9 +1575,9 @@ class TestGenerateFixyAnalysis:
             intervention_mode="UNKNOWN_MODE",
             turn_count=4,
         )
-        assert "Detected failure mode:" not in result["dialogue_read"], (
-            f"dialogue_read fallback must not use procedural label; got: {result['dialogue_read']!r}"
-        )
+        assert (
+            "Detected failure mode:" not in result["dialogue_read"]
+        ), f"dialogue_read fallback must not use procedural label; got: {result['dialogue_read']!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -1671,7 +1668,6 @@ class TestPerspectiveDrivenOutput:
                 f"_REASON_LABEL_MAP[{reason!r}] must include perspective-based language; "
                 f"got: {instruction}"
             )
-
 
     import pytest as _pytest
 

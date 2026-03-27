@@ -15,7 +15,6 @@ Covers (Part G requirements):
   8. Agent-local continuity does not override session topic anchoring
 """
 
-
 import sys
 import os
 
@@ -925,11 +924,14 @@ class TestTopicManagerGating:
         own_texts = ["some prior text"]
 
         compliance_would_run = (
-            cfg.topics_enabled and bool(own_texts) and bool(_active_topic) and bool(_active_anchors)
+            cfg.topics_enabled
+            and bool(own_texts)
+            and bool(_active_topic)
+            and bool(_active_anchors)
         )
-        assert not compliance_would_run, (
-            "[DRAFT-TOPIC] compliance block must not run when topics_enabled=False"
-        )
+        assert (
+            not compliance_would_run
+        ), "[DRAFT-TOPIC] compliance block must not run when topics_enabled=False"
 
     def test_post_stage2_compliance_gate_skips_when_topics_disabled(self):
         """[TOPIC-COMPLIANCE] post-Stage-2 gate must not fire when topics_enabled=False."""
@@ -946,9 +948,9 @@ class TestTopicManagerGating:
             and bool(_active_anchors)
             and not _skip_draft_transform
         )
-        assert not compliance_would_run, (
-            "[TOPIC-COMPLIANCE] post-Stage-2 block must not run when topics_enabled=False"
-        )
+        assert (
+            not compliance_would_run
+        ), "[TOPIC-COMPLIANCE] post-Stage-2 block must not run when topics_enabled=False"
 
     def test_human_ai_cooperation_anchors_include_cooperation(self):
         """'Human-AI cooperation' TOPIC_ANCHORS must include 'cooperation' to prevent
@@ -963,9 +965,9 @@ class TestTopicManagerGating:
         """'Human-AI cooperation' TOPIC_ANCHORS must include 'human-AI' so that
         text naturally referring to the topic title phrase scores as an exact match."""
         anchors = TOPIC_ANCHORS.get("Human-AI cooperation", [])
-        assert "human-AI" in anchors, (
-            "'human-AI' must be in Human-AI cooperation anchors for direct topic-name matching"
-        )
+        assert (
+            "human-AI" in anchors
+        ), "'human-AI' must be in Human-AI cooperation anchors for direct topic-name matching"
 
 
 # ---------------------------------------------------------------------------
@@ -1009,7 +1011,9 @@ class TestTopicManagerEnabledSwitch:
         assert topicman is not None
         assert isinstance(topicman, TopicManager)
 
-    def test_topic_manager_not_created_when_topics_disabled_regardless_of_manager_flag(self):
+    def test_topic_manager_not_created_when_topics_disabled_regardless_of_manager_flag(
+        self,
+    ):
         """When topics_enabled=False, TopicManager must not be created
         even if topic_manager_enabled=True."""
         topics = ["Free will and determinism"]
@@ -1085,7 +1089,9 @@ class TestTopicPipelineEnabled:
         topicman = None  # never created when topics disabled
 
         # Replicate the _run_loop assignment
-        topic_label = topicman.current() if topic_pipeline_enabled(cfg) and topicman else ""
+        topic_label = (
+            topicman.current() if topic_pipeline_enabled(cfg) and topicman else ""
+        )
 
         assert topic_label == "", (
             "topic_label must be '' by default (topics_enabled=False); "
@@ -1099,7 +1105,9 @@ class TestTopicPipelineEnabled:
 
         cfg = Config(topics_enabled=False)
         topicman = None
-        topic_label = topicman.current() if topic_pipeline_enabled(cfg) and topicman else ""
+        topic_label = (
+            topicman.current() if topic_pipeline_enabled(cfg) and topicman else ""
+        )
 
         log_records: list[logging.LogRecord] = []
 
@@ -1122,6 +1130,6 @@ class TestTopicPipelineEnabled:
         topic_records = [
             r for r in log_records if "selected active topic" in r.getMessage()
         ]
-        assert not topic_records, (
-            "No 'selected active topic' log must be emitted when topics are disabled"
-        )
+        assert (
+            not topic_records
+        ), "No 'selected active topic' log must be emitted when topics are disabled"
