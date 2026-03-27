@@ -79,6 +79,11 @@ _AGENT_MODE_INSTRUCTION: Dict[str, str] = {
 }
 
 
+# Header prefix that all seed templates inject when a topic is active.
+# Used to detect and strip the prefix when the topic subsystem is disabled.
+_SEED_TOPIC_PREFIX = "TOPIC: \n"
+
+
 class SeedGenerator:
     """Generates varied, context-aware dialogue seeds."""
 
@@ -156,6 +161,12 @@ class SeedGenerator:
                 strategy, self.SEED_TEMPLATES["constructive_disagree"]
             )
             base = template.format(topic=topic)
+
+        # When the topic subsystem is disabled (topic is empty) strip the
+        # "TOPIC: \n" header that all seed templates inject, so no topic
+        # reference leaks into the prompt.
+        if not topic:
+            base = base.removeprefix(_SEED_TOPIC_PREFIX)
 
         # Append mode-specific instruction when a loop is active
         mode_instruction = ""

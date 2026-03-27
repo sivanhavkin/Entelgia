@@ -545,7 +545,7 @@ class DialogueLoopDetector:
 
         if (
             turn_count >= _MIN_TURNS_STAGNATION
-            and current_topic is not None
+            and current_topic  # truthy: skips stagnation when topic subsystem is off ("")
             and self._check_topic_stagnation(recent)
         ):
             modes.append(TOPIC_STAGNATION)
