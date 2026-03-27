@@ -82,15 +82,17 @@ MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION: int = 8
 MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION: int = 3
 
 # Set of modes considered "hard" — blocked until thresholds are reached.
-_HARD_INTERVENTION_MODES: frozenset = frozenset({
-    FixyMode.CONTRADICT,
-    FixyMode.FORCE_CHOICE,
-    FixyMode.FORCE_DIRECT_DISAGREEMENT,
-    FixyMode.FORCE_SHORT_ANSWER,
-    FixyMode.FORCE_COUNTEREXAMPLE,
-    FixyMode.EXPOSE_SYNTHESIS,
-    FixyMode.HARD_CONSTRAINT,
-})
+_HARD_INTERVENTION_MODES: frozenset = frozenset(
+    {
+        FixyMode.CONTRADICT,
+        FixyMode.FORCE_CHOICE,
+        FixyMode.FORCE_DIRECT_DISAGREEMENT,
+        FixyMode.FORCE_SHORT_ANSWER,
+        FixyMode.FORCE_COUNTEREXAMPLE,
+        FixyMode.EXPOSE_SYNTHESIS,
+        FixyMode.HARD_CONSTRAINT,
+    }
+)
 
 
 # Policy: loop failure mode → preferred Fixy mode
@@ -852,12 +854,9 @@ class InteractiveFixy:
                 candidate_mode = _LOOP_REWRITE_MODE_POLICY.get(
                     primary, FixyMode.FORCE_CASE
                 )
-                hard_blocked = (
-                    candidate_mode in _HARD_INTERVENTION_MODES
-                    and (
-                        turn_count < self._min_turns_hard
-                        or self._consecutive_full_pair_count < self._min_pairs_hard
-                    )
+                hard_blocked = candidate_mode in _HARD_INTERVENTION_MODES and (
+                    turn_count < self._min_turns_hard
+                    or self._consecutive_full_pair_count < self._min_pairs_hard
                 )
                 if hard_blocked:
                     logger.info(

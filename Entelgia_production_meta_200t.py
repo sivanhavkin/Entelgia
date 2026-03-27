@@ -21,7 +21,7 @@ Advanced Multi-Agent Dialogue System with:
 - NO AUTO-TIMEOUT (turn-based stop only)
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
-Version Note: Latest release: 4.1.0.
+Version Note: Latest release: 5.0.0.
 (Features in 2.2.0: Pronoun support and 150-word limit features)
 
 Requirements:
@@ -5056,7 +5056,11 @@ class Agent:
 
         # ── Memory Topic Filter ─────────────────────────────────────────────
         # Apply a strict topical relevance filter before injecting memories.
-        if topic_pipeline_enabled(CFG) and CFG.memory_topic_filter_enabled and _current_topic:
+        if (
+            topic_pipeline_enabled(CFG)
+            and CFG.memory_topic_filter_enabled
+            and _current_topic
+        ):
             recent_ltm = self._filter_memories_by_topic(
                 recent_ltm, _current_topic, _current_cluster
             )
@@ -5124,7 +5128,11 @@ class Agent:
         _prev_anchors = (
             TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
         )
-        if topic_pipeline_enabled(CFG) and _prev_anchors and CFG.topic_anchor_include_forbidden_carryover:
+        if (
+            topic_pipeline_enabled(CFG)
+            and _prev_anchors
+            and CFG.topic_anchor_include_forbidden_carryover
+        ):
             forbidden = _prev_anchors[: CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
@@ -5155,7 +5163,11 @@ class Agent:
             )
 
         # ── Cluster Wallpaper Penalty ───────────────────────────────────────
-        if topic_pipeline_enabled(CFG) and CFG.cluster_wallpaper_penalty_enabled and _current_cluster:
+        if (
+            topic_pipeline_enabled(CFG)
+            and CFG.cluster_wallpaper_penalty_enabled
+            and _current_cluster
+        ):
             prompt += self._build_wallpaper_penalty_block(
                 _current_topic, _current_cluster, dialog_tail
             )
@@ -5618,7 +5630,9 @@ class Agent:
         _draft_reanchor_hint = ""  # compact hint passed to Stage 2 REWRITE
         if topic_pipeline_enabled(CFG):
             _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
-            _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
+            _active_topic = (
+                _seed_topic_match.group(1).strip() if _seed_topic_match else ""
+            )
             _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
             _prev_anchors_for_score = (
                 TOPIC_ANCHORS.get(self._last_topic, [])
@@ -5626,7 +5640,12 @@ class Agent:
                 else []
             )
 
-        if topic_pipeline_enabled(CFG) and own_texts and _active_topic and _active_anchors:
+        if (
+            topic_pipeline_enabled(CFG)
+            and own_texts
+            and _active_topic
+            and _active_anchors
+        ):
             # Detect meta-framing opener BEFORE scoring so it doesn't produce
             # a spuriously low score that triggers unnecessary regeneration.
             _draft_meta_framing = detect_meta_framing_opener(out)
@@ -6330,7 +6349,11 @@ class Agent:
             content = str(mem.get("content", "")).strip()
 
             # ── Self-Replication Topic Gate ─────────────────────────────────
-            if topic_pipeline_enabled(CFG) and CFG.self_replication_topic_gate_enabled and topic:
+            if (
+                topic_pipeline_enabled(CFG)
+                and CFG.self_replication_topic_gate_enabled
+                and topic
+            ):
                 score = self._score_repl_topic_relevance(
                     mem, topic, _current_cluster, _topic_anchors
                 )
@@ -6689,7 +6712,7 @@ class AsyncProcessor:
 # ============================================
 
 if FASTAPI_AVAILABLE:
-    app = FastAPI(title="Entelgia API", version="4.1.0")
+    app = FastAPI(title="Entelgia API", version="5.0.0")
 
     class DialogRequest(BaseModel):
         seed_topic: str = "what would you like to talk about?"
@@ -6747,7 +6770,7 @@ if FASTAPI_AVAILABLE:
     @app.get("/api/health")
     async def health_check():
         """Health check endpoint."""
-        return {"status": "ok", "version": "4.1.0"}
+        return {"status": "ok", "version": "5.0.0"}
 
 
 # ============================================
@@ -7461,7 +7484,11 @@ class MainScript:
                 _active_loop_modes = self._loop_detector.detect(
                     self.dialog,
                     self.turn_index,
-                    current_topic=topicman.current() if topic_pipeline_enabled(CFG) and topicman else "",
+                    current_topic=(
+                        topicman.current()
+                        if topic_pipeline_enabled(CFG) and topicman
+                        else ""
+                    ),
                 )
                 if _active_loop_modes:
                     # Select the agent mode that best counters the primary failure
@@ -7533,7 +7560,11 @@ class MainScript:
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
             # ── v2.9.0: Force cluster pivot on topic_stagnation ─────────────
-            if topic_pipeline_enabled(CFG) and topicman and "topic_stagnation" in _active_loop_modes:
+            if (
+                topic_pipeline_enabled(CFG)
+                and topicman
+                and "topic_stagnation" in _active_loop_modes
+            ):
                 new_topic = topicman.force_cluster_pivot()
                 logger.info(
                     "loop_guard: topic_stagnation → cluster pivot → %r", new_topic
@@ -7563,7 +7594,9 @@ class MainScript:
                         + "\n"
                     )
 
-            topic_label = topicman.current() if topic_pipeline_enabled(CFG) and topicman else ""
+            topic_label = (
+                topicman.current() if topic_pipeline_enabled(CFG) and topicman else ""
+            )
             if topic_pipeline_enabled(CFG):
                 logger.debug(
                     "MainScript.run: turn=%d selected active topic=%r",
@@ -7584,9 +7617,7 @@ class MainScript:
                 # Legacy or Fixy seed
                 _base_seed = "DISAGREE constructively; add one new angle."
                 seed = (
-                    f"TOPIC: {topic_label}\n{_base_seed}"
-                    if topic_label
-                    else _base_seed
+                    f"TOPIC: {topic_label}\n{_base_seed}" if topic_label else _base_seed
                 )
 
             # ── v2.9.0: Prepend rewrite block when loop is active ─────────
@@ -7936,7 +7967,9 @@ class MainScript:
                         "Stop signal received from agent (consecutive_full_pair=%d)",
                         _full_pair_count,
                     )
-                    print(Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL)
+                    print(
+                        Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL
+                    )
                     break
                 else:
                     logger.info(
