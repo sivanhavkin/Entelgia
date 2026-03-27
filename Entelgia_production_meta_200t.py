@@ -2035,6 +2035,11 @@ class Config:
     # and compliance scoring.  When False, agents speak freely with no topic
     # constraints and all topic-enforcement logic is bypassed.
     topics_enabled: bool = False
+    # ── TopicManager Switch ───────────────────────────────────────────────
+    # When False, the TopicManager is not instantiated even if topics_enabled
+    # is True.  Useful when topic anchors/enforcement are desired but automatic
+    # rotation is not (the session stays on the seed topic indefinitely).
+    topic_manager_enabled: bool = False
     # ── Topic Anchor (pre-generation) ──────────────────────────────────────
     topic_anchor_enabled: bool = False
     topic_anchor_include_forbidden_carryover: bool = False
@@ -2052,6 +2057,11 @@ class Config:
     fixy_role_aware_compliance: bool = False
     fixy_must_name_topic_or_core_concept: bool = False
     fixy_new_domain_penalty: float = 0.20
+    # ── Fixy Interventions Switch ──────────────────────────────────────────
+    # When False, Fixy's need-based interventions are disabled while Fixy may
+    # still participate as a scheduled dialogue speaker (enable_observer still
+    # controls whether Fixy turns appear at all).
+    fixy_interventions_enabled: bool = False
     # ── Web Trigger Multi-Signal ───────────────────────────────────────────
     web_trigger_require_multi_signal: bool = True
     web_trigger_min_concepts: int = 2
@@ -7334,7 +7344,7 @@ class MainScript:
         first_topic = self.cfg.seed_topic
         logger.debug("MainScript.run: configured first topic=%r", first_topic)
         topicman: Optional[TopicManager]
-        if CFG.topics_enabled:
+        if CFG.topics_enabled and CFG.topic_manager_enabled:
             _seed_cluster, _topic_style_str = get_style_for_topic(
                 first_topic, TOPIC_CLUSTERS
             )
@@ -7377,9 +7387,15 @@ class MainScript:
             topicman = TopicManager(topic_list, rotate_every_rounds=1, shuffle=False)
         else:
             topicman = None
-            logger.debug(
-                "MainScript.run: topics_enabled=False — topic subsystem fully bypassed"
-            )
+            if not CFG.topics_enabled:
+                logger.debug(
+                    "MainScript.run: topics_enabled=False — topic subsystem fully bypassed"
+                )
+            else:
+                logger.debug(
+                    "MainScript.run: topic_manager_enabled=False — TopicManager disabled"
+                    " (topic enforcement active, rotation skipped)"
+                )
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
 
@@ -7684,9 +7700,11 @@ class MainScript:
             self.print_meta_state(speaker, _meta_actions)
 
             # Interactive Fixy (need-based) or legacy scheduled Fixy
-            # Skipped entirely when enable_observer is False
+            # Skipped entirely when enable_observer is False or
+            # fixy_interventions_enabled is False
             if (
                 self.cfg.enable_observer
+                and self.cfg.fixy_interventions_enabled
                 and self.interactive_fixy
                 and speaker.name != "Fixy"
             ):
@@ -7697,6 +7715,17 @@ class MainScript:
                 if should_intervene:
                     # v2.9.0: Fixy selects disruption mode based on detected loop type
                     fixy_mode = self.interactive_fixy.get_fixy_mode(reason)
+                    # When topics are disabled, FORCE_TOPIC_RETURN is meaningless;
+                    # substitute FORCE_CHOICE so Fixy still advances the dialogue.
+                    if (
+                        not CFG.topics_enabled
+                        and fixy_mode == FixyMode.FORCE_TOPIC_RETURN
+                    ):
+                        logger.debug(
+                            "[FIXY-MODE] topics_enabled=False:"
+                            " FORCE_TOPIC_RETURN → FORCE_CHOICE"
+                        )
+                        fixy_mode = FixyMode.FORCE_CHOICE
                     intervention = self.interactive_fixy.generate_intervention(
                         self.dialog, reason, mode=fixy_mode, current_topic=topic_label
                     )

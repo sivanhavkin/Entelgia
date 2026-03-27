@@ -965,3 +965,56 @@ class TestTopicManagerGating:
         assert "human-AI" in anchors, (
             "'human-AI' must be in Human-AI cooperation anchors for direct topic-name matching"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestTopicManagerEnabledSwitch — topic_manager_enabled Config flag
+# ---------------------------------------------------------------------------
+
+
+class TestTopicManagerEnabledSwitch:
+    """topic_manager_enabled flag defaults and TopicManager gating."""
+
+    def test_topic_manager_enabled_defaults_to_false(self):
+        """Config.topic_manager_enabled must default to False."""
+        cfg = Config()
+        assert cfg.topic_manager_enabled is False
+
+    def test_topic_manager_enabled_can_be_set_to_true(self):
+        """Config(topic_manager_enabled=True) must not raise."""
+        cfg = Config(topic_manager_enabled=True)
+        assert cfg.topic_manager_enabled is True
+
+    def test_topic_manager_not_created_when_manager_disabled(self):
+        """When topic_manager_enabled=False, TopicManager must not be instantiated
+        even if topics_enabled=True."""
+        topics = ["Free will and determinism", "Consciousness and matter"]
+        cfg = Config(topics_enabled=True, topic_manager_enabled=False)
+        topicman = None
+        if cfg.topics_enabled and cfg.topic_manager_enabled:
+            topicman = TopicManager(topics[:], rotate_every_rounds=1)
+
+        assert topicman is None
+
+    def test_topic_manager_created_when_both_flags_true(self):
+        """When topics_enabled=True AND topic_manager_enabled=True, TopicManager
+        must be instantiated."""
+        topics = ["Free will and determinism", "Consciousness and matter"]
+        cfg = Config(topics_enabled=True, topic_manager_enabled=True)
+        topicman = None
+        if cfg.topics_enabled and cfg.topic_manager_enabled:
+            topicman = TopicManager(topics[:], rotate_every_rounds=1)
+
+        assert topicman is not None
+        assert isinstance(topicman, TopicManager)
+
+    def test_topic_manager_not_created_when_topics_disabled_regardless_of_manager_flag(self):
+        """When topics_enabled=False, TopicManager must not be created
+        even if topic_manager_enabled=True."""
+        topics = ["Free will and determinism"]
+        cfg = Config(topics_enabled=False, topic_manager_enabled=True)
+        topicman = None
+        if cfg.topics_enabled and cfg.topic_manager_enabled:
+            topicman = TopicManager(topics[:], rotate_every_rounds=1)
+
+        assert topicman is None
