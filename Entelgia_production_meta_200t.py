@@ -5854,7 +5854,7 @@ class Agent:
         _prev_topic_for_circ = self._last_topic
 
         # Update last-topic tracker so the next turn can inject forbidden carryover
-        if _active_topic:
+        if CFG.topics_enabled and _active_topic:
             self._last_topic = _active_topic
 
         # ── Post-generation revision layer ────────────────────────────────────────
