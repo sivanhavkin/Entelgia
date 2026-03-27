@@ -1286,10 +1286,12 @@ TOPIC_ANCHORS: dict[str, list[str]] = {
         "decision-making",
     ],
     "Human-AI cooperation": [
+        "cooperation",
         "collaboration",
         "complementarity",
         "human oversight",
         "shared agency",
+        "human-AI",
         "automation",
         "augmentation",
         "interface",
@@ -5577,16 +5579,23 @@ class Agent:
         #   The OPENING sentences must be anchored to the SESSION topic.
         #   Agent-local memory continuity may shape reasoning *after* the opening
         #   but must not override the session topic in the first sentences.
-        _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
-        _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
-        _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
-        _prev_anchors_for_score = (
-            TOPIC_ANCHORS.get(self._last_topic, [])
-            if self._last_topic and self._last_topic != _active_topic
-            else []
-        )
+        # Topic variables are only populated when topics_enabled=True so that
+        # all downstream compliance checks and logging are fully suppressed
+        # when the topic subsystem is disabled (the default).
+        _active_topic = ""
+        _active_anchors: List[str] = []
+        _prev_anchors_for_score: List[str] = []
         _skip_draft_transform = False  # set True when fallback template is injected
         _draft_reanchor_hint = ""  # compact hint passed to Stage 2 REWRITE
+        if CFG.topics_enabled:
+            _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
+            _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
+            _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
+            _prev_anchors_for_score = (
+                TOPIC_ANCHORS.get(self._last_topic, [])
+                if self._last_topic and self._last_topic != _active_topic
+                else []
+            )
 
         if CFG.topics_enabled and own_texts and _active_topic and _active_anchors:
             # Detect meta-framing opener BEFORE scoring so it doesn't produce

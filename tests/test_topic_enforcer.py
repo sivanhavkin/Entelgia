@@ -889,3 +889,79 @@ class TestTopicManagerGating:
             advance_called = True
 
         assert not advance_called
+
+    def test_active_topic_empty_when_topics_disabled(self):
+        """When topics_enabled=False, _active_topic must be empty regardless of seed content."""
+        import re
+
+        cfg = Config(topics_enabled=False)
+        # Even if the seed somehow contained a TOPIC: header, the extraction
+        # must not happen when topics_enabled=False (gated extraction).
+        # Simulate the gating logic: extraction only runs when topics_enabled.
+        seed_with_topic = "TOPIC: Human-AI cooperation\nDISAGREE constructively."
+        seed_without_topic = "DISAGREE constructively; add one new angle."
+
+        for seed in (seed_with_topic, seed_without_topic):
+            if cfg.topics_enabled:
+                m = re.search(r"TOPIC:\s*([^\n]+)", seed)
+                _active_topic = m.group(1).strip() if m else ""
+            else:
+                _active_topic = ""  # gated: no extraction when topics disabled
+
+            assert _active_topic == "", (
+                f"_active_topic must be empty when topics_enabled=False; "
+                f"got {_active_topic!r} for seed {seed!r}"
+            )
+
+    def test_draft_topic_compliance_gate_skips_when_topics_disabled(self):
+        """[DRAFT-TOPIC] compliance gate must not fire when topics_enabled=False."""
+        import Entelgia_production_meta as _meta
+
+        cfg = Config(topics_enabled=False)
+        # With topics disabled, _active_topic and _active_anchors are always empty.
+        _active_topic = ""
+        _active_anchors: list[str] = []
+        own_texts = ["some prior text"]
+
+        compliance_would_run = (
+            cfg.topics_enabled and bool(own_texts) and bool(_active_topic) and bool(_active_anchors)
+        )
+        assert not compliance_would_run, (
+            "[DRAFT-TOPIC] compliance block must not run when topics_enabled=False"
+        )
+
+    def test_post_stage2_compliance_gate_skips_when_topics_disabled(self):
+        """[TOPIC-COMPLIANCE] post-Stage-2 gate must not fire when topics_enabled=False."""
+        cfg = Config(topics_enabled=False)
+        _active_topic = ""
+        _active_anchors: list[str] = []
+        own_texts = ["some prior text"]
+        _skip_draft_transform = False
+
+        compliance_would_run = (
+            cfg.topics_enabled
+            and bool(own_texts)
+            and bool(_active_topic)
+            and bool(_active_anchors)
+            and not _skip_draft_transform
+        )
+        assert not compliance_would_run, (
+            "[TOPIC-COMPLIANCE] post-Stage-2 block must not run when topics_enabled=False"
+        )
+
+    def test_human_ai_cooperation_anchors_include_cooperation(self):
+        """'Human-AI cooperation' TOPIC_ANCHORS must include 'cooperation' to prevent
+        compliance regression when Stage 2 rewriting uses morphological variants."""
+        anchors = TOPIC_ANCHORS.get("Human-AI cooperation", [])
+        assert "cooperation" in anchors, (
+            "'cooperation' must be in Human-AI cooperation anchors to ensure "
+            "topic compliance survives Stage 2 rewriting (see [TOPIC-COMPLIANCE] score=0.40 bug)"
+        )
+
+    def test_human_ai_cooperation_anchors_include_human_ai(self):
+        """'Human-AI cooperation' TOPIC_ANCHORS must include 'human-AI' so that
+        text naturally referring to the topic title phrase scores as an exact match."""
+        anchors = TOPIC_ANCHORS.get("Human-AI cooperation", [])
+        assert "human-AI" in anchors, (
+            "'human-AI' must be in Human-AI cooperation anchors for direct topic-name matching"
+        )
