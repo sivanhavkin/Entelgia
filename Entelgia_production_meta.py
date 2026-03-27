@@ -5825,7 +5825,8 @@ class Agent:
 
         # Register scrubber: remove rhetorical openers that violate the active
         # cluster's tone policy (no-op for philosophy cluster).
-        out = scrub_rhetorical_openers(out, self.topic_cluster)
+        if CFG.topics_enabled:
+            out = scrub_rhetorical_openers(out, self.topic_cluster)
 
         # Safety net: strip "I am {name}" identity schema leak if LLM started with it
         out_stripped = out.lstrip()
@@ -7353,46 +7354,54 @@ class MainScript:
         # active topic always matches the opening seed text.
         first_topic = self.cfg.seed_topic
         logger.debug("MainScript.run: configured first topic=%r", first_topic)
-        _seed_cluster, _topic_style_str = get_style_for_topic(
-            first_topic, TOPIC_CLUSTERS
-        )
-        for _agent, _agent_name in [
-            (self.socrates, "Socrates"),
-            (self.athena, "Athena"),
-            (self.fixy_agent, "Fixy"),
-        ]:
-            _agent.topic_style = build_style_instruction(
-                _topic_style_str, _agent_name, _seed_cluster
+        if CFG.topics_enabled:
+            _seed_cluster, _topic_style_str = get_style_for_topic(
+                first_topic, TOPIC_CLUSTERS
             )
-            _agent.topic_cluster = _seed_cluster
-        logger.info(
-            'Seed topic selected: "%s" (cluster: %s)',
-            first_topic,
-            _seed_cluster,
-        )
-        logger.info(
-            "Topic style refreshed: %s (%s) for topic '%s'",
-            _topic_style_str,
-            _seed_cluster,
-            first_topic,
-        )
-        # Build the full topic pool from all TOPIC_CLUSTERS topics (deduped, order-preserving).
-        # Previously this used only the 9-entry TOPIC_CYCLE, which prevented the system from
-        # ever discussing the broader set of 56 defined topics.
-        _seen_topics: set[str] = set()
-        _all_topics: list[str] = []
-        for _cluster_topics in TOPIC_CLUSTERS.values():
-            for _t in _cluster_topics:
-                if _t not in _seen_topics:
-                    _seen_topics.add(_t)
-                    _all_topics.append(_t)
+            for _agent, _agent_name in [
+                (self.socrates, "Socrates"),
+                (self.athena, "Athena"),
+                (self.fixy_agent, "Fixy"),
+            ]:
+                _agent.topic_style = build_style_instruction(
+                    _topic_style_str, _agent_name, _seed_cluster
+                )
+                _agent.topic_cluster = _seed_cluster
+            logger.info(
+                'Seed topic selected: "%s" (cluster: %s)',
+                first_topic,
+                _seed_cluster,
+            )
+            logger.info(
+                "Topic style refreshed: %s (%s) for topic '%s'",
+                _topic_style_str,
+                _seed_cluster,
+                first_topic,
+            )
+            # Build the full topic pool from all TOPIC_CLUSTERS topics (deduped, order-preserving).
+            # Previously this used only the 9-entry TOPIC_CYCLE, which prevented the system from
+            # ever discussing the broader set of 56 defined topics.
+            _seen_topics: set[str] = set()
+            _all_topics: list[str] = []
+            for _cluster_topics in TOPIC_CLUSTERS.values():
+                for _t in _cluster_topics:
+                    if _t not in _seen_topics:
+                        _seen_topics.add(_t)
+                        _all_topics.append(_t)
 
-        if first_topic in _all_topics:
-            idx = _all_topics.index(first_topic)
-            topic_list = _all_topics[idx:] + _all_topics[:idx]
+            if first_topic in _all_topics:
+                idx = _all_topics.index(first_topic)
+                topic_list = _all_topics[idx:] + _all_topics[:idx]
+            else:
+                topic_list = [first_topic] + _all_topics
+            topicman: Optional[TopicManager] = TopicManager(
+                topic_list, rotate_every_rounds=1, shuffle=False
+            )
         else:
-            topic_list = [first_topic] + _all_topics
-        topicman = TopicManager(topic_list, rotate_every_rounds=1, shuffle=False)
+            topicman = None
+            logger.debug(
+                "MainScript.run: topics_enabled=False — topic subsystem fully bypassed"
+            )
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
 
@@ -7435,7 +7444,7 @@ class MainScript:
                 _active_loop_modes = self._loop_detector.detect(
                     self.dialog,
                     self.turn_index,
-                    current_topic=topicman.current(),
+                    current_topic=topicman.current() if CFG.topics_enabled and topicman else "",
                 )
                 if _active_loop_modes:
                     # Select the agent mode that best counters the primary failure
@@ -7507,7 +7516,7 @@ class MainScript:
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
             # ── v2.9.0: Force cluster pivot on topic_stagnation ─────────────
-            if "topic_stagnation" in _active_loop_modes:
+            if CFG.topics_enabled and topicman and "topic_stagnation" in _active_loop_modes:
                 new_topic = topicman.force_cluster_pivot()
                 logger.info(
                     "loop_guard: topic_stagnation → cluster pivot → %r", new_topic
@@ -7537,7 +7546,7 @@ class MainScript:
                         + "\n"
                     )
 
-            topic_label = topicman.current()
+            topic_label = topicman.current() if CFG.topics_enabled and topicman else ""
             logger.debug(
                 "MainScript.run: turn=%d selected active topic=%r",
                 self.turn_index,
@@ -7902,7 +7911,7 @@ class MainScript:
                         _full_pair_count,
                     )
 
-            if self.turn_index % 5 == 0:
+            if CFG.topics_enabled and topicman and self.turn_index % 5 == 0:
                 # ── Topic-lock guard ─────────────────────────────────────────
                 # Do not allow a topic shift while the dialogue is in an
                 # unresolved high-conflict window or while a force_choice
