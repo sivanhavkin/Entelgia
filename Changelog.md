@@ -23,11 +23,13 @@ All notable changes to this project will be documented in this file. The format 
 ### Fixed
 
 - **`anthropic_api_key` now masked in startup config display** — `_SENSITIVE_KEYS` in `run_cli()` extended to include `"anthropic_api_key"`, preventing the Anthropic API key from being printed in plain text in the startup JSON configuration block. Previously only `grok_api_key`, `openai_api_key`, and `memory_secret_key` were redacted; `anthropic_api_key` was inadvertently exposed. Fix applied to both `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`.
+- **TopicManager fully disabled when `topics_enabled=False`** — corrected `docs/CONFIGURATION.md` which incorrectly stated that `TopicManager.advance_with_proposals` "continues to run for session bookkeeping" when `topics_enabled=False`. In reality, `topicman` is set to `None` and the `TopicManager` is never instantiated when `topics_enabled=False`. All topic rotation, proposal, and selection logic is completely skipped. The documentation now accurately reflects this behaviour and lists the `TopicManager` in the "fully bypassed" subsystems.
 
 ### Tests
 
 - **`tests/test_llm_openai_backend.py`** — new suite with **10 tests** covering `LLM.generate()` with the OpenAI backend: normal response extraction from `choices[0].message.content`, whitespace stripping, `None` content (tool-call response), empty `choices` list, missing `choices` key, missing `message` key, empty content string, correct Chat Completions endpoint URL, `messages` request body format, and `Authorization: Bearer` header using `openai_api_key`.
-- **Total test count**: **1274 tests** (1274 collected) across **33 suites**.
+- **`tests/test_topic_enforcer.py`** — added **5 new tests** in `TestTopicManagerGating` verifying that: `Config.topics_enabled` defaults to `False`; `TopicManager` is never instantiated when `topics_enabled=False`; `TopicManager` is instantiated when `topics_enabled=True`; `topic_label` is empty string when topics are disabled; `advance_with_proposals` is never called when `topics_enabled=False`.
+- **Total test count**: **1279 tests** (1279 collected) across **33 suites**.
 
 ---
 
