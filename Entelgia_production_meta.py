@@ -5308,8 +5308,8 @@ class Agent:
         )
 
         # ── Topic Anchors: inject topic constraint before generation ──────────
-        _topic_anchors_enh = TOPIC_ANCHORS.get(topic, [])
-        if topic and _topic_anchors_enh:
+        _topic_anchors_enh = TOPIC_ANCHORS.get(topic, []) if CFG.topics_enabled else []
+        if CFG.topics_enabled and topic and _topic_anchors_enh:
             topic_constraint = (
                 f"\n\nTopic constraint:\n"
                 f"The active topic is: {topic}.\n"
@@ -5892,7 +5892,7 @@ class Agent:
         _prev_topic_for_circ = self._last_topic
 
         # Update last-topic tracker so the next turn can inject forbidden carryover
-        if _active_topic:
+        if CFG.topics_enabled and _active_topic:
             self._last_topic = _active_topic
 
         # ── Post-generation revision layer ────────────────────────────────────────
