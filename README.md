@@ -514,6 +514,7 @@ pytest tests/ -v
 | Version | Status | Notes |
 |---------|--------|-------|
 | **v5.0.0** | ✅ **Latest** | current |
+| **v4.1.0** | ✅ **Stable** | previous stable release |
 | **v4.0.0** | ✅ **Stable** | previous stable release |
 | **v3.0.0** | ⚠️ Superseded | Use v5.0.0 instead |
 | **v2.8.1** | ⚠️ Superseded | Use v5.0.0 instead |

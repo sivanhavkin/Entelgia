@@ -1090,7 +1090,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 ## 📊 Quick Reference
 
 - ✅ **Latest stable:** v5.0.0
-- 🔒 **Previous stable:** v4.0.0
+- 🔒 **Previous stable:** v4.1.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -1102,6 +1102,7 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
 | **v5.0.0** | 2026-03-27 | Major | ✅ **Current** | Topics master switch, Fixy staged intervention ladder, perspective-driven prompts, topic pipeline predicate |
+| **v4.1.0** | 2026-03-26 | Minor | ✅ **Stable** | OpenAI and Anthropic LLM backends, extended interactive startup selector |
 | **v4.0.0** | 2026-03-20 | Major | ✅ **Stable** | Version bump to 4.0.0; two-stage DRAFT→FINAL pipeline, proposal-aware topic selection, query rewriting improvements |
 | **v3.0.0** | 2026-03-12 | Minor | ⚠️ Superseded | Topic-aware style selection, forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |
 | **v2.8.1** | 2026-03-07 | Patch | ✅ **Stable** | Version bump across all documentation |
