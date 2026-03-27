@@ -165,8 +165,8 @@ class SeedGenerator:
         # When the topic subsystem is disabled (topic is empty) strip the
         # "TOPIC: \n" header that all seed templates inject, so no topic
         # reference leaks into the prompt.
-        if not topic and base.startswith(_SEED_TOPIC_PREFIX):
-            base = base[len(_SEED_TOPIC_PREFIX):]
+        if not topic:
+            base = base.removeprefix(_SEED_TOPIC_PREFIX)
 
         # Append mode-specific instruction when a loop is active
         mode_instruction = ""
