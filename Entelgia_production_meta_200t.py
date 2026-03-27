@@ -2063,6 +2063,11 @@ class Config:
     # still participate as a scheduled dialogue speaker (enable_observer still
     # controls whether Fixy turns appear at all).
     fixy_interventions_enabled: bool = False
+    # ── Fixy Hard Intervention Thresholds ─────────────────────────────────
+    # Fixy will NOT use hard intervention modes (forcing choice, declaring
+    # deadlock, requiring attack/commitment) until both thresholds are met.
+    min_turns_before_fixy_hard_intervention: int = 8
+    min_full_pairs_before_fixy_hard_intervention: int = 3
     # ── Web Trigger Multi-Signal ───────────────────────────────────────────
     web_trigger_require_multi_signal: bool = True
     web_trigger_min_concepts: int = 2
@@ -7071,7 +7076,13 @@ class MainScript:
             # Pass topics_enabled so Fixy can suppress topic-shift pair-window
             # resets and topic-anchored prompts in topics-disabled sessions.
             self.interactive_fixy = (
-                InteractiveFixy(self.llm, cfg.model_fixy, topics_enabled=topic_pipeline_enabled(cfg))
+                InteractiveFixy(
+                    self.llm,
+                    cfg.model_fixy,
+                    topics_enabled=topic_pipeline_enabled(cfg),
+                    min_turns_hard=cfg.min_turns_before_fixy_hard_intervention,
+                    min_pairs_hard=cfg.min_full_pairs_before_fixy_hard_intervention,
+                )
                 if cfg.enable_observer
                 else None
             )
