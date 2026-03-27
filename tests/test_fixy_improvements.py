@@ -1004,6 +1004,62 @@ class TestPairGatingWindowScope:
             "accepted" in m and "full pair" in m for m in caplog.messages
         ), "[FIXY-GATE] Expected '[FIXY-GATE] accepted: full pair observed' in logs"
 
+    def test_consecutive_full_pair_count_increments(self):
+        """_consecutive_full_pair_count must increment on each gate-passing call."""
+        fixy = self._make_fixy()
+        dialog = [
+            {"role": "Socrates", "text": "What is truth?"},
+            {"role": "Athena", "text": "Truth is correspondence."},
+        ]
+        assert fixy.consecutive_full_pair_count == 0
+        fixy.should_intervene(dialog, turn_count=2)
+        assert fixy.consecutive_full_pair_count == 1
+        fixy.should_intervene(dialog, turn_count=3)
+        assert fixy.consecutive_full_pair_count == 2
+        fixy.should_intervene(dialog, turn_count=4)
+        assert fixy.consecutive_full_pair_count == 3
+
+    def test_consecutive_full_pair_count_resets_on_pair_gate_failure(self):
+        """Counter must reset to 0 when the pair gate fails."""
+        fixy = self._make_fixy()
+        # First pass the gate twice
+        dialog = [
+            {"role": "Socrates", "text": "What is truth?"},
+            {"role": "Athena", "text": "Truth is correspondence."},
+        ]
+        fixy.should_intervene(dialog, turn_count=2)
+        fixy.should_intervene(dialog, turn_count=3)
+        assert fixy.consecutive_full_pair_count == 2
+
+        # Simulate a pair-window reset so only one agent is in the window
+        fixy.notify_pair_reset(len(dialog), "topic_shift")
+        dialog.append({"role": "Socrates", "text": "New topic: consciousness."})
+        fixy.should_intervene(dialog, turn_count=4)
+        assert fixy.consecutive_full_pair_count == 0, (
+            "Counter must reset to 0 when pair gate fails"
+        )
+
+    def test_consecutive_full_pair_count_resets_on_context_gate_failure(self):
+        """Counter must reset to 0 when a gate fails on the same instance."""
+        fixy = self._make_fixy()
+        # First pass the gate to get counter to 1
+        dialog = [
+            {"role": "Socrates", "text": "A"},
+            {"role": "Athena", "text": "B"},
+        ]
+        fixy.should_intervene(dialog, turn_count=2)
+        assert fixy.consecutive_full_pair_count == 1
+
+        # Simulate a pair-window reset so the next call fails the pair gate.
+        # After notify_pair_reset, only Socrates is in the new window, so the
+        # pair-presence gate fails and the counter must reset to 0.
+        fixy.notify_pair_reset(len(dialog), "topic_shift")
+        dialog.append({"role": "Socrates", "text": "New topic."})
+        fixy.should_intervene(dialog, turn_count=3)
+        assert fixy.consecutive_full_pair_count == 0, (
+            "Counter must reset to 0 when the gate fails (same instance)"
+        )
+
 
 if __name__ == "__main__":
     import pytest as _pytest
