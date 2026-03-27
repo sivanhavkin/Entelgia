@@ -622,7 +622,7 @@ class DialogueLoopDetector:
         # Weak conflict: lots of conflict language but also lots of hedging synthesis
         conflict_ratio = conflict_turns / len(turns)
         synth_ratio = synthesis_turns / len(turns)
-        return conflict_ratio >= self.conflict_ratio and synth_ratio >= 0.25
+        return conflict_ratio >= self.conflict_ratio and synth_ratio >= 0.40
 
     def _check_premature_synthesis(self, turns: List[Dict[str, str]]) -> bool:
         """Detect convergence into generic 'both are needed' language (premature_synthesis)."""

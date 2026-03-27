@@ -2029,29 +2029,29 @@ class Config:
     # constraints and all topic-enforcement logic is bypassed.
     topics_enabled: bool = False
     # ── Topic Anchor (pre-generation) ──────────────────────────────────────
-    topic_anchor_enabled: bool = True
-    topic_anchor_include_forbidden_carryover: bool = True
+    topic_anchor_enabled: bool = False
+    topic_anchor_include_forbidden_carryover: bool = False
     topic_anchor_max_forbidden_items: int = 5
     # ── Memory Topic Filter ────────────────────────────────────────────────
-    memory_topic_filter_enabled: bool = True
+    memory_topic_filter_enabled: bool = False
     memory_topic_min_score: float = 0.45
-    memory_require_same_cluster: bool = True
+    memory_require_same_cluster: bool = False
     memory_contamination_penalty: float = 0.25
     # ── Self-Replication Topic Gate ────────────────────────────────────────
-    self_replication_topic_gate_enabled: bool = True
+    self_replication_topic_gate_enabled: bool = False
     self_replication_topic_min_score: float = 0.50
-    self_replication_require_same_cluster: bool = True
+    self_replication_require_same_cluster: bool = False
     # ── Fixy Role-Aware Compliance ─────────────────────────────────────────
-    fixy_role_aware_compliance: bool = True
-    fixy_must_name_topic_or_core_concept: bool = True
+    fixy_role_aware_compliance: bool = False
+    fixy_must_name_topic_or_core_concept: bool = False
     fixy_new_domain_penalty: float = 0.20
     # ── Web Trigger Multi-Signal ───────────────────────────────────────────
     web_trigger_require_multi_signal: bool = True
     web_trigger_min_concepts: int = 2
     web_trigger_require_uncertainty_or_evidence: bool = True
     # ── Cluster Wallpaper Penalty ──────────────────────────────────────────
-    topic_specific_lexicon_bias_enabled: bool = True
-    cluster_wallpaper_penalty_enabled: bool = True
+    topic_specific_lexicon_bias_enabled: bool = False
+    cluster_wallpaper_penalty_enabled: bool = False
     cluster_wallpaper_repeat_window: int = 6
     # ── Observability / Debug Flags ────────────────────────────────────────
     show_topic_anchor_debug: bool = False
@@ -4747,8 +4747,8 @@ class Agent:
         if not memories:
             return memories
 
-        # Honour global disable flag — pass all memories through unchanged
-        if not CFG.memory_topic_filter_enabled:
+        # Honour global disable flags — pass all memories through unchanged
+        if not CFG.topics_enabled or not CFG.memory_topic_filter_enabled:
             return memories
 
         # Build recent dialogue term set for overlap scoring
@@ -5052,7 +5052,7 @@ class Agent:
 
         # ── Memory Topic Filter ─────────────────────────────────────────────
         # Apply a strict topical relevance filter before injecting memories.
-        if CFG.memory_topic_filter_enabled and _current_topic:
+        if CFG.topics_enabled and CFG.memory_topic_filter_enabled and _current_topic:
             recent_ltm = self._filter_memories_by_topic(
                 recent_ltm, _current_topic, _current_cluster
             )
@@ -6337,7 +6337,7 @@ class Agent:
             content = str(mem.get("content", "")).strip()
 
             # ── Self-Replication Topic Gate ─────────────────────────────────
-            if CFG.self_replication_topic_gate_enabled and topic:
+            if CFG.topics_enabled and CFG.self_replication_topic_gate_enabled and topic:
                 score = self._score_repl_topic_relevance(
                     mem, topic, _current_cluster, _topic_anchors
                 )
@@ -6418,7 +6418,7 @@ class Agent:
             _promoted_this_cycle.append(content)
             promoted_count += 1
 
-        if CFG.self_replication_topic_gate_enabled:
+        if CFG.topics_enabled and CFG.self_replication_topic_gate_enabled:
             logger.info(
                 "[SELF-REPL-TOPIC-GATE] agent=%s kept=%d rejected=%d promoted=%d",
                 self.name,
