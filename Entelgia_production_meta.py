@@ -618,9 +618,9 @@ LLM_BEHAVIORAL_CONTRACT_ATHENA = (
 
 LLM_BEHAVIORAL_CONTRACT_FIXY = (
     "FIXY ROLE GOAL: Diagnose the conversation failure mode.\n"
-    "Diagnostic labels — preferred: 'Deadlock:', 'Missing variable:', 'Next move:'; "
+    "Diagnostic labels — preferred: 'Missing variable:', 'Next move:'; "
     "accepted: 'Problem:', 'Missing:', 'Suggestion:'.\n"
-    "Allowed forms (vary each turn): structural diagnosis | deadlock naming | missing-variable identification | concrete redirect.\n"
+    "Allowed forms (vary each turn): structural diagnosis | missing-variable identification | concrete redirect.\n"
     "Not required: mediation phrasing every turn | 'Shift focus to' framing.\n"
     "- Diagnose conversation STRUCTURE only — not the topic itself.\n"
     "- Do NOT philosophize, lecture, or recycle dialogue content into a summary.\n"
@@ -2689,7 +2689,7 @@ _FINAL_STAGE_PERSONA_NOTES: Dict[str, str] = {
     ),
     "Fixy": (
         "You are Fixy. Prefer diagnostic output over explanation. Max 2–3 sentences. "
-        "Use structures like 'Deadlock:', 'Missing variable:', or 'Next move:'. "
+        "Use structures like 'Missing variable:' or 'Next move:'. "
         "Do NOT summarize the discussion."
     ),
 }
@@ -2775,7 +2775,7 @@ def transform_draft_to_final(
             elif locked_form in ("directive", "mediation_openers"):
                 form_instruction = (
                     "FORM PREFERENCE: The draft uses a mediation directive. "
-                    "Prefer a structural diagnosis or deadlock-naming if possible.\n"
+                    "Prefer a structural diagnosis if possible.\n"
                 )
             elif locked_form == "challenge":
                 form_instruction = (
@@ -3119,7 +3119,7 @@ _VARIATION_MODE_INSTRUCTIONS: Dict[str, Dict[str, str]] = {
     "Fixy": {
         "mediator": "Identify exactly what is blocking resolution and name it precisely.",
         "debugger": "Debug the conversation: locate where the argument went wrong.",
-        "deadlock-breaker": "Name the deadlock: what neither side will concede.",
+        "deadlock-breaker": "Name what neither side will concede.",
         "reframer": "Reframe the question: what should they actually be arguing about?",
         "structural observer": "Observe from outside: what structural pattern is playing out?",
     },
@@ -5433,7 +5433,7 @@ class Agent:
             elif _locked_form == "directive":
                 _form_ban = (
                     "FORM PREFERENCE: You have used mediation directives two turns in a row. "
-                    "Consider diagnosing structurally or naming the deadlock instead."
+                    "Consider diagnosing structurally instead."
                 )
             elif _locked_form == "challenge":
                 _form_ban = (
