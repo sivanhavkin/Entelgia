@@ -513,11 +513,12 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v4.1.0** | ✅ **Latest** | current |
+| **v5.0.0** | ✅ **Latest** | current |
+| **v4.1.0** | ✅ **Stable** | previous stable release |
 | **v4.0.0** | ✅ **Stable** | previous stable release |
-| **v3.0.0** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.8.1** | ⚠️ Superseded | Use v4.1.0 instead |
-| **v2.8.0** | ⚠️ Superseded | Use v4.1.0 instead |
+| **v3.0.0** | ⚠️ Superseded | Use v5.0.0 instead |
+| **v2.8.1** | ⚠️ Superseded | Use v5.0.0 instead |
+| **v2.8.0** | ⚠️ Superseded | Use v5.0.0 instead |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version. For the full version history, see [Changelog.md](Changelog.md).
 
@@ -601,6 +602,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 4.1.0 
+* **Version:** 5.0.0 
 * **Last Updated:** 26 March 2026
 ---
