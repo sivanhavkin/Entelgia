@@ -512,6 +512,11 @@ class InteractiveFixy:
         self._pair_window_start: int = 0
         # Human-readable label of the most recent reset trigger (for logging).
         self._pair_reset_reason: str = ""
+        # Counter: how many consecutive times the pair gate AND minimum-context
+        # check both passed (i.e. "full pair observed" was reached).  Resets to
+        # zero whenever either gate fails.  Used to gate the agent stop signal —
+        # the stop signal is honoured only after 3 consecutive full-pair turns.
+        self._consecutive_full_pair_count: int = 0
 
         # Lazy import to avoid circular dependency (loop_guard → no imports from fixy)
         try:
@@ -555,6 +560,18 @@ class InteractiveFixy:
             reason or "external",
             dialog_length,
         )
+
+    @property
+    def consecutive_full_pair_count(self) -> int:
+        """Number of consecutive turns where both pair and context gates passed.
+
+        This counter increments each time :meth:`should_intervene` reaches the
+        "full pair observed" checkpoint without either gate failing.  It resets
+        to zero whenever the pair-presence gate or the minimum-context gate
+        rejects the evaluation.  The main loop uses this to require at least 3
+        consecutive full-pair turns before honouring an agent stop signal.
+        """
+        return self._consecutive_full_pair_count
 
     def should_intervene(
         self,
@@ -610,6 +627,7 @@ class InteractiveFixy:
                 skip_detail = "waiting for both agents"
             else:
                 skip_detail = "waiting for both agents"
+            self._consecutive_full_pair_count = 0
             logger.info(
                 "[FIXY-GATE] skipped: %s at turn %d",
                 skip_detail,
@@ -620,6 +638,7 @@ class InteractiveFixy:
         # ── Minimum context window ──────────────────────────────────────────
         agent_turns_all = [t for t in dialog if t.get("role") not in ("Fixy", "seed")]
         if len(agent_turns_all) < self._MIN_CONTEXT_TURNS:
+            self._consecutive_full_pair_count = 0
             logger.info(
                 "[FIXY-GATE] skipped: insufficient context (have %d agent turns, need %d) at turn %d",
                 len(agent_turns_all),
@@ -628,7 +647,12 @@ class InteractiveFixy:
             )
             return (False, "")
 
-        logger.info("[FIXY-GATE] accepted: full pair observed at turn %d", turn_count)
+        self._consecutive_full_pair_count += 1
+        logger.info(
+            "[FIXY-GATE] accepted: full pair observed at turn %d (consecutive=%d)",
+            turn_count,
+            self._consecutive_full_pair_count,
+        )
 
         # ── Loop-guard checks (new v2.9.0) ─────────────────────────────────
         if self._loop_detector is not None:

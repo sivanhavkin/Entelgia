@@ -7883,9 +7883,24 @@ class MainScript:
                     )
 
             if re.search(r"\b(stop|quit|bye)\b", out.lower()):
-                logger.info("Stop signal received from agent")
-                print(Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL)
-                break
+                _full_pair_count = (
+                    self.interactive_fixy.consecutive_full_pair_count
+                    if self.interactive_fixy
+                    else 0
+                )
+                if _full_pair_count >= 3:
+                    logger.info(
+                        "Stop signal received from agent (consecutive_full_pair=%d)",
+                        _full_pair_count,
+                    )
+                    print(Fore.YELLOW + "[STOP] Agent requested stop." + Style.RESET_ALL)
+                    break
+                else:
+                    logger.info(
+                        "[STOP] Stop signal ignored: only %d consecutive full pair(s) observed"
+                        " (need 3)",
+                        _full_pair_count,
+                    )
 
             if self.turn_index % 5 == 0:
                 # ── Topic-lock guard ─────────────────────────────────────────
