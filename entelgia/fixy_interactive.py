@@ -24,19 +24,19 @@ logger = logging.getLogger(__name__)
 # Fixy response modes
 # ---------------------------------------------------------------------------
 # These modes determine *how* Fixy intervenes.  MEDIATE is the legacy
-# behaviour.  All other modes are disruptive — they force the dialogue out
-# of a detected loop rather than summarising or bridging it.
+# behaviour.  All other modes introduce novelty to move the dialogue beyond
+# a detected loop rather than summarising or bridging it.
 
 
 class FixyMode:
     """Named constants for Fixy intervention modes.
 
-    Staged intervention ladder (soft → hard):
+    Staged intervention ladder (soft → deep):
       SILENT_OBSERVE      — Fixy observes but says nothing yet.
       SOFT_REFLECTION     — Gentle observation; reflects what the disagreement is about.
       GENTLE_NUDGE        — Points to a missing distinction or reframes the discussion.
       STRUCTURED_MEDIATION— Structured analysis of the disagreement with suggested vector.
-      HARD_CONSTRAINT     — Firm directive to break a deadlock (only after thresholds met).
+      HARD_CONSTRAINT     — Deep structural reflection after extended unresolved tension (only after thresholds met).
 
     Legacy disruption modes remain for backward-compat with loop_guard policy.
     """
@@ -73,10 +73,11 @@ class FixyMode:
 
 
 # ---------------------------------------------------------------------------
-# Hard-intervention threshold constants
+# Deep-intervention threshold constants
 # ---------------------------------------------------------------------------
-# Fixy must NOT use hard intervention modes (forcing choice, declaring deadlock,
-# requiring attack or commitment) before these thresholds are reached.
+# Fixy must NOT use deeper intervention modes (surfacing hidden assumptions,
+# naming structural patterns, probing unexamined variables) before these
+# thresholds are reached.
 MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION: int = 8
 MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION: int = 3
 
@@ -367,11 +368,12 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Max 3 sentences. Sound like a theorist, not a policy engine."
     ),
     FixyMode.HARD_CONSTRAINT: (
-        "You are Fixy. The dialogue has been running long without resolution.\n"
-        "The disagreement requires a structural move. Identify the core binary.\n"
-        "Name what is blocking progress. Propose one concrete step forward.\n"
-        "You may use directive language, but avoid 'Deadlock:' or 'Next move:' as rigid labels.\n"
-        "Max 3 short sentences. Be direct, not procedural."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "The dialogue has persisted long enough to reveal its underlying structural tensions.\n"
+        "Begin with 'It seems the tension here is fundamentally between...' "
+        "or 'What remains unresolved beneath the surface is...'\n"
+        "Do NOT instruct, prescribe, or propose next steps. Illuminate the structure of the disagreement.\n"
+        "Max 3 short sentences. Sound like a thinker inside the dialogue, not an arbiter above it."
     ),
     # ── Legacy / default mode ──────────────────────────────────────────────
     FixyMode.MEDIATE: (
@@ -383,113 +385,123 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Max 3 short sentences. Do NOT summarize or recycle dialogue content. Do NOT moralize."
     ),
     FixyMode.CONTRADICT: (
-        "You are Fixy. Pattern: agents are softening a genuine contradiction into synthesis.\n"
-        "Name the unresolved tension. Ask what the disagreement is actually about.\n"
-        "Example: 'It seems the disagreement is really about X versus Y — not just framing.'\n"
-        "Do NOT use 'Deadlock:' or 'Next move:'. Max 3 short sentences. Do NOT bridge."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: a genuine contradiction is being softened into apparent agreement.\n"
+        "Begin with 'It seems the disagreement is really about...' "
+        "or 'Both of you may be using this concept in different senses...'\n"
+        "Do NOT use 'Deadlock:' or 'Next move:'. Max 3 short sentences. Do NOT bridge or reconcile."
     ),
     FixyMode.CONCRETIZE: (
-        "You are Fixy. Pattern: abstraction loop — no concrete case grounding the claim.\n"
-        "Name the recurring abstract claim. Point to the missing grounding.\n"
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the exchange has remained abstract without a concrete grounding.\n"
         "Begin with 'A missing distinction here may be...' or "
         "'What neither side has yet examined is a specific instance...'\n"
         "Max 3 short sentences. Do NOT summarize the dialogue."
     ),
     FixyMode.INVERT: (
-        "You are Fixy. Pattern: one view repeated without genuine challenge.\n"
-        "Reflect the locked position. Ask what the strongest counterargument would look like.\n"
-        "Begin with 'What remains unclear is whether...' "
-        "or 'Both may be using this concept in different senses...'\n"
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: one view has been repeated without genuine challenge.\n"
+        "Begin with 'What remains unclear is what the strongest objection to this position would be...' "
+        "or 'A missing distinction may emerge if the dominant view is tested against...'\n"
         "Max 3 short sentences. Do NOT recycle dialogue content."
     ),
     FixyMode.PIVOT: (
-        "You are Fixy. Pattern: conceptual cluster lock — ideas stay in one domain.\n"
-        "Name the stuck cluster. Propose a question from a different domain.\n"
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the conversation appears locked within one conceptual domain.\n"
         "Begin with 'What remains unaddressed is...' "
         "or 'The conversation seems anchored to a single frame...'\n"
-        "Max 3 short sentences. Do NOT philosophize."
+        "Max 3 short sentences. Do NOT philosophize or prescribe a direction."
     ),
     FixyMode.EXPOSE_SYNTHESIS: (
-        "You are Fixy. Pattern: premature synthesis — contradiction papered over.\n"
-        "Name what the synthesis glosses over. Restore productive tension.\n"
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: a synthesis has been claimed without resolving the underlying contradiction.\n"
         "Begin with 'A missing distinction here may be...' "
         "or 'The synthesis claimed here may paper over...'\n"
         "Max 3 short sentences. Do NOT accept the synthesis. Do NOT recycle dialogue content."
     ),
     FixyMode.FORCE_MECHANISM: (
-        "You are Fixy. Pattern: claims stated without causal mechanism.\n"
-        "Name the unsupported claim. Ask for the causal step-by-step.\n"
-        "Begin with 'A missing variable here is the causal chain from X to Y...'\n"
-        "Max 3 short sentences."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: claims are being made without a stated causal mechanism.\n"
+        "Begin with 'A missing variable here is the causal chain from...' "
+        "or 'What remains unclear is how one leads to the other...'\n"
+        "Max 3 short sentences. Do NOT prescribe a mechanism or direct next steps."
     ),
     FixyMode.FORCE_CONCRETE_EXAMPLE: (
-        "You are Fixy. Pattern: abstraction loop — no real-world case cited.\n"
-        "Name the recurring claim. Point to the missing grounding.\n"
-        "Begin with 'What neither side has yet examined is a specific real-world instance...'\n"
-        "Max 3 short sentences. Do NOT summarize. Do NOT moralize."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the exchange has remained abstract without any real-world grounding.\n"
+        "Begin with 'What neither side has yet examined is a specific real-world instance...' "
+        "or 'A missing distinction may become visible in a concrete situation where...'\n"
+        "Max 3 short sentences. Do NOT summarize or moralize."
     ),
     FixyMode.FORCE_COUNTEREXAMPLE: (
-        "You are Fixy. Pattern: unchallenged assertion — no disconfirming case cited.\n"
-        "Name the assertion. Ask what a case where it fails would look like.\n"
-        "Begin with 'A missing variable here is a case where this claim does not hold...'\n"
-        "Max 3 short sentences. Do NOT hedge."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: a central assertion has not been subjected to a disconfirming case.\n"
+        "Begin with 'A missing variable here is a case where this claim does not hold...' "
+        "or 'What remains unclear is whether this position survives a situation where...'\n"
+        "Max 3 short sentences. Do NOT resolve or prescribe an answer."
     ),
     FixyMode.FORCE_DIRECT_DISAGREEMENT: (
-        "You are Fixy. Pattern: false agreement — agents converge without genuine contradiction.\n"
-        "Identify the hidden tension. Name what the agreement papers over.\n"
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the exchange has converged toward agreement without naming the underlying tension.\n"
         "Begin with 'It seems the disagreement is really about...' "
         "or 'Both of you may be using this concept in different senses...'\n"
-        "Max 3 short sentences. Do NOT reconcile."
+        "Max 3 short sentences. Do NOT reconcile or bridge the positions."
     ),
     FixyMode.FORCE_TOPIC_RETURN: (
-        "You are Fixy. Pattern: topic drift — dialogue has left the original question.\n"
-        "Name the original question and the tangent. Suggest returning to the core.\n"
-        "Begin with 'What remains unaddressed is the original question of...'\n"
-        "Max 3 short sentences. Do NOT allow the tangent to dominate."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the conversation has drifted from its original question.\n"
+        "Begin with 'What remains unaddressed is the original question of...' "
+        "or 'A tension emerges when the current frame is held against what was first asked...'\n"
+        "Max 3 short sentences. Do NOT moralize or prescribe a direction."
     ),
     FixyMode.FORCE_SHORT_ANSWER: (
-        "You are Fixy. Pattern: evasion — question not directly answered.\n"
-        "Name the unanswered question. Ask for a direct position.\n"
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: a central question has gone unanswered in the exchange.\n"
         "Begin with 'What remains unclear is whether...' "
-        "followed by a sharply posed question.\n"
-        "Max 2 short sentences."
+        "followed by a precise articulation of the unresolved question.\n"
+        "Max 2 short sentences. Do NOT prescribe an answer."
     ),
     FixyMode.FORCE_NEW_DOMAIN: (
-        "You are Fixy. Pattern: semantic trap — all topics collapse into the same cluster.\n"
-        "Name the cluster. Propose one question from a different domain.\n"
-        "Begin with 'The conversation seems anchored to a single frame...'\n"
-        "Max 3 short sentences. Do NOT stay in philosophy or abstract reasoning."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the conversation appears anchored to a single conceptual cluster.\n"
+        "Begin with 'The conversation seems anchored to a single frame...' "
+        "or 'A tension emerges when this argument is held against a different domain...'\n"
+        "Max 3 short sentences. Do NOT moralize or prescribe a next step."
     ),
     FixyMode.FORCE_METRIC: (
-        "You are Fixy. Pattern: argument lacks any measurable criterion or benchmark.\n"
-        "Name the unmeasured claim. Point to the missing criterion.\n"
-        "Begin with 'A missing variable here is a measurable criterion for...'\n"
-        "Max 3 short sentences. Do NOT accept abstract assertions."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: no measurable criterion or benchmark has appeared in the exchange.\n"
+        "Begin with 'A missing variable here is a measurable criterion for...' "
+        "or 'What remains unclear is how either position could be evaluated against...'\n"
+        "Max 3 short sentences. Do NOT prescribe what to measure."
     ),
     FixyMode.FORCE_CHOICE: (
-        "You are Fixy. Pattern: both positions held without commitment.\n"
-        "Name the binary at stake. Ask what it would take to commit to one side.\n"
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: both positions are held simultaneously without genuine conflict.\n"
         "Begin with 'It seems the disagreement is really about...' "
-        "then identify what a genuine commitment would require.\n"
-        "Max 3 short sentences. Do NOT allow continued hedging."
+        "or 'A tension emerges when both views are held at once — specifically...'\n"
+        "Max 3 short sentences. Do NOT resolve the tension or prescribe a commitment."
     ),
     FixyMode.FORCE_TEST: (
-        "You are Fixy. Pattern: unfalsifiable claim — no empirical test proposed.\n"
-        "Name the untestable claim. Ask what observable outcome would refute it.\n"
-        "Begin with 'A missing variable here is a testable prediction for...'\n"
-        "Max 3 short sentences. Do NOT accept claims without tests."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the exchange contains claims that have not yet been grounded empirically.\n"
+        "Begin with 'A missing variable here is a testable prediction for...' "
+        "or 'What remains unclear is what observable difference would follow from...'\n"
+        "Max 3 short sentences. Do NOT demand proof or prescribe a test."
     ),
     FixyMode.FORCE_CASE: (
-        "You are Fixy. Pattern: ungrounded abstraction — no real-world case anchors the claim.\n"
-        "Name the abstract claim. Point to the missing grounding.\n"
-        "Begin with 'What neither side has yet examined is a specific grounded case...'\n"
-        "Max 3 short sentences. Do NOT accept purely theoretical assertions."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: the reasoning has remained at an abstract level with no grounded instance.\n"
+        "Begin with 'A missing distinction may be visible in a specific historical or situational case where...' "
+        "or 'Both of you may be assuming something that a particular case would complicate...'\n"
+        "Max 3 short sentences. Do NOT prescribe which case to examine."
     ),
     FixyMode.FORCE_DEFINITION: (
-        "You are Fixy. Pattern: a central term is contested but never defined.\n"
-        "Name the undefined term. Ask what a precise operational definition would include.\n"
-        "Begin with 'Both of you may be using this term in different senses...'\n"
-        "Max 3 short sentences. Do NOT allow the term to remain ambiguous."
+        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
+        "Pattern: a central term is being used by both sides without a shared definition.\n"
+        "Begin with 'Both of you may be using this term in different senses...' "
+        "or 'What remains unclear is whether the same word is carrying different meanings...'\n"
+        "Max 3 short sentences. Do NOT define the term or prescribe a resolution."
     ),
 }
 
@@ -582,9 +594,9 @@ class InteractiveFixy:
     evaluation), structural rewrite hint injection, and condition-based output.
 
     v4.2.0: Refactored into a staged intervention ladder (SOFT_REFLECTION →
-    GENTLE_NUDGE → STRUCTURED_MEDIATION → HARD_CONSTRAINT).  Hard interventions
-    (forcing choice, declaring deadlock, requiring attack/commitment) are blocked
-    until configurable turn/pair thresholds are reached.  When NEW_CLAIM is
+    GENTLE_NUDGE → STRUCTURED_MEDIATION → HARD_CONSTRAINT).  Deeper interventions
+    (surfacing hidden assumptions, naming structural tensions, introducing missing variables)
+    are gated until configurable turn/pair thresholds are reached.  When NEW_CLAIM is
     present in recent turns, Fixy stays silent or uses only SOFT_REFLECTION.
     """
 
@@ -1497,7 +1509,7 @@ class InteractiveFixy:
             FixyMode.SOFT_REFLECTION: "The disagreement appears to be about a conceptual distinction not yet named.",
             FixyMode.GENTLE_NUDGE: "A key variable is missing from both positions.",
             FixyMode.STRUCTURED_MEDIATION: "The disagreement is structural — both sides share a hidden assumption.",
-            FixyMode.HARD_CONSTRAINT: "The dialogue has stalled; a structural move is required.",
+            FixyMode.HARD_CONSTRAINT: "The dialogue has persisted long enough for its underlying structural tensions to become visible.",
             FixyMode.MEDIATE: "A pattern-level issue is preventing dialogue from deepening.",
         }
         dialogue_read = _mode_read.get(
@@ -1525,7 +1537,7 @@ class InteractiveFixy:
             FixyMode.SOFT_REFLECTION: "Reflect the disagreement structure back without forcing closure.",
             FixyMode.GENTLE_NUDGE: "Introduce the missing distinction gently.",
             FixyMode.STRUCTURED_MEDIATION: "Name the hidden assumption and propose a new framing.",
-            FixyMode.HARD_CONSTRAINT: "Force a structural commitment to one side.",
+            FixyMode.HARD_CONSTRAINT: "Illuminate the structural tension that both sides have not yet named.",
             FixyMode.MEDIATE: "Identify and name the pattern preventing progress.",
         }
         suggested_vector = _mode_vector.get(
