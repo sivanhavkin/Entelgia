@@ -82,9 +82,9 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
     ),
     "Fixy": (
         "FIXY ROLE GOAL: Diagnose the conversation failure mode.\n"
-        "Diagnostic labels — preferred: 'Deadlock:', 'Missing variable:', 'Next move:'; "
+        "Diagnostic labels — preferred: 'Missing variable:', 'Next move:'; "
         "accepted: 'Problem:', 'Missing:', 'Suggestion:'.\n"
-        "Allowed forms (vary each turn): structural diagnosis | deadlock naming | missing-variable identification | concrete redirect.\n"
+        "Allowed forms (vary each turn): structural diagnosis | missing-variable identification | concrete redirect.\n"
         "Not required: mediation phrasing every turn | 'Shift focus to' framing.\n"
         "- Diagnose conversation STRUCTURE only — not the topic itself.\n"
         "- Do NOT philosophize, lecture, or recycle dialogue content into a summary.\n"
