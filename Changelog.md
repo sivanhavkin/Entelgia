@@ -8,6 +8,55 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`topics_enabled` master switch** (`Config`, default `False`) — when `False` (the new default), the entire topic pipeline is a strict no-op: `TopicManager` is not instantiated, topic anchors and forbidden-carryover terms are never injected into prompts, compliance scoring is skipped, and Fixy topic-compliance checks do not run. Agents speak freely out of the box. Set to `True` to restore full pre-4.1.0 topic-enforcement behaviour. Applied to both `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py`. (#332)
+- **`topic_manager_enabled` Config field** (`bool`, default `False`) — independent gate for `TopicManager` instantiation. When `True` (and `topics_enabled=True`), topic rotation, proposal, and selection run normally. When `False`, the session stays on its seed topic even if `topics_enabled=True`, allowing anchor/compliance enforcement without automatic rotation. (#340)
+- **`fixy_interventions_enabled` Config field** (`bool`, default `False`) — gates need-based Fixy interventions via `should_intervene()` independently of `enable_observer`. Fixy can still appear as a scheduled speaker; only on-demand interventions are suppressed when this flag is `False`. (#340)
+- **`topic_pipeline_enabled(cfg) → bool` central predicate** — single authoritative gate for all topic-related call sites in `topic_enforcer.py` and both main scripts. Replaces ad-hoc `CFG.topics_enabled` checks across dozens of call sites, ensuring zero topic-related log lines or operations when the predicate returns `False`. Exported from `entelgia/__init__.py` as part of the public API. (#341)
+- **Fixy staged intervention ladder** — `InteractiveFixy` now uses a five-level graduated response system: `SILENT_OBSERVE → SOFT_REFLECTION → GENTLE_NUDGE → STRUCTURED_MEDIATION → HARD_CONSTRAINT`. Hard modes (`FORCE_CHOICE`, `CONTRADICT`, `EXPOSE_SYNTHESIS`, etc.) are blocked until `MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION = 8` turns and `MIN_FULL_PAIRS = 3` full pairs have been observed. Two new `Config` fields control the thresholds: `min_turns_before_fixy_hard_intervention: int = 8` and `min_full_pairs_before_fixy_hard_intervention: int = 3`. (#342)
+- **`generate_fixy_analysis()` structured output** — new function returns a typed dict before rendering: `{intervention_mode, dialogue_read, missing_element, suggested_vector, urgency}`. Gives the controller layer full authority to show, suppress, or escalate the intervention without parsing rendered text. (#342)
+- **NEW_CLAIM gate in `should_intervene()`** — when recent turns still contain `NEW_CLAIM` moves (detected via `progress_enforcer.classify_move`), Fixy forces soft mode instead of escalating to hard intervention. Prevents premature deadlock declarations when the dialogue is still producing novel content. (#342)
+- **`_soft_mode_forced` flag** — internal `bool` set by `should_intervene()` when hard intervention is blocked (threshold not met or `NEW_CLAIM` active); consumed by `get_fixy_mode()` to return the appropriate soft staged mode based on consecutive pair count. (#342)
+- **`_consecutive_full_pair_count` counter on `InteractiveFixy`** — increments each time both the pair-presence and minimum-context gates pass in `should_intervene()`; resets to `0` on any gate failure. Exposed as a read-only `consecutive_full_pair_count` property. Used by both main scripts to gate the agent stop signal. (#333)
+- **Agent stop signal gated behind 3 consecutive full pairs** — the `stop|quit|bye` pattern in agent output no longer breaks the main dialogue loop immediately. The loop exits only when `interactive_fixy.consecutive_full_pair_count >= 3`; otherwise the signal is logged and ignored. Prevents premature termination before agents have meaningfully engaged. (#333)
+- **`PACKAGE_STRUCTURE.md`** — new dedicated file at repository root covering the full directory layout: entry points, all 20 `entelgia/` modules, `scripts/`, `tests/`, `docs/`, and root-level configuration files. Replaces the stale and incomplete package tree that was previously embedded in `README.md`. (#327)
+- **`docs/CONFIGURATION.md`** — new dedicated configuration reference extracted from `README.md`. Covers all `Config` subsections with code examples and field-by-field descriptions. `README.md` now holds a one-line pointer with link. (#325)
+
+### Changed
+
+- **Fixy perspective-driven prompt language** — all `_MODE_PROMPTS` entries and `_REASON_LABEL_MAP` entries in `entelgia/fixy_interactive.py` rewritten from instruction-driven / control-system framing to perspective-based dialogue participation. Removed procedural labels (`Pattern:`, `Your role:`, `Deadlock:`, `Next move:`, `Loop:`) and trailing imperative step directives (`"Shift the frame entirely."`, `"Name the missing distinction."`). Fixy now observes and reflects rather than commands: e.g. `"The exchange has remained at an abstract level."` instead of `"Pattern: the exchange has remained abstract — shift the frame entirely."` (#342, #343, #344, #345)
+- **`STRUCTURED_MEDIATION` no longer instructs Fixy to suggest a direction** — removed the explicit `"Then suggest a direction:"` step from the `STRUCTURED_MEDIATION` prompt template. Fixy illuminates the structure of disagreement without imposing a resolution path. (#345)
+- **`generate_fixy_analysis()` fallback `dialogue_read`** — replaced the procedural fallback string (`"Detected failure mode: {reason}."`) with a neutral observation. (#345)
+- **Legacy fallback prompts in `generate_intervention`** — removed remaining `Pattern:` labels from legacy fallback prompt paths. (#345)
+- **`LLM_BEHAVIORAL_CONTRACT_FIXY`** — dropped `'Deadlock:'` from the preferred-labels list and `deadlock naming` from the allowed-forms list in both main production scripts, `context_manager.py`, and `enhanced_personas.py`. Also removed from Fixy style guide dict. (#344)
+- **`README.md` restructured** — test section collapsed to a single count line (`1274 tests across 33 suites`) with full breakdown in `tests/README.md`; configuration reference extracted to `docs/CONFIGURATION.md`; core feature descriptions trimmed; version table limited to 5 most recent releases; package structure section moved to `PACKAGE_STRUCTURE.md`; new `🧠 LLM Backends Explained` section added before installation steps. (#324, #325, #326, #327, #328)
+- **README Ollama installation note** — added `⚠️ Note` callout under the Ollama step in *What the installer does*, directing users to the Manual Installation section if automatic Ollama setup fails. (#329)
+- **Black formatting applied** — `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py` reformatted: `_SENSITIVE_KEYS` set literal expanded from single line to multi-line style to satisfy Black's 88-character limit. (#330)
+
+### Fixed
+
+- **Topic subsystem fully disabled when `topics_enabled=False`** — multiple successive fixes (PRs #334–#341) eliminated every remaining leak: topic anchor injection in `_build_enhanced_prompt`, memory topic filter, self-replication topic gate, `fixy_interactive.py` pair-window reset on `topic_shift`, context-manager style instruction blocks, topic-biased memory scoring, per-turn topic variable extraction in `speak()`, and all topic-related debug log lines. With `topics_enabled=False`, the system emits zero topic-related log output. (#334, #335, #336, #337, #338, #339, #340, #341)
+- **Fixy false-positive intervention rate reduced** — `weak_conflict` threshold tightened so that low-signal disagreement no longer triggers unnecessary Fixy interventions. (#336)
+- **`TopicManager` documentation corrected** — `docs/CONFIGURATION.md` previously stated that `TopicManager.advance_with_proposals` "continues to run for session bookkeeping" when `topics_enabled=False`. In reality `topicman` is set to `None` and the `TopicManager` is never instantiated; all rotation, proposal, and selection logic is completely skipped. (#337)
+- **`Human-AI cooperation` topic anchors extended** — added `"cooperation"` and `"human-AI"` as natural-language anchors to prevent `[TOPIC-COMPLIANCE]` regression from 0.80 to 0.40 when Stage 2 rewriting replaces exact anchor words with morphological variants. (#338)
+- **`FORCE_TOPIC_RETURN` → `FORCE_CHOICE` when `topics_enabled=False`** — when Fixy's mode rotation lands on `FORCE_TOPIC_RETURN` and the topic pipeline is off, the mode is silently substituted with `FORCE_CHOICE` to keep Fixy productive. (#340)
+
+### Tests
+
+- **`TestStagedInterventionLadder`** (26 new tests in `tests/test_fixy_improvements.py`) — covers: staged mode constants, hard-intervention threshold gating, `_soft_mode_forced` behaviour, prompt label validation (no `Deadlock:`, `Next move:`, `Loop:` in output), `generate_fixy_analysis()` output structure and fallback, and NEW_CLAIM detection gate. (#342)
+- **`TestFixyInterventionsEnabled`** (4 new tests in `tests/test_enable_observer.py`) — default is `False`; interventions blocked when disabled; triggered when enabled; `enable_observer=False` still wins. (#340)
+- **`TestTopicManagerEnabledSwitch`** (5 new tests in `tests/test_topic_enforcer.py`) — default is `False`; both `topics_enabled` and `topic_manager_enabled` must be `True` to instantiate; `topics_enabled=False` always wins regardless of `topic_manager_enabled`. (#340)
+- **`TestTopicPipelineEnabled`** (9 new tests in `tests/test_topic_enforcer.py`) — covers: default-off, explicit on/off, duck-typed config objects, missing attribute, import check, `topic_label == ""` by default, log-line suppression when disabled. (#341)
+- **`TestPerspectiveDrivenOutput`** (6 new tests in `tests/test_fixy_improvements.py`) — asserts no `Pattern:` or `Your role:` in any `_MODE_PROMPTS` entry; `STRUCTURED_MEDIATION` does not ask Fixy to "suggest a direction"; `_REASON_LABEL_MAP` entries contain no forbidden imperative endings and each includes at least one perspective-based phrase. (#345)
+- **`TestGenerateFixyAnalysis`** (1 new test in `tests/test_fixy_improvements.py`) — `dialogue_read` fallback avoids procedural labels. (#345)
+- **Stop-signal counter tests** (3 new tests in `tests/test_fixy_improvements.py`) — counter increments on successive gate-passes; resets on pair-gate failure; stays at `0` when gate never passes. (#333)
+- **Total test count**: **1270 tests** across **33 suites**.
+
+---
+
 ## [4.1.0] - 2026-03-26
 
 ### Added

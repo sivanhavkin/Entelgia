@@ -162,27 +162,33 @@ Memory influences behavior without requiring explicit recall in every turn.
 
 ### Observer Layer (Fixy)
 
-Fixy acts as a meta-cognitive observer.
+Fixy acts as a meta-cognitive observer using perspective-driven language — no rigid procedural labels (`Deadlock:`, `Next move:`, `Loop:`, `Pattern:`) in output.
 
 Responsibilities:
 - detect dialogue loops via `DialogueLoopDetector` (4 failure modes)
 - identify instability or escalation
-- suggest corrective interventions mapped to `FixyMode` actions
-- preserve dialogue quality
+- reflect the structure of disagreement back without imposing a resolution path
+- preserve dialogue quality via a staged intervention ladder
 
-**`FixyMode` actions:**
+**Staged intervention ladder:**
 
-| Mode | Trigger | Effect |
+| Level | Mode | When activated |
 |---|---|---|
-| `CONCRETIZE` | `loop_repetition` | Demand a concrete real-world example |
-| `CONTRADICT` | `weak_conflict` | Force a sharper binary contradiction |
-| `EXPOSE_SYNTHESIS` | `premature_synthesis` | Expose contradictions hidden by false synthesis |
-| `PIVOT` | `topic_stagnation` | Force a genuine domain shift |
-| `MEDIATE` | Legacy fallback | Neutral mediation |
+| 0 | `SILENT_OBSERVE` | Pair threshold not met |
+| 1 | `SOFT_REFLECTION` | First eligible pair |
+| 2 | `GENTLE_NUDGE` | Second eligible pair |
+| 3 | `STRUCTURED_MEDIATION` | Third+ eligible pair |
+| 4 | `HARD_CONSTRAINT` | ≥ 8 turns **and** ≥ 3 full pairs, no `NEW_CLAIM` moves in recent turns |
+
+Hard modes are additionally blocked when `NEW_CLAIM` moves (detected via `progress_enforcer.classify_move`) are still arriving, preventing premature deadlock declarations.
+
+**`generate_fixy_analysis()`** — returns a typed dict `{intervention_mode, dialogue_read, missing_element, suggested_vector, urgency}` before rendering, giving the controller full authority to show, suppress, or escalate.
+
+**`topic_pipeline_enabled(cfg)`** — single authoritative predicate (exported from `entelgia/topic_enforcer.py`) replacing all ad-hoc `CFG.topics_enabled` checks. When `False`, the entire topic pipeline is a strict no-op with zero topic-related log output.
 
 **Semantic repetition detection** — `InteractiveFixy._detect_repetition` combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers/all-MiniLM-L6-v2`) when available. Degrades gracefully to Jaccard-only when the library is absent (`_SEMANTIC_AVAILABLE = False`).
 
-**Observer toggle** — set `Config.enable_observer = False` (env: `ENTELGIA_ENABLE_OBSERVER`) to completely exclude Fixy from the dialogue. Socrates and Athena are unaffected.
+**Observer toggle** — set `Config.enable_observer = False` (env: `ENTELGIA_ENABLE_OBSERVER`) to completely exclude Fixy from the dialogue. Set `Config.fixy_interventions_enabled = False` to suppress need-based interventions while keeping Fixy as a scheduled speaker.
 
 Fixy does not dominate conversation but regulates interaction when needed.
 
