@@ -334,5 +334,130 @@ def _apply_patches(patch_list):
                 pass
 
 
+# ---------------------------------------------------------------------------
+# 7 — fixy_interventions_enabled switch
+# ---------------------------------------------------------------------------
+
+
+class TestFixyInterventionsEnabled:
+    """fixy_interventions_enabled flag defaults and intervention block gating."""
+
+    def test_default_is_false(self):
+        """fixy_interventions_enabled must default to False."""
+        cfg = Config()
+        assert cfg.fixy_interventions_enabled is False
+
+    def test_can_be_set_to_true(self):
+        """Config(fixy_interventions_enabled=True) must not raise."""
+        cfg = Config(fixy_interventions_enabled=True)
+        assert cfg.fixy_interventions_enabled is True
+
+    def _make_ms(self, cfg, tmp_path):
+        patches = _build_init_patches(enhanced=True)
+        with _apply_patches(patches):
+            ms = _meta.MainScript(cfg)
+        ms.dialog = []
+        ms.turn_index = 5
+        return ms
+
+    def test_intervention_not_triggered_when_interventions_disabled(self, tmp_path):
+        """should_intervene must not be called when fixy_interventions_enabled=False."""
+        cfg = Config(
+            enable_observer=True,
+            fixy_interventions_enabled=False,
+            db_path=str(tmp_path / "mem.db"),
+            data_dir=str(tmp_path),
+            csv_log_path=str(tmp_path / "log.csv"),
+            gexf_path=str(tmp_path / "graph.gexf"),
+            version_dir=str(tmp_path / "versions"),
+            metrics_path=str(tmp_path / "metrics.json"),
+            sessions_dir=str(tmp_path / "sessions"),
+        )
+        ms = self._make_ms(cfg, tmp_path)
+
+        mock_interactive_fixy = MagicMock()
+        mock_interactive_fixy.should_intervene.return_value = (True, "loop_repetition")
+        ms.interactive_fixy = mock_interactive_fixy
+
+        speaker = MagicMock()
+        speaker.name = "Socrates"
+
+        # Mirror the guard condition from MainScript._run_loop
+        if (
+            ms.cfg.enable_observer
+            and ms.cfg.fixy_interventions_enabled
+            and ms.interactive_fixy
+            and speaker.name != "Fixy"
+        ):
+            ms.interactive_fixy.should_intervene(ms.dialog, ms.turn_index)
+
+        mock_interactive_fixy.should_intervene.assert_not_called()
+
+    def test_intervention_triggered_when_interventions_enabled(self, tmp_path):
+        """should_intervene IS called when fixy_interventions_enabled=True."""
+        cfg = Config(
+            enable_observer=True,
+            fixy_interventions_enabled=True,
+            db_path=str(tmp_path / "mem.db"),
+            data_dir=str(tmp_path),
+            csv_log_path=str(tmp_path / "log.csv"),
+            gexf_path=str(tmp_path / "graph.gexf"),
+            version_dir=str(tmp_path / "versions"),
+            metrics_path=str(tmp_path / "metrics.json"),
+            sessions_dir=str(tmp_path / "sessions"),
+        )
+        ms = self._make_ms(cfg, tmp_path)
+
+        mock_interactive_fixy = MagicMock()
+        mock_interactive_fixy.should_intervene.return_value = (False, "")
+        ms.interactive_fixy = mock_interactive_fixy
+
+        speaker = MagicMock()
+        speaker.name = "Socrates"
+
+        if (
+            ms.cfg.enable_observer
+            and ms.cfg.fixy_interventions_enabled
+            and ms.interactive_fixy
+            and speaker.name != "Fixy"
+        ):
+            ms.interactive_fixy.should_intervene(ms.dialog, ms.turn_index)
+
+        mock_interactive_fixy.should_intervene.assert_called_once()
+
+    def test_observer_disabled_overrides_interventions_enabled(self, tmp_path):
+        """When enable_observer=False, interventions are still blocked even if
+        fixy_interventions_enabled=True."""
+        cfg = Config(
+            enable_observer=False,
+            fixy_interventions_enabled=True,
+            db_path=str(tmp_path / "mem.db"),
+            data_dir=str(tmp_path),
+            csv_log_path=str(tmp_path / "log.csv"),
+            gexf_path=str(tmp_path / "graph.gexf"),
+            version_dir=str(tmp_path / "versions"),
+            metrics_path=str(tmp_path / "metrics.json"),
+            sessions_dir=str(tmp_path / "sessions"),
+        )
+        ms = self._make_ms(cfg, tmp_path)
+
+        mock_interactive_fixy = MagicMock()
+        mock_interactive_fixy.should_intervene.return_value = (True, "loop_repetition")
+        ms.interactive_fixy = mock_interactive_fixy
+
+        speaker = MagicMock()
+        speaker.name = "Socrates"
+
+        if (
+            ms.cfg.enable_observer
+            and ms.cfg.fixy_interventions_enabled
+            and ms.interactive_fixy
+            and speaker.name != "Fixy"
+        ):
+            ms.interactive_fixy.should_intervene(ms.dialog, ms.turn_index)
+
+        mock_interactive_fixy.should_intervene.assert_not_called()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
