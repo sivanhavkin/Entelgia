@@ -68,6 +68,7 @@ from .circularity_guard import (
 from .topic_enforcer import (
     compute_topic_compliance_score,
     build_soft_reanchor_instruction,
+    topic_pipeline_enabled,
     ACCEPT_THRESHOLD,
     SOFT_REANCHOR_THRESHOLD,
 )
@@ -126,6 +127,7 @@ __all__ = [
     "get_new_angle_instruction",
     "compute_topic_compliance_score",
     "build_soft_reanchor_instruction",
+    "topic_pipeline_enabled",
     "ACCEPT_THRESHOLD",
     "SOFT_REANCHOR_THRESHOLD",
 ]

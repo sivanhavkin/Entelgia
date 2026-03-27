@@ -161,6 +161,26 @@ def _stale_phrase_penalty(text: str) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Central pipeline predicate
+# ---------------------------------------------------------------------------
+
+
+def topic_pipeline_enabled(cfg) -> bool:
+    """Return True only when the entire topic pipeline must be active.
+
+    This is the single authoritative gate for the topic subsystem.  Every
+    topic entry point (proposal, selection, TopicManager state mutation,
+    compliance scoring, lock logic, prompt injection, logging, and metadata
+    output) must be gated through this function.
+
+    When this returns False the topic subsystem is a hard no-op: no topic
+    anchors are injected, no compliance scores are computed, no topic-related
+    log lines are emitted, and TopicManager remains uninitialised.
+    """
+    return bool(getattr(cfg, "topics_enabled", False))
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 

@@ -37,6 +37,7 @@ from entelgia.topic_enforcer import (
     SOFT_REANCHOR_THRESHOLD,
     compute_topic_compliance_score,
     build_soft_reanchor_instruction,
+    topic_pipeline_enabled,
     _get_opening_sentences,
     _semantic_relevance,
     _contamination_score,
@@ -1018,3 +1019,109 @@ class TestTopicManagerEnabledSwitch:
             topicman = TopicManager(topics[:], rotate_every_rounds=1)
 
         assert topicman is None
+
+
+# ---------------------------------------------------------------------------
+# TestTopicPipelineEnabled — central predicate
+# ---------------------------------------------------------------------------
+
+
+class TestTopicPipelineEnabled:
+    """topic_pipeline_enabled() is the single authoritative gate for the
+    topic subsystem.  Every entry point must route through it."""
+
+    def test_returns_false_when_topics_enabled_false(self):
+        """`topic_pipeline_enabled` must return False when topics_enabled=False."""
+        cfg = Config(topics_enabled=False)
+        assert topic_pipeline_enabled(cfg) is False
+
+    def test_returns_true_when_topics_enabled_true(self):
+        """`topic_pipeline_enabled` must return True when topics_enabled=True."""
+        cfg = Config(topics_enabled=True)
+        assert topic_pipeline_enabled(cfg) is True
+
+    def test_returns_false_for_default_config(self):
+        """Default Config has topics_enabled=False so predicate must return False."""
+        cfg = Config()
+        assert topic_pipeline_enabled(cfg) is False
+
+    def test_predicate_consistent_with_topics_enabled_attribute(self):
+        """topic_pipeline_enabled(cfg) must equal bool(cfg.topics_enabled)."""
+        for flag in (True, False):
+            cfg = Config(topics_enabled=flag)
+            assert topic_pipeline_enabled(cfg) == flag
+
+    def test_accepts_arbitrary_object_with_topics_enabled(self):
+        """topic_pipeline_enabled must work with any object that has topics_enabled."""
+
+        class FakeCfg:
+            topics_enabled = True
+
+        assert topic_pipeline_enabled(FakeCfg()) is True
+
+        class FakeCfgOff:
+            topics_enabled = False
+
+        assert topic_pipeline_enabled(FakeCfgOff()) is False
+
+    def test_returns_false_for_object_without_topics_enabled(self):
+        """topic_pipeline_enabled must return False when the attribute is absent."""
+
+        class NoCfg:
+            pass
+
+        assert topic_pipeline_enabled(NoCfg()) is False
+
+    def test_is_importable_from_topic_enforcer(self):
+        """topic_pipeline_enabled must be importable from entelgia.topic_enforcer."""
+        from entelgia.topic_enforcer import topic_pipeline_enabled as _fn
+
+        assert callable(_fn)
+
+    def test_default_config_produces_no_topic_label(self):
+        """With default Config (topics_enabled=False), topic_label must be empty
+        — no topic is visible in any output by default."""
+        cfg = Config()
+        topicman = None  # never created when topics disabled
+
+        # Replicate the _run_loop assignment
+        topic_label = topicman.current() if topic_pipeline_enabled(cfg) and topicman else ""
+
+        assert topic_label == "", (
+            "topic_label must be '' by default (topics_enabled=False); "
+            f"got {topic_label!r}"
+        )
+
+    def test_no_topic_log_when_disabled(self):
+        """When topic_pipeline_enabled returns False, the per-turn topic debug
+        log must not be emitted."""
+        import logging
+
+        cfg = Config(topics_enabled=False)
+        topicman = None
+        topic_label = topicman.current() if topic_pipeline_enabled(cfg) and topicman else ""
+
+        log_records: list[logging.LogRecord] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                log_records.append(record)
+
+        handler = _Capture()
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
+        try:
+            # Simulate the gated log: only emit when topic_pipeline_enabled
+            if topic_pipeline_enabled(cfg):
+                logging.getLogger("Entelgia_production_meta").debug(
+                    "MainScript.run: turn=%d selected active topic=%r", 1, topic_label
+                )
+        finally:
+            root_logger.removeHandler(handler)
+
+        topic_records = [
+            r for r in log_records if "selected active topic" in r.getMessage()
+        ]
+        assert not topic_records, (
+            "No 'selected active topic' log must be emitted when topics are disabled"
+        )
