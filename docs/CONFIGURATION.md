@@ -110,3 +110,33 @@ config.affective_emotion_weight = 0.4   # Weight of emotion_intensity vs importa
 ```
 
 Use `memory.ltm_search_affective(agent, emotion_weight=0.7)` for more emotion-biased retrieval.
+
+## 🗂️ Topics Feature Switch
+
+```python
+config.topics_enabled = False   # Master switch for the topics feature (default: False)
+                                 # False → agents speak freely; all topic enforcement is bypassed.
+                                 # True  → topic rotation, anchor injection, compliance scoring,
+                                 #         and Fixy topic-compliance checks are all active.
+```
+
+When `topics_enabled = False` (the default), the following subsystems are **fully bypassed**:
+
+* Topic anchor injection into prompts (`topic_anchor_enabled`, legacy anchor fallback)
+* Forbidden carryover terms from the previous topic
+* Cluster wallpaper penalty block
+* Pre-generation anchor instruction and topic continuity hint
+* DRAFT-stage topic compliance scoring (`TOPIC-RECOVERY` levels: none / soft / partial / hard)
+* Post-Stage-2 `TOPIC-COMPLIANCE` diagnostic log
+* Fixy intervention topic compliance scoring (`TOPIC-COMPLIANCE-FIXY`)
+
+Topic rotation (`TopicManager.advance_with_proposals`) continues to run for session bookkeeping
+even when `topics_enabled = False`; the topic label is simply not enforced on agent output.
+
+To re-enable full topic enforcement:
+
+```python
+config.topics_enabled = True
+```
+
+This is equivalent to the pre-4.1.0 default behaviour where topics were always enforced.
