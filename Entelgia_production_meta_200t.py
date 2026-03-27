@@ -2028,6 +2028,11 @@ class Config:
         0.2  # minimum combined score to include affective memory
     )
     show_affective_ltm_debug: bool = False  # print per-memory debug summary when True
+    # ── Topics Master Switch ───────────────────────────────────────────────
+    # Set to True to activate topic rotation, enforcement, anchor injection,
+    # and compliance scoring.  When False, agents speak freely with no topic
+    # constraints and all topic-enforcement logic is bypassed.
+    topics_enabled: bool = False
     # ── Topic Anchor (pre-generation) ──────────────────────────────────────
     topic_anchor_enabled: bool = True
     topic_anchor_include_forbidden_carryover: bool = True
@@ -5069,11 +5074,11 @@ class Agent:
 
         # ── Enhanced Topic Anchor Block ──────────────────────────────────────
         _topic_anchors = TOPIC_ANCHORS.get(_current_topic, [])
-        if _current_topic and CFG.topic_anchor_enabled:
+        if CFG.topics_enabled and _current_topic and CFG.topic_anchor_enabled:
             prompt += self._build_topic_anchor_block(
                 _current_topic, _current_cluster, _topic_anchors, dialog_tail
             )
-        elif _current_topic and _topic_anchors:
+        elif CFG.topics_enabled and _current_topic and _topic_anchors:
             # Fallback: legacy-style anchor when topic_anchor_enabled=False.
             # Note: the enhanced anchor block (topic_anchor_enabled=True) is preferred.
             logger.debug(
@@ -5094,7 +5099,7 @@ class Agent:
         _prev_anchors = (
             TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
         )
-        if _prev_anchors and CFG.topic_anchor_include_forbidden_carryover:
+        if CFG.topics_enabled and _prev_anchors and CFG.topic_anchor_include_forbidden_carryover:
             forbidden = _prev_anchors[: CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
@@ -5112,7 +5117,7 @@ class Agent:
                     self._last_topic,
                     forbidden,
                 )
-        elif _prev_anchors:
+        elif CFG.topics_enabled and _prev_anchors:
             forbidden = _prev_anchors[: CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
@@ -5125,7 +5130,7 @@ class Agent:
             )
 
         # ── Cluster Wallpaper Penalty ───────────────────────────────────────
-        if CFG.cluster_wallpaper_penalty_enabled and _current_cluster:
+        if CFG.topics_enabled and CFG.cluster_wallpaper_penalty_enabled and _current_cluster:
             prompt += self._build_wallpaper_penalty_block(
                 _current_topic, _current_cluster, dialog_tail
             )
@@ -5133,7 +5138,7 @@ class Agent:
         # ── Pre-generation topic anchor (compact, one-line) ─────────────────
         # Forces the DRAFT to enter the topic in the first sentence.
         # Injected only when a topic is active; kept compact to avoid bloat.
-        if _current_topic and _topic_anchors:
+        if CFG.topics_enabled and _current_topic and _topic_anchors:
             _lexicon_items = get_topic_distinct_lexicon(_current_topic)
             _anchor_instr = build_pre_generation_anchor_instruction(
                 _current_topic, _lexicon_items[:3]
@@ -5151,7 +5156,7 @@ class Agent:
         # ── Topic continuity hint (one-line, carries sub-concept forward) ───
         # Extracts the key concept from the last other-agent turn and injects
         # a continuity hint so agents don't lose the active sub-concept.
-        if _current_topic:
+        if CFG.topics_enabled and _current_topic:
             _other_turn_texts = [
                 t.get("text", "")
                 for t in dialog_tail[-3:]
@@ -5583,7 +5588,7 @@ class Agent:
         _skip_draft_transform = False  # set True when fallback template is injected
         _draft_reanchor_hint = ""  # compact hint passed to Stage 2 REWRITE
 
-        if own_texts and _active_topic and _active_anchors:
+        if CFG.topics_enabled and own_texts and _active_topic and _active_anchors:
             # Detect meta-framing opener BEFORE scoring so it doesn't produce
             # a spuriously low score that triggers unnecessary regeneration.
             _draft_meta_framing = detect_meta_framing_opener(out)
@@ -5928,7 +5933,8 @@ class Agent:
         # Log the final compliance score after Stage 2 has had a chance to apply
         # any reanchor hint.  This is diagnostic only — no further regeneration.
         if (
-            own_texts
+            CFG.topics_enabled
+            and own_texts
             and _active_topic
             and _active_anchors
             and not _skip_draft_transform
@@ -7662,7 +7668,7 @@ class MainScript:
                     # Apply graded topic compliance to Fixy interventions
                     _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
                     _fixy_anchors = TOPIC_ANCHORS.get(topic_label, [])
-                    if topic_label and _fixy_anchors:
+                    if CFG.topics_enabled and topic_label and _fixy_anchors:
                         _fixy_prev_anchors = (
                             TOPIC_ANCHORS.get(_fixy_prev_topic, [])
                             if _fixy_prev_topic and _fixy_prev_topic != topic_label
