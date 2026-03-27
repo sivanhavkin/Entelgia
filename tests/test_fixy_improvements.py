@@ -1568,6 +1568,110 @@ class TestGenerateFixyAnalysis:
         assert isinstance(result["suggested_vector"], str)
         assert len(result["suggested_vector"]) > 0
 
+    def test_dialogue_read_fallback_not_procedural(self):
+        """dialogue_read fallback must not use procedural 'Detected failure mode:' label."""
+        fixy = self._make_fixy()
+        # Use an unknown mode to trigger the fallback path
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="some_unknown_reason",
+            intervention_mode="UNKNOWN_MODE",
+            turn_count=4,
+        )
+        assert "Detected failure mode:" not in result["dialogue_read"], (
+            f"dialogue_read fallback must not use procedural label; got: {result['dialogue_read']!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 14. Perspective-driven output constraints
+# ---------------------------------------------------------------------------
+
+
+class TestPerspectiveDrivenOutput:
+    """Fixy prompts and output instructions must use perspective language, not procedural labels."""
+
+    def test_no_pattern_label_in_mode_prompts(self):
+        """No _MODE_PROMPTS entry may use the 'Pattern:' procedural label."""
+        from entelgia.fixy_interactive import _MODE_PROMPTS
+
+        for mode, prompt in _MODE_PROMPTS.items():
+            assert "Pattern:" not in prompt, (
+                f"_MODE_PROMPTS[{mode!r}] must not use 'Pattern:' label; "
+                f"got: {prompt[:200]}"
+            )
+
+    def test_no_your_role_in_mode_prompts(self):
+        """No _MODE_PROMPTS entry may use 'Your role:' instruction language."""
+        from entelgia.fixy_interactive import _MODE_PROMPTS
+
+        for mode, prompt in _MODE_PROMPTS.items():
+            assert "Your role:" not in prompt, (
+                f"_MODE_PROMPTS[{mode!r}] must not use 'Your role:' instruction; "
+                f"got: {prompt[:200]}"
+            )
+
+    def test_structured_mediation_does_not_suggest_direction(self):
+        """STRUCTURED_MEDIATION prompt must not ask Fixy to 'suggest a direction'."""
+        from entelgia.fixy_interactive import _MODE_PROMPTS, FixyMode
+
+        prompt = _MODE_PROMPTS[FixyMode.STRUCTURED_MEDIATION]
+        assert "suggest a direction" not in prompt.lower(), (
+            f"STRUCTURED_MEDIATION must not ask Fixy to suggest a direction; "
+            f"got: {prompt[:300]}"
+        )
+
+    def test_reason_label_map_no_trailing_imperatives(self):
+        """_REASON_LABEL_MAP entries must not end with bare imperative verbs like 'Name', 'Identify', 'Suggest', 'Shift'."""
+        from entelgia.fixy_interactive import _REASON_LABEL_MAP
+
+        # These imperative starters at the end of an instruction string instruct
+        # Fixy to take a directive action, violating the perspective-driven requirement.
+        forbidden_imperative_endings = (
+            "Gently name the missing distinction that would allow progress.",
+            "Identify the hidden fork in the argument without forcing a choice.",
+            "Restore productive tension without collapsing it.",
+            "Suggest a new conceptual angle, not a topic change.",
+            "Name the hidden shared premise that both sides rely on.",
+            "Reflect the structure of the conflict without forcing a verdict.",
+            "Invite depth by pointing to what neither side has yet examined.",
+            "Identify the conceptual bridge that would let both positions advance.",
+            "Shift the frame entirely.",
+        )
+        for reason, instruction in _REASON_LABEL_MAP.items():
+            for ending in forbidden_imperative_endings:
+                assert ending not in instruction, (
+                    f"_REASON_LABEL_MAP[{reason!r}] must not contain imperative ending "
+                    f"{ending!r}; got: {instruction}"
+                )
+
+    def test_reason_label_map_uses_perspective_language(self):
+        """Each _REASON_LABEL_MAP entry must include at least one perspective-based phrase."""
+        from entelgia.fixy_interactive import _REASON_LABEL_MAP
+
+        # These perspective-based openers are the required replacement patterns.
+        perspective_phrases = (
+            "It seems",
+            "Perhaps",
+            "It is unclear whether",
+            "A missing element may be",
+            "You may be assuming",
+            "The tension may lie in",
+            "may be what",
+            "may not yet be",
+            "may still be",
+            "may exist but",
+            "may be where",
+            "has not yet been named",
+            "may deserve",
+            "may be what this exchange has not yet considered",
+        )
+        for reason, instruction in _REASON_LABEL_MAP.items():
+            assert any(phrase in instruction for phrase in perspective_phrases), (
+                f"_REASON_LABEL_MAP[{reason!r}] must include perspective-based language; "
+                f"got: {instruction}"
+            )
+
 
     import pytest as _pytest
 
