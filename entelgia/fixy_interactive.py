@@ -704,8 +704,10 @@ class InteractiveFixy:
             self._pending_rewrite_mode = FixyMode.FORCE_TEST
             return (True, "shallow_discussion")
 
-        # Pattern 4: Missed synthesis opportunity — disabled (fires too early
-        # with unrelated interventions; loop-guard already covers this case).
+        # Pattern 4: Missed synthesis opportunity
+        if turn_count >= 5 and self._detect_synthesis_opportunity(last_10):
+            self._pending_rewrite_mode = FixyMode.FORCE_METRIC
+            return (True, "synthesis_opportunity")
 
         # Pattern 5: Meta-reflection needed (every 15 turns)
         if turn_count > 15 and turn_count % 15 == 0:
@@ -1112,9 +1114,7 @@ class InteractiveFixy:
         if len(turns) < 4:
             return False
 
-        # Look for synthesis markers being absent.
-        # Deliberately excludes very common filler words ("all", "also") that
-        # appear in nearly every turn and would cause false positives.
+        # Look for synthesis markers being absent
         synthesis_markers = [
             "connect",
             "integrate",
@@ -1124,6 +1124,8 @@ class InteractiveFixy:
             "linking",
             "merging",
             "unified",
+            "all",
+            "also",
         ]
 
         has_synthesis = False

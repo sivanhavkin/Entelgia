@@ -2029,29 +2029,29 @@ class Config:
     # constraints and all topic-enforcement logic is bypassed.
     topics_enabled: bool = False
     # ── Topic Anchor (pre-generation) ──────────────────────────────────────
-    topic_anchor_enabled: bool = True
-    topic_anchor_include_forbidden_carryover: bool = True
+    topic_anchor_enabled: bool = False
+    topic_anchor_include_forbidden_carryover: bool = False
     topic_anchor_max_forbidden_items: int = 5
     # ── Memory Topic Filter ────────────────────────────────────────────────
-    memory_topic_filter_enabled: bool = True
+    memory_topic_filter_enabled: bool = False
     memory_topic_min_score: float = 0.45
-    memory_require_same_cluster: bool = True
+    memory_require_same_cluster: bool = False
     memory_contamination_penalty: float = 0.25
     # ── Self-Replication Topic Gate ────────────────────────────────────────
-    self_replication_topic_gate_enabled: bool = True
+    self_replication_topic_gate_enabled: bool = False
     self_replication_topic_min_score: float = 0.50
-    self_replication_require_same_cluster: bool = True
+    self_replication_require_same_cluster: bool = False
     # ── Fixy Role-Aware Compliance ─────────────────────────────────────────
-    fixy_role_aware_compliance: bool = True
-    fixy_must_name_topic_or_core_concept: bool = True
+    fixy_role_aware_compliance: bool = False
+    fixy_must_name_topic_or_core_concept: bool = False
     fixy_new_domain_penalty: float = 0.20
     # ── Web Trigger Multi-Signal ───────────────────────────────────────────
     web_trigger_require_multi_signal: bool = True
     web_trigger_min_concepts: int = 2
     web_trigger_require_uncertainty_or_evidence: bool = True
     # ── Cluster Wallpaper Penalty ──────────────────────────────────────────
-    topic_specific_lexicon_bias_enabled: bool = True
-    cluster_wallpaper_penalty_enabled: bool = True
+    topic_specific_lexicon_bias_enabled: bool = False
+    cluster_wallpaper_penalty_enabled: bool = False
     cluster_wallpaper_repeat_window: int = 6
     # ── Observability / Debug Flags ────────────────────────────────────────
     show_topic_anchor_debug: bool = False

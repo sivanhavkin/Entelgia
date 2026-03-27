@@ -203,6 +203,7 @@ class TestMemoryTopicFilter:
     def test_unrelated_old_topic_memory_is_rejected(self):
         agent, memory, cfg = _make_agent()
         cfg.topics_enabled = True
+        cfg.memory_topic_filter_enabled = True
         cfg.memory_require_same_cluster = True
         cfg.memory_topic_min_score = 0.45
         with patch.object(_meta, "CFG", cfg):
