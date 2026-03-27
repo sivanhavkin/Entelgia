@@ -159,6 +159,7 @@ try:
         build_topic_continuity_hint,
         build_draft_topic_reanchor_instruction,
         extract_key_concept,
+        topic_pipeline_enabled,
         ACCEPT_THRESHOLD as _TOPIC_ACCEPT_THRESHOLD,
         SOFT_REANCHOR_THRESHOLD as _TOPIC_SOFT_REANCHOR_THRESHOLD,
         PARTIAL_RECOVERY_THRESHOLD as _TOPIC_PARTIAL_RECOVERY_THRESHOLD,
@@ -4760,7 +4761,7 @@ class Agent:
             return memories
 
         # Honour global disable flags — pass all memories through unchanged
-        if not CFG.topics_enabled or not CFG.memory_topic_filter_enabled:
+        if not topic_pipeline_enabled(CFG) or not CFG.memory_topic_filter_enabled:
             return memories
 
         # Build recent dialogue term set for overlap scoring
@@ -5010,8 +5011,8 @@ class Agent:
         # When topics are disabled, force _current_topic to "" so that all
         # topic-gated STM/LTM filtering and anchor injection are fully
         # suppressed regardless of what the seed string contains.
-        _current_topic = self._extract_topic_from_seed(user_seed) if CFG.topics_enabled else ""
-        _current_cluster = self.topic_cluster or "" if CFG.topics_enabled else ""
+        _current_topic = self._extract_topic_from_seed(user_seed) if topic_pipeline_enabled(CFG) else ""
+        _current_cluster = self.topic_cluster or "" if topic_pipeline_enabled(CFG) else ""
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -5067,7 +5068,7 @@ class Agent:
 
         # ── Memory Topic Filter ─────────────────────────────────────────────
         # Apply a strict topical relevance filter before injecting memories.
-        if CFG.topics_enabled and CFG.memory_topic_filter_enabled and _current_topic:
+        if topic_pipeline_enabled(CFG) and CFG.memory_topic_filter_enabled and _current_topic:
             recent_ltm = self._filter_memories_by_topic(
                 recent_ltm, _current_topic, _current_cluster
             )
@@ -5110,11 +5111,11 @@ class Agent:
 
         # ── Enhanced Topic Anchor Block ──────────────────────────────────────
         _topic_anchors = TOPIC_ANCHORS.get(_current_topic, [])
-        if CFG.topics_enabled and _current_topic and CFG.topic_anchor_enabled:
+        if topic_pipeline_enabled(CFG) and _current_topic and CFG.topic_anchor_enabled:
             prompt += self._build_topic_anchor_block(
                 _current_topic, _current_cluster, _topic_anchors, dialog_tail
             )
-        elif CFG.topics_enabled and _current_topic and _topic_anchors:
+        elif topic_pipeline_enabled(CFG) and _current_topic and _topic_anchors:
             # Fallback: legacy-style anchor when topic_anchor_enabled=False.
             # Note: the enhanced anchor block (topic_anchor_enabled=True) is preferred.
             logger.debug(
@@ -5135,7 +5136,7 @@ class Agent:
         _prev_anchors = (
             TOPIC_ANCHORS.get(self._last_topic, []) if _topic_changed else []
         )
-        if CFG.topics_enabled and _prev_anchors and CFG.topic_anchor_include_forbidden_carryover:
+        if topic_pipeline_enabled(CFG) and _prev_anchors and CFG.topic_anchor_include_forbidden_carryover:
             forbidden = _prev_anchors[: CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
@@ -5153,7 +5154,7 @@ class Agent:
                     _last_topic,
                     forbidden,
                 )
-        elif CFG.topics_enabled and _prev_anchors:
+        elif topic_pipeline_enabled(CFG) and _prev_anchors:
             forbidden = _prev_anchors[: CFG.topic_anchor_max_forbidden_items]
             prompt += (
                 f"Do NOT reuse concepts from previous discussions such as: "
@@ -5166,7 +5167,7 @@ class Agent:
             )
 
         # ── Cluster Wallpaper Penalty ───────────────────────────────────────
-        if CFG.topics_enabled and CFG.cluster_wallpaper_penalty_enabled and _current_cluster:
+        if topic_pipeline_enabled(CFG) and CFG.cluster_wallpaper_penalty_enabled and _current_cluster:
             prompt += self._build_wallpaper_penalty_block(
                 _current_topic, _current_cluster, dialog_tail
             )
@@ -5174,7 +5175,7 @@ class Agent:
         # ── Pre-generation topic anchor (compact, one-line) ─────────────────
         # Forces the DRAFT to enter the topic in the first sentence.
         # Injected only when a topic is active; kept compact to avoid bloat.
-        if CFG.topics_enabled and _current_topic and _topic_anchors:
+        if topic_pipeline_enabled(CFG) and _current_topic and _topic_anchors:
             _lexicon_items = get_topic_distinct_lexicon(_current_topic)
             _anchor_instr = build_pre_generation_anchor_instruction(
                 _current_topic, _lexicon_items[:3]
@@ -5192,7 +5193,7 @@ class Agent:
         # ── Topic continuity hint (one-line, carries sub-concept forward) ───
         # Extracts the key concept from the last other-agent turn and injects
         # a continuity hint so agents don't lose the active sub-concept.
-        if CFG.topics_enabled and _current_topic:
+        if topic_pipeline_enabled(CFG) and _current_topic:
             _other_turn_texts = [
                 t.get("text", "")
                 for t in dialog_tail[-3:]
@@ -5242,7 +5243,7 @@ class Agent:
         # Extract topic from seed (used for memory selection and topic anchors).
         # When topics are disabled, force to "" to prevent any topic-related
         # processing from running via the extracted label.
-        topic = self._extract_topic_from_seed(user_seed) if CFG.topics_enabled else ""
+        topic = self._extract_topic_from_seed(user_seed) if topic_pipeline_enabled(CFG) else ""
 
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
@@ -5252,7 +5253,7 @@ class Agent:
                 recent_dialog=dialog_tail[-5:],
                 ltm_entries=all_ltm,
                 limit=8,
-                topics_enabled=CFG.topics_enabled,
+                topics_enabled=topic_pipeline_enabled(CFG),
             )
         else:
             ltm = all_ltm[:5] if all_ltm else []
@@ -5323,12 +5324,12 @@ class Agent:
             agent_pronoun=agent_pronoun,
             web_context=web_context,
             topic_style=self.topic_style,
-            topics_enabled=CFG.topics_enabled,
+            topics_enabled=topic_pipeline_enabled(CFG),
         )
 
         # ── Topic Anchors: inject topic constraint before generation ──────────
-        _topic_anchors_enh = TOPIC_ANCHORS.get(topic, []) if CFG.topics_enabled else []
-        if CFG.topics_enabled and topic and _topic_anchors_enh:
+        _topic_anchors_enh = TOPIC_ANCHORS.get(topic, []) if topic_pipeline_enabled(CFG) else []
+        if topic_pipeline_enabled(CFG) and topic and _topic_anchors_enh:
             topic_constraint = (
                 f"\n\nTopic constraint:\n"
                 f"The active topic is: {topic}.\n"
@@ -5642,7 +5643,7 @@ class Agent:
         _prev_anchors_for_score: List[str] = []
         _skip_draft_transform = False  # set True when fallback template is injected
         _draft_reanchor_hint = ""  # compact hint passed to Stage 2 REWRITE
-        if CFG.topics_enabled:
+        if topic_pipeline_enabled(CFG):
             _seed_topic_match = re.search(r"TOPIC:\s*([^\n]+)", seed)
             _active_topic = _seed_topic_match.group(1).strip() if _seed_topic_match else ""
             _active_anchors = TOPIC_ANCHORS.get(_active_topic, [])
@@ -5652,7 +5653,7 @@ class Agent:
                 else []
             )
 
-        if CFG.topics_enabled and own_texts and _active_topic and _active_anchors:
+        if topic_pipeline_enabled(CFG) and own_texts and _active_topic and _active_anchors:
             # Detect meta-framing opener BEFORE scoring so it doesn't produce
             # a spuriously low score that triggers unnecessary regeneration.
             _draft_meta_framing = detect_meta_framing_opener(out)
@@ -5851,7 +5852,7 @@ class Agent:
 
         # Register scrubber: remove rhetorical openers that violate the active
         # cluster's tone policy (no-op for philosophy cluster).
-        if CFG.topics_enabled:
+        if topic_pipeline_enabled(CFG):
             out = scrub_rhetorical_openers(out, self.topic_cluster)
 
         # Safety net: strip "I am {name}" identity schema leak if LLM started with it
@@ -5918,7 +5919,7 @@ class Agent:
         _prev_topic_for_circ = self._last_topic
 
         # Update last-topic tracker so the next turn can inject forbidden carryover
-        if CFG.topics_enabled and _active_topic:
+        if topic_pipeline_enabled(CFG) and _active_topic:
             self._last_topic = _active_topic
 
         # ── Post-generation revision layer ────────────────────────────────────────
@@ -5998,7 +5999,7 @@ class Agent:
         # Log the final compliance score after Stage 2 has had a chance to apply
         # any reanchor hint.  This is diagnostic only — no further regeneration.
         if (
-            CFG.topics_enabled
+            topic_pipeline_enabled(CFG)
             and own_texts
             and _active_topic
             and _active_anchors
@@ -6363,7 +6364,7 @@ class Agent:
             content = str(mem.get("content", "")).strip()
 
             # ── Self-Replication Topic Gate ─────────────────────────────────
-            if CFG.topics_enabled and CFG.self_replication_topic_gate_enabled and topic:
+            if topic_pipeline_enabled(CFG) and CFG.self_replication_topic_gate_enabled and topic:
                 score = self._score_repl_topic_relevance(
                     mem, topic, _current_cluster, _topic_anchors
                 )
@@ -6444,7 +6445,7 @@ class Agent:
             _promoted_this_cycle.append(content)
             promoted_count += 1
 
-        if CFG.topics_enabled and CFG.self_replication_topic_gate_enabled:
+        if topic_pipeline_enabled(CFG) and CFG.self_replication_topic_gate_enabled:
             logger.info(
                 "[SELF-REPL-TOPIC-GATE] agent=%s kept=%d rejected=%d promoted=%d",
                 self.name,
@@ -7109,7 +7110,7 @@ class MainScript:
             # Pass topics_enabled so Fixy can suppress topic-shift pair-window
             # resets and topic-anchored prompts in topics-disabled sessions.
             self.interactive_fixy = (
-                InteractiveFixy(self.llm, cfg.model_fixy, topics_enabled=cfg.topics_enabled)
+                InteractiveFixy(self.llm, cfg.model_fixy, topics_enabled=topic_pipeline_enabled(cfg))
                 if cfg.enable_observer
                 else None
             )
@@ -7381,9 +7382,10 @@ class MainScript:
         # Build topic cycle starting from the configured seed_topic so the
         # active topic always matches the opening seed text.
         first_topic = self.cfg.seed_topic
-        logger.debug("MainScript.run: configured first topic=%r", first_topic)
+        if topic_pipeline_enabled(CFG):
+            logger.debug("MainScript.run: configured first topic=%r", first_topic)
         topicman: Optional[TopicManager]
-        if CFG.topics_enabled and CFG.topic_manager_enabled:
+        if topic_pipeline_enabled(CFG) and CFG.topic_manager_enabled:
             _seed_cluster, _topic_style_str = get_style_for_topic(
                 first_topic, TOPIC_CLUSTERS
             )
@@ -7426,7 +7428,7 @@ class MainScript:
             topicman = TopicManager(topic_list, rotate_every_rounds=1, shuffle=False)
         else:
             topicman = None
-            if not CFG.topics_enabled:
+            if not topic_pipeline_enabled(CFG):
                 logger.debug(
                     "MainScript.run: topics_enabled=False — topic subsystem fully bypassed"
                 )
@@ -7477,7 +7479,7 @@ class MainScript:
                 _active_loop_modes = self._loop_detector.detect(
                     self.dialog,
                     self.turn_index,
-                    current_topic=topicman.current() if CFG.topics_enabled and topicman else "",
+                    current_topic=topicman.current() if topic_pipeline_enabled(CFG) and topicman else "",
                 )
                 if _active_loop_modes:
                     # Select the agent mode that best counters the primary failure
@@ -7549,7 +7551,7 @@ class MainScript:
                 speaker = self.socrates if self.turn_index % 2 == 1 else self.athena
 
             # ── v2.9.0: Force cluster pivot on topic_stagnation ─────────────
-            if CFG.topics_enabled and topicman and "topic_stagnation" in _active_loop_modes:
+            if topic_pipeline_enabled(CFG) and topicman and "topic_stagnation" in _active_loop_modes:
                 new_topic = topicman.force_cluster_pivot()
                 logger.info(
                     "loop_guard: topic_stagnation → cluster pivot → %r", new_topic
@@ -7579,12 +7581,13 @@ class MainScript:
                         + "\n"
                     )
 
-            topic_label = topicman.current() if CFG.topics_enabled and topicman else ""
-            logger.debug(
-                "MainScript.run: turn=%d selected active topic=%r",
-                self.turn_index,
-                topic_label,
-            )
+            topic_label = topicman.current() if topic_pipeline_enabled(CFG) and topicman else ""
+            if topic_pipeline_enabled(CFG):
+                logger.debug(
+                    "MainScript.run: turn=%d selected active topic=%r",
+                    self.turn_index,
+                    topic_label,
+                )
 
             # Dynamic seed generation (if enhanced mode available)
             if self.dialogue_engine and speaker.name != "Fixy":
@@ -7747,7 +7750,7 @@ class MainScript:
                     # When topics are disabled, FORCE_TOPIC_RETURN is meaningless;
                     # substitute FORCE_CHOICE so Fixy still advances the dialogue.
                     if (
-                        not CFG.topics_enabled
+                        not topic_pipeline_enabled(CFG)
                         and fixy_mode == FixyMode.FORCE_TOPIC_RETURN
                     ):
                         logger.debug(
@@ -7761,7 +7764,7 @@ class MainScript:
                     # Apply graded topic compliance to Fixy interventions
                     _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
                     _fixy_anchors = TOPIC_ANCHORS.get(topic_label, [])
-                    if CFG.topics_enabled and topic_label and _fixy_anchors:
+                    if topic_pipeline_enabled(CFG) and topic_label and _fixy_anchors:
                         _fixy_prev_anchors = (
                             TOPIC_ANCHORS.get(_fixy_prev_topic, [])
                             if _fixy_prev_topic and _fixy_prev_topic != topic_label
@@ -7960,7 +7963,7 @@ class MainScript:
                         _full_pair_count,
                     )
 
-            if CFG.topics_enabled and topicman and self.turn_index % 5 == 0:
+            if topic_pipeline_enabled(CFG) and topicman and self.turn_index % 5 == 0:
                 # ── Topic-lock guard ─────────────────────────────────────────
                 # Do not allow a topic shift while the dialogue is in an
                 # unresolved high-conflict window or while a force_choice
