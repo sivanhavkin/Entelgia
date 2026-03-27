@@ -704,10 +704,8 @@ class InteractiveFixy:
             self._pending_rewrite_mode = FixyMode.FORCE_TEST
             return (True, "shallow_discussion")
 
-        # Pattern 4: Missed synthesis opportunity
-        if turn_count >= 12 and self._detect_synthesis_opportunity(last_10):
-            self._pending_rewrite_mode = FixyMode.FORCE_METRIC
-            return (True, "synthesis_opportunity")
+        # Pattern 4: Missed synthesis opportunity — disabled (fires too early
+        # with unrelated interventions; loop-guard already covers this case).
 
         # Pattern 5: Meta-reflection needed (every 15 turns)
         if turn_count > 15 and turn_count % 15 == 0:
