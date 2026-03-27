@@ -66,12 +66,15 @@ Retrieves **relevant** memories rather than “most recent only”:
 - returns a bounded set (e.g., up to 8 items)
 
 ### Interactive Fixy (Enhanced Mode)
-Need-based intervention:
+Need-based intervention with staged escalation:
 - analyzes dialog patterns via `DialogueLoopDetector` (4 failure modes) and legacy heuristics
-- decides *if* and *why* to intervene; maps failure mode → `FixyMode` action
-- generates a short actionable 1-2 sentence intervention message
-- uses **Jaccard + sentence-embedding cosine similarity** for repetition detection (degrades to Jaccard-only when `sentence_transformers` is absent)
-- completely excluded when `Config.enable_observer = False`
+- decides *if* and *why* to intervene; maps failure mode → `FixyMode` action via a five-level ladder: `SILENT_OBSERVE → SOFT_REFLECTION → GENTLE_NUDGE → STRUCTURED_MEDIATION → HARD_CONSTRAINT`
+- hard modes blocked until `min_turns_before_fixy_hard_intervention` (default `8`) turns **and** `min_full_pairs_before_fixy_hard_intervention` (default `3`) full pairs observed; also blocked when `NEW_CLAIM` moves are present in recent turns
+- `_soft_mode_forced = True` when hard modes are blocked; `get_fixy_mode()` returns appropriate soft mode based on `_consecutive_full_pair_count`
+- `generate_fixy_analysis()` returns `{intervention_mode, dialogue_read, missing_element, suggested_vector, urgency}` before rendering
+- all prompt templates use perspective-driven language; no rigid labels (`Pattern:`, `Deadlock:`, `Next move:`, `Loop:`, `Your role:`)
+- generates a short 1–2 sentence intervention; uses **Jaccard + sentence-embedding cosine similarity** for repetition detection (degrades to Jaccard-only when `sentence_transformers` is absent)
+- completely excluded when `Config.enable_observer = False`; need-based interventions suppressed when `Config.fixy_interventions_enabled = False`
 
 ### Dialogue Loop Guard (v3.0.0)
 `entelgia/loop_guard.py` — detects and breaks dialogue failure modes:
@@ -307,7 +310,7 @@ Fixy should:
 
 * detect patterns that degrade dialogue quality
 * point out contradictions / loops / escalating conflict
-* propose a small corrective action
+* reflect the structure of disagreement back without imposing a resolution path
 * teach (optional) via short structured hints
 
 Fixy must NOT:
@@ -316,6 +319,19 @@ Fixy must NOT:
 * produce long philosophical essays
 * override the agents’ autonomy every turn
 * inject unrelated topics
+* use procedural labels (`Deadlock:`, `Next move:`, `Loop:`, `Pattern:`) in output
+
+### Staged Intervention Ladder
+
+Fixy escalates through five levels rather than jumping straight to hard intervention:
+
+| Level | Mode | When activated |
+|---|---|---|
+| 0 | `SILENT_OBSERVE` | Gate not passed (pair threshold not met) |
+| 1 | `SOFT_REFLECTION` | First eligible pair |
+| 2 | `GENTLE_NUDGE` | Second eligible pair |
+| 3 | `STRUCTURED_MEDIATION` | Third+ eligible pair |
+| 4 | `HARD_CONSTRAINT` | ≥ `min_turns_before_fixy_hard_intervention` turns **and** ≥ `min_full_pairs_before_fixy_hard_intervention` full pairs, **and** no `NEW_CLAIM` moves in recent turns |
 
 ### Intervention triggers (examples)
 
@@ -327,10 +343,10 @@ Fixy must NOT:
 
 ### Intervention style
 
+* perspective-driven (observational, not commanding)
 * brief
 * concrete
-* actionable
-* optionally: 1 question + 1 suggestion
+* no rigid output labels
 
 ---
 
@@ -1116,6 +1132,8 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 * `show_pronoun` — Include agent pronouns in output (default: `False`)
 * `show_meta` — Print meta-state after each turn (default: `False`)
 * `enable_observer` — Include Fixy as speaker and need-based intervener (env: `ENTELGIA_ENABLE_OBSERVER`; default: `True`). When `False`, Fixy is entirely excluded — no speaker turns, no interventions, no `InteractiveFixy` instance.
+* `min_turns_before_fixy_hard_intervention` — Minimum total dialogue turns before hard Fixy intervention modes are unlocked (default: `8`). Below this threshold, `should_intervene()` forces soft mode regardless of failure-mode severity.
+* `min_full_pairs_before_fixy_hard_intervention` — Minimum number of observed full dialogue pairs before hard Fixy modes are unlocked (default: `3`). A full pair requires both the pair-presence and minimum-context gates to pass in `should_intervene()`.
 
 ### Memory
 
@@ -1156,6 +1174,8 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 ### Output Quality Pipeline
 
 * `topics_enabled` — Master switch for the topics feature (default: `False`). When `False`, the `TopicManager` is not initialised (no topic rotation, proposals, or selection) and all topic enforcement, anchor injection, compliance scoring, and Fixy topic-compliance checks are bypassed; agents speak freely. Set to `True` to restore full topic-driven behaviour.
+* `topic_manager_enabled` — Gate `TopicManager` instantiation independently of `topics_enabled` (default: `False`). When `True` (and `topics_enabled=True`), topic rotation via `TopicManager.advance_with_proposals()` is active. When `False`, the session stays on its seed topic even if topic enforcement is on. Requires `topics_enabled=True` to have any effect.
+* `fixy_interventions_enabled` — Gate need-based Fixy interventions via `should_intervene()` independently of `enable_observer` (default: `False`). When `False`, Fixy may still appear as a scheduled speaker but will not perform on-demand pattern-triggered interventions. `enable_observer=False` always takes precedence.
 * `topic_anchor_enabled` — Enable topic anchor injection into prompts (default: `True`)
 * `topic_anchor_include_forbidden_carryover` — Include forbidden carryover terms in anchor block (default: `True`)
 * `topic_anchor_max_forbidden_items` — Max carryover terms injected (default: `5`)

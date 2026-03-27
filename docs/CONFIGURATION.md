@@ -138,3 +138,53 @@ config.topics_enabled = True
 ```
 
 This is equivalent to the pre-4.1.0 default behaviour where topics were always enforced.
+
+### Opt-in subsystem switches
+
+Two additional flags let you selectively re-enable subsystems without toggling `topics_enabled` globally:
+
+```python
+config.topic_manager_enabled = False   # Gate TopicManager instantiation independently of topics_enabled.
+                                        # False → session stays on seed topic; no rotation, no proposals.
+                                        # True  → automatic topic rotation via TopicManager.advance_with_proposals().
+                                        # Has no effect when topics_enabled=False (master switch off).
+
+config.fixy_interventions_enabled = False  # Gate need-based Fixy interventions via should_intervene().
+                                            # False → Fixy may still appear as scheduled speaker but
+                                            #         will not perform on-demand pattern-triggered interventions.
+                                            # True  → standard intervention behaviour restored.
+                                            # enable_observer=False always takes precedence.
+```
+
+### `topic_pipeline_enabled(cfg)` predicate
+
+A single authoritative entry point for all topic-related call sites:
+
+```python
+from entelgia.topic_enforcer import topic_pipeline_enabled
+
+if topic_pipeline_enabled(cfg):
+    # anchors, compliance scoring, TopicManager — all gated here
+    ...
+```
+
+When `Config()` uses the default `topics_enabled=False`, `topic_pipeline_enabled` returns `False` and the entire topic pipeline is a strict no-op with zero topic-related log output.
+
+## 🔍 Fixy Intervention Settings
+
+```python
+config.min_turns_before_fixy_hard_intervention = 8   # Minimum total turns before hard Fixy modes are unlocked.
+config.min_full_pairs_before_fixy_hard_intervention = 3  # Minimum observed full dialogue pairs before hard modes.
+```
+
+Fixy uses a staged intervention ladder:
+
+| Stage | Mode | Condition |
+|---|---|---|
+| 0 | `SILENT_OBSERVE` | Gate not passed |
+| 1 | `SOFT_REFLECTION` | First eligible pair |
+| 2 | `GENTLE_NUDGE` | Second eligible pair |
+| 3 | `STRUCTURED_MEDIATION` | Third+ eligible pair |
+| 4 | `HARD_CONSTRAINT` | ≥ 8 turns **and** ≥ 3 full pairs observed |
+
+Hard modes (`FORCE_CHOICE`, `CONTRADICT`, `EXPOSE_SYNTHESIS`, etc.) are blocked until both thresholds are met **and** no `NEW_CLAIM` moves are present in recent turns (detected via `progress_enforcer.classify_move`). When hard modes are blocked, `should_intervene()` sets `_soft_mode_forced = True` and `get_fixy_mode()` returns the appropriate soft staged mode.

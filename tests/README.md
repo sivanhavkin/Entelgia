@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **1274 tests** (1274 collected) in 33 suites:
+Entelgia ships with comprehensive test coverage across **1270 tests** (1270 collected) in 33 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -341,7 +341,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 1274 total tests across 33 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend) |
+| **Unit Tests** | `pytest` | Runs 1270 total tests across 33 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -352,7 +352,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 ---
 
-### 👁️ Enable Observer Tests (10 tests)
+### 👁️ Enable Observer Tests (15 tests)
 
 ```bash
 pytest tests/test_enable_observer.py -v
@@ -370,6 +370,11 @@ Tests verify the `enable_observer` configuration flag introduced in v3.0.0 (PR #
 - ✅ **Env var respected** — `ENTELGIA_ENABLE_OBSERVER=false` disables the observer via environment
 - ✅ **Non-enhanced mode unaffected** — disabling observer in non-enhanced mode does not crash
 - ✅ **Both modes consistent** — `enable_observer` behaviour is uniform across enhanced and standard modes
+- ✅ **`fixy_interventions_enabled` default is False** — `Config.fixy_interventions_enabled` defaults to `False`
+- ✅ **Interventions blocked when disabled** — `should_intervene` not called when `fixy_interventions_enabled=False`
+- ✅ **Interventions triggered when enabled** — `should_intervene` called when `fixy_interventions_enabled=True`
+- ✅ **`enable_observer=False` still wins** — setting `fixy_interventions_enabled=True` has no effect when `enable_observer=False`
+- ✅ **`topic_manager_enabled` default is False** — `TopicManager` not instantiated by default even when `topics_enabled=True`
 
 ---
 
@@ -658,7 +663,7 @@ Tests verify stabilization pass features:
 
 ---
 
-### 🔍 Topic Enforcer Tests (41 tests)
+### 🔍 Topic Enforcer Tests (88 tests)
 
 ```bash
 pytest tests/test_topic_enforcer.py -v
@@ -673,6 +678,15 @@ Tests verify `entelgia/topic_enforcer.py` compliance scoring and vocabulary func
 - ✅ **`build_soft_reanchor_instruction`** — generates correct reanchor instruction text
 - ✅ **`ACCEPT_THRESHOLD`** — constant value correct
 - ✅ **`SOFT_REANCHOR_THRESHOLD`** — constant value correct
+- ✅ **`topic_pipeline_enabled` default-off** — returns `False` with default `Config()`
+- ✅ **`topic_pipeline_enabled` explicit on/off** — returns correct value for both `True` and `False`
+- ✅ **`topic_pipeline_enabled` duck-typed config** — works with any object exposing `topics_enabled`
+- ✅ **`topic_pipeline_enabled` missing attribute** — returns `False` when config lacks the attribute
+- ✅ **`topic_pipeline_enabled` importable** — exported from `entelgia/__init__.py`
+- ✅ **`topic_label` empty when topics disabled** — `topic_label` is `""` when `topics_enabled=False`
+- ✅ **Log suppression when disabled** — no topic-related log lines emitted when `topic_pipeline_enabled` returns `False`
+- ✅ **`topic_manager_enabled` default is False** — both flags must be `True` to instantiate `TopicManager`
+- ✅ **`topics_enabled=False` wins** — `topic_manager_enabled=True` has no effect when master switch is off
 
 ---
 
@@ -695,7 +709,7 @@ Tests verify `entelgia/circularity_guard.py` pre-generation circularity detectio
 
 ---
 
-### 🔧 Fixy Improvements Tests (68 tests)
+### 🔧 Fixy Improvements Tests (110 tests)
 
 ```bash
 pytest tests/test_fixy_improvements.py -v
@@ -707,12 +721,15 @@ Tests verify improved Fixy intervention logic in `entelgia/loop_guard.py` and `e
 - ✅ **Pair gating (`InteractiveFixy`)** — no intervention after single Socrates or Athena turn, no intervention when only one agent appears many times, intervention allowed after both agents have spoken, `pending_rewrite_mode` set on intervention and cleared on no-intervention
 - ✅ **Novelty suppression** — loop not declared when new metric, concrete case, forced choice, testable claim, or operational definition is present; structural loop fires without novelty; novelty check returns clusters; no novelty in pure repetition
 - ✅ **Rewrite mode selection** — loop repetition → `force_case`, weak conflict → `force_choice`, premature synthesis → `force_test`, topic stagnation → `force_metric`, shallow discussion → `force_test`; all rewrite modes have prompts; rewrite mode constants have correct values
-- ✅ **Rewrite hint generation** — hint contains rewrite header, rewrite mode, and target agent; hint is structural for each mode (`force_metric`, `force_choice`, `force_test`, `force_case`, `force_definition`); hint sets `pending_rewrite_hint`; empty hint when no modes; hint infers mode from active modes
+- ✅ **Rewrite hint generation** — hint contains rewrite header, rewrite mode, and target agent; hint is structural for each mode (e.g. `force_metric`, `force_choice`, `force_test`, `force_case`, `force_definition`); hint sets `pending_rewrite_hint`; empty hint when no modes; hint infers mode from active modes
 - ✅ **`DialogueRewriter` structural mode** — rewrite includes mode label and target agent; rewrite-mode rule takes priority; no rewrite mode still works
 - ✅ **False positive reduction** — advancing dialogue suppressed, stagnant dialogue still detected, advancement keywords regression
 - ✅ **Both-agents-present check** — true with both, false when only one, correct for Fixy combinations
-- ✅ **`validate_force_choice`** — commitment phrases accepted (`"I choose"`, `"is wrong because"`, `"not X but Y"`, `"wins because"`), hedge phrases rejected (`"both matter"`, `"it depends"`, `"balance"`, `"third path"`, `"reframing without choice"`), commitment overrides single hedge
-- ✅ **Pair gating window scope** — gate closed after Fixy intervention, opens after Fixy when both present, resets after topic shift, resets after dream cycle, resets after each Fixy turn, accepted log emitted when gate passes
+- ✅ **`validate_force_choice`** — commitment phrases accepted, hedge phrases rejected, commitment overrides single hedge
+- ✅ **Pair gating window scope** — gate closed after Fixy intervention, opens after Fixy when both present, resets after topic shift/dream cycle/each Fixy turn
+- ✅ **Staged intervention ladder** — `SOFT_REFLECTION`, `GENTLE_NUDGE`, `STRUCTURED_MEDIATION`, `HARD_CONSTRAINT` mode constants present; hard modes blocked below turn/pair thresholds; `_soft_mode_forced` set when hard blocked; `generate_fixy_analysis()` returns all required fields with correct types and fallback behaviour; NEW_CLAIM gate blocks hard escalation
+- ✅ **Perspective-driven output** — no `Pattern:` or `Your role:` in any `_MODE_PROMPTS` entry; `STRUCTURED_MEDIATION` does not instruct Fixy to "suggest a direction"; `_REASON_LABEL_MAP` entries contain no forbidden imperative endings and each includes at least one perspective-based phrase; `dialogue_read` fallback avoids procedural labels
+- ✅ **Stop-signal counter** — `_consecutive_full_pair_count` increments on successive gate-passes, resets on pair-gate failure, stays at `0` when gate never passes
 
 ---
 
