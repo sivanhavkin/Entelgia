@@ -172,6 +172,7 @@ class ContextManager:
         agent_pronoun: Optional[str] = None,
         web_context: str = "",
         topic_style: str = "",
+        topics_enabled: bool = True,
     ) -> str:
         """
         Build rich context with smart truncation and memory integration.
@@ -190,10 +191,18 @@ class ContextManager:
             agent_pronoun: Pronoun to display (e.g., "he", "she") if show_pronoun is True
             web_context: Optional external knowledge context from web research
             topic_style: Optional style instruction derived from the seed topic cluster
+            topics_enabled: Whether the topic subsystem is active.  When
+                ``False``, ``topic_style`` is suppressed regardless of the
+                value passed by the caller, ensuring no topic-related
+                instructions appear in the prompt.
 
         Returns:
             Formatted prompt string
         """
+        # When the topic subsystem is disabled, force topic_style to empty so
+        # that no STYLE INSTRUCTION block is injected into the prompt.
+        if not topics_enabled:
+            topic_style = ""
         # Take last 8 turns (up from 5)
         recent_dialog = dialog_tail[-8:] if len(dialog_tail) >= 8 else dialog_tail
 
@@ -409,6 +418,7 @@ class EnhancedMemoryIntegration:
         recent_dialog: List[Dict[str, str]],
         ltm_entries: List[Dict[str, Any]],
         limit: int = 8,
+        topics_enabled: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Retrieve memories based on relevance scoring.
@@ -419,6 +429,10 @@ class EnhancedMemoryIntegration:
             recent_dialog: Recent dialogue turns
             ltm_entries: Available LTM entries
             limit: Maximum memories to return
+            topics_enabled: Whether the topic subsystem is active.  When
+                ``False``, ``current_topic`` is ignored and memories are
+                ranked by importance and dialog relevance only, preventing
+                topic-based filtering in topics-disabled sessions.
 
         Returns:
             List of relevant memories
@@ -426,11 +440,15 @@ class EnhancedMemoryIntegration:
         if not ltm_entries:
             return []
 
+        # When topics are disabled, discard the topic label so that memory
+        # scoring cannot be biased by a stale or irrelevant topic string.
+        effective_topic = current_topic if topics_enabled else ""
+
         # Score each memory
         scored_memories = []
         for mem in ltm_entries:
             score = self._calculate_relevance_score(
-                memory=mem, topic=current_topic, recent_dialog=recent_dialog
+                memory=mem, topic=effective_topic, recent_dialog=recent_dialog
             )
             scored_memories.append((score, mem))
 

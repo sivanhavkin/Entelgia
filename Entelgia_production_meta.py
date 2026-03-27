@@ -4996,9 +4996,12 @@ class Agent:
         ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))
         stm_tail = max(3, min(12, int(3 + ego / 2)))
 
-        # Extract current topic from seed for topic gating
-        _current_topic = self._extract_topic_from_seed(user_seed)
-        _current_cluster = self.topic_cluster or ""
+        # Extract current topic from seed for topic gating.
+        # When topics are disabled, force _current_topic to "" so that all
+        # topic-gated STM/LTM filtering and anchor injection are fully
+        # suppressed regardless of what the seed string contains.
+        _current_topic = self._extract_topic_from_seed(user_seed) if CFG.topics_enabled else ""
+        _current_cluster = self.topic_cluster or "" if CFG.topics_enabled else ""
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -5226,8 +5229,10 @@ class Agent:
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
-        # Extract topic from seed (used for memory selection and topic anchors)
-        topic = self._extract_topic_from_seed(user_seed)
+        # Extract topic from seed (used for memory selection and topic anchors).
+        # When topics are disabled, force to "" to prevent any topic-related
+        # processing from running via the extracted label.
+        topic = self._extract_topic_from_seed(user_seed) if CFG.topics_enabled else ""
 
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
@@ -5237,6 +5242,7 @@ class Agent:
                 recent_dialog=dialog_tail[-5:],
                 ltm_entries=all_ltm,
                 limit=8,
+                topics_enabled=CFG.topics_enabled,
             )
         else:
             ltm = all_ltm[:5] if all_ltm else []
@@ -5307,6 +5313,7 @@ class Agent:
             agent_pronoun=agent_pronoun,
             web_context=web_context,
             topic_style=self.topic_style,
+            topics_enabled=CFG.topics_enabled,
         )
 
         # ── Topic Anchors: inject topic constraint before generation ──────────
@@ -7088,9 +7095,11 @@ class MainScript:
         # Initialize enhanced dialogue components if available
         if ENTELGIA_ENHANCED:
             self.dialogue_engine = DialogueEngine()
-            # InteractiveFixy is only created when the observer is enabled
+            # InteractiveFixy is only created when the observer is enabled.
+            # Pass topics_enabled so Fixy can suppress topic-shift pair-window
+            # resets and topic-anchored prompts in topics-disabled sessions.
             self.interactive_fixy = (
-                InteractiveFixy(self.llm, cfg.model_fixy)
+                InteractiveFixy(self.llm, cfg.model_fixy, topics_enabled=cfg.topics_enabled)
                 if cfg.enable_observer
                 else None
             )

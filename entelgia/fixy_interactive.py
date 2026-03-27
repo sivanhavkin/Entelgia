@@ -478,16 +478,26 @@ class InteractiveFixy:
     # turn_count.
     _MIN_CONTEXT_TURNS: int = 2
 
-    def __init__(self, llm, model: str):
+    def __init__(self, llm, model: str, topics_enabled: bool = True):
         """
         Initialize Interactive Fixy.
 
         Args:
             llm: LLM instance for generating interventions
             model: Model name to use
+            topics_enabled: Whether the topic subsystem is active.  When
+                ``False``, any ``notify_pair_reset`` call with
+                ``reason="topic_shift"`` is silently suppressed so that
+                topic-related log entries never appear in a topics-disabled
+                session.
         """
         self.llm = llm
         self.model = model
+        # Mirror of CFG.topics_enabled captured at construction time.
+        # Used to gate topic-shift pair-window resets and topic-aware
+        # prompt anchoring so that all topic-related behaviour is fully
+        # suppressed when the topic subsystem is disabled.
+        self._topics_enabled: bool = topics_enabled
         # Counter for rotating through loop-breaking modes so Fixy never
         # repeats the same breaking strategy in consecutive interventions.
         self._loop_break_rotation: int = 0
@@ -553,6 +563,18 @@ class InteractiveFixy:
             Human-readable label for the triggering event (e.g.
             ``"dream_cycle"``, ``"topic_shift"``, ``"rewrite_injection"``).
         """
+        # When the topic subsystem is disabled, topic-shift resets are
+        # meaningless (there are no topic transitions to wait for) and would
+        # produce misleading log entries.  Suppress them silently so that a
+        # topics-disabled session never emits [FIXY-GATE] pair window reset
+        # entries with reason=topic_shift.
+        if reason == "topic_shift" and not self._topics_enabled:
+            logger.debug(
+                "[FIXY-GATE] pair window reset suppressed: reason=topic_shift"
+                " (topics_enabled=False) dialog_idx=%d",
+                dialog_length,
+            )
+            return
         self._pair_window_start = dialog_length
         self._pair_reset_reason = reason
         logger.info(
@@ -606,6 +628,12 @@ class InteractiveFixy:
         # Reset pending rewrite hint from the previous turn
         self._pending_rewrite_hint = None
         self._pending_rewrite_mode = None
+
+        # When the topic subsystem is disabled, discard any topic label passed
+        # by the caller so that stagnation detection and loop-guard logging
+        # never reference topic strings in a topics-disabled session.
+        if not self._topics_enabled:
+            current_topic = None
 
         # ── Pair gating: require both main agents to have spoken since last reset ──
         # Compute the pair-window boundary: the later of (a) the index just after
@@ -849,6 +877,13 @@ class InteractiveFixy:
             Intervention text
         """
         context = self._build_intervention_context(dialog, reason)
+
+        # When topics are disabled, topic anchoring in the intervention prompt
+        # would reference topic labels that are not active in the session.
+        # Discard the caller-supplied topic so no ACTIVE TOPIC instruction is
+        # injected into the Fixy prompt.
+        if not self._topics_enabled:
+            current_topic = None
 
         # Select Fixy mode — loop-guard reasons override legacy behaviour
         if mode is None:
