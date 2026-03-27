@@ -1155,7 +1155,7 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 
 ### Output Quality Pipeline
 
-* `topics_enabled` — Master switch for the topics feature (default: `False`). When `False`, all topic enforcement, anchor injection, compliance scoring, and Fixy topic-compliance checks are bypassed and agents speak freely. Set to `True` to restore full topic-driven behaviour.
+* `topics_enabled` — Master switch for the topics feature (default: `False`). When `False`, the `TopicManager` is not initialised (no topic rotation, proposals, or selection) and all topic enforcement, anchor injection, compliance scoring, and Fixy topic-compliance checks are bypassed; agents speak freely. Set to `True` to restore full topic-driven behaviour.
 * `topic_anchor_enabled` — Enable topic anchor injection into prompts (default: `True`)
 * `topic_anchor_include_forbidden_carryover` — Include forbidden carryover terms in anchor block (default: `True`)
 * `topic_anchor_max_forbidden_items` — Max carryover terms injected (default: `5`)

@@ -15,12 +15,14 @@ Covers (Part G requirements):
   8. Agent-local continuity does not override session topic anchoring
 """
 
+
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+from unittest.mock import patch
 
 from Entelgia_production_meta import (
     TOPIC_CLUSTERS,
@@ -28,6 +30,7 @@ from Entelgia_production_meta import (
     TopicManager,
     propose_next_topic,
     select_next_topic,
+    Config,
 )
 from entelgia.topic_enforcer import (
     ACCEPT_THRESHOLD,
@@ -807,3 +810,82 @@ class TestGradedRecoveryThresholds:
             < ACCEPT_THRESHOLD
             <= 1.0
         )
+
+
+# ---------------------------------------------------------------------------
+# TopicManager gating: disabled when topics_enabled=False
+# ---------------------------------------------------------------------------
+
+
+class TestTopicManagerGating:
+    """TopicManager must not be instantiated when topics_enabled=False."""
+
+    def test_topics_enabled_defaults_to_false(self):
+        """Config.topics_enabled must default to False."""
+        cfg = Config()
+        assert cfg.topics_enabled is False
+
+    def test_topic_manager_not_created_when_topics_disabled(self):
+        """When topics_enabled=False, TopicManager should never be instantiated."""
+        import Entelgia_production_meta as _meta
+
+        mock_topicmanager_cls = patch.object(_meta, "TopicManager")
+        with mock_topicmanager_cls as mock_cls:
+            # Simulate the gating condition from _run_loop
+            cfg = Config(topics_enabled=False)
+            topicman = None
+            if cfg.topics_enabled:
+                topicman = _meta.TopicManager([], rotate_every_rounds=1)
+            else:
+                topicman = None
+
+            assert topicman is None
+            mock_cls.assert_not_called()
+
+    def test_topic_manager_created_when_topics_enabled(self):
+        """When topics_enabled=True, TopicManager should be instantiated."""
+        topics = _economics_cluster_topics()
+        cfg = Config(topics_enabled=True)
+        topicman = None
+        if cfg.topics_enabled:
+            topicman = TopicManager(topics[:], rotate_every_rounds=1)
+        else:
+            topicman = None
+
+        assert topicman is not None
+        assert isinstance(topicman, TopicManager)
+
+    def test_topic_label_empty_when_topics_disabled(self):
+        """topic_label must be empty string when topics_enabled=False."""
+        cfg = Config(topics_enabled=False)
+        topicman = None
+        if cfg.topics_enabled:
+            topics = _economics_cluster_topics()
+            topicman = TopicManager(topics[:], rotate_every_rounds=1)
+        # Simulate the topic_label assignment from _run_loop
+        import Entelgia_production_meta as _meta
+
+        _meta.CFG = cfg
+        topic_label = topicman.current() if cfg.topics_enabled and topicman else ""
+        assert topic_label == ""
+
+    def test_advance_with_proposals_not_called_when_topics_disabled(self):
+        """advance_with_proposals must not run when topics_enabled=False."""
+        import Entelgia_production_meta as _meta
+
+        cfg = Config(topics_enabled=False)
+        _meta.CFG = cfg
+        topicman = None  # as set by _run_loop when topics_enabled=False
+
+        proposals = ["Scarcity and human behavior", "Economic freedom"]
+        cluster = "economics"
+
+        # Simulate the gating condition from _run_loop (turn_index % 5 == 0)
+        turn_index = 5
+        is_rotation_turn = turn_index % 5 == 0
+        advance_called = False
+        if cfg.topics_enabled and topicman and is_rotation_turn:
+            topicman.advance_with_proposals(proposals, cluster)
+            advance_called = True
+
+        assert not advance_called

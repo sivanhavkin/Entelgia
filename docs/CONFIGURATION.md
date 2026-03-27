@@ -122,6 +122,7 @@ config.topics_enabled = False   # Master switch for the topics feature (default:
 
 When `topics_enabled = False` (the default), the following subsystems are **fully bypassed**:
 
+* **TopicManager** — not initialised; `topicman` is `None` for the entire session (no topic rotation, no proposals, no selection)
 * Topic anchor injection into prompts (`topic_anchor_enabled`, legacy anchor fallback)
 * Forbidden carryover terms from the previous topic
 * Cluster wallpaper penalty block
@@ -129,9 +130,6 @@ When `topics_enabled = False` (the default), the following subsystems are **full
 * DRAFT-stage topic compliance scoring (`TOPIC-RECOVERY` levels: none / soft / partial / hard)
 * Post-Stage-2 `TOPIC-COMPLIANCE` diagnostic log
 * Fixy intervention topic compliance scoring (`TOPIC-COMPLIANCE-FIXY`)
-
-Topic rotation (`TopicManager.advance_with_proposals`) continues to run for session bookkeeping
-even when `topics_enabled = False`; the topic label is simply not enforced on agent output.
 
 To re-enable full topic enforcement:
 
