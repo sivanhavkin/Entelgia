@@ -705,7 +705,7 @@ class InteractiveFixy:
             return (True, "shallow_discussion")
 
         # Pattern 4: Missed synthesis opportunity
-        if turn_count >= 5 and self._detect_synthesis_opportunity(last_10):
+        if turn_count >= 12 and self._detect_synthesis_opportunity(last_10):
             self._pending_rewrite_mode = FixyMode.FORCE_METRIC
             return (True, "synthesis_opportunity")
 
@@ -1114,7 +1114,9 @@ class InteractiveFixy:
         if len(turns) < 4:
             return False
 
-        # Look for synthesis markers being absent
+        # Look for synthesis markers being absent.
+        # Deliberately excludes very common filler words ("all", "also") that
+        # appear in nearly every turn and would cause false positives.
         synthesis_markers = [
             "connect",
             "integrate",
@@ -1124,8 +1126,6 @@ class InteractiveFixy:
             "linking",
             "merging",
             "unified",
-            "all",
-            "also",
         ]
 
         has_synthesis = False

@@ -4747,8 +4747,8 @@ class Agent:
         if not memories:
             return memories
 
-        # Honour global disable flag — pass all memories through unchanged
-        if not CFG.memory_topic_filter_enabled:
+        # Honour global disable flags — pass all memories through unchanged
+        if not CFG.topics_enabled or not CFG.memory_topic_filter_enabled:
             return memories
 
         # Build recent dialogue term set for overlap scoring
@@ -5052,7 +5052,7 @@ class Agent:
 
         # ── Memory Topic Filter ─────────────────────────────────────────────
         # Apply a strict topical relevance filter before injecting memories.
-        if CFG.memory_topic_filter_enabled and _current_topic:
+        if CFG.topics_enabled and CFG.memory_topic_filter_enabled and _current_topic:
             recent_ltm = self._filter_memories_by_topic(
                 recent_ltm, _current_topic, _current_cluster
             )
@@ -6337,7 +6337,7 @@ class Agent:
             content = str(mem.get("content", "")).strip()
 
             # ── Self-Replication Topic Gate ─────────────────────────────────
-            if CFG.self_replication_topic_gate_enabled and topic:
+            if CFG.topics_enabled and CFG.self_replication_topic_gate_enabled and topic:
                 score = self._score_repl_topic_relevance(
                     mem, topic, _current_cluster, _topic_anchors
                 )
@@ -6418,7 +6418,7 @@ class Agent:
             _promoted_this_cycle.append(content)
             promoted_count += 1
 
-        if CFG.self_replication_topic_gate_enabled:
+        if CFG.topics_enabled and CFG.self_replication_topic_gate_enabled:
             logger.info(
                 "[SELF-REPL-TOPIC-GATE] agent=%s kept=%d rejected=%d promoted=%d",
                 self.name,
