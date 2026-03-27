@@ -7354,6 +7354,7 @@ class MainScript:
         # active topic always matches the opening seed text.
         first_topic = self.cfg.seed_topic
         logger.debug("MainScript.run: configured first topic=%r", first_topic)
+        topicman: Optional[TopicManager]
         if CFG.topics_enabled:
             _seed_cluster, _topic_style_str = get_style_for_topic(
                 first_topic, TOPIC_CLUSTERS
@@ -7394,9 +7395,7 @@ class MainScript:
                 topic_list = _all_topics[idx:] + _all_topics[:idx]
             else:
                 topic_list = [first_topic] + _all_topics
-            topicman: Optional[TopicManager] = TopicManager(
-                topic_list, rotate_every_rounds=1, shuffle=False
-            )
+            topicman = TopicManager(topic_list, rotate_every_rounds=1, shuffle=False)
         else:
             topicman = None
             logger.debug(
@@ -7566,6 +7565,8 @@ class MainScript:
                 # Legacy or Fixy seed
                 seed = (
                     f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
+                    if topic_label
+                    else "DISAGREE constructively; add one new angle."
                 )
 
             # ── v2.9.0: Prepend rewrite block when loop is active ─────────

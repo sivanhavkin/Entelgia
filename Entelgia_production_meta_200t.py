@@ -7531,6 +7531,8 @@ class MainScript:
                 # Legacy or Fixy seed
                 seed = (
                     f"TOPIC: {topic_label}\nDISAGREE constructively; add one new angle."
+                    if topic_label
+                    else "DISAGREE constructively; add one new angle."
                 )
 
             # ── v2.9.0: Prepend rewrite block when loop is active ─────────
