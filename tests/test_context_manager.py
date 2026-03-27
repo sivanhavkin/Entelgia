@@ -311,5 +311,154 @@ class TestEnhancedMemoryIntegration:
         assert result == []
 
 
+# ---------------------------------------------------------------------------
+# topics_enabled=False — topic data must be fully suppressed
+# ---------------------------------------------------------------------------
+
+
+class TestTopicsDisabledInContextManager:
+    """When topics_enabled=False, ContextManager and EnhancedMemoryIntegration
+    must not inject topic-related data into prompts or scoring."""
+
+    def setup_method(self):
+        self.cm = ContextManager()
+        self.emi = EnhancedMemoryIntegration()
+
+    def _minimal_drives(self):
+        return {
+            "curiosity": 0.5,
+            "certainty": 0.4,
+            "existential": 0.3,
+            "social": 0.5,
+            "tension": 0.2,
+        }
+
+    def _minimal_debate_profile(self):
+        return {"style": "neutral", "temperature": 0.7}
+
+    # ── build_enriched_context ────────────────────────────────────────────
+
+    def test_topic_style_suppressed_when_topics_disabled(self):
+        """STYLE INSTRUCTION must not appear in the prompt when topics_enabled=False,
+        even if a non-empty topic_style is supplied by the caller."""
+        result = self.cm.build_enriched_context(
+            agent_name="Socrates",
+            agent_lang="en",
+            persona="A philosopher.",
+            drives=self._minimal_drives(),
+            user_seed="What is consciousness?",
+            dialog_tail=[],
+            stm=[],
+            ltm=[],
+            debate_profile=self._minimal_debate_profile(),
+            topic_style="Use investigative, causal reasoning.",
+            topics_enabled=False,
+        )
+        assert "STYLE INSTRUCTION" not in result, (
+            "STYLE INSTRUCTION must be absent when topics_enabled=False"
+        )
+        assert "Use investigative, causal reasoning." not in result, (
+            "topic_style content must not appear in prompt when topics_enabled=False"
+        )
+
+    def test_topic_style_injected_when_topics_enabled(self):
+        """STYLE INSTRUCTION must appear when topics_enabled=True and topic_style is set."""
+        result = self.cm.build_enriched_context(
+            agent_name="Socrates",
+            agent_lang="en",
+            persona="A philosopher.",
+            drives=self._minimal_drives(),
+            user_seed="What is consciousness?",
+            dialog_tail=[],
+            stm=[],
+            ltm=[],
+            debate_profile=self._minimal_debate_profile(),
+            topic_style="Use investigative, causal reasoning.",
+            topics_enabled=True,
+        )
+        assert "STYLE INSTRUCTION" in result or "Use investigative" in result, (
+            "STYLE INSTRUCTION must be present when topics_enabled=True and topic_style is set"
+        )
+
+    def test_empty_topic_style_still_absent_when_topics_disabled(self):
+        """With empty topic_style and topics_enabled=False, no style block appears."""
+        result = self.cm.build_enriched_context(
+            agent_name="Socrates",
+            agent_lang="en",
+            persona="A philosopher.",
+            drives=self._minimal_drives(),
+            user_seed="What is freedom?",
+            dialog_tail=[],
+            stm=[],
+            ltm=[],
+            debate_profile=self._minimal_debate_profile(),
+            topic_style="",
+            topics_enabled=False,
+        )
+        assert "STYLE INSTRUCTION" not in result
+
+    # ── retrieve_relevant_memories ────────────────────────────────────────
+
+    def _dialog(self, text: str = "test"):
+        return [{"role": "Socrates", "text": text}]
+
+    def test_topic_not_used_for_scoring_when_topics_disabled(self):
+        """With topics_enabled=False, a memory highly relevant to the topic
+        must not be ranked above a memory that is better matched by importance
+        and dialog content alone, confirming topic scoring is suppressed."""
+        # Memory A: exact match for topic but low importance
+        mem_topic_match = {
+            "content": "wealth inequality economics distribution",
+            "importance": 0.1,
+        }
+        # Memory B: no topic match but high importance
+        mem_high_importance = {
+            "content": "consciousness identity mind",
+            "importance": 0.9,
+        }
+        result = self.emi.retrieve_relevant_memories(
+            agent_name="Socrates",
+            current_topic="wealth inequality",
+            recent_dialog=self._dialog("philosophy of mind"),
+            ltm_entries=[mem_topic_match, mem_high_importance],
+            limit=2,
+            topics_enabled=False,
+        )
+        # With topic scoring suppressed, the high-importance memory should rank first.
+        assert result, "Must return at least one memory"
+        assert result[0]["content"] == "consciousness identity mind", (
+            "High-importance memory must rank first when topic scoring is suppressed"
+        )
+
+    def test_topic_used_for_scoring_when_topics_enabled(self):
+        """With topics_enabled=True, a memory that matches the topic must be
+        ranked above a memory with higher importance but no topic match."""
+        # Memory A: exact topic match but low importance
+        mem_topic_match = {
+            "content": "wealth inequality economics distribution",
+            "importance": 0.1,
+        }
+        # Memory B: high importance but unrelated topic
+        mem_high_importance = {
+            "content": "quantum mechanics physics",
+            "importance": 0.9,
+        }
+        result = self.emi.retrieve_relevant_memories(
+            agent_name="Socrates",
+            current_topic="wealth inequality",
+            recent_dialog=self._dialog("wealth inequality"),
+            ltm_entries=[mem_topic_match, mem_high_importance],
+            limit=2,
+            topics_enabled=True,
+        )
+        assert len(result) == 2, "Both memories must be returned"
+        assert result[0]["content"] == "wealth inequality economics distribution", (
+            "Topic-matching memory must rank first when topics_enabled=True"
+        )
+        assert result[1]["content"] == "quantum mechanics physics", (
+            "High-importance but off-topic memory must rank second"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])

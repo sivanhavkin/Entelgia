@@ -4974,10 +4974,17 @@ class Agent:
         ltm_limit = max(2, min(10, int(2 + ego / 2 + sa * 4)))
         stm_tail = max(3, min(12, int(3 + ego / 2)))
 
-        # Extract current topic from seed for topic gating
-        _topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-        _current_topic = _topic_match.group(1).strip() if _topic_match else ""
-        _current_cluster = self.topic_cluster or ""
+        # Extract current topic from seed for topic gating.
+        # When topics are disabled, force _current_topic to "" so that all
+        # topic-gated STM/LTM filtering and anchor injection are fully
+        # suppressed regardless of what the seed string contains.
+        if CFG.topics_enabled:
+            _topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
+            _current_topic = _topic_match.group(1).strip() if _topic_match else ""
+            _current_cluster = self.topic_cluster or ""
+        else:
+            _current_topic = ""
+            _current_cluster = ""
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -5207,9 +5214,13 @@ class Agent:
 
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
-            # Extract topic from seed
-            topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-            topic = topic_match.group(1) if topic_match else ""
+            # Extract topic from seed; suppress when topics are disabled so that
+            # memory retrieval is not biased by stale or irrelevant topic strings.
+            if CFG.topics_enabled:
+                topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
+                topic = topic_match.group(1) if topic_match else ""
+            else:
+                topic = ""
 
             ltm = self.memory_integration.retrieve_relevant_memories(
                 agent_name=self.name,
@@ -5217,6 +5228,7 @@ class Agent:
                 recent_dialog=dialog_tail[-5:],
                 ltm_entries=all_ltm,
                 limit=8,
+                topics_enabled=CFG.topics_enabled,
             )
         else:
             ltm = all_ltm[:5] if all_ltm else []
@@ -5287,6 +5299,7 @@ class Agent:
             agent_pronoun=agent_pronoun,
             web_context=web_context,
             topic_style=self.topic_style,
+            topics_enabled=CFG.topics_enabled,
         )
 
         return prompt
@@ -7043,9 +7056,11 @@ class MainScript:
         # Initialize enhanced dialogue components if available
         if ENTELGIA_ENHANCED:
             self.dialogue_engine = DialogueEngine()
-            # InteractiveFixy is only created when the observer is enabled
+            # InteractiveFixy is only created when the observer is enabled.
+            # Pass topics_enabled so Fixy can suppress topic-shift pair-window
+            # resets and topic-anchored prompts in topics-disabled sessions.
             self.interactive_fixy = (
-                InteractiveFixy(self.llm, cfg.model_fixy)
+                InteractiveFixy(self.llm, cfg.model_fixy, topics_enabled=cfg.topics_enabled)
                 if cfg.enable_observer
                 else None
             )

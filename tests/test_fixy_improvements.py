@@ -1061,7 +1061,164 @@ class TestPairGatingWindowScope:
         )
 
 
-if __name__ == "__main__":
+# ---------------------------------------------------------------------------
+# 10. topics_enabled=False — topic-related behaviour must be fully suppressed
+# ---------------------------------------------------------------------------
+
+
+class TestTopicsDisabledSuppression:
+    """When topics_enabled=False, Fixy must not emit topic-shift pair-window
+    resets, must not anchor interventions to a topic, and must not use the
+    caller-supplied current_topic for stagnation detection."""
+
+    class _StubLLM:
+        def generate(self, *args, **kwargs):
+            return "stub intervention"
+
+    def _make_fixy(self, topics_enabled: bool = False):
+        return InteractiveFixy(
+            self._StubLLM(), "stub-model", topics_enabled=topics_enabled
+        )
+
+    # ── notify_pair_reset ─────────────────────────────────────────────────
+
+    def test_topic_shift_reset_suppressed_when_topics_disabled(self, caplog):
+        """notify_pair_reset('topic_shift') must be a no-op when topics_enabled=False."""
+        fixy = self._make_fixy(topics_enabled=False)
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+            fixy.notify_pair_reset(4, "topic_shift")
+
+        # The INFO-level pair-window reset must NOT appear.
+        assert not any(
+            "pair window reset" in m and "topic_shift" in m
+            for m in caplog.messages
+        ), (
+            "notify_pair_reset('topic_shift') must not log an INFO pair window "
+            "reset message when topics_enabled=False"
+        )
+
+    def test_topic_shift_reset_does_not_update_state_when_topics_disabled(self):
+        """When topics_disabled, notify_pair_reset('topic_shift') must not alter
+        _pair_window_start or _pair_reset_reason."""
+        fixy = self._make_fixy(topics_enabled=False)
+        initial_start = fixy._pair_window_start
+        initial_reason = fixy._pair_reset_reason
+
+        fixy.notify_pair_reset(10, "topic_shift")
+
+        assert fixy._pair_window_start == initial_start, (
+            "_pair_window_start must not change when topic_shift is suppressed"
+        )
+        assert fixy._pair_reset_reason == initial_reason, (
+            "_pair_reset_reason must not change when topic_shift is suppressed"
+        )
+
+    def test_non_topic_reset_still_works_when_topics_disabled(self, caplog):
+        """dream_cycle and rewrite_injection resets must still fire when topics_enabled=False."""
+        fixy = self._make_fixy(topics_enabled=False)
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+            fixy.notify_pair_reset(4, "dream_cycle")
+
+        assert any(
+            "pair window reset" in m and "dream_cycle" in m
+            for m in caplog.messages
+        ), "notify_pair_reset('dream_cycle') must still log when topics_enabled=False"
+        assert fixy._pair_window_start == 4
+        assert fixy._pair_reset_reason == "dream_cycle"
+
+    def test_topic_shift_reset_works_when_topics_enabled(self, caplog):
+        """With topics_enabled=True (default), topic_shift resets must fire normally."""
+        fixy = self._make_fixy(topics_enabled=True)
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+            fixy.notify_pair_reset(6, "topic_shift")
+
+        assert any(
+            "pair window reset" in m and "topic_shift" in m
+            for m in caplog.messages
+        ), "notify_pair_reset('topic_shift') must log normally when topics_enabled=True"
+        assert fixy._pair_window_start == 6
+        assert fixy._pair_reset_reason == "topic_shift"
+
+    # ── should_intervene — current_topic discarded ───────────────────────
+
+    def test_should_intervene_discards_current_topic_when_topics_disabled(
+        self, caplog
+    ):
+        """should_intervene must not log or use current_topic when topics_enabled=False."""
+        fixy = self._make_fixy(topics_enabled=False)
+        dialog = [
+            {"role": "Socrates", "text": "Wealth inequality is structural."},
+            {"role": "Athena", "text": "Structural causes require structural remedies."},
+        ]
+        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+            fixy.should_intervene(dialog, turn_count=2, current_topic="Wealth inequality")
+
+        # No log entry should mention the topic label in a way that implies it
+        # was used for active reasoning (e.g. the FIXY-LOOP topic= field).
+        topic_log_entries = [
+            m for m in caplog.messages
+            if "Wealth inequality" in m
+        ]
+        assert not topic_log_entries, (
+            "should_intervene must not emit log messages referencing the "
+            f"current_topic when topics_enabled=False; found: {topic_log_entries}"
+        )
+
+    # ── generate_intervention — topic anchor suppressed ──────────────────
+
+    def test_generate_intervention_suppresses_topic_anchor_when_topics_disabled(self):
+        """generate_intervention must not inject ACTIVE TOPIC into the prompt
+        when topics_enabled=False even if current_topic is non-empty."""
+        prompts_seen: list[str] = []
+
+        class _CaptureLLM:
+            def generate(self, model, prompt, **kwargs):
+                prompts_seen.append(prompt)
+                return "stub"
+
+        fixy = InteractiveFixy(_CaptureLLM(), "stub-model", topics_enabled=False)
+        dialog = [
+            {"role": "Socrates", "text": "What is wealth?"},
+            {"role": "Athena", "text": "A relative construct."},
+        ]
+        fixy.generate_intervention(
+            dialog, "circular_reasoning", current_topic="Wealth inequality"
+        )
+
+        assert prompts_seen, "LLM.generate must have been called"
+        combined = "\n".join(prompts_seen)
+        assert "ACTIVE TOPIC" not in combined, (
+            "generate_intervention must not inject ACTIVE TOPIC when topics_enabled=False"
+        )
+        assert "Wealth inequality" not in combined, (
+            "generate_intervention must not reference the topic label when topics_enabled=False"
+        )
+
+    def test_generate_intervention_includes_topic_anchor_when_topics_enabled(self):
+        """With topics_enabled=True, ACTIVE TOPIC must appear in the prompt."""
+        prompts_seen: list[str] = []
+
+        class _CaptureLLM:
+            def generate(self, model, prompt, **kwargs):
+                prompts_seen.append(prompt)
+                return "stub"
+
+        fixy = InteractiveFixy(_CaptureLLM(), "stub-model", topics_enabled=True)
+        dialog = [
+            {"role": "Socrates", "text": "What is wealth?"},
+            {"role": "Athena", "text": "A relative construct."},
+        ]
+        fixy.generate_intervention(
+            dialog, "circular_reasoning", current_topic="Wealth inequality"
+        )
+
+        combined = "\n".join(prompts_seen)
+        assert "ACTIVE TOPIC" in combined, (
+            "generate_intervention must inject ACTIVE TOPIC when topics_enabled=True"
+        )
+        assert "Wealth inequality" in combined, (
+            "generate_intervention must reference the topic label when topics_enabled=True"
+        )
     import pytest as _pytest
 
     _pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
