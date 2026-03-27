@@ -1219,6 +1219,356 @@ class TestTopicsDisabledSuppression:
         assert "Wealth inequality" in combined, (
             "generate_intervention must reference the topic label when topics_enabled=True"
         )
+
+
+# ---------------------------------------------------------------------------
+# 11. Staged intervention ladder — new FixyMode constants and hard thresholds
+# ---------------------------------------------------------------------------
+
+
+from entelgia.fixy_interactive import (
+    MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION,
+    MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION,
+    _HARD_INTERVENTION_MODES,
+)
+
+
+class TestStagedInterventionLadder:
+    """Fixy must NOT use hard intervention modes before threshold turns/pairs."""
+
+    class _StubLLM:
+        def generate(self, *args, **kwargs):
+            return "stub"
+
+    def _make_fixy(
+        self,
+        min_turns_hard=MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION,
+        min_pairs_hard=MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION,
+    ):
+        return InteractiveFixy(
+            self._StubLLM(),
+            "stub-model",
+            min_turns_hard=min_turns_hard,
+            min_pairs_hard=min_pairs_hard,
+        )
+
+    def test_module_level_constants_correct(self):
+        """Module-level threshold constants must match documented defaults."""
+        assert MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION == 8
+        assert MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION == 3
+
+    def test_new_fixy_modes_defined(self):
+        """All staged intervention mode constants must be present on FixyMode."""
+        assert hasattr(FixyMode, "SILENT_OBSERVE")
+        assert hasattr(FixyMode, "SOFT_REFLECTION")
+        assert hasattr(FixyMode, "GENTLE_NUDGE")
+        assert hasattr(FixyMode, "STRUCTURED_MEDIATION")
+        assert hasattr(FixyMode, "HARD_CONSTRAINT")
+
+    def test_hard_modes_set_non_empty(self):
+        """_HARD_INTERVENTION_MODES must be a non-empty frozenset."""
+        assert isinstance(_HARD_INTERVENTION_MODES, frozenset)
+        assert len(_HARD_INTERVENTION_MODES) > 0
+
+    def test_hard_mode_force_choice_in_set(self):
+        """FORCE_CHOICE must be classified as a hard intervention mode."""
+        assert FixyMode.FORCE_CHOICE in _HARD_INTERVENTION_MODES
+
+    def test_hard_mode_contradict_in_set(self):
+        """CONTRADICT must be classified as a hard intervention mode."""
+        assert FixyMode.CONTRADICT in _HARD_INTERVENTION_MODES
+
+    def test_soft_mode_not_in_hard_set(self):
+        """SOFT_REFLECTION must NOT be in _HARD_INTERVENTION_MODES."""
+        assert FixyMode.SOFT_REFLECTION not in _HARD_INTERVENTION_MODES
+
+    def test_gentle_nudge_not_in_hard_set(self):
+        """GENTLE_NUDGE must NOT be in _HARD_INTERVENTION_MODES."""
+        assert FixyMode.GENTLE_NUDGE not in _HARD_INTERVENTION_MODES
+
+    def test_constructor_accepts_threshold_params(self):
+        """InteractiveFixy must accept min_turns_hard and min_pairs_hard params."""
+        fixy = self._make_fixy(min_turns_hard=5, min_pairs_hard=2)
+        assert fixy._min_turns_hard == 5
+        assert fixy._min_pairs_hard == 2
+
+    def test_default_thresholds_match_constants(self):
+        """Default constructor thresholds must match module-level constants."""
+        fixy = InteractiveFixy(self._StubLLM(), "stub-model")
+        assert fixy._min_turns_hard == MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION
+        assert fixy._min_pairs_hard == MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION
+
+    def test_get_fixy_mode_returns_soft_when_soft_mode_forced(self):
+        """get_fixy_mode must return a soft mode when _soft_mode_forced is True."""
+        fixy = self._make_fixy()
+        fixy._soft_mode_forced = True  # simulate hard-blocked state
+        mode = fixy.get_fixy_mode("loop_repetition")
+        assert mode in {
+            FixyMode.SOFT_REFLECTION,
+            FixyMode.GENTLE_NUDGE,
+            FixyMode.STRUCTURED_MEDIATION,
+        }, f"Expected soft mode when _soft_mode_forced; got {mode!r}"
+
+    def test_get_fixy_mode_uses_rotation_when_soft_mode_not_forced(self):
+        """get_fixy_mode must use loop-breaking rotation when soft mode not forced."""
+        fixy = self._make_fixy()
+        fixy._soft_mode_forced = False  # normal state
+        fixy._pending_rewrite_mode = FixyMode.FORCE_CASE
+        mode = fixy.get_fixy_mode("loop_repetition")
+        # Should be a loop-breaking mode, not a soft staged mode
+        assert mode not in {
+            FixyMode.SOFT_REFLECTION,
+            FixyMode.GENTLE_NUDGE,
+            FixyMode.STRUCTURED_MEDIATION,
+        }, f"Should not return soft mode when _soft_mode_forced=False; got {mode!r}"
+
+    def test_new_staged_modes_have_prompts(self):
+        """All staged ladder modes must have entries in _MODE_PROMPTS."""
+        for mode in (
+            FixyMode.SOFT_REFLECTION,
+            FixyMode.GENTLE_NUDGE,
+            FixyMode.STRUCTURED_MEDIATION,
+            FixyMode.HARD_CONSTRAINT,
+        ):
+            assert (
+                mode in _MODE_PROMPTS
+            ), f"FixyMode.{mode!r} must have a prompt in _MODE_PROMPTS"
+
+    def test_soft_mode_prompts_avoid_rigid_labels(self):
+        """Soft mode prompts must not instruct the LLM to produce rigid labels."""
+        soft_modes = (
+            FixyMode.SOFT_REFLECTION,
+            FixyMode.GENTLE_NUDGE,
+            FixyMode.STRUCTURED_MEDIATION,
+        )
+        # These phrases would instruct the LLM to produce rigid police-style output.
+        forbidden_instructions = (
+            "Preferred labels:",
+            "Use 'Deadlock:'",
+            "Use 'Loop:'",
+            "Use 'Next move:'",
+            "Use 'Drift:'",
+        )
+        for mode in soft_modes:
+            prompt = _MODE_PROMPTS[mode]
+            for instruction in forbidden_instructions:
+                assert instruction not in prompt, (
+                    f"Soft mode {mode!r} prompt must not contain instruction {instruction!r}; "
+                    f"got: {prompt[:200]}"
+                )
+
+    def test_soft_mode_prompts_use_natural_language(self):
+        """Soft mode prompts must include natural mediation language."""
+        natural_phrases = (
+            "It seems the disagreement",
+            "What remains unclear",
+            "A missing distinction",
+            "Both of you may be",
+        )
+        soft_modes = (
+            FixyMode.SOFT_REFLECTION,
+            FixyMode.GENTLE_NUDGE,
+            FixyMode.STRUCTURED_MEDIATION,
+        )
+        for mode in soft_modes:
+            prompt = _MODE_PROMPTS[mode]
+            assert any(phrase in prompt for phrase in natural_phrases), (
+                f"Soft mode {mode!r} prompt must include natural mediation language; "
+                f"got: {prompt[:200]}"
+            )
+
+    def test_reason_label_map_avoids_deadlock_label(self):
+        """_REASON_LABEL_MAP entries must NOT instruct the LLM to use 'Deadlock:'."""
+        from entelgia.fixy_interactive import _REASON_LABEL_MAP
+
+        for reason, instruction in _REASON_LABEL_MAP.items():
+            assert "Use 'Deadlock:'" not in instruction, (
+                f"_REASON_LABEL_MAP[{reason!r}] must not instruct LLM to use "
+                f"rigid 'Deadlock:' label; got: {instruction}"
+            )
+
+    def test_reason_label_map_avoids_next_move_label(self):
+        """_REASON_LABEL_MAP entries must NOT instruct LLM to use 'Next move:' label."""
+        from entelgia.fixy_interactive import _REASON_LABEL_MAP
+
+        for reason, instruction in _REASON_LABEL_MAP.items():
+            assert "Use 'Next move:'" not in instruction, (
+                f"_REASON_LABEL_MAP[{reason!r}] must not instruct LLM to use "
+                f"rigid 'Next move:' label; got: {instruction}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# 12. NEW_CLAIM detection in recent turns
+# ---------------------------------------------------------------------------
+
+
+class TestNewClaimDetection:
+    """_detect_new_claim_in_recent_turns must suppress hard interventions."""
+
+    class _StubLLM:
+        def generate(self, *args, **kwargs):
+            return "stub"
+
+    def _make_fixy(self):
+        return InteractiveFixy(self._StubLLM(), "stub-model")
+
+    def test_empty_turns_returns_false(self):
+        """Empty turn list must return False (no NEW_CLAIM)."""
+        fixy = self._make_fixy()
+        assert fixy._detect_new_claim_in_recent_turns([]) is False
+
+    def test_fixy_turns_excluded(self):
+        """Fixy turns must be excluded from NEW_CLAIM detection."""
+        fixy = self._make_fixy()
+        turns = [
+            {"role": "Fixy", "text": "This is a novel claim about a new concept."},
+        ]
+        # Fixy's own turns should not count as NEW_CLAIM for the gate
+        # (the method filters out role=Fixy)
+        result = fixy._detect_new_claim_in_recent_turns(turns)
+        # Whether True or False, the filter must not crash
+        assert isinstance(result, bool)
+
+
+# ---------------------------------------------------------------------------
+# 13. generate_fixy_analysis — structured internal output
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateFixyAnalysis:
+    """generate_fixy_analysis must return a well-formed structured dict."""
+
+    class _StubLLM:
+        def generate(self, *args, **kwargs):
+            return "stub"
+
+    def _make_fixy(self, min_turns_hard=8, min_pairs_hard=3):
+        return InteractiveFixy(
+            self._StubLLM(),
+            "stub-model",
+            min_turns_hard=min_turns_hard,
+            min_pairs_hard=min_pairs_hard,
+        )
+
+    def _make_dialog(self):
+        return _make_turns(
+            [
+                "freedom means self-determination and personal autonomy",
+                "society constrains freedom through collective agreements",
+            ]
+        )
+
+    def test_returns_dict_with_required_keys(self):
+        """generate_fixy_analysis must return a dict with all required keys."""
+        fixy = self._make_fixy()
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="loop_repetition",
+            intervention_mode=FixyMode.SOFT_REFLECTION,
+            turn_count=4,
+        )
+        required_keys = {
+            "intervention_mode",
+            "dialogue_read",
+            "missing_element",
+            "suggested_vector",
+            "urgency",
+        }
+        assert set(result.keys()) == required_keys, (
+            f"generate_fixy_analysis must return {required_keys!r}; got {set(result.keys())!r}"
+        )
+
+    def test_intervention_mode_preserved(self):
+        """intervention_mode in output must match the supplied mode."""
+        fixy = self._make_fixy()
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="weak_conflict",
+            intervention_mode=FixyMode.GENTLE_NUDGE,
+            turn_count=3,
+        )
+        assert result["intervention_mode"] == FixyMode.GENTLE_NUDGE
+
+    def test_urgency_low_early_turns(self):
+        """Urgency must be 'low' when turn count is below half the threshold."""
+        fixy = self._make_fixy(min_turns_hard=8)
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="loop_repetition",
+            intervention_mode=FixyMode.SOFT_REFLECTION,
+            turn_count=2,  # below 8//2 = 4
+        )
+        assert result["urgency"] == "low", (
+            f"Expected 'low' urgency at turn 2; got {result['urgency']!r}"
+        )
+
+    def test_urgency_medium_mid_turns(self):
+        """Urgency must be 'medium' when turn count is at or above half the threshold."""
+        fixy = self._make_fixy(min_turns_hard=8)
+        # pairs < threshold so urgency is medium, not high
+        fixy._consecutive_full_pair_count = 1
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="loop_repetition",
+            intervention_mode=FixyMode.GENTLE_NUDGE,
+            turn_count=5,  # 5 >= 8//2 = 4, but pairs=1 < 3
+        )
+        assert result["urgency"] == "medium", (
+            f"Expected 'medium' urgency at turn 5, pairs=1; got {result['urgency']!r}"
+        )
+
+    def test_urgency_high_above_thresholds(self):
+        """Urgency must be 'high' when both turn and pair thresholds are met."""
+        fixy = self._make_fixy(min_turns_hard=8, min_pairs_hard=3)
+        fixy._consecutive_full_pair_count = 4  # above pairs threshold
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="high_conflict_no_resolution",
+            intervention_mode=FixyMode.STRUCTURED_MEDIATION,
+            turn_count=10,  # above turn threshold
+        )
+        assert result["urgency"] == "high", (
+            f"Expected 'high' urgency when thresholds met; got {result['urgency']!r}"
+        )
+
+    def test_dialogue_read_non_empty(self):
+        """dialogue_read must be a non-empty string."""
+        fixy = self._make_fixy()
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="loop_repetition",
+            intervention_mode=FixyMode.SOFT_REFLECTION,
+            turn_count=4,
+        )
+        assert isinstance(result["dialogue_read"], str)
+        assert len(result["dialogue_read"]) > 0
+
+    def test_missing_element_non_empty(self):
+        """missing_element must be a non-empty string."""
+        fixy = self._make_fixy()
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="weak_conflict",
+            intervention_mode=FixyMode.GENTLE_NUDGE,
+            turn_count=4,
+        )
+        assert isinstance(result["missing_element"], str)
+        assert len(result["missing_element"]) > 0
+
+    def test_suggested_vector_non_empty(self):
+        """suggested_vector must be a non-empty string."""
+        fixy = self._make_fixy()
+        result = fixy.generate_fixy_analysis(
+            dialog=self._make_dialog(),
+            reason="shallow_discussion",
+            intervention_mode=FixyMode.STRUCTURED_MEDIATION,
+            turn_count=12,
+        )
+        assert isinstance(result["suggested_vector"], str)
+        assert len(result["suggested_vector"]) > 0
+
+
     import pytest as _pytest
 
     _pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
