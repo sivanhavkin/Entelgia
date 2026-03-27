@@ -45,9 +45,17 @@ from Entelgia_production_meta import (
 # ---------------------------------------------------------------------------
 
 
+def _make_cfg(*, topic_anchor_enabled: bool = True) -> Config:
+    """Return a Config with the topic subsystem enabled for testing."""
+    cfg = Config()
+    cfg.topics_enabled = True
+    cfg.topic_anchor_enabled = topic_anchor_enabled
+    return cfg
+
+
 def _make_agent(name: str = "Socrates", last_topic: str = "") -> Agent:
     """Return a minimal Agent whose LLM and memory calls are fully mocked."""
-    cfg = Config()
+    cfg = _make_cfg()
 
     llm_mock = MagicMock()
     llm_mock.generate.return_value = "I reflect on this philosophical question."
@@ -233,7 +241,7 @@ class TestBuildCompactPromptTopicAnchors:
     """_build_compact_prompt injects topic anchor requirements."""
 
     def test_anchor_requirement_injected_for_known_topic(self):
-        cfg = Config()
+        cfg = _make_cfg()
         agent = _make_agent()
         seed = "TOPIC: AI alignment\nDiscuss the implications."
         with patch.object(_meta, "CFG", cfg):
@@ -247,7 +255,7 @@ class TestBuildCompactPromptTopicAnchors:
         assert "reward hacking" in prompt
 
     def test_no_anchor_requirement_for_unknown_topic(self):
-        cfg = Config()
+        cfg = _make_cfg()
         agent = _make_agent()
         seed = "TOPIC: Some unknown topic\nDiscuss."
         with patch.object(_meta, "CFG", cfg):
@@ -260,7 +268,7 @@ class TestBuildCompactPromptTopicAnchors:
         assert "Active topic: Some unknown topic" in prompt
 
     def test_no_anchor_requirement_when_no_topic_in_seed(self):
-        cfg = Config()
+        cfg = _make_cfg()
         agent = _make_agent()
         seed = "What is consciousness?"
         with patch.object(_meta, "CFG", cfg):
@@ -271,7 +279,7 @@ class TestBuildCompactPromptTopicAnchors:
         assert "Topic constraint:" not in prompt
 
     def test_forbidden_carryover_injected_on_topic_change(self):
-        cfg = Config()
+        cfg = _make_cfg()
         agent = _make_agent(last_topic="Autonomous systems")
         seed = "TOPIC: AI alignment\nDiscuss."
         with patch.object(_meta, "CFG", cfg):
@@ -288,7 +296,7 @@ class TestBuildCompactPromptTopicAnchors:
             ), f"Expected forbidden concept {concept!r} in prompt"
 
     def test_no_forbidden_carryover_when_topic_unchanged(self):
-        cfg = Config()
+        cfg = _make_cfg()
         agent = _make_agent(last_topic="AI alignment")
         seed = "TOPIC: AI alignment\nDiscuss."
         with patch.object(_meta, "CFG", cfg):
@@ -297,7 +305,7 @@ class TestBuildCompactPromptTopicAnchors:
         assert "Do NOT reuse concepts from previous discussions" not in prompt
 
     def test_no_forbidden_carryover_on_first_turn(self):
-        cfg = Config()
+        cfg = _make_cfg()
         agent = _make_agent(last_topic="")
         seed = "TOPIC: AI alignment\nDiscuss."
         with patch.object(_meta, "CFG", cfg):
@@ -307,8 +315,7 @@ class TestBuildCompactPromptTopicAnchors:
 
     def test_topic_anchor_disabled_falls_back_to_legacy(self):
         """When topic_anchor_enabled=False, the old 'Topic constraint:' format is used."""
-        cfg = Config()
-        cfg.topic_anchor_enabled = False
+        cfg = _make_cfg(topic_anchor_enabled=False)
         agent = _make_agent()
         seed = "TOPIC: AI alignment\nDiscuss."
         with patch.object(_meta, "CFG", cfg):
@@ -347,7 +354,7 @@ class TestTopicMismatchPersistWarning:
         )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
@@ -371,7 +378,7 @@ class TestTopicMismatchPersistWarning:
         )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
@@ -407,7 +414,7 @@ class TestTopicHardRecovery:
         )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
@@ -433,7 +440,7 @@ class TestTopicHardRecovery:
         agent.llm.generate.side_effect = capturing_generate
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         # Two calls: initial (score < 0.50 → hard recovery) + hard-recovery prompt
@@ -463,7 +470,7 @@ class TestTopicHardRecovery:
         ]
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 result = agent.speak(seed, self._PRIOR_TURN)
 
         assert (
@@ -480,7 +487,7 @@ class TestTopicHardRecovery:
         )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         recovery_msgs = [
@@ -506,7 +513,7 @@ class TestTopicHardRecovery:
         agent.llm.generate.side_effect = capturing_generate
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         assert (
@@ -545,7 +552,7 @@ class TestTopicMismatchFirstTurn:
         seed = "TOPIC: AI alignment\nDiscuss."
         # Empty dialog_tail → agent has not spoken yet (first turn)
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, [])
 
         mismatch_msgs = [
@@ -564,7 +571,7 @@ class TestTopicMismatchFirstTurn:
         )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, [])
 
         persist_msgs = [
@@ -584,7 +591,7 @@ class TestTopicMismatchFirstTurn:
         seed = "TOPIC: AI alignment\nDiscuss."
         prior_turn = [{"role": "Socrates", "text": "I have previously spoken on this."}]
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, prior_turn)
 
         recovery_msgs = [
@@ -767,7 +774,7 @@ class TestTopicFallbackPipeline:
         )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         fallback_msgs = [
@@ -785,7 +792,7 @@ class TestTopicFallbackPipeline:
         )
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 result = agent.speak(seed, self._PRIOR_TURN)
 
         expected_fallback = TOPIC_FALLBACK_TEMPLATES["AI alignment"]
@@ -803,7 +810,7 @@ class TestTopicFallbackPipeline:
         ]
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 result = agent.speak(seed, self._PRIOR_TURN)
 
         fallback_msgs = [
@@ -831,7 +838,7 @@ class TestTopicFallbackPipeline:
         original = _meta_module.TOPIC_FALLBACK_TEMPLATES.pop(fake_topic, None)
         try:
             with caplog.at_level(logging.WARNING, logger="entelgia"):
-                with patch.object(_meta, "CFG", Config()):
+                with patch.object(_meta, "CFG", _make_cfg()):
                     result = agent.speak(seed, self._PRIOR_TURN)
             assert (
                 fake_topic in result
@@ -863,7 +870,7 @@ class TestHardRecoveryPromptEnhancements:
         agent.llm.generate.side_effect = capturing_generate
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         # Two calls: initial + hard recovery
@@ -890,7 +897,7 @@ class TestHardRecoveryPromptEnhancements:
         agent.llm.generate.side_effect = capturing_generate
         seed = "TOPIC: AI alignment\nDiscuss."
         with caplog.at_level(logging.WARNING, logger="entelgia"):
-            with patch.object(_meta, "CFG", Config()):
+            with patch.object(_meta, "CFG", _make_cfg()):
                 agent.speak(seed, self._PRIOR_TURN)
 
         assert len(captured_prompts) == 2

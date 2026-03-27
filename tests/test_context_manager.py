@@ -354,12 +354,12 @@ class TestTopicsDisabledInContextManager:
             topic_style="Use investigative, causal reasoning.",
             topics_enabled=False,
         )
-        assert "STYLE INSTRUCTION" not in result, (
-            "STYLE INSTRUCTION must be absent when topics_enabled=False"
-        )
-        assert "Use investigative, causal reasoning." not in result, (
-            "topic_style content must not appear in prompt when topics_enabled=False"
-        )
+        assert (
+            "STYLE INSTRUCTION" not in result
+        ), "STYLE INSTRUCTION must be absent when topics_enabled=False"
+        assert (
+            "Use investigative, causal reasoning." not in result
+        ), "topic_style content must not appear in prompt when topics_enabled=False"
 
     def test_topic_style_injected_when_topics_enabled(self):
         """STYLE INSTRUCTION must appear when topics_enabled=True and topic_style is set."""
@@ -376,9 +376,9 @@ class TestTopicsDisabledInContextManager:
             topic_style="Use investigative, causal reasoning.",
             topics_enabled=True,
         )
-        assert "STYLE INSTRUCTION" in result or "Use investigative" in result, (
-            "STYLE INSTRUCTION must be present when topics_enabled=True and topic_style is set"
-        )
+        assert (
+            "STYLE INSTRUCTION" in result or "Use investigative" in result
+        ), "STYLE INSTRUCTION must be present when topics_enabled=True and topic_style is set"
 
     def test_empty_topic_style_still_absent_when_topics_disabled(self):
         """With empty topic_style and topics_enabled=False, no style block appears."""
@@ -426,9 +426,9 @@ class TestTopicsDisabledInContextManager:
         )
         # With topic scoring suppressed, the high-importance memory should rank first.
         assert result, "Must return at least one memory"
-        assert result[0]["content"] == "consciousness identity mind", (
-            "High-importance memory must rank first when topic scoring is suppressed"
-        )
+        assert (
+            result[0]["content"] == "consciousness identity mind"
+        ), "High-importance memory must rank first when topic scoring is suppressed"
 
     def test_topic_used_for_scoring_when_topics_enabled(self):
         """With topics_enabled=True, a memory that matches the topic must be
@@ -452,12 +452,12 @@ class TestTopicsDisabledInContextManager:
             topics_enabled=True,
         )
         assert len(result) == 2, "Both memories must be returned"
-        assert result[0]["content"] == "wealth inequality economics distribution", (
-            "Topic-matching memory must rank first when topics_enabled=True"
-        )
-        assert result[1]["content"] == "quantum mechanics physics", (
-            "High-importance but off-topic memory must rank second"
-        )
+        assert (
+            result[0]["content"] == "wealth inequality economics distribution"
+        ), "Topic-matching memory must rank first when topics_enabled=True"
+        assert (
+            result[1]["content"] == "quantum mechanics physics"
+        ), "High-importance but off-topic memory must rank second"
 
 
 if __name__ == "__main__":

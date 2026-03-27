@@ -37,7 +37,10 @@ from entelgia.topic_enforcer import (
 def _make_agent(cfg_overrides=None, last_topic=""):
     """Build a minimal Agent stub for testing _build_compact_prompt."""
     cfg = Config()
-    # Apply any caller overrides
+    # Enable topic subsystem by default so tests that verify anchor injection work.
+    cfg.topics_enabled = True
+    cfg.topic_anchor_enabled = True
+    # Apply any caller overrides (may override topics_enabled / topic_anchor_enabled)
     if cfg_overrides:
         for k, v in cfg_overrides.items():
             setattr(cfg, k, v)
