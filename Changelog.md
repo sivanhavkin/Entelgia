@@ -12,18 +12,48 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
-- **Dynamic progress scoring in `score_progress()`** (`entelgia/progress_enforcer.py`) — replaces the static flat score for `NEW_CLAIM` moves with a composite system that rewards genuinely state-changing turns. Four dynamic bonuses stack on top of the base move-type score:
+- **Dynamic progress scoring in `score_progress()`** (`entelgia/progress_enforcer.py`) — replaces the static flat score for `NEW_CLAIM` moves with a composite system that rewards genuinely state-changing turns. Four dynamic bonuses stack on top of the base move-type score: (#350)
   - `+0.20` when the argumentative state actually changed (new or updated claim in `ClaimsMemory`)
   - `+0.20` when contradiction strength exceeds 0.7 (≥ 4 of 5 attack-pattern families matched)
   - `+0.20` when a significant domain / vocabulary shift is detected vs. recent history
   - `+0.30` additional bonus for a `RESOLUTION_ATTEMPT` move (on top of the base `+0.20`)
   - Scores are capped at `1.0`. Enables progress scores well above 0.40 for substantive turns.
-- **`_contradiction_strength(text) → float`** — new internal helper that normalizes the number of distinct attack-pattern families matched in `text` to `[0.0, 1.0]`. Used by `score_progress()` to gate the contradiction bonus.
-- **`_detect_domain_shift(text, history) → bool`** — new internal helper that returns `True` when more than 40 % of the meaningful tokens in `text` are absent from all recent history turns, indicating the response opens a new conceptual domain.
+- **`_contradiction_strength(text) → float`** — new internal helper that normalizes the number of distinct attack-pattern families matched in `text` to `[0.0, 1.0]`. Used by `score_progress()` to gate the contradiction bonus. (#350)
+- **`_detect_domain_shift(text, history) → bool`** — new internal helper that returns `True` when more than 40 % of the meaningful tokens in `text` are absent from all recent history turns, indicating the response opens a new conceptual domain. (#350)
+- **New module `entelgia/response_evaluator.py`** — measurement-only turn-level evaluation layer. Neither score connects to engine logic, thresholds, or Fixy routing: (#351)
+  - **`evaluate_response() → linguistic_score`** — heuristic quality scorer: lexical diversity, specificity, sentence complexity, depth, hedge penalty. Returns `float` in `[0.0, 1.0]`.
+  - **`evaluate_dialogue_movement() → dialogue_score`** — measures whether the response moved the conversation: base `0.4`, new-claim bonus `+0.15` (Jaccard overlap < 0.75 vs last turn), pressure bonus `+0.15`, resolution bonus `+0.25`, semantic-repeat penalty `−0.20`. Returns `float` in `[0.0, 1.0]`.
+- **`DialogueSignals` TypedDict** (`entelgia/response_evaluator.py`) — structured breakdown dict with fields `score`, `new_claim`, `pressure`, `resolution`, `semantic_repeat`. Returned by the new `evaluate_dialogue_movement_with_signals()` function, giving full component-level visibility into what drove the dialogue score. (#353)
+- **`[EVAL]` / `[DIALOGUE]` per-turn log lines** — emitted once per agent turn after the visible response. `[EVAL]` reports `linguistic_score`; `[DIALOGUE]` reports `dialogue_score` plus all four component flags (`new_claim`, `pressure`, `resolution`, `semantic_repeat`). Stored on `Agent` as `_last_eval_score`, `_last_dialogue_score`, and `_last_dialogue_signals`. (#351, #353)
+- **`creates_pressure()` — multi-layer heuristic** (`entelgia/response_evaluator.py`) — extended from a single keyword list to five independent detection layers, reducing false negatives without relaxing the signal definition: (#354, #355, #356, #357)
+  - **Layer 1** — keyword list (`"but"`, `"however"`, `"contradicts"`, etc.)
+  - **Layer 2** — phrase fragments: `"you assume"`, `"what if"`, `"how do you know"`, `"hidden premise"`, `"quietly assumes"`, `"what happens if"`, and more
+  - **Layer 3** — compiled regex patterns for structural challenge forms: `treats … as if`, `if … does that mean`, `if …, then`, conditional instability probes; all bounded `{0,200}` to prevent backtracking
+  - **Layer 4** — rhetorical-question rule: fires when `?` is present and a marker from `_RHETORICAL_QUESTION_MARKERS` is matched; markers include assumption/epistemic/contradiction-framing and reframing families; word-family prefixes (`"assum"`, `"justif"`, `"defin"`) match inflected forms
+  - **Layer 5** — assertion phrases: declarative critique and reframing patterns that apply pressure without a question mark (`"misses that"`, `"ignores that"`, `"assumes that"`, `"you seem to"`, `"there's no guarantee"`, `"fails to consider"`, `"overlooks"`)
+- **`shows_resolution()` — extended keyword and regex matching** (`entelgia/response_evaluator.py`) — adds mutual-exclusion phrases (`"one must yield"`, `"one excludes the other"`, `"cannot operate simultaneously"`), tradeoff phrases (`"you cannot have both"`, `"for one to happen, the other must"`), collapse/narrowing phrases, and compiled regex patterns for `either…or` exclusion and conditional tradeoff structures. (#354)
+- **`compute_pressure_alignment()` measurement signal** (`entelgia/response_evaluator.py`) — passive per-turn comparison between the agent's internal `drive_pressure` scalar (meta signal) and the text-detected `pressure` boolean. Uses banded thresholds `_META_PRESSURE_LOW_THRESHOLD = 2.5` and `_META_PRESSURE_HIGH_THRESHOLD = 4.5` to produce five labels: `aligned`, `internal_not_expressed`, `text_more_pressured_than_state`, `weak_alignment` (grey zone), `neutral`. Emitted as a `[PRESSURE-SYNC]` log line after `[DIALOGUE]`. (#359, #360)
+- **`compute_resolution_alignment()` and `compute_semantic_repeat_alignment()` measurement signals** (`entelgia/response_evaluator.py`) — passive per-turn alignment between text-detected resolution/semantic-repeat signals and internal dialogue state. Emitted as `[RESOLUTION-SYNC]` and `[SEMANTIC-REPEAT-SYNC]` log lines. (#362, #363)
+- **Dialogue pressure feedback loop** — soft exponential-weighted moving average (EWM) upward nudge from text-detected pressure into `drive_pressure`: `_PRESSURE_FEEDBACK_ALPHA = 0.15`, upward-only (existing `compute_drive_pressure` decay handles the downward direction), capped at `10.0`. Max single-turn delta is `α × (10 − current)` ≤ 1.5, diminishing as pressure rises. (#361)
+- **Stagnation metric: `_topic_keywords()` and `_keyword_jaccard()`** (`Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`) — replaces the MD5 hash-based exact-match comparison with Jaccard similarity on keyword frozensets. `_JACCARD_STAGNATION_THRESHOLD = 0.35` and `_PE_STAGNATION_INCREMENT = 0.25` are new named constants. Progress-enforcer stagnation detections now feed back into `_last_stagnation` (capped at 1.0), ensuring the meta-state scalar reflects detected behavioural stagnation. (#364)
 
 ### Changed
 
-- **`score_progress()` state-changed logic consolidated** — the old `if not state_changed and move not in HIGH_VALUE_MOVES: score -= 0.20` penalty and the new `if state_changed: score += 0.20` bonus are now expressed as a single `if/elif` branch, making the net effect of `state_changed` unambiguous at a glance.
+- **`score_progress()` state-changed logic consolidated** — the old `if not state_changed and move not in HIGH_VALUE_MOVES: score -= 0.20` penalty and the new `if state_changed: score += 0.20` bonus are now expressed as a single `if/elif` branch, making the net effect of `state_changed` unambiguous at a glance. (#350)
+- **`[EVAL]` and `[DIALOGUE]` log ordering fixed** — scores are now logged by `MainScript._run_loop` after `print_agent()` and `print_meta_state()`, so they appear after the visible agent response in both the terminal and log file. Previously they were logged inside `Agent.speak()`, before the response was printed. Score logic and engine behaviour are unchanged. (#352)
+- **`[FIXY-GATE] skipped` and `[DEDUP] dream_cycle skipped` log lines downgraded to `DEBUG`** — these are expected no-op paths; emitting them at `INFO` level created log noise during normal operation. Updated in `entelgia/loop_guard.py`, `entelgia/fixy_interactive.py`, and both production scripts. (#358)
+- **`compute_resolution_alignment()` simplified** — internal-state threshold logic removed; resolution alignment now derives solely from `dialogue_resolution` (the text-level signal), returning only `"aligned"` or `"neutral"`. Parameters `unresolved_count`, `conflict`, and `stagnation` retained for call-site compatibility but are no longer read. (#363)
+
+### Fixed
+
+- **CI test helpers** — `tests/test_topic_anchors.py` and `tests/test_stabilization_pass.py` now use topic-enabled configs via a shared `_make_cfg()` helper, ensuring all topic anchor assertions (`TOPIC ANCHOR [STRICT]:`, `Active topic:`, `[TOPIC-RECOVERY]`, etc.) fire correctly. Three files reformatted with Black. (#349)
+
+### Tests
+
+- **`tests/test_response_evaluator.py`** — new suite with **156 tests** covering all helpers in `entelgia/response_evaluator.py`: `evaluate_response`, `evaluate_dialogue_movement`, `evaluate_dialogue_movement_with_signals` (`DialogueSignals` key/type/flag consistency), `creates_pressure` (all five detection layers including Layer 4 rhetorical-question rule and Layer 5 assertion phrases), `shows_resolution` (extended keywords and regex patterns), `compute_pressure_alignment` (all five labels and both threshold boundaries), `compute_resolution_alignment`, and `compute_semantic_repeat_alignment`. (#351, #353, #354, #355, #356, #357, #359, #360, #362, #363)
+- **`tests/test_drive_pressure.py`** — `TestDialoguePressureFeedback` (7 new tests) covering alpha bounds, nudge direction, no-op on `False`, single-turn jump ceiling, `10.0` clamp, multi-turn accumulation, and exact EWM formula match. (#361)
+- **`tests/test_progress_enforcer.py`** — 9 new tests covering all four dynamic bonus paths and both new helpers (`_contradiction_strength`, `_detect_domain_shift`); additional tests for the Jaccard-based stagnation metric (`_topic_keywords`, `_keyword_jaccard`, `_JACCARD_STAGNATION_THRESHOLD`, `_PE_STAGNATION_INCREMENT`). (#350, #364)
+- **Total test count**: **1456 tests** across **34 suites**.
 
 ---
 

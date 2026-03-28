@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **1270 tests** (1270 collected) in 33 suites:
+Entelgia ships with comprehensive test coverage across **1456 tests** (1456 collected) in 34 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -114,7 +114,7 @@ Tests verify the coherent Freudian drive correlations added in PR #92:
 
 ---
 
-### 🔥 Drive Pressure Tests (23 tests)
+### 🔥 Drive Pressure Tests (46 tests)
 
 ```bash
 pytest tests/test_drive_pressure.py -v
@@ -127,6 +127,7 @@ Tests verify the DrivePressure urgency/tension system:
 - ✅ **Natural decay** — pressure decreases after progress/resolution
 - ✅ **Forced brevity thresholds** — output trimmed at pressure ≥ 6.5 and ≥ 8.0
 - ✅ **Unresolved question tracking** — count increments and decrements correctly
+- ✅ **Dialogue pressure feedback** — EWM upward nudge (`α = 0.15`) from text-detected pressure into `drive_pressure`; upward-only; capped at 10.0; no-op when pressure signal is `False`
 
 ---
 
@@ -341,7 +342,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 1270 total tests across 33 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend) |
+| **Unit Tests** | `pytest` | Runs 1456 total tests across 34 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -767,7 +768,7 @@ Tests verify `LLM.generate()` with the OpenAI backend:
 
 ---
 
-### 📈 Progress Enforcer Tests (69 tests)
+### 📈 Progress Enforcer Tests (78 tests)
 
 ```bash
 pytest tests/test_progress_enforcer.py -v
@@ -777,7 +778,9 @@ Tests verify `entelgia/progress_enforcer.py` dialogue progress tracking:
 
 - ✅ **`extract_claims`** — returns list, excludes questions, declarative sentences included, max-claims limit respected, empty text returns empty, short text excluded, commitment phrase boosts ranking
 - ✅ **`classify_move`** — all move types detected: filler, balanced restatement, direct attack, direct defense, forced choice, reframe, resolution attempt, escalation, new claim (low similarity), paraphrase (high similarity), soft nuance
-- ✅ **`score_progress`** — returns string, score in range, high score for attack move, low score for filler, high similarity penalises score, commitment raises score, no state change penalty
+- ✅ **`score_progress`** — returns string, score in range, high score for attack move, low score for filler, high similarity penalises score, commitment raises score, no state change penalty; dynamic bonuses: state-changed `+0.20`, contradiction-strength `+0.20`, domain-shift `+0.20`, resolution-attempt `+0.30`; cap at `1.0`
+- ✅ **`_contradiction_strength`** — returns float in `[0.0, 1.0]`; normalises matched attack-pattern families
+- ✅ **`_detect_domain_shift`** — returns `True` when > 40 % of meaningful tokens absent from recent history; `False` when tokens overlap
 - ✅ **`ClaimsMemory`** — add and retrieve claims, deduplication, `update_status` challenged and defended, `state_changed_by` detection
 - ✅ **`detect_stagnation`** — low scores trigger commitment intervention, repeated moves trigger attack intervention, no state change triggers evidence intervention, unknown reason returns commitment
 - ✅ **`get_intervention_policy`** — all reason → policy mappings correct
@@ -786,6 +789,7 @@ Tests verify `entelgia/progress_enforcer.py` dialogue progress tracking:
 - ✅ **Module-level state** — add/get scores and moves, clear specific agent, clear all agents, deque max size enforced
 - ✅ **`get_regeneration_instruction`** — returns non-empty string, mentions key concepts
 - ✅ **End-to-end scenario** — stagnation triggers after multiple low-progress turns, high-value move prevents stagnation
+- ✅ **Jaccard stagnation metric** — `_topic_keywords` extracts frozensets; `_keyword_jaccard` computes set similarity; threshold constant `_JACCARD_STAGNATION_THRESHOLD = 0.35`; increment constant `_PE_STAGNATION_INCREMENT = 0.25`
 
 ```bash
 # Run the full suite
@@ -797,3 +801,26 @@ pytest tests/ --cov=. --cov-report=term
 # Run a single suite
 pytest tests/test_long_term_memory.py -v
 ```
+
+---
+
+### 📐 Response Evaluator Tests (156 tests)
+
+```bash
+pytest tests/test_response_evaluator.py -v
+```
+
+Tests verify `entelgia/response_evaluator.py` — the measurement-only turn-level evaluation layer:
+
+- ✅ **`evaluate_response` — linguistic score** — returns float in `[0.0, 1.0]`; lexical diversity, specificity, sentence complexity, depth, and hedge penalty all affect output
+- ✅ **`evaluate_dialogue_movement` — dialogue score** — base `0.4`; new-claim Jaccard bonus `+0.15`; pressure bonus `+0.15`; resolution bonus `+0.25`; semantic-repeat penalty `−0.20`; clamped to `[0.0, 1.0]`
+- ✅ **`evaluate_dialogue_movement_with_signals` — `DialogueSignals`** — returns TypedDict with `score`, `new_claim`, `pressure`, `resolution`, `semantic_repeat`; key presence and type correctness verified; score and flag values internally consistent
+- ✅ **`creates_pressure` — Layer 1 (keywords)** — explicit contradiction vocabulary (`"but"`, `"however"`, `"contradicts"`, etc.)
+- ✅ **`creates_pressure` — Layer 2 (phrases)** — assumption challenges and framing incompatibilities: `"you assume"`, `"what if"`, `"how do you know"`, `"hidden premise"`, `"quietly assumes"`, `"what happens if"`, and more
+- ✅ **`creates_pressure` — Layer 3 (regex patterns)** — structural challenge forms: `treats … as if`, `if … does that mean`, `if …, then`, conditional instability probes
+- ✅ **`creates_pressure` — Layer 4 (rhetorical-question rule)** — fires when `?` present and a marker from `_RHETORICAL_QUESTION_MARKERS` is matched; word-family prefixes match inflected forms; no false positive without `?`
+- ✅ **`creates_pressure` — Layer 5 (assertion phrases)** — declarative critique patterns without `?`: `"misses that"`, `"ignores that"`, `"assumes that"`, `"you seem to"`, `"there's no guarantee"`, `"fails to consider"`, `"overlooks"`; case-insensitive
+- ✅ **`shows_resolution`** — extended keyword list (mutual-exclusion, tradeoff, collapse/narrowing phrases) and compiled regex patterns; correctly returns `True`/`False`
+- ✅ **`compute_pressure_alignment`** — five labels: `aligned`, `internal_not_expressed`, `text_more_pressured_than_state`, `weak_alignment`, `neutral`; both threshold boundaries (`2.5`, `4.5`) and grey-zone edges (`2.51`, `4.49`) verified
+- ✅ **`compute_resolution_alignment`** — derives from `dialogue_resolution` only; returns `aligned` or `neutral`; internal state parameters have no effect
+- ✅ **`compute_semantic_repeat_alignment`** — five labels; boundary values and distinctness contract verified
