@@ -184,6 +184,8 @@ try:
         PROGRESS_SCORE_THRESHOLD as _PE_PROGRESS_THRESHOLD,
         HIGH_VALUE_MOVES as _PE_HIGH_VALUE_MOVES,
     )
+    from entelgia.response_evaluator import evaluate_response as _eval_response
+    from entelgia.response_evaluator import evaluate_dialogue_movement as _eval_dialogue
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -385,6 +387,12 @@ except ImportError:
 
     def _pe_get_moves(agent_name):  # type: ignore[no-redef]
         return []
+
+    def _eval_response(response, context):  # type: ignore[no-redef]
+        return 0.0
+
+    def _eval_dialogue(response, context):  # type: ignore[no-redef]
+        return 0.0
 
 
 # Optional: FastAPI for REST API
@@ -6241,6 +6249,22 @@ class Agent:
         self._last_emotion_intensity = float(inten)
         self._last_response_kind = kind
         self.update_drives_after_turn(kind, emo, float(inten))
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Evaluation scores (measurement only) ──────────────────────────────────
+        # Independent quality signals — do NOT influence engine behaviour.
+        _eval_score = _eval_response(out, _history_texts)
+        logger.info(
+            "[EVAL] agent=%s linguistic_score=%.2f",
+            self.name,
+            _eval_score,
+        )
+        _dialogue_score = _eval_dialogue(out, _history_texts)
+        logger.info(
+            "[DIALOGUE] agent=%s dialogue_score=%.2f",
+            self.name,
+            _dialogue_score,
+        )
         # ─────────────────────────────────────────────────────────────────────────
 
         return out
