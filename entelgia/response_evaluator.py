@@ -33,6 +33,7 @@ Public API
 ----------
 evaluate_response(response, context) -> float
 evaluate_dialogue_movement(response, context) -> float
+evaluate_dialogue_movement_with_signals(response, context) -> DialogueSignals
 is_new_claim(response, context) -> bool
 is_semantic_repeat(response, context) -> bool
 creates_pressure(response) -> bool
@@ -42,7 +43,7 @@ shows_resolution(response) -> bool
 from __future__ import annotations
 
 import re
-from typing import List, Sequence
+from typing import List, Sequence, TypedDict
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -356,3 +357,77 @@ def evaluate_dialogue_movement(response: str, context: Sequence[str]) -> float:
         score -= 0.20
 
     return max(0.0, min(1.0, score))
+
+
+# ---------------------------------------------------------------------------
+# Step 2 — Dialogue-movement signals (debug / measurement)
+# ---------------------------------------------------------------------------
+
+
+class DialogueSignals(TypedDict):
+    """Raw component signals used to produce the dialogue-movement score.
+
+    All fields are **measurement-only** — they do not influence engine
+    behaviour, thresholds, or Fixy logic.
+    """
+
+    score: float
+    new_claim: bool
+    pressure: bool
+    resolution: bool
+    semantic_repeat: bool
+
+
+def evaluate_dialogue_movement_with_signals(
+    response: str, context: Sequence[str]
+) -> DialogueSignals:
+    """Return the dialogue-movement score together with its component signals.
+
+    This is a **measurement-only** helper that exposes the individual boolean
+    flags used internally by :func:`evaluate_dialogue_movement` so that the
+    score can be validated and debugged in real sessions.
+
+    Parameters
+    ----------
+    response:
+        The generated agent response text.
+    context:
+        Recent dialogue history (list of plain-text turns), most recent last.
+
+    Returns
+    -------
+    DialogueSignals
+        A dict with keys ``score``, ``new_claim``, ``pressure``,
+        ``resolution``, and ``semantic_repeat``.
+    """
+    if not response or not response.strip():
+        return DialogueSignals(
+            score=0.0,
+            new_claim=False,
+            pressure=False,
+            resolution=False,
+            semantic_repeat=False,
+        )
+
+    _new_claim = is_new_claim(response, context)
+    _pressure = creates_pressure(response)
+    _resolution = shows_resolution(response)
+    _semantic_repeat = is_semantic_repeat(response, context)
+
+    raw = 0.40  # base
+    if _new_claim:
+        raw += 0.15
+    if _pressure:
+        raw += 0.15
+    if _resolution:
+        raw += 0.25
+    if _semantic_repeat:
+        raw -= 0.20
+
+    return DialogueSignals(
+        score=max(0.0, min(1.0, raw)),
+        new_claim=_new_claim,
+        pressure=_pressure,
+        resolution=_resolution,
+        semantic_repeat=_semantic_repeat,
+    )

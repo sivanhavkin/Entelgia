@@ -33,6 +33,7 @@ import entelgia.response_evaluator as resp_eval
 from entelgia.response_evaluator import (
     evaluate_response,
     evaluate_dialogue_movement,
+    evaluate_dialogue_movement_with_signals,
     is_new_claim,
     is_semantic_repeat,
     creates_pressure,
@@ -335,3 +336,84 @@ class TestEvaluateDialogueMovement:
         text = "yes of course certainly"
         result = evaluate_dialogue_movement(text, [text])
         assert result >= 0.0
+
+
+# ---------------------------------------------------------------------------
+# 13.  evaluate_dialogue_movement_with_signals
+# ---------------------------------------------------------------------------
+
+
+class TestEvaluateDialogueMovementWithSignals:
+    def test_returns_dict_with_expected_keys(self):
+        result = evaluate_dialogue_movement_with_signals("The mind is distinct from the body.", [])
+        assert set(result.keys()) == {"score", "new_claim", "pressure", "resolution", "semantic_repeat"}
+
+    def test_score_matches_evaluate_dialogue_movement(self):
+        text = "However, we cannot reconcile these views."
+        ctx = ["prior turn about mind and body"]
+        assert evaluate_dialogue_movement_with_signals(text, ctx)["score"] == pytest.approx(
+            evaluate_dialogue_movement(text, ctx)
+        )
+
+    def test_score_within_range(self):
+        result = evaluate_dialogue_movement_with_signals("Some response.", [])
+        assert 0.0 <= result["score"] <= 1.0
+
+    def test_empty_returns_zero_score_and_false_flags(self):
+        result = evaluate_dialogue_movement_with_signals("", [])
+        assert result["score"] == 0.0
+        assert result["new_claim"] is False
+        assert result["pressure"] is False
+        assert result["resolution"] is False
+        assert result["semantic_repeat"] is False
+
+    def test_whitespace_returns_zero_score_and_false_flags(self):
+        result = evaluate_dialogue_movement_with_signals("   ", [])
+        assert result["score"] == 0.0
+        assert result["new_claim"] is False
+
+    def test_pressure_flag_set(self):
+        result = evaluate_dialogue_movement_with_signals(
+            "However, this cannot be reconciled — it is a contradiction.", []
+        )
+        assert result["pressure"] is True
+
+    def test_resolution_flag_set(self):
+        result = evaluate_dialogue_movement_with_signals(
+            "We conclude that the materialist account fails.", []
+        )
+        assert result["resolution"] is True
+
+    def test_semantic_repeat_flag_set(self):
+        text = "the mind is identical to brain processes and nothing more"
+        result = evaluate_dialogue_movement_with_signals(text, [text])
+        assert result["semantic_repeat"] is True
+
+    def test_new_claim_flag_set_no_context(self):
+        result = evaluate_dialogue_movement_with_signals("Consciousness is irreducible.", [])
+        assert result["new_claim"] is True
+
+    def test_signal_types_are_bool_and_float(self):
+        result = evaluate_dialogue_movement_with_signals("Some claim here.", [])
+        assert isinstance(result["score"], float)
+        assert isinstance(result["new_claim"], bool)
+        assert isinstance(result["pressure"], bool)
+        assert isinstance(result["resolution"], bool)
+        assert isinstance(result["semantic_repeat"], bool)
+
+    def test_score_consistent_with_flags(self):
+        # Verify that the score reflects the component signals correctly.
+        text = "However, we conclude that the argument fails entirely."
+        ctx = ["some unrelated prior claim about knowledge"]
+        result = evaluate_dialogue_movement_with_signals(text, ctx)
+        # Recompute expected score manually
+        expected = 0.40
+        if result["new_claim"]:
+            expected += 0.15
+        if result["pressure"]:
+            expected += 0.15
+        if result["resolution"]:
+            expected += 0.25
+        if result["semantic_repeat"]:
+            expected -= 0.20
+        assert result["score"] == pytest.approx(max(0.0, min(1.0, expected)))
