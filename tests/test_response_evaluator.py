@@ -47,7 +47,6 @@ from entelgia.response_evaluator import (
     compute_semantic_repeat_alignment,
 )
 
-
 # ---------------------------------------------------------------------------
 # 1.  Return type and range
 # ---------------------------------------------------------------------------
@@ -126,7 +125,9 @@ class TestLexicalDiversity:
 
 class TestSpecificity:
     def test_text_with_numbers_not_zero(self):
-        text = "Aristotle identified 4 causes in 350 BCE that shaped Western metaphysics."
+        text = (
+            "Aristotle identified 4 causes in 350 BCE that shaped Western metaphysics."
+        )
         result = evaluate_response(text, [])
         assert result > 0.0
 
@@ -225,7 +226,9 @@ class TestIsNewClaim:
         assert is_new_claim(text, [text]) is False
 
     def test_different_text_is_new_claim(self):
-        last = "determinism implies that no one is morally responsible for their actions"
+        last = (
+            "determinism implies that no one is morally responsible for their actions"
+        )
         response = "quantum indeterminacy opens the door to genuine freedom"
         assert is_new_claim(response, [last]) is True
 
@@ -250,12 +253,18 @@ class TestCreatesPressure:
         assert creates_pressure("This is a contradiction in your argument.") is True
 
     def test_however_triggers(self):
-        assert creates_pressure("However, that cannot be reconciled with evidence.") is True
+        assert (
+            creates_pressure("However, that cannot be reconciled with evidence.")
+            is True
+        )
 
     def test_fails_triggers(self):
         # "fails" is a known pressure keyword; substring match is intentional
         # for this measurement-only heuristic.
-        assert creates_pressure("Your premise fails to account for counterexamples.") is True
+        assert (
+            creates_pressure("Your premise fails to account for counterexamples.")
+            is True
+        )
 
     def test_neutral_text_no_pressure(self):
         assert creates_pressure("Consciousness is a fascinating topic.") is False
@@ -266,7 +275,10 @@ class TestCreatesPressure:
     # --- new structural / phrase-fragment checks ---
 
     def test_you_assume_triggers(self):
-        assert creates_pressure("You assume that freedom and causation are compatible.") is True
+        assert (
+            creates_pressure("You assume that freedom and causation are compatible.")
+            is True
+        )
 
     def test_why_assume_triggers(self):
         assert creates_pressure("Why assume that the two can coexist?") is True
@@ -278,7 +290,9 @@ class TestCreatesPressure:
         assert creates_pressure("How do you know the premise is sound?") is True
 
     def test_are_you_not_just_triggers(self):
-        assert creates_pressure("Are you not just restating the same assumption?") is True
+        assert (
+            creates_pressure("Are you not just restating the same assumption?") is True
+        )
 
     def test_doesnt_that_triggers(self):
         assert creates_pressure("Doesn't that contradict what you said before?") is True
@@ -293,14 +307,20 @@ class TestCreatesPressure:
         assert creates_pressure("These two drives pull in opposite directions.") is True
 
     def test_already_stacked_triggers(self):
-        assert creates_pressure("The argument is already stacked against coherence.") is True
+        assert (
+            creates_pressure("The argument is already stacked against coherence.")
+            is True
+        )
 
     def test_rhetorical_question_negation_triggers(self):
         # Negation-contracted rhetorical question via regex pattern
         assert creates_pressure("Isn't that precisely the problem?") is True
 
     def test_hidden_premise_triggers(self):
-        assert creates_pressure("There is a hidden premise you have not addressed.") is True
+        assert (
+            creates_pressure("There is a hidden premise you have not addressed.")
+            is True
+        )
 
     def test_you_are_assuming_triggers(self):
         assert creates_pressure("You are assuming the very thing in question.") is True
@@ -317,11 +337,16 @@ class TestCreatesPressure:
 
     def test_does_this_not_triggers(self):
         # "does this not" + "?" — reframing prompt, Layer 4
-        assert creates_pressure("Does this not undermine your entire framework?") is True
+        assert (
+            creates_pressure("Does this not undermine your entire framework?") is True
+        )
 
     def test_does_this_not_assumption_triggers(self):
         # "does this not" + "?" variant from problem statement
-        assert creates_pressure("Does this not reveal an assumption in the framing?") is True
+        assert (
+            creates_pressure("Does this not reveal an assumption in the framing?")
+            is True
+        )
 
     def test_rhetorical_question_no_pressure_without_marker(self):
         # A question without any challenging marker should not trigger Layer 4
@@ -358,7 +383,9 @@ class TestCreatesPressure:
 
     def test_agreement_word_family_with_question_triggers(self):
         # "agreement" contains "agre" prefix; ? present → Layer 4 fires.
-        assert creates_pressure("Is there any agreement on what that term means?") is True
+        assert (
+            creates_pressure("Is there any agreement on what that term means?") is True
+        )
 
     def test_agree_word_family_with_question_triggers(self):
         assert creates_pressure("Why would you agree with an unstable premise?") is True
@@ -370,41 +397,71 @@ class TestCreatesPressure:
     # --- structural challenge phrases (Layer 2) ---
 
     def test_quietly_assumes_triggers(self):
-        assert creates_pressure("The argument quietly assumes a fixed reference frame.") is True
+        assert (
+            creates_pressure("The argument quietly assumes a fixed reference frame.")
+            is True
+        )
 
     def test_risks_sneaking_in_triggers(self):
-        assert creates_pressure(
-            "That move risks sneaking in the very premise we are questioning."
-        ) is True
+        assert (
+            creates_pressure(
+                "That move risks sneaking in the very premise we are questioning."
+            )
+            is True
+        )
 
     def test_just_swaps_one_anchor_triggers(self):
-        assert creates_pressure(
-            "This just swaps one anchor for another without resolving the tension."
-        ) is True
+        assert (
+            creates_pressure(
+                "This just swaps one anchor for another without resolving the tension."
+            )
+            is True
+        )
 
     def test_what_happens_if_triggers(self):
-        assert creates_pressure("What happens if the ground condition is removed?") is True
+        assert (
+            creates_pressure("What happens if the ground condition is removed?") is True
+        )
 
     # --- structural regex patterns (Layer 3) ---
 
     def test_treats_as_if_triggers(self):
         # "treats X as if" exposes a hidden assumption.
-        assert creates_pressure("That view treats consciousness as if it were divisible.") is True
+        assert (
+            creates_pressure("That view treats consciousness as if it were divisible.")
+            is True
+        )
 
     def test_treat_as_if_triggers(self):
-        assert creates_pressure("You treat the concept as if it had a fixed referent.") is True
+        assert (
+            creates_pressure("You treat the concept as if it had a fixed referent.")
+            is True
+        )
 
     def test_if_does_that_mean_triggers(self):
         # Conditional challenge: "if … does that mean"
-        assert creates_pressure("If determinism is true, does that mean agency is illusory?") is True
+        assert (
+            creates_pressure(
+                "If determinism is true, does that mean agency is illusory?"
+            )
+            is True
+        )
 
     def test_if_what_happens_triggers(self):
         # Conditional challenge: "if … what happens"
-        assert creates_pressure("If we remove the axiom, what happens to the proof?") is True
+        assert (
+            creates_pressure("If we remove the axiom, what happens to the proof?")
+            is True
+        )
 
     def test_if_then_conditional_triggers(self):
         # Conditional challenge: "if …, then"
-        assert creates_pressure("If the premise fails, then the whole structure collapses.") is True
+        assert (
+            creates_pressure(
+                "If the premise fails, then the whole structure collapses."
+            )
+            is True
+        )
 
     def test_plain_question_no_challenge_no_pressure(self):
         # A purely neutral question with no challenge markers must not trigger.
@@ -414,35 +471,71 @@ class TestCreatesPressure:
 
     def test_misses_that_triggers(self):
         # "misses that" — declarative challenge to the other claim, no "?" needed.
-        assert creates_pressure("That argument misses that agency requires more than causation.") is True
+        assert (
+            creates_pressure(
+                "That argument misses that agency requires more than causation."
+            )
+            is True
+        )
 
     def test_ignores_that_triggers(self):
         # "ignores that" — exposes an unconsidered factor.
-        assert creates_pressure("The position ignores that experience is not reducible to function.") is True
+        assert (
+            creates_pressure(
+                "The position ignores that experience is not reducible to function."
+            )
+            is True
+        )
 
     def test_assumes_that_triggers(self):
         # "assumes that" — exposes a hidden premise without a question mark.
-        assert creates_pressure("The view assumes that consciousness is substrate-independent.") is True
+        assert (
+            creates_pressure(
+                "The view assumes that consciousness is substrate-independent."
+            )
+            is True
+        )
 
     def test_you_seem_to_triggers(self):
         # "you seem to" — implicit challenge to framing or stance.
-        assert creates_pressure("You seem to conflate correlation with causation here.") is True
+        assert (
+            creates_pressure("You seem to conflate correlation with causation here.")
+            is True
+        )
 
     def test_theres_no_guarantee_triggers(self):
         # "there's no guarantee" — challenges the reliability of the claim.
-        assert creates_pressure("There's no guarantee that the framework survives this counterexample.") is True
+        assert (
+            creates_pressure(
+                "There's no guarantee that the framework survives this counterexample."
+            )
+            is True
+        )
 
     def test_there_is_no_guarantee_triggers(self):
         # "there is no guarantee" — uncontracted variant.
-        assert creates_pressure("There is no guarantee that coherence is preserved under revision.") is True
+        assert (
+            creates_pressure(
+                "There is no guarantee that coherence is preserved under revision."
+            )
+            is True
+        )
 
     def test_fails_to_consider_triggers(self):
         # "fails to consider" — explicit declarative critique of omission.
-        assert creates_pressure("This account fails to consider the role of embodiment.") is True
+        assert (
+            creates_pressure("This account fails to consider the role of embodiment.")
+            is True
+        )
 
     def test_overlooks_triggers(self):
         # "overlooks" — exposes an unconsidered dimension.
-        assert creates_pressure("The argument overlooks the distinction between types and tokens.") is True
+        assert (
+            creates_pressure(
+                "The argument overlooks the distinction between types and tokens."
+            )
+            is True
+        )
 
     def test_assertion_no_question_mark_still_triggers(self):
         # Core requirement: assertion phrases must fire without any "?" present.
@@ -452,7 +545,10 @@ class TestCreatesPressure:
 
     def test_assertion_case_insensitive(self):
         # Assertion-phrase matching must be case-insensitive.
-        assert creates_pressure("THAT FRAMING IGNORES THAT CONTEXT SHAPES MEANING.") is True
+        assert (
+            creates_pressure("THAT FRAMING IGNORES THAT CONTEXT SHAPES MEANING.")
+            is True
+        )
 
 
 class TestShowsResolution:
@@ -463,7 +559,12 @@ class TestShowsResolution:
         assert shows_resolution("We must reject the premise entirely.") is True
 
     def test_cannot_both_triggers(self):
-        assert shows_resolution("We cannot both accept determinism and moral responsibility.") is True
+        assert (
+            shows_resolution(
+                "We cannot both accept determinism and moral responsibility."
+            )
+            is True
+        )
 
     def test_i_was_wrong_triggers(self):
         assert shows_resolution("I was wrong about the nature of qualia.") is True
@@ -477,46 +578,92 @@ class TestShowsResolution:
     # --- new structural / phrase-fragment checks ---
 
     def test_one_must_yield_triggers(self):
-        assert shows_resolution("One must yield when the evidence is this clear.") is True
+        assert (
+            shows_resolution("One must yield when the evidence is this clear.") is True
+        )
 
     def test_one_excludes_the_other_triggers(self):
-        assert shows_resolution("Freedom and strict determinism: one excludes the other.") is True
+        assert (
+            shows_resolution("Freedom and strict determinism: one excludes the other.")
+            is True
+        )
 
     def test_one_force_always_has_to_yield_triggers(self):
         assert shows_resolution("One force always has to yield in this system.") is True
 
     def test_cannot_operate_simultaneously_triggers(self):
-        assert shows_resolution("The two principles cannot operate simultaneously.") is True
+        assert (
+            shows_resolution("The two principles cannot operate simultaneously.")
+            is True
+        )
 
     def test_you_cannot_have_both_triggers(self):
-        assert shows_resolution("You cannot have both radical freedom and causal closure.") is True
+        assert (
+            shows_resolution("You cannot have both radical freedom and causal closure.")
+            is True
+        )
 
     def test_the_loop_closes_triggers(self):
-        assert shows_resolution("At this point the loop closes and no new options remain.") is True
+        assert (
+            shows_resolution("At this point the loop closes and no new options remain.")
+            is True
+        )
 
     def test_the_drive_fades_triggers(self):
-        assert shows_resolution("Without resolution the drive fades and the argument stalls.") is True
+        assert (
+            shows_resolution(
+                "Without resolution the drive fades and the argument stalls."
+            )
+            is True
+        )
 
     def test_one_side_has_to_give_triggers(self):
-        assert shows_resolution("One side has to give; the two positions are irreconcilable.") is True
+        assert (
+            shows_resolution(
+                "One side has to give; the two positions are irreconcilable."
+            )
+            is True
+        )
 
     def test_this_narrows_the_issue_to_triggers(self):
-        assert shows_resolution("This narrows the issue to a single unavoidable question.") is True
+        assert (
+            shows_resolution("This narrows the issue to a single unavoidable question.")
+            is True
+        )
 
     def test_cannot_coexist_triggers(self):
-        assert shows_resolution("These two values cannot coexist within the same framework.") is True
+        assert (
+            shows_resolution(
+                "These two values cannot coexist within the same framework."
+            )
+            is True
+        )
 
     def test_must_give_way_triggers(self):
-        assert shows_resolution("Something must give way if progress is to be made.") is True
+        assert (
+            shows_resolution("Something must give way if progress is to be made.")
+            is True
+        )
 
     def test_forced_to_choose_triggers(self):
-        assert shows_resolution("We are forced to choose between coherence and completeness.") is True
+        assert (
+            shows_resolution(
+                "We are forced to choose between coherence and completeness."
+            )
+            is True
+        )
 
     def test_either_or_exclusion_regex_triggers(self):
-        assert shows_resolution("Either the claim holds, or the whole argument collapses.") is True
+        assert (
+            shows_resolution("Either the claim holds, or the whole argument collapses.")
+            is True
+        )
 
     def test_one_side_collapse_regex_triggers(self):
-        assert shows_resolution("One side must yield when the evidence accumulates.") is True
+        assert (
+            shows_resolution("One side must yield when the evidence accumulates.")
+            is True
+        )
 
 
 class TestEvaluateDialogueMovement:
@@ -554,7 +701,9 @@ class TestEvaluateDialogueMovement:
         no_res = "The debate continues."
         with_res = "We conclude that the materialist account fails."
         ctx = ["prior turn text"]
-        assert evaluate_dialogue_movement(with_res, ctx) > evaluate_dialogue_movement(no_res, ctx)
+        assert evaluate_dialogue_movement(with_res, ctx) > evaluate_dialogue_movement(
+            no_res, ctx
+        )
 
     def test_semantic_repeat_decreases_score(self):
         # Identical text → semantic repeat penalty
@@ -587,15 +736,23 @@ class TestEvaluateDialogueMovement:
 
 class TestEvaluateDialogueMovementWithSignals:
     def test_returns_dict_with_expected_keys(self):
-        result = evaluate_dialogue_movement_with_signals("The mind is distinct from the body.", [])
-        assert set(result.keys()) == {"score", "new_claim", "pressure", "resolution", "semantic_repeat"}
+        result = evaluate_dialogue_movement_with_signals(
+            "The mind is distinct from the body.", []
+        )
+        assert set(result.keys()) == {
+            "score",
+            "new_claim",
+            "pressure",
+            "resolution",
+            "semantic_repeat",
+        }
 
     def test_score_matches_evaluate_dialogue_movement(self):
         text = "However, we cannot reconcile these views."
         ctx = ["prior turn about mind and body"]
-        assert evaluate_dialogue_movement_with_signals(text, ctx)["score"] == pytest.approx(
-            evaluate_dialogue_movement(text, ctx)
-        )
+        assert evaluate_dialogue_movement_with_signals(text, ctx)[
+            "score"
+        ] == pytest.approx(evaluate_dialogue_movement(text, ctx))
 
     def test_score_within_range(self):
         result = evaluate_dialogue_movement_with_signals("Some response.", [])
@@ -632,7 +789,9 @@ class TestEvaluateDialogueMovementWithSignals:
         assert result["semantic_repeat"] is True
 
     def test_new_claim_flag_set_no_context(self):
-        result = evaluate_dialogue_movement_with_signals("Consciousness is irreducible.", [])
+        result = evaluate_dialogue_movement_with_signals(
+            "Consciousness is irreducible.", []
+        )
         assert result["new_claim"] is True
 
     def test_signal_types_are_bool_and_float(self):
@@ -720,11 +879,11 @@ class TestComputePressureAlignment:
 
     def test_all_five_outcomes_are_distinct(self):
         outcomes = {
-            compute_pressure_alignment(8.0, True),    # aligned
-            compute_pressure_alignment(8.0, False),   # internal_not_expressed
-            compute_pressure_alignment(1.0, True),    # text_more_pressured_than_state
-            compute_pressure_alignment(3.5, True),    # weak_alignment
-            compute_pressure_alignment(1.0, False),   # neutral
+            compute_pressure_alignment(8.0, True),  # aligned
+            compute_pressure_alignment(8.0, False),  # internal_not_expressed
+            compute_pressure_alignment(1.0, True),  # text_more_pressured_than_state
+            compute_pressure_alignment(3.5, True),  # weak_alignment
+            compute_pressure_alignment(1.0, False),  # neutral
         }
         assert len(outcomes) == 5
 
@@ -784,7 +943,7 @@ class TestComputeResolutionAlignment:
 
     def test_aligned_and_neutral_outcomes_are_distinct(self):
         outcomes = {
-            compute_resolution_alignment(True, 0, 0.0, 0.0),   # aligned
+            compute_resolution_alignment(True, 0, 0.0, 0.0),  # aligned
             compute_resolution_alignment(False, 0, 0.0, 0.0),  # neutral
         }
         assert len(outcomes) == 2
@@ -804,13 +963,19 @@ class TestComputeSemanticRepeatAlignment:
 
     def test_repeat_not_detected_when_stagnation_high_but_text_not_repeat(self):
         # high stagnation but text not flagged → under-detection
-        assert compute_semantic_repeat_alignment(False, 0.8, 2.0, 1) == "repeat_not_detected"
+        assert (
+            compute_semantic_repeat_alignment(False, 0.8, 2.0, 1)
+            == "repeat_not_detected"
+        )
 
     # --- state does NOT expect repeat ---
 
     def test_text_repeat_no_stagnation_when_low_stagnation_and_text_repeat(self):
         # low stagnation + text flagged as repeat → over-detection or local word-overlap
-        assert compute_semantic_repeat_alignment(True, 0.2, 2.0, 1) == "text_repeat_no_stagnation"
+        assert (
+            compute_semantic_repeat_alignment(True, 0.2, 2.0, 1)
+            == "text_repeat_no_stagnation"
+        )
 
     def test_neutral_when_neither_stagnation_nor_text_repeat(self):
         assert compute_semantic_repeat_alignment(False, 0.0, 1.0, 0) == "neutral"
@@ -848,10 +1013,14 @@ class TestComputeSemanticRepeatAlignment:
 
     def test_all_five_outcomes_are_distinct(self):
         outcomes = {
-            compute_semantic_repeat_alignment(True, 0.7, 2.0, 1),   # aligned
-            compute_semantic_repeat_alignment(False, 0.8, 2.0, 1),  # repeat_not_detected
-            compute_semantic_repeat_alignment(True, 0.2, 2.0, 1),   # text_repeat_no_stagnation
-            compute_semantic_repeat_alignment(True, 0.7, 5.0, 3),   # weak_alignment
+            compute_semantic_repeat_alignment(True, 0.7, 2.0, 1),  # aligned
+            compute_semantic_repeat_alignment(
+                False, 0.8, 2.0, 1
+            ),  # repeat_not_detected
+            compute_semantic_repeat_alignment(
+                True, 0.2, 2.0, 1
+            ),  # text_repeat_no_stagnation
+            compute_semantic_repeat_alignment(True, 0.7, 5.0, 3),  # weak_alignment
             compute_semantic_repeat_alignment(False, 0.0, 1.0, 0),  # neutral
         }
         assert len(outcomes) == 5

@@ -401,7 +401,13 @@ except ImportError:
         return 0.0
 
     def _eval_dialogue_signals(response, context):  # type: ignore[no-redef]
-        return {"score": 0.0, "new_claim": False, "pressure": False, "resolution": False, "semantic_repeat": False}
+        return {
+            "score": 0.0,
+            "new_claim": False,
+            "pressure": False,
+            "resolution": False,
+            "semantic_repeat": False,
+        }
 
     def _compute_pressure_alignment(meta_pressure, dialogue_pressure):  # type: ignore[no-redef]
         return "neutral"
@@ -5948,7 +5954,11 @@ class Agent:
         if len(self._topic_history) > 6:
             self._topic_history = self._topic_history[-6:]
         recent_sigs = self._topic_history
-        if len(recent_sigs) >= 2 and _keyword_jaccard(recent_sigs[-1], recent_sigs[-2]) >= _JACCARD_STAGNATION_THRESHOLD:
+        if (
+            len(recent_sigs) >= 2
+            and _keyword_jaccard(recent_sigs[-1], recent_sigs[-2])
+            >= _JACCARD_STAGNATION_THRESHOLD
+        ):
             self._same_topic_turns = min(self._same_topic_turns + 1, 4)
         else:
             self._same_topic_turns = max(0, self._same_topic_turns - 1)
@@ -6241,7 +6251,9 @@ class Agent:
             # Wire progress-enforcer stagnation back into meta-state so that
             # _last_stagnation reflects behavioural stagnation, not just
             # topic-signature similarity.
-            self._last_stagnation = min(1.0, self._last_stagnation + _PE_STAGNATION_INCREMENT)
+            self._last_stagnation = min(
+                1.0, self._last_stagnation + _PE_STAGNATION_INCREMENT
+            )
             # Inject intervention instruction into the next prompt via regeneration
             _pe_instr = _pe_build_intervention(_pe_policy, _pe_claims_mem)
             _pe_prompt = prompt.replace(
@@ -6375,9 +6387,8 @@ class Agent:
         # existing compute_drive_pressure decay handles the downward direction.
         if _dialogue_sigs["pressure"]:
             self.drive_pressure = (
-                (1.0 - _PRESSURE_FEEDBACK_ALPHA) * self.drive_pressure
-                + _PRESSURE_FEEDBACK_ALPHA * 10.0
-            )
+                1.0 - _PRESSURE_FEEDBACK_ALPHA
+            ) * self.drive_pressure + _PRESSURE_FEEDBACK_ALPHA * 10.0
             self.drive_pressure = min(10.0, self.drive_pressure)
         # ─────────────────────────────────────────────────────────────────────────
 
