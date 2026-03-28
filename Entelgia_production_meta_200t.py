@@ -7328,7 +7328,7 @@ class MainScript:
                 # Semantic dedup: skip near-duplicate promotions
                 _dedup_corpus = _recent_conscious_texts + _promoted_this_cycle
                 if _is_too_similar(content, _dedup_corpus):
-                    logger.info(
+                    logger.debug(
                         "[DEDUP] dream_cycle skipped promotion (similar to recent): "
                         "agent=%s content=%r",
                         agent.name,

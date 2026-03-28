@@ -805,7 +805,7 @@ class InteractiveFixy:
             else:
                 skip_detail = "waiting for both agents"
             self._consecutive_full_pair_count = 0
-            logger.info(
+            logger.debug(
                 "[FIXY-GATE] skipped: %s at turn %d",
                 skip_detail,
                 turn_count,

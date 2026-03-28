@@ -929,7 +929,7 @@ class TestPairGatingWindowScope:
         # Only Socrates speaks on the new topic
         dialog.append({"role": "Socrates", "text": "On consciousness: is it real?"})
 
-        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_interactive"):
             result, reason = fixy.should_intervene(dialog, turn_count=5)
 
         assert result is False, (
@@ -955,7 +955,7 @@ class TestPairGatingWindowScope:
             {"role": "Athena", "text": "After dreaming: consciousness is key."}
         )
 
-        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_interactive"):
             result, reason = fixy.should_intervene(dialog, turn_count=5)
 
         assert result is False, (
