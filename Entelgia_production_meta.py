@@ -2488,6 +2488,40 @@ def _topic_signature(text: str) -> str:
     return hashlib.md5(payload.encode("utf-8")).hexdigest()[:8]
 
 
+#: Jaccard similarity threshold above which two consecutive agent outputs are
+#: considered to cover the same conceptual territory (stagnation signal).
+_JACCARD_STAGNATION_THRESHOLD: float = 0.35
+
+#: Amount added to ``_last_stagnation`` each time the progress enforcer
+#: independently confirms behavioural stagnation (move-type or score based).
+_PE_STAGNATION_INCREMENT: float = 0.25
+
+
+def _topic_keywords(text: str) -> frozenset:
+    """Return the top content words of *text* as a frozenset.
+
+    Unlike ``_topic_signature``, this returns the raw word-set so that two
+    texts can be compared by conceptual overlap rather than exact identity.
+    Used internally for Jaccard-based stagnation detection.
+    """
+    words = re.findall(r"[a-z]+", text.lower())
+    key_words = [w for w in words if w not in _STOPWORDS]
+    top = sorted(set(key_words), key=lambda w: -key_words.count(w))[:12]
+    return frozenset(top)
+
+
+def _keyword_jaccard(a: frozenset, b: frozenset) -> float:
+    """Return Jaccard similarity between two keyword sets (0.0–1.0).
+
+    Returns 1.0 when both sets are empty (vacuously identical), and 0.0
+    when only one is empty.
+    """
+    union = a | b
+    if not union:
+        return 1.0
+    return len(a & b) / len(union)
+
+
 def compute_drive_pressure(
     prev_pressure: float,
     energy: float,
@@ -4320,7 +4354,7 @@ class Agent:
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
-        self._topic_history: List[str] = []  # last N topic signatures for stagnation
+        self._topic_history: List[frozenset] = []  # last N keyword sets for stagnation
         self._same_topic_turns: int = 0  # consecutive turns with same signature
         self._last_stagnation: float = 0.0
         # Limbic hijack state
@@ -5953,12 +5987,12 @@ class Agent:
             self.open_questions = min(5, self.open_questions + 1)
 
         # 2. Update stagnation tracking
-        sig = _topic_signature(out)
-        self._topic_history.append(sig)
+        kws = _topic_keywords(out)
+        self._topic_history.append(kws)
         if len(self._topic_history) > 6:
             self._topic_history = self._topic_history[-6:]
         recent_sigs = self._topic_history
-        if len(recent_sigs) >= 2 and recent_sigs[-1] == recent_sigs[-2]:
+        if len(recent_sigs) >= 2 and _keyword_jaccard(recent_sigs[-1], recent_sigs[-2]) >= _JACCARD_STAGNATION_THRESHOLD:
             self._same_topic_turns = min(self._same_topic_turns + 1, 4)
         else:
             self._same_topic_turns = max(0, self._same_topic_turns - 1)
@@ -6255,6 +6289,10 @@ class Agent:
                 self.name,
                 _pe_policy,
             )
+            # Wire progress-enforcer stagnation back into meta-state so that
+            # _last_stagnation reflects behavioural stagnation, not just
+            # topic-signature similarity.
+            self._last_stagnation = min(1.0, self._last_stagnation + _PE_STAGNATION_INCREMENT)
             # Inject intervention instruction into the next prompt via regeneration
             _pe_instr = _pe_build_intervention(_pe_policy, _pe_claims_mem)
             _pe_prompt = prompt.replace(

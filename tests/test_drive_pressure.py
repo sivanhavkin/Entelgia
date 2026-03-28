@@ -20,6 +20,10 @@ from Entelgia_production_meta import (
     compute_drive_pressure,
     _PRESSURE_FEEDBACK_ALPHA,
     _topic_signature,
+    _topic_keywords,
+    _keyword_jaccard,
+    _JACCARD_STAGNATION_THRESHOLD,
+    _PE_STAGNATION_INCREMENT,
     _trim_to_word_limit,
     _is_question_resolved,
 )
@@ -844,6 +848,110 @@ class TestDialoguePressureFeedback:
             title="Feedback – EWM Formula Verification",
         )
         assert actual == pytest.approx(expected, abs=1e-9)
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
+
+# ---------------------------------------------------------------------------
+# Test F: _topic_keywords and _keyword_jaccard (stagnation detection helpers)
+# ---------------------------------------------------------------------------
+
+
+class TestTopicKeywords:
+    """Verify _topic_keywords returns a frozenset of content words."""
+
+    def test_returns_frozenset(self):
+        kws = _topic_keywords("consciousness and philosophy matter.")
+        assert isinstance(kws, frozenset)
+
+    def test_stopwords_excluded(self):
+        kws = _topic_keywords("the and a is in on")
+        assert len(kws) == 0, f"Expected empty set, got {kws}"
+
+    def test_content_words_included(self):
+        kws = _topic_keywords("consciousness mind philosophy debate")
+        assert "consciousness" in kws
+        assert "philosophy" in kws
+
+    def test_order_invariant(self):
+        kws1 = _topic_keywords("consciousness philosophy mind")
+        kws2 = _topic_keywords("mind philosophy consciousness")
+        assert kws1 == kws2
+
+    def test_empty_text_returns_empty_set(self):
+        assert _topic_keywords("") == frozenset()
+
+
+class TestKeywordJaccard:
+    """Verify _keyword_jaccard similarity semantics."""
+
+    def test_identical_sets_return_one(self):
+        a = frozenset(["mind", "philosophy", "consciousness"])
+        assert _keyword_jaccard(a, a) == 1.0
+
+    def test_disjoint_sets_return_zero(self):
+        a = frozenset(["mind", "philosophy"])
+        b = frozenset(["quantum", "physics"])
+        assert _keyword_jaccard(a, b) == 0.0
+
+    def test_partial_overlap_between_zero_and_one(self):
+        a = frozenset(["mind", "philosophy", "consciousness"])
+        b = frozenset(["mind", "philosophy", "quantum"])
+        score = _keyword_jaccard(a, b)
+        assert 0.0 < score < 1.0
+
+    def test_both_empty_returns_one(self):
+        assert _keyword_jaccard(frozenset(), frozenset()) == 1.0
+
+    def test_one_empty_returns_zero(self):
+        assert _keyword_jaccard(frozenset(["mind"]), frozenset()) == 0.0
+
+    def test_symmetry(self):
+        a = frozenset(["mind", "philosophy"])
+        b = frozenset(["mind", "consciousness"])
+        assert _keyword_jaccard(a, b) == _keyword_jaccard(b, a)
+
+    def test_similar_texts_score_above_threshold(self):
+        """Texts on the same topic should produce Jaccard >= _JACCARD_STAGNATION_THRESHOLD."""
+        kws1 = _topic_keywords(
+            "consciousness cannot be reduced to physical brain states."
+        )
+        kws2 = _topic_keywords(
+            "consciousness is not reducible to the brain or physical states."
+        )
+        score = _keyword_jaccard(kws1, kws2)
+        assert score >= _JACCARD_STAGNATION_THRESHOLD, (
+            f"Expected Jaccard >= {_JACCARD_STAGNATION_THRESHOLD} for similar texts, got {score:.3f}"
+        )
+
+    def test_different_topics_score_below_threshold(self):
+        """Texts on clearly different topics should produce Jaccard < _JACCARD_STAGNATION_THRESHOLD."""
+        kws1 = _topic_keywords("quantum mechanics electrons nuclear physics")
+        kws2 = _topic_keywords("freedom democracy justice political society")
+        score = _keyword_jaccard(kws1, kws2)
+        assert score < _JACCARD_STAGNATION_THRESHOLD, (
+            f"Expected Jaccard < {_JACCARD_STAGNATION_THRESHOLD} for different topics, got {score:.3f}"
+        )
+
+
+class TestStagnationConstants:
+    """Verify the stagnation-related module constants have sensible values."""
+
+    def test_jaccard_threshold_in_range(self):
+        """_JACCARD_STAGNATION_THRESHOLD must be in (0.0, 1.0)."""
+        assert 0.0 < _JACCARD_STAGNATION_THRESHOLD < 1.0
+
+    def test_pe_stagnation_increment_in_range(self):
+        """_PE_STAGNATION_INCREMENT must be positive and ≤ 0.5 (gradual, not a jump)."""
+        assert 0.0 < _PE_STAGNATION_INCREMENT <= 0.5
+
+    def test_pe_stagnation_increment_caps_at_one(self):
+        """Accumulating _PE_STAGNATION_INCREMENT four times from 0 must not exceed 1.0."""
+        value = 0.0
+        for _ in range(4):
+            value = min(1.0, value + _PE_STAGNATION_INCREMENT)
+        assert value <= 1.0
 
 
 if __name__ == "__main__":
