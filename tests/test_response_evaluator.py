@@ -256,6 +256,48 @@ class TestCreatesPressure:
     def test_case_insensitive(self):
         assert creates_pressure("HOWEVER, the argument is inconsistent.") is True
 
+    # --- new structural / phrase-fragment checks ---
+
+    def test_you_assume_triggers(self):
+        assert creates_pressure("You assume that freedom and causation are compatible.") is True
+
+    def test_why_assume_triggers(self):
+        assert creates_pressure("Why assume that the two can coexist?") is True
+
+    def test_what_if_triggers(self):
+        assert creates_pressure("What if the entire framing is flawed?") is True
+
+    def test_how_do_you_know_triggers(self):
+        assert creates_pressure("How do you know the premise is sound?") is True
+
+    def test_are_you_not_just_triggers(self):
+        assert creates_pressure("Are you not just restating the same assumption?") is True
+
+    def test_doesnt_that_triggers(self):
+        assert creates_pressure("Doesn't that contradict what you said before?") is True
+
+    def test_why_overlook_triggers(self):
+        assert creates_pressure("Why overlook the structural dependency here?") is True
+
+    def test_cannot_hold_triggers(self):
+        assert creates_pressure("That framing cannot hold under scrutiny.") is True
+
+    def test_pull_in_opposite_directions_triggers(self):
+        assert creates_pressure("These two drives pull in opposite directions.") is True
+
+    def test_already_stacked_triggers(self):
+        assert creates_pressure("The argument is already stacked against coherence.") is True
+
+    def test_rhetorical_question_negation_triggers(self):
+        # Negation-contracted rhetorical question via regex pattern
+        assert creates_pressure("Isn't that precisely the problem?") is True
+
+    def test_hidden_premise_triggers(self):
+        assert creates_pressure("There is a hidden premise you have not addressed.") is True
+
+    def test_you_are_assuming_triggers(self):
+        assert creates_pressure("You are assuming the very thing in question.") is True
+
 
 class TestShowsResolution:
     def test_we_conclude_triggers(self):
@@ -275,6 +317,50 @@ class TestShowsResolution:
 
     def test_case_insensitive(self):
         assert shows_resolution("THEREFORE WE MUST abandon the old model.") is True
+
+    # --- new structural / phrase-fragment checks ---
+
+    def test_one_must_yield_triggers(self):
+        assert shows_resolution("One must yield when the evidence is this clear.") is True
+
+    def test_one_excludes_the_other_triggers(self):
+        assert shows_resolution("Freedom and strict determinism: one excludes the other.") is True
+
+    def test_one_force_always_has_to_yield_triggers(self):
+        assert shows_resolution("One force always has to yield in this system.") is True
+
+    def test_cannot_operate_simultaneously_triggers(self):
+        assert shows_resolution("The two principles cannot operate simultaneously.") is True
+
+    def test_you_cannot_have_both_triggers(self):
+        assert shows_resolution("You cannot have both radical freedom and causal closure.") is True
+
+    def test_the_loop_closes_triggers(self):
+        assert shows_resolution("At this point the loop closes and no new options remain.") is True
+
+    def test_the_drive_fades_triggers(self):
+        assert shows_resolution("Without resolution the drive fades and the argument stalls.") is True
+
+    def test_one_side_has_to_give_triggers(self):
+        assert shows_resolution("One side has to give; the two positions are irreconcilable.") is True
+
+    def test_this_narrows_the_issue_to_triggers(self):
+        assert shows_resolution("This narrows the issue to a single unavoidable question.") is True
+
+    def test_cannot_coexist_triggers(self):
+        assert shows_resolution("These two values cannot coexist within the same framework.") is True
+
+    def test_must_give_way_triggers(self):
+        assert shows_resolution("Something must give way if progress is to be made.") is True
+
+    def test_forced_to_choose_triggers(self):
+        assert shows_resolution("We are forced to choose between coherence and completeness.") is True
+
+    def test_either_or_exclusion_regex_triggers(self):
+        assert shows_resolution("Either the claim holds, or the whole argument collapses.") is True
+
+    def test_one_side_collapse_regex_triggers(self):
+        assert shows_resolution("One side must yield when the evidence accumulates.") is True
 
 
 class TestEvaluateDialogueMovement:
