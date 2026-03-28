@@ -146,29 +146,54 @@ _PRESSURE_PHRASES: List[str] = [
     "you're assuming",
     "you are assuming",
     "is that not just",
+    # structural challenge phrases
+    "quietly assumes",
+    "risks sneaking in",
+    "just swaps one anchor for another",
+    "what happens if",
 ]
 
 # Compiled regex patterns for structural pressure signals.
 # Catches rhetorical question forms that challenge framing or stability.
+# All [^.!?] character classes are bounded to 200 characters to prevent
+# catastrophic backtracking on pathological inputs.
 _PRESSURE_PATTERNS: List[re.Pattern[str]] = [
     # Negation-contracted rhetorical question, e.g. "Doesn't this collapse?"
     # The optional apostrophe (') also handles informal spellings like "doesnt".
     re.compile(
         r"\b(?:doesn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|can'?t|won'?t"
-        r"|wouldn'?t|shouldn'?t|couldn'?t)\b[^.!?]*\?",
+        r"|wouldn'?t|shouldn'?t|couldn'?t)\b[^.!?]{0,200}\?",
         re.IGNORECASE,
     ),
+    # Structural challenge: "treats X as if" exposes a hidden assumption.
+    re.compile(r"\btreats?\b[^.!?]{0,200}\bas\s+if\b", re.IGNORECASE),
+    # Conditional challenge: "if …, does that mean" — probes consequences.
+    re.compile(r"\bif\b[^.!?]{0,200}\bdoes that mean\b", re.IGNORECASE),
+    # Conditional challenge: "if … what happens" — probes instability.
+    re.compile(r"\bif\b[^.!?]{0,200}\bwhat happens\b", re.IGNORECASE),
+    # Conditional challenge: "if …, then" — exposes entailed consequence.
+    re.compile(r"\bif\b[^.!?]{0,200},\s*then\b", re.IGNORECASE),
 ]
 
 # Markers that, when combined with the presence of '?' in a response, signal
 # a challenging rhetorical question.  Covers assumption challenges, epistemic
 # challenges, contradiction framing, and reframing prompts.  Used exclusively
 # in the structural Layer-4 check of creates_pressure().
+# NOTE: All entries here are substring prefixes — they only produce a pressure
+# signal when the response also contains '?', so short prefixes like "assum"
+# or "justif" do not fire on declarative statements.
 _RHETORICAL_QUESTION_MARKERS: List[str] = [
-    # assumption challenges
-    "assume",
+    # assumption challenges — word-family prefix catches assume/assumes/assumed/
+    # assuming/assumption/assumptions without an NLP library.
+    "assum",
     "you assume",
     "why assume",
+    # justification challenges — justif* catches justify/justified/justification
+    "justif",
+    # definition challenges — defin* catches define/defines/definition/defining
+    "defin",
+    # agreement challenges — agre* catches agree/agrees/agreed/agreement
+    "agre",
     # epistemic challenges — specific interrogative forms to avoid false positives
     # from mid-sentence uses of "why" (e.g. "that's why it matters?")
     "how do you know",
@@ -183,8 +208,9 @@ _RHETORICAL_QUESTION_MARKERS: List[str] = [
     "doesn't that",
     "isn't that",
     "aren't you",
-    # reframing prompts
+    # reframing / collective challenge prompts
     "are you not just",
+    "are we just",
     "does this not",
 ]
 
@@ -413,13 +439,18 @@ def creates_pressure(response: str) -> bool:
     Detection uses four layers:
     1. ``_PRESSURE_KEYWORDS`` — explicit contradiction / tension vocabulary.
     2. ``_PRESSURE_PHRASES`` — phrase fragments that challenge assumptions or
-       expose framing instability.
-    3. ``_PRESSURE_PATTERNS`` — structural regex patterns (e.g. negation-based
-       rhetorical questions).
+       expose framing instability, including structural phrases such as
+       "quietly assumes", "risks sneaking in", "what happens if", and
+       "just swaps one anchor for another".
+    3. ``_PRESSURE_PATTERNS`` — structural regex patterns including
+       negation-contracted rhetorical questions, "treats X as if" constructs,
+       and conditional challenge forms ("if …, then", "if … does that mean",
+       "if … what happens").
     4. Rhetorical-question rule — if the response contains a ``?`` *and* any
-       marker from ``_RHETORICAL_QUESTION_MARKERS`` (assumption challenge,
-       epistemic challenge, contradiction framing, or reframing prompt), the
-       response is treating a question as argumentative pressure.
+       marker from ``_RHETORICAL_QUESTION_MARKERS`` (assumption/justification/
+       definition/agreement word-family prefixes, epistemic interrogative forms,
+       contradiction framing, or reframing prompts), the response is treated as
+       argumentative pressure.
     """
     lower = response.lower()
     if any(k in lower for k in _PRESSURE_KEYWORDS):

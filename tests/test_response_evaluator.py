@@ -326,6 +326,83 @@ class TestCreatesPressure:
         # "why assume"), so no other layer fires either → overall False.
         assert creates_pressure("We assume the argument holds in all cases.") is False
 
+    # --- word-family matching (Layer 4) ---
+
+    def test_assumption_word_family_with_question_triggers(self):
+        # "assumption" contains "assum" prefix; ? present → Layer 4 fires.
+        assert creates_pressure("Does this not rest on a false assumption?") is True
+
+    def test_assumptions_word_family_with_question_triggers(self):
+        assert creates_pressure("What are the assumptions behind that claim?") is True
+
+    def test_justification_word_family_with_question_triggers(self):
+        # "justification" contains "justif" prefix; ? present → Layer 4 fires.
+        assert creates_pressure("Is there any justification for that position?") is True
+
+    def test_justify_word_family_with_question_triggers(self):
+        assert creates_pressure("Can you justify that leap?") is True
+
+    def test_definition_word_family_with_question_triggers(self):
+        # "definition" contains "defin" prefix; ? present → Layer 4 fires.
+        assert creates_pressure("What definition of freedom are you using?") is True
+
+    def test_define_word_family_with_question_triggers(self):
+        assert creates_pressure("How do you define consciousness here?") is True
+
+    def test_agreement_word_family_with_question_triggers(self):
+        # "agreement" contains "agre" prefix; ? present → Layer 4 fires.
+        assert creates_pressure("Is there any agreement on what that term means?") is True
+
+    def test_agree_word_family_with_question_triggers(self):
+        assert creates_pressure("Why would you agree with an unstable premise?") is True
+
+    def test_are_we_just_triggers(self):
+        # "are we just" + "?" → Layer 4 fires.
+        assert creates_pressure("Are we just restating the same problem?") is True
+
+    # --- structural challenge phrases (Layer 2) ---
+
+    def test_quietly_assumes_triggers(self):
+        assert creates_pressure("The argument quietly assumes a fixed reference frame.") is True
+
+    def test_risks_sneaking_in_triggers(self):
+        assert creates_pressure(
+            "That move risks sneaking in the very premise we are questioning."
+        ) is True
+
+    def test_just_swaps_one_anchor_triggers(self):
+        assert creates_pressure(
+            "This just swaps one anchor for another without resolving the tension."
+        ) is True
+
+    def test_what_happens_if_triggers(self):
+        assert creates_pressure("What happens if the ground condition is removed?") is True
+
+    # --- structural regex patterns (Layer 3) ---
+
+    def test_treats_as_if_triggers(self):
+        # "treats X as if" exposes a hidden assumption.
+        assert creates_pressure("That view treats consciousness as if it were divisible.") is True
+
+    def test_treat_as_if_triggers(self):
+        assert creates_pressure("You treat the concept as if it had a fixed referent.") is True
+
+    def test_if_does_that_mean_triggers(self):
+        # Conditional challenge: "if … does that mean"
+        assert creates_pressure("If determinism is true, does that mean agency is illusory?") is True
+
+    def test_if_what_happens_triggers(self):
+        # Conditional challenge: "if … what happens"
+        assert creates_pressure("If we remove the axiom, what happens to the proof?") is True
+
+    def test_if_then_conditional_triggers(self):
+        # Conditional challenge: "if …, then"
+        assert creates_pressure("If the premise fails, then the whole structure collapses.") is True
+
+    def test_plain_question_no_challenge_no_pressure(self):
+        # A purely neutral question with no challenge markers must not trigger.
+        assert creates_pressure("Is consciousness a product of the brain?") is False
+
 
 class TestShowsResolution:
     def test_we_conclude_triggers(self):
