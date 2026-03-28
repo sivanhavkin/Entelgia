@@ -180,6 +180,7 @@ try:
         PROGRESS_SCORE_THRESHOLD as _PE_PROGRESS_THRESHOLD,
         HIGH_VALUE_MOVES as _PE_HIGH_VALUE_MOVES,
     )
+    from entelgia.response_evaluator import evaluate_response as _eval_response
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -380,6 +381,9 @@ except ImportError:
 
     def _pe_get_moves(agent_name):  # type: ignore[no-redef]
         return []
+
+    def _eval_response(response, context):  # type: ignore[no-redef]
+        return 0.0
 
 
 # Optional: FastAPI for REST API
@@ -6292,6 +6296,16 @@ class Agent:
         self._last_emotion_intensity = float(inten)
         self._last_response_kind = kind
         self.update_drives_after_turn(kind, emo, float(inten))
+        # ─────────────────────────────────────────────────────────────────────────
+
+        # ── Evaluation score (measurement only) ───────────────────────────────────
+        # Independent quality signal — does NOT influence engine behaviour.
+        _eval_score = _eval_response(out, _history_texts)
+        logger.info(
+            "[EVAL] agent=%s evaluation_score=%.2f",
+            self.name,
+            _eval_score,
+        )
         # ─────────────────────────────────────────────────────────────────────────
 
         return out
