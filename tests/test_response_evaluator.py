@@ -298,6 +298,34 @@ class TestCreatesPressure:
     def test_you_are_assuming_triggers(self):
         assert creates_pressure("You are assuming the very thing in question.") is True
 
+    # --- Layer 4: rhetorical-question structural rule ---
+
+    def test_assume_with_question_triggers(self):
+        # "assume" + "?" — caught by Layer 4 even without "you assume" prefix
+        assert creates_pressure("Does the view not assume a stable ground?") is True
+
+    def test_bare_why_question_triggers(self):
+        # "why" + "?" — epistemic challenge via Layer 4
+        assert creates_pressure("Why does this paradox remain unresolved?") is True
+
+    def test_does_this_not_triggers(self):
+        # "does this not" + "?" — reframing prompt, Layer 4
+        assert creates_pressure("Does this not undermine your entire framework?") is True
+
+    def test_does_this_not_assumption_triggers(self):
+        # "does this not" + "?" variant from problem statement
+        assert creates_pressure("Does this not reveal an assumption in the framing?") is True
+
+    def test_rhetorical_question_no_pressure_without_marker(self):
+        # A question without any challenging marker should not trigger Layer 4
+        assert creates_pressure("Is consciousness related to matter?") is False
+
+    def test_marker_without_question_no_layer4_pressure(self):
+        # "assume" without "?" does not trigger Layer 4 (no question present).
+        # "we assume" also does not match _PRESSURE_PHRASES ("you assume" /
+        # "why assume"), so no other layer fires either → overall False.
+        assert creates_pressure("We assume the argument holds in all cases.") is False
+
 
 class TestShowsResolution:
     def test_we_conclude_triggers(self):

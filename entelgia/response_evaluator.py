@@ -160,6 +160,34 @@ _PRESSURE_PATTERNS: List[re.Pattern[str]] = [
     ),
 ]
 
+# Markers that, when combined with the presence of '?' in a response, signal
+# a challenging rhetorical question.  Covers assumption challenges, epistemic
+# challenges, contradiction framing, and reframing prompts.  Used exclusively
+# in the structural Layer-4 check of creates_pressure().
+_RHETORICAL_QUESTION_MARKERS: List[str] = [
+    # assumption challenges
+    "assume",
+    "you assume",
+    "why assume",
+    # epistemic challenges — specific interrogative forms to avoid false positives
+    # from mid-sentence uses of "why" (e.g. "that's why it matters?")
+    "how do you know",
+    "what if",
+    "why do",
+    "why does",
+    "why is",
+    "why are",
+    "why would",
+    "why should",
+    # contradiction framing
+    "doesn't that",
+    "isn't that",
+    "aren't you",
+    # reframing prompts
+    "are you not just",
+    "does this not",
+]
+
 # Keywords that signal resolution, narrowing, or collapse
 _RESOLUTION_KEYWORDS: List[str] = [
     "i was wrong",
@@ -382,12 +410,16 @@ def creates_pressure(response: str) -> bool:
     signal argumentative pressure, tension, contradiction, or sharpened
     disagreement.
 
-    Detection uses three layers:
+    Detection uses four layers:
     1. ``_PRESSURE_KEYWORDS`` — explicit contradiction / tension vocabulary.
     2. ``_PRESSURE_PHRASES`` — phrase fragments that challenge assumptions or
        expose framing instability.
     3. ``_PRESSURE_PATTERNS`` — structural regex patterns (e.g. negation-based
        rhetorical questions).
+    4. Rhetorical-question rule — if the response contains a ``?`` *and* any
+       marker from ``_RHETORICAL_QUESTION_MARKERS`` (assumption challenge,
+       epistemic challenge, contradiction framing, or reframing prompt), the
+       response is treating a question as argumentative pressure.
     """
     lower = response.lower()
     if any(k in lower for k in _PRESSURE_KEYWORDS):
@@ -395,6 +427,8 @@ def creates_pressure(response: str) -> bool:
     if any(phrase in lower for phrase in _PRESSURE_PHRASES):
         return True
     if any(p.search(response) for p in _PRESSURE_PATTERNS):
+        return True
+    if "?" in response and any(marker in lower for marker in _RHETORICAL_QUESTION_MARKERS):
         return True
     return False
 
