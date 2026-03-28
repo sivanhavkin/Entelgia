@@ -18,6 +18,7 @@ import pytest
 
 from Entelgia_production_meta import (
     compute_drive_pressure,
+    _PRESSURE_FEEDBACK_ALPHA,
     _topic_signature,
     _trim_to_word_limit,
     _is_question_resolved,
@@ -705,6 +706,144 @@ class TestNoBreakingChanges:
             title="compute_drive_pressure – Deterministic",
         )
         assert p1 == p2
+
+
+# ---------------------------------------------------------------------------
+# Test E: Soft feedback loop – dialogue pressure → drive pressure
+# ---------------------------------------------------------------------------
+
+
+def _apply_pressure_feedback(drive_pressure: float, dialogue_pressure: bool) -> float:
+    """Mirror of the EWM feedback applied in Agent.speak() after pressure alignment."""
+    if dialogue_pressure:
+        drive_pressure = (
+            (1.0 - _PRESSURE_FEEDBACK_ALPHA) * drive_pressure
+            + _PRESSURE_FEEDBACK_ALPHA * 10.0
+        )
+        drive_pressure = min(10.0, drive_pressure)
+    return drive_pressure
+
+
+class TestDialoguePressureFeedback:
+    """Verify the soft EWM feedback loop from dialogue pressure into drive pressure."""
+
+    def test_alpha_constant_is_small(self):
+        """_PRESSURE_FEEDBACK_ALPHA must be in the (0, 0.25] range (soft, not hard)."""
+        _print_table(
+            ["constant", "value", "expected range", "ok?"],
+            [
+                [
+                    "_PRESSURE_FEEDBACK_ALPHA",
+                    f"{_PRESSURE_FEEDBACK_ALPHA:.4f}",
+                    "(0.0, 0.25]",
+                    str(0.0 < _PRESSURE_FEEDBACK_ALPHA <= 0.25),
+                ]
+            ],
+            title="Feedback Alpha – Small Coefficient",
+        )
+        assert 0.0 < _PRESSURE_FEEDBACK_ALPHA <= 0.25
+
+    def test_feedback_raises_pressure_when_dialogue_pressure_true(self):
+        """Applying feedback with dialogue_pressure=True must increase drive_pressure."""
+        initial = 2.0
+        after = _apply_pressure_feedback(initial, dialogue_pressure=True)
+        _print_table(
+            ["state", "drive_pressure"],
+            [
+                ["before feedback", f"{initial:.4f}"],
+                ["after feedback (dialogue_pressure=True)", f"{after:.4f}"],
+                ["increased?", str(after > initial)],
+            ],
+            title="Feedback – Raises Pressure When Dialogue Shows Pressure",
+        )
+        assert after > initial, f"Expected pressure to rise above {initial:.3f}, got {after:.3f}"
+
+    def test_feedback_no_change_when_dialogue_pressure_false(self):
+        """Applying feedback with dialogue_pressure=False must NOT change drive_pressure."""
+        initial = 2.0
+        after = _apply_pressure_feedback(initial, dialogue_pressure=False)
+        _print_table(
+            ["state", "drive_pressure"],
+            [
+                ["before feedback", f"{initial:.4f}"],
+                ["after feedback (dialogue_pressure=False)", f"{after:.4f}"],
+                ["unchanged?", str(after == initial)],
+            ],
+            title="Feedback – No Change When Dialogue Is Calm",
+        )
+        assert after == initial, f"Expected no change, got {after:.3f}"
+
+    def test_feedback_nudge_is_not_a_large_jump(self):
+        """Each single application of feedback must raise pressure by < 2.0."""
+        initial = 2.0
+        after = _apply_pressure_feedback(initial, dialogue_pressure=True)
+        delta = after - initial
+        _print_table(
+            ["metric", "value", "threshold"],
+            [
+                ["single-turn delta", f"{delta:.4f}", "< 2.0"],
+                ["within bound?", str(delta < 2.0), "True"],
+            ],
+            title="Feedback – Small Single-Turn Jump",
+        )
+        assert delta < 2.0, f"Single-turn feedback delta ({delta:.3f}) exceeds 2.0 – too large"
+
+    def test_feedback_bounded_at_max(self):
+        """drive_pressure must never exceed 10.0 after feedback."""
+        near_max = 9.9
+        after = _apply_pressure_feedback(near_max, dialogue_pressure=True)
+        _print_table(
+            ["state", "drive_pressure"],
+            [
+                ["before (near max)", f"{near_max:.4f}"],
+                ["after feedback", f"{after:.4f}"],
+                ["capped at 10.0?", str(after <= 10.0)],
+            ],
+            title="Feedback – Bounded at 10.0",
+        )
+        assert after <= 10.0, f"Pressure exceeded 10.0: {after:.4f}"
+
+    def test_feedback_accumulates_over_repeated_turns(self):
+        """After 8 turns of consistent dialogue pressure, drive_pressure must rise noticeably."""
+        pressure = 2.0
+        baseline = pressure
+        rows = []
+        for turn in range(1, 9):
+            pressure = _apply_pressure_feedback(pressure, dialogue_pressure=True)
+            rows.append([turn, f"{pressure:.4f}", f"{pressure - baseline:.4f}"])
+
+        _print_table(
+            ["turn", "pressure", "Δ from baseline"],
+            rows,
+            title="Feedback – Accumulation Over 8 Turns (dialogue_pressure=True)",
+        )
+        _print_bar_chart(
+            [(f"turn {r[0]}", float(r[1])) for r in rows],
+            title="Pressure growth via dialogue feedback",
+        )
+        # After 8 turns of consistent pressure, drive_pressure must have risen by ≥ 1.0
+        assert pressure >= baseline + 1.0, (
+            f"Expected pressure to rise by ≥1.0 after 8 feedback turns; "
+            f"got {pressure:.3f} (baseline {baseline:.3f})"
+        )
+
+    def test_feedback_ewm_formula_matches_expected(self):
+        """The EWM blend result must equal (1-α)*p + α*10.0 exactly."""
+        p = 3.0
+        expected = (1.0 - _PRESSURE_FEEDBACK_ALPHA) * p + _PRESSURE_FEEDBACK_ALPHA * 10.0
+        actual = _apply_pressure_feedback(p, dialogue_pressure=True)
+        _print_table(
+            ["metric", "value"],
+            [
+                ["input pressure", f"{p:.4f}"],
+                ["alpha", f"{_PRESSURE_FEEDBACK_ALPHA:.4f}"],
+                ["expected (1-α)*p + α*10", f"{expected:.6f}"],
+                ["actual", f"{actual:.6f}"],
+                ["match?", str(actual == pytest.approx(expected))],
+            ],
+            title="Feedback – EWM Formula Verification",
+        )
+        assert actual == pytest.approx(expected, abs=1e-9)
 
 
 if __name__ == "__main__":
