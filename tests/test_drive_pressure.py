@@ -721,9 +721,8 @@ def _apply_pressure_feedback(drive_pressure: float, dialogue_pressure: bool) -> 
     """Mirror of the EWM feedback applied in Agent.speak() after pressure alignment."""
     if dialogue_pressure:
         drive_pressure = (
-            (1.0 - _PRESSURE_FEEDBACK_ALPHA) * drive_pressure
-            + _PRESSURE_FEEDBACK_ALPHA * 10.0
-        )
+            1.0 - _PRESSURE_FEEDBACK_ALPHA
+        ) * drive_pressure + _PRESSURE_FEEDBACK_ALPHA * 10.0
         drive_pressure = min(10.0, drive_pressure)
     return drive_pressure
 
@@ -760,7 +759,9 @@ class TestDialoguePressureFeedback:
             ],
             title="Feedback – Raises Pressure When Dialogue Shows Pressure",
         )
-        assert after > initial, f"Expected pressure to rise above {initial:.3f}, got {after:.3f}"
+        assert (
+            after > initial
+        ), f"Expected pressure to rise above {initial:.3f}, got {after:.3f}"
 
     def test_feedback_no_change_when_dialogue_pressure_false(self):
         """Applying feedback with dialogue_pressure=False must NOT change drive_pressure."""
@@ -790,7 +791,9 @@ class TestDialoguePressureFeedback:
             ],
             title="Feedback – Small Single-Turn Jump",
         )
-        assert delta < 2.0, f"Single-turn feedback delta ({delta:.3f}) exceeds 2.0 – too large"
+        assert (
+            delta < 2.0
+        ), f"Single-turn feedback delta ({delta:.3f}) exceeds 2.0 – too large"
 
     def test_feedback_bounded_at_max(self):
         """drive_pressure must never exceed 10.0 after feedback."""
@@ -834,7 +837,9 @@ class TestDialoguePressureFeedback:
     def test_feedback_ewm_formula_matches_expected(self):
         """The EWM blend result must equal (1-α)*p + α*10.0 exactly."""
         p = 3.0
-        expected = (1.0 - _PRESSURE_FEEDBACK_ALPHA) * p + _PRESSURE_FEEDBACK_ALPHA * 10.0
+        expected = (
+            1.0 - _PRESSURE_FEEDBACK_ALPHA
+        ) * p + _PRESSURE_FEEDBACK_ALPHA * 10.0
         actual = _apply_pressure_feedback(p, dialogue_pressure=True)
         _print_table(
             ["metric", "value"],
@@ -921,18 +926,18 @@ class TestKeywordJaccard:
             "consciousness is not reducible to the brain or physical states."
         )
         score = _keyword_jaccard(kws1, kws2)
-        assert score >= _JACCARD_STAGNATION_THRESHOLD, (
-            f"Expected Jaccard >= {_JACCARD_STAGNATION_THRESHOLD} for similar texts, got {score:.3f}"
-        )
+        assert (
+            score >= _JACCARD_STAGNATION_THRESHOLD
+        ), f"Expected Jaccard >= {_JACCARD_STAGNATION_THRESHOLD} for similar texts, got {score:.3f}"
 
     def test_different_topics_score_below_threshold(self):
         """Texts on clearly different topics should produce Jaccard < _JACCARD_STAGNATION_THRESHOLD."""
         kws1 = _topic_keywords("quantum mechanics electrons nuclear physics")
         kws2 = _topic_keywords("freedom democracy justice political society")
         score = _keyword_jaccard(kws1, kws2)
-        assert score < _JACCARD_STAGNATION_THRESHOLD, (
-            f"Expected Jaccard < {_JACCARD_STAGNATION_THRESHOLD} for different topics, got {score:.3f}"
-        )
+        assert (
+            score < _JACCARD_STAGNATION_THRESHOLD
+        ), f"Expected Jaccard < {_JACCARD_STAGNATION_THRESHOLD} for different topics, got {score:.3f}"
 
 
 class TestStagnationConstants:
