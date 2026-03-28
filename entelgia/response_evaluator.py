@@ -46,6 +46,17 @@ DrivePressure (meta signal) and the dialogue-pressure flag (text signal).
 Does not influence engine behaviour, scores, or Fixy logic.
 
 compute_pressure_alignment(meta_pressure, dialogue_pressure) -> str
+
+Step 4 — Resolution and semantic-repeat alignment (``compute_resolution_alignment``,
+``compute_semantic_repeat_alignment``)
+-------------------------------------------------------------------------------------
+Measurement-only comparison layers between structural dialogue signals
+(resolution, semantic_repeat) and the internal dialogue state
+(unresolved_count, conflict, stagnation).  Neither function influences
+engine behaviour, scores, or Fixy logic.
+
+compute_resolution_alignment(dialogue_resolution, unresolved_count, conflict, stagnation) -> str
+compute_semantic_repeat_alignment(dialogue_semantic_repeat, stagnation, conflict, unresolved_count) -> str
 """
 
 from __future__ import annotations
@@ -685,4 +696,148 @@ def compute_pressure_alignment(
         return "aligned" if dialogue_pressure else "internal_not_expressed"
     if dialogue_pressure:
         return "text_more_pressured_than_state"
+    return "neutral"
+
+
+# ---------------------------------------------------------------------------
+# Step 4 — Resolution and semantic-repeat alignment (measurement only)
+# ---------------------------------------------------------------------------
+
+# Shared thresholds used by both alignment functions below.
+# unresolved_count at or above this value → state has substantial open claims.
+_UNRESOLVED_COUNT_HIGH: int = 2
+# conflict at or above this value → elevated tension present in the dialogue.
+_CONFLICT_HIGH: float = 4.0
+# stagnation at or above this value → same-topic repetition, no forward motion.
+_STAGNATION_HIGH: float = 0.5
+
+
+def compute_resolution_alignment(
+    dialogue_resolution: bool,
+    unresolved_count: int,
+    conflict: float,
+    stagnation: float,
+) -> str:
+    """Compare the text-level resolution signal with internal dialogue state.
+
+    This is a **measurement-only** function.  It does not influence engine
+    behaviour, score weights, or Fixy logic.
+
+    The internal state is considered to *expect* resolution when:
+    * ``unresolved_count`` is high (≥ 2) — there are open claims that could
+      be narrowed or decided, **and**
+    * ``conflict`` is elevated (≥ 4.0) — tension is present, making
+      resolution meaningful.
+
+    When stagnation is also high (≥ 0.5) the expectation is treated as
+    *uncertain* because stagnation is more consistent with circular repetition
+    than with genuine resolution movement.
+
+    Parameters
+    ----------
+    dialogue_resolution:
+        The ``resolution`` flag from
+        :func:`evaluate_dialogue_movement_with_signals`, indicating whether
+        the generated text signals narrowing, concession, or collapse.
+    unresolved_count:
+        Number of currently unresolved claims / open questions (0–5).
+    conflict:
+        Agent conflict index (0.0–10.0); higher values indicate greater
+        internal tension between drives.
+    stagnation:
+        Stagnation level for the current turn (0.0–1.0); 1.0 means the
+        dialogue has been on the same topic for ≥ 4 consecutive turns.
+
+    Returns
+    -------
+    str
+        One of:
+
+        * ``"aligned"`` — state expects resolution **and** the text signals
+          resolution.
+        * ``"resolution_not_expressed"`` — state expects resolution but the
+          text shows no resolution signal (under-detection candidate).
+        * ``"text_resolved_no_state_pressure"`` — text signals resolution but
+          state does not indicate elevated tension (over-detection candidate).
+        * ``"weak_alignment"`` — state expectation is uncertain (high
+          stagnation alongside high unresolved/conflict); no strong conclusion.
+        * ``"neutral"`` — neither state nor text indicates resolution pressure.
+    """
+    state_expects = (
+        unresolved_count >= _UNRESOLVED_COUNT_HIGH
+        and conflict >= _CONFLICT_HIGH
+    )
+    uncertain = state_expects and stagnation >= _STAGNATION_HIGH
+
+    if uncertain:
+        return "weak_alignment"
+    if state_expects:
+        return "aligned" if dialogue_resolution else "resolution_not_expressed"
+    if dialogue_resolution:
+        return "text_resolved_no_state_pressure"
+    return "neutral"
+
+
+def compute_semantic_repeat_alignment(
+    dialogue_semantic_repeat: bool,
+    stagnation: float,
+    conflict: float,
+    unresolved_count: int,
+) -> str:
+    """Compare the text-level semantic-repeat signal with internal dialogue state.
+
+    This is a **measurement-only** function.  It does not influence engine
+    behaviour, score weights, or Fixy logic.
+
+    The internal state is considered to *expect* a semantic repeat when
+    stagnation is high (≥ 0.5), meaning the same topic has been revisited
+    across multiple turns without clear advancement.
+
+    When conflict is also elevated (≥ 4.0) **and** there are unresolved
+    claims, stagnation alone is less informative — the dialogue may be
+    circling around a genuine disagreement rather than simply repeating.
+    That combination is treated as uncertain.
+
+    Parameters
+    ----------
+    dialogue_semantic_repeat:
+        The ``semantic_repeat`` flag from
+        :func:`evaluate_dialogue_movement_with_signals`, indicating whether
+        the generated text is too similar to recent dialogue history.
+    stagnation:
+        Stagnation level for the current turn (0.0–1.0).
+    conflict:
+        Agent conflict index (0.0–10.0).
+    unresolved_count:
+        Number of currently unresolved claims / open questions (0–5).
+
+    Returns
+    -------
+    str
+        One of:
+
+        * ``"aligned"`` — state expects repetition **and** the text is
+          flagged as a semantic repeat.
+        * ``"repeat_not_detected"`` — state expects repetition but the text
+          is not flagged (under-detection candidate).
+        * ``"text_repeat_no_stagnation"`` — text is flagged as a semantic
+          repeat but state does not indicate stagnation (over-detection or
+          local word-overlap without structural repetition).
+        * ``"weak_alignment"`` — stagnation is high but conflict and
+          unresolved claims are also elevated; context is ambiguous.
+        * ``"neutral"`` — neither state nor text indicates repetition.
+    """
+    state_expects = stagnation >= _STAGNATION_HIGH
+    uncertain = (
+        state_expects
+        and conflict >= _CONFLICT_HIGH
+        and unresolved_count >= _UNRESOLVED_COUNT_HIGH
+    )
+
+    if uncertain:
+        return "weak_alignment"
+    if state_expects:
+        return "aligned" if dialogue_semantic_repeat else "repeat_not_detected"
+    if dialogue_semantic_repeat:
+        return "text_repeat_no_stagnation"
     return "neutral"
