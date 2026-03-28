@@ -543,6 +543,36 @@ def _status_from_move(move_type: str) -> str:
     return STATUS_UNRESOLVED
 
 
+def _contradiction_strength(text: str) -> float:
+    """Return a normalized contradiction strength in [0.0, 1.0].
+
+    Counts the number of distinct attack-pattern families matched in *text*
+    and normalizes by the total number of families.  A score above 0.7
+    indicates a strongly adversarial / contradictory move.
+    """
+    hits = _count_pattern_matches(text, _ATTACK_PATTERNS)
+    return min(hits / max(len(_ATTACK_PATTERNS), 1), 1.0)
+
+
+def _detect_domain_shift(text: str, history: List[str]) -> bool:
+    """Return True if *text* introduces a substantially new vocabulary domain.
+
+    A domain shift is detected when more than 40 % of the meaningful tokens
+    in *text* are absent from all recent history turns.  An empty history is
+    not considered a domain shift (there is nothing to shift *from*).
+    """
+    if not history:
+        return False
+    current_tokens = _tokenize(text)
+    if not current_tokens:
+        return False
+    history_tokens: set = set()
+    for h in history:
+        history_tokens |= _tokenize(h)
+    new_tokens = current_tokens - history_tokens
+    return len(new_tokens) / len(current_tokens) > 0.40
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -668,17 +698,26 @@ def score_progress(
 
     Higher is better (more argumentative progress).
 
-    Scoring rules
-    -------------
+    Base move-type scoring
+    ----------------------
     + 0.40  new claim that isn't in claims_memory
     + 0.30  direct attack or defense
     + 0.25  forced choice, reframe, escalation
     + 0.20  resolution attempt
     + 0.15  any commitment phrase
-    − 0.30  high similarity to recent turns (> 0.6)
-    − 0.15  moderate similarity (0.40 – 0.60)
-    − 0.20  no existing claim state changed and no new claim
+    − 0.05  soft nuance / mild hedge
+    − 0.15  paraphrase, balanced restatement, or filler
+    − 0.15  moderate similarity to recent turns (0.40 – 0.60)
+    − 0.30  high similarity to recent turns (> 0.60)
+    − 0.20  no existing claim state changed and move is low-value
     − 0.10  per hedge phrase (up to −0.30)
+
+    Dynamic progress bonuses (state-changing dynamics)
+    ---------------------------------------------------
+    + 0.20  argumentative state actually changed (new or updated claim)
+    + 0.20  strong contradiction detected (contradiction_strength > 0.7)
+    + 0.20  significant domain / vocabulary shift vs. recent history
+    + 0.30  resolution attempt (additional bonus on top of base +0.20)
     """
     move = classify_move(text, history)
     new_claims = extract_claims(text)
@@ -711,13 +750,34 @@ def score_progress(
     elif similarity > 0.40:
         score -= 0.15
 
-    # Claims-memory bonus / penalty
+    # Claims-memory state bonus / penalty — consolidated into one branch so
+    # the net effect of state_changed is clear: +0.20 when the argumentative
+    # state genuinely changed, −0.20 when nothing changed and the move was
+    # already low-value.
     state_changed = claims_memory.state_changed_by(new_claims, move)
-    if not state_changed and move not in HIGH_VALUE_MOVES:
+    if state_changed:
+        score += 0.20
+    elif move not in HIGH_VALUE_MOVES:
         score -= 0.20  # nothing changed argumentatively
 
     # Hedge penalty
     score -= min(hedge_hits * 0.10, 0.30)
+
+    # ------------------------------------------------------------------
+    # Dynamic progress bonuses — enable scores > 0.40 for genuinely
+    # state-changing turns (regardless of base move-type label).
+    # ------------------------------------------------------------------
+    contradiction_strength = _contradiction_strength(text)
+    domain_shift = _detect_domain_shift(text, history)
+    # Additional bonus for resolution on top of the base +0.20 move-type score
+    resolution_bonus = move == RESOLUTION_ATTEMPT
+
+    if contradiction_strength > 0.70:
+        score += 0.20
+    if domain_shift:
+        score += 0.20
+    if resolution_bonus:
+        score += 0.30
 
     # Clamp to [0.0, 1.0]
     return float(max(0.0, min(1.0, score)))

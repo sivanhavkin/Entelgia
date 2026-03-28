@@ -230,6 +230,90 @@ class TestScoreProgress:
         result = pe.score_progress("Hello.", [], mem)
         assert isinstance(result, float)
 
+    def test_dynamic_state_changed_bonus(self):
+        """state_changed=True should add +0.20 above the base move-type score."""
+        mem = self._mem()
+        text = "I claim that free will is an illusion caused by deterministic brain states."
+        score = pe.score_progress(text, [], mem)
+        # With a genuinely new claim (state_changed=True), score should exceed 0.40
+        assert score > 0.40
+
+    def test_dynamic_contradiction_bonus(self):
+        """Strongly adversarial text should earn the contradiction bonus (+0.20)."""
+        mem = self._mem()
+        # Triggers all 5 attack-pattern families: wrong/incorrect/mistaken/contradicts (pat1),
+        # "but this is" (pat2), counterargument/refutes (pat3), "No, in fact" (pat4), disagree (pat5)
+        text = (
+            "This is completely wrong and incorrect. "
+            "No, in fact, the evidence directly contradicts that claim — "
+            "but this is clearly mistaken. I disagree and the counterargument refutes it."
+        )
+        score = pe.score_progress(text, [], mem)
+        # DIRECT_ATTACK base (0.30) + state_changed (0.20) + contradiction (0.20) >= 0.60
+        assert score >= 0.60
+
+    def test_dynamic_domain_shift_bonus(self):
+        """Text introducing substantially new vocabulary should earn domain-shift bonus (+0.20)."""
+        mem = self._mem()
+        history = ["The colour of the sky is blue due to light scattering."]
+        text = (
+            "Quantum entanglement proves that consciousness collapses "
+            "superpositioned wave functions through observation."
+        )
+        score = pe.score_progress(text, history, mem)
+        # NEW_CLAIM (0.40) + state_changed (0.20) + domain_shift (0.20) → well above 0.40
+        assert score > 0.40
+
+    def test_dynamic_resolution_bonus(self):
+        """A resolution move should earn both the base (+0.20) and the resolution bonus (+0.30)."""
+        mem = self._mem()
+        text = (
+            "Therefore, we can resolve this disagreement: both sides share common ground "
+            "in that they both accept empirical evidence. The synthesis is clear."
+        )
+        score = pe.score_progress(text, [], mem)
+        # RESOLUTION_ATTEMPT (0.20) + resolution bonus (0.30) → at least 0.40
+        assert score >= 0.40
+
+    def test_dynamic_combined_high_score(self):
+        """Multiple dynamic factors together should allow scores well above 0.40."""
+        mem = self._mem()
+        text = (
+            "I claim that determinism is true and this completely refutes libertarian free will. "
+            "The evidence directly contradicts every objection. "
+            "Therefore, we can resolve this: compatibilism is the only coherent synthesis."
+        )
+        score = pe.score_progress(text, [], mem)
+        # Many bonuses should combine to produce a score > 0.60
+        assert score > 0.60
+
+    def test_dynamic_helpers_contradiction_strength(self):
+        """_contradiction_strength returns float in [0.0, 1.0]."""
+        strength = pe._contradiction_strength(
+            "This argument is wrong, incorrect, and refutes itself. I disagree."
+        )
+        assert 0.0 <= strength <= 1.0
+        assert strength > 0.0  # should detect attack patterns
+
+    def test_dynamic_helpers_domain_shift_true(self):
+        """_detect_domain_shift returns True when vocabulary is substantially new."""
+        history = ["The ocean waves splash against the sandy shore."]
+        text = "Quantum chromodynamics explains quark confinement through gluon fields."
+        result = pe._detect_domain_shift(text, history)
+        assert result is True
+
+    def test_dynamic_helpers_domain_shift_false_no_history(self):
+        """_detect_domain_shift returns False when there is no history."""
+        result = pe._detect_domain_shift("Any text whatsoever.", [])
+        assert result is False
+
+    def test_dynamic_helpers_domain_shift_false_similar(self):
+        """_detect_domain_shift returns False when vocabulary mostly overlaps with history."""
+        history = ["The brain generates consciousness through neural activity."]
+        text = "Neural activity generates consciousness in the brain."
+        result = pe._detect_domain_shift(text, history)
+        assert result is False
+
 
 # ===========================================================================
 # 4.  ClaimsMemory
