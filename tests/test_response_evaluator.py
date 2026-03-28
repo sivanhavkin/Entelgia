@@ -735,65 +735,59 @@ class TestComputePressureAlignment:
 
 
 class TestComputeResolutionAlignment:
-    # --- state expects resolution, no stagnation ---
+    # --- resolution derived solely from dialogue_resolution flag ---
 
-    def test_aligned_when_state_expects_and_text_resolves(self):
-        # high unresolved + high conflict + low stagnation + text resolves → aligned
+    def test_aligned_when_text_resolves(self):
+        # text signals resolution → aligned, regardless of internal state
         assert compute_resolution_alignment(True, 2, 5.0, 0.2) == "aligned"
 
-    def test_resolution_not_expressed_when_state_expects_but_text_does_not(self):
-        # high unresolved + high conflict + low stagnation + no text resolution → under-detection
-        assert compute_resolution_alignment(False, 3, 6.0, 0.1) == "resolution_not_expressed"
+    def test_aligned_when_text_resolves_low_state(self):
+        # text signals resolution even when unresolved/conflict are low
+        assert compute_resolution_alignment(True, 1, 5.0, 0.2) == "aligned"
 
-    # --- state does NOT expect resolution ---
+    def test_aligned_when_text_resolves_low_conflict(self):
+        # text signals resolution even when conflict is low
+        assert compute_resolution_alignment(True, 3, 2.0, 0.2) == "aligned"
 
-    def test_text_resolved_no_state_pressure_when_no_state_but_text_resolves(self):
-        # low unresolved + high conflict → state does not expect resolution
-        assert compute_resolution_alignment(True, 1, 5.0, 0.2) == "text_resolved_no_state_pressure"
+    def test_aligned_when_text_resolves_high_stagnation(self):
+        # text signals resolution regardless of high stagnation
+        assert compute_resolution_alignment(True, 2, 5.0, 0.6) == "aligned"
 
-    def test_text_resolved_no_state_pressure_when_low_conflict(self):
-        # high unresolved but low conflict → state does not expect resolution
-        assert compute_resolution_alignment(True, 3, 2.0, 0.2) == "text_resolved_no_state_pressure"
+    def test_neutral_when_no_text_resolution(self):
+        # no text-level resolution → neutral, regardless of internal state
+        assert compute_resolution_alignment(False, 3, 6.0, 0.1) == "neutral"
 
     def test_neutral_when_neither_state_nor_text(self):
         # low everything → neutral
         assert compute_resolution_alignment(False, 0, 1.0, 0.0) == "neutral"
 
-    # --- uncertain band (high stagnation alongside high state expectation) ---
+    def test_neutral_when_high_state_but_no_text_resolution(self):
+        # high unresolved + high conflict + high stagnation but no text resolution → neutral
+        assert compute_resolution_alignment(False, 2, 4.0, 0.5) == "neutral"
 
-    def test_weak_alignment_when_state_expects_but_stagnation_high(self):
-        # high unresolved + high conflict + high stagnation → ambiguous
-        assert compute_resolution_alignment(True, 2, 5.0, 0.6) == "weak_alignment"
+    # --- internal state parameters do not affect outcome ---
 
-    def test_weak_alignment_at_stagnation_boundary(self):
-        assert compute_resolution_alignment(False, 2, 4.0, 0.5) == "weak_alignment"
+    def test_internal_state_ignored_when_text_resolves(self):
+        # varying internal state must not change the outcome when text resolves
+        assert compute_resolution_alignment(True, 0, 0.0, 0.0) == "aligned"
+        assert compute_resolution_alignment(True, 5, 10.0, 1.0) == "aligned"
 
-    # --- boundary values ---
-
-    def test_aligned_at_exact_thresholds(self):
-        # exactly at unresolved=2, conflict=4.0, stagnation just below 0.5
-        assert compute_resolution_alignment(True, 2, 4.0, 0.49) == "aligned"
-
-    def test_neutral_just_below_unresolved_threshold(self):
-        assert compute_resolution_alignment(False, 1, 5.0, 0.0) == "neutral"
-
-    def test_neutral_just_below_conflict_threshold(self):
-        assert compute_resolution_alignment(False, 3, 3.99, 0.0) == "neutral"
+    def test_internal_state_ignored_when_text_does_not_resolve(self):
+        # varying internal state must not change the outcome when text does not resolve
+        assert compute_resolution_alignment(False, 2, 4.0, 0.0) == "neutral"
+        assert compute_resolution_alignment(False, 0, 10.0, 0.9) == "neutral"
 
     # --- general ---
 
     def test_returns_string(self):
         assert isinstance(compute_resolution_alignment(False, 0, 0.0, 0.0), str)
 
-    def test_all_five_outcomes_are_distinct(self):
+    def test_aligned_and_neutral_outcomes_are_distinct(self):
         outcomes = {
-            compute_resolution_alignment(True, 2, 5.0, 0.2),   # aligned
-            compute_resolution_alignment(False, 2, 5.0, 0.2),  # resolution_not_expressed
-            compute_resolution_alignment(True, 1, 5.0, 0.2),   # text_resolved_no_state_pressure
-            compute_resolution_alignment(True, 2, 5.0, 0.6),   # weak_alignment
-            compute_resolution_alignment(False, 0, 1.0, 0.0),  # neutral
+            compute_resolution_alignment(True, 0, 0.0, 0.0),   # aligned
+            compute_resolution_alignment(False, 0, 0.0, 0.0),  # neutral
         }
-        assert len(outcomes) == 5
+        assert len(outcomes) == 2
 
 
 # ---------------------------------------------------------------------------
