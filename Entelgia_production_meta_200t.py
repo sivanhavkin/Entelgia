@@ -2533,6 +2533,11 @@ def compute_drive_pressure(
     return max(0.0, min(10.0, new_p))
 
 
+# EWM coefficient for the dialogue → meta-pressure soft feedback loop.
+# Small value (0.1–0.2) so each turn only nudges drive_pressure slightly.
+_PRESSURE_FEEDBACK_ALPHA: float = 0.15
+
+
 def _trim_to_word_limit(text: str, max_words: int) -> str:
     """Trim *text* to at most *max_words* words, ending at the last sentence boundary."""
     words = text.split()
@@ -6292,6 +6297,19 @@ class Agent:
             self.drive_pressure,
             _dialogue_sigs["pressure"],
         )
+        # ── Soft feedback: dialogue pressure → drive pressure ─────────────────────
+        # When the generated text signals argumentative pressure, softly nudge
+        # drive_pressure upward using an EWM blend toward the high end of the
+        # scale.  This closes the coherence gap between expressed output and
+        # internal state without overwriting existing pressure dynamics.
+        # Only applied when dialogue_pressure is True (upward nudge only); the
+        # existing compute_drive_pressure decay handles the downward direction.
+        if _dialogue_sigs["pressure"]:
+            self.drive_pressure = (
+                (1.0 - _PRESSURE_FEEDBACK_ALPHA) * self.drive_pressure
+                + _PRESSURE_FEEDBACK_ALPHA * 10.0
+            )
+            self.drive_pressure = min(10.0, self.drive_pressure)
         # ─────────────────────────────────────────────────────────────────────────
 
         return out
