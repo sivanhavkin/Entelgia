@@ -8,6 +8,25 @@ All notable changes to this project will be documented in this file. The format 
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Dynamic progress scoring in `score_progress()`** (`entelgia/progress_enforcer.py`) — replaces the static flat score for `NEW_CLAIM` moves with a composite system that rewards genuinely state-changing turns. Four dynamic bonuses stack on top of the base move-type score:
+  - `+0.20` when the argumentative state actually changed (new or updated claim in `ClaimsMemory`)
+  - `+0.20` when contradiction strength exceeds 0.7 (≥ 4 of 5 attack-pattern families matched)
+  - `+0.20` when a significant domain / vocabulary shift is detected vs. recent history
+  - `+0.30` additional bonus for a `RESOLUTION_ATTEMPT` move (on top of the base `+0.20`)
+  - Scores are capped at `1.0`. Enables progress scores well above 0.40 for substantive turns.
+- **`_contradiction_strength(text) → float`** — new internal helper that normalizes the number of distinct attack-pattern families matched in `text` to `[0.0, 1.0]`. Used by `score_progress()` to gate the contradiction bonus.
+- **`_detect_domain_shift(text, history) → bool`** — new internal helper that returns `True` when more than 40 % of the meaningful tokens in `text` are absent from all recent history turns, indicating the response opens a new conceptual domain.
+
+### Changed
+
+- **`score_progress()` state-changed logic consolidated** — the old `if not state_changed and move not in HIGH_VALUE_MOVES: score -= 0.20` penalty and the new `if state_changed: score += 0.20` bonus are now expressed as a single `if/elif` branch, making the net effect of `state_changed` unambiguous at a glance.
+
+---
+
 ## [5.0.0] - 2026-03-27
 
 ### Added
