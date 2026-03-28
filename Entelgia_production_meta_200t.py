@@ -189,6 +189,8 @@ try:
     from entelgia.response_evaluator import (
         evaluate_dialogue_movement_with_signals as _eval_dialogue_signals,
         compute_pressure_alignment as _compute_pressure_alignment,
+        compute_resolution_alignment as _compute_resolution_alignment,
+        compute_semantic_repeat_alignment as _compute_semantic_repeat_alignment,
     )
 
     ENTELGIA_ENHANCED = True
@@ -402,6 +404,12 @@ except ImportError:
         return {"score": 0.0, "new_claim": False, "pressure": False, "resolution": False, "semantic_repeat": False}
 
     def _compute_pressure_alignment(meta_pressure, dialogue_pressure):  # type: ignore[no-redef]
+        return "neutral"
+
+    def _compute_resolution_alignment(dialogue_resolution, unresolved_count, conflict, stagnation):  # type: ignore[no-redef]
+        return "neutral"
+
+    def _compute_semantic_repeat_alignment(dialogue_semantic_repeat, stagnation, conflict, unresolved_count):  # type: ignore[no-redef]
         return "neutral"
 
 
@@ -4325,6 +4333,9 @@ class Agent:
         }
         # Pressure synchronisation (measurement only) — set by speak(), logged by MainScript.
         self._last_pressure_sync: str = "neutral"
+        # Resolution and semantic-repeat alignment (measurement only) — set by speak(), logged by MainScript.
+        self._last_resolution_alignment: str = "neutral"
+        self._last_semantic_repeat_alignment: str = "neutral"
         # ── Anti-repetition form tracking ─────────────────────────────────────
         self._last_response_forms: deque = deque(maxlen=3)
         self._last_template_families: deque = deque(maxlen=3)
@@ -6297,6 +6308,26 @@ class Agent:
             self.drive_pressure,
             _dialogue_sigs["pressure"],
         )
+        # ── Resolution alignment (measurement only) ───────────────────────────────
+        # Compare text-level resolution signal with internal state:
+        # unresolved_count, conflict index, and stagnation.
+        # Result stored for MainScript to log as [RESOLUTION-SYNC].
+        self._last_resolution_alignment = _compute_resolution_alignment(
+            _dialogue_sigs["resolution"],
+            self.open_questions,
+            self.conflict_index(),
+            self._last_stagnation,
+        )
+        # ── Semantic-repeat alignment (measurement only) ──────────────────────────
+        # Compare text-level semantic_repeat signal with internal stagnation,
+        # conflict index, and unresolved count.
+        # Result stored for MainScript to log as [SEMANTIC-REPEAT-SYNC].
+        self._last_semantic_repeat_alignment = _compute_semantic_repeat_alignment(
+            _dialogue_sigs["semantic_repeat"],
+            self._last_stagnation,
+            self.conflict_index(),
+            self.open_questions,
+        )
         # ── Soft feedback: dialogue pressure → drive pressure ─────────────────────
         # When the generated text signals argumentative pressure, softly nudge
         # drive_pressure upward using an EWM blend toward the high end of the
@@ -7835,6 +7866,26 @@ class MainScript:
                 speaker.drive_pressure,
                 speaker._last_dialogue_signals["pressure"],
                 speaker._last_pressure_sync,
+            )
+            logger.info(
+                "[RESOLUTION-SYNC] agent=%s dialogue_resolution=%s"
+                " unresolved=%d conflict=%.2f stagnation=%.2f alignment=%s",
+                speaker.name,
+                speaker._last_dialogue_signals["resolution"],
+                speaker.open_questions,
+                speaker.conflict_index(),
+                speaker._last_stagnation,
+                speaker._last_resolution_alignment,
+            )
+            logger.info(
+                "[SEMANTIC-REPEAT-SYNC] agent=%s dialogue_semantic_repeat=%s"
+                " stagnation=%.2f conflict=%.2f unresolved=%d alignment=%s",
+                speaker.name,
+                speaker._last_dialogue_signals["semantic_repeat"],
+                speaker._last_stagnation,
+                speaker.conflict_index(),
+                speaker.open_questions,
+                speaker._last_semantic_repeat_alignment,
             )
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             # Skipped entirely when enable_observer is False or

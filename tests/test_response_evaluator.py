@@ -20,6 +20,10 @@ Covers:
   10. creates_pressure — keyword detection
   11. shows_resolution — keyword detection
   12. evaluate_dialogue_movement — range, base score, bonuses, penalties
+
+  Step 4 — compute_resolution_alignment / compute_semantic_repeat_alignment
+  13. compute_resolution_alignment — all outcomes
+  14. compute_semantic_repeat_alignment — all outcomes
 """
 
 import sys
@@ -39,6 +43,8 @@ from entelgia.response_evaluator import (
     creates_pressure,
     shows_resolution,
     compute_pressure_alignment,
+    compute_resolution_alignment,
+    compute_semantic_repeat_alignment,
 )
 
 
@@ -719,5 +725,139 @@ class TestComputePressureAlignment:
             compute_pressure_alignment(1.0, True),    # text_more_pressured_than_state
             compute_pressure_alignment(3.5, True),    # weak_alignment
             compute_pressure_alignment(1.0, False),   # neutral
+        }
+        assert len(outcomes) == 5
+
+
+# ---------------------------------------------------------------------------
+# 13. compute_resolution_alignment
+# ---------------------------------------------------------------------------
+
+
+class TestComputeResolutionAlignment:
+    # --- state expects resolution, no stagnation ---
+
+    def test_aligned_when_state_expects_and_text_resolves(self):
+        # high unresolved + high conflict + low stagnation + text resolves → aligned
+        assert compute_resolution_alignment(True, 2, 5.0, 0.2) == "aligned"
+
+    def test_resolution_not_expressed_when_state_expects_but_text_does_not(self):
+        # high unresolved + high conflict + low stagnation + no text resolution → under-detection
+        assert compute_resolution_alignment(False, 3, 6.0, 0.1) == "resolution_not_expressed"
+
+    # --- state does NOT expect resolution ---
+
+    def test_text_resolved_no_state_pressure_when_no_state_but_text_resolves(self):
+        # low unresolved + high conflict → state does not expect resolution
+        assert compute_resolution_alignment(True, 1, 5.0, 0.2) == "text_resolved_no_state_pressure"
+
+    def test_text_resolved_no_state_pressure_when_low_conflict(self):
+        # high unresolved but low conflict → state does not expect resolution
+        assert compute_resolution_alignment(True, 3, 2.0, 0.2) == "text_resolved_no_state_pressure"
+
+    def test_neutral_when_neither_state_nor_text(self):
+        # low everything → neutral
+        assert compute_resolution_alignment(False, 0, 1.0, 0.0) == "neutral"
+
+    # --- uncertain band (high stagnation alongside high state expectation) ---
+
+    def test_weak_alignment_when_state_expects_but_stagnation_high(self):
+        # high unresolved + high conflict + high stagnation → ambiguous
+        assert compute_resolution_alignment(True, 2, 5.0, 0.6) == "weak_alignment"
+
+    def test_weak_alignment_at_stagnation_boundary(self):
+        assert compute_resolution_alignment(False, 2, 4.0, 0.5) == "weak_alignment"
+
+    # --- boundary values ---
+
+    def test_aligned_at_exact_thresholds(self):
+        # exactly at unresolved=2, conflict=4.0, stagnation just below 0.5
+        assert compute_resolution_alignment(True, 2, 4.0, 0.49) == "aligned"
+
+    def test_neutral_just_below_unresolved_threshold(self):
+        assert compute_resolution_alignment(False, 1, 5.0, 0.0) == "neutral"
+
+    def test_neutral_just_below_conflict_threshold(self):
+        assert compute_resolution_alignment(False, 3, 3.99, 0.0) == "neutral"
+
+    # --- general ---
+
+    def test_returns_string(self):
+        assert isinstance(compute_resolution_alignment(False, 0, 0.0, 0.0), str)
+
+    def test_all_five_outcomes_are_distinct(self):
+        outcomes = {
+            compute_resolution_alignment(True, 2, 5.0, 0.2),   # aligned
+            compute_resolution_alignment(False, 2, 5.0, 0.2),  # resolution_not_expressed
+            compute_resolution_alignment(True, 1, 5.0, 0.2),   # text_resolved_no_state_pressure
+            compute_resolution_alignment(True, 2, 5.0, 0.6),   # weak_alignment
+            compute_resolution_alignment(False, 0, 1.0, 0.0),  # neutral
+        }
+        assert len(outcomes) == 5
+
+
+# ---------------------------------------------------------------------------
+# 14. compute_semantic_repeat_alignment
+# ---------------------------------------------------------------------------
+
+
+class TestComputeSemanticRepeatAlignment:
+    # --- state expects repeat (high stagnation, low conflict/unresolved) ---
+
+    def test_aligned_when_stagnation_high_and_text_repeat(self):
+        # high stagnation + low conflict + low unresolved + text is repeat → aligned
+        assert compute_semantic_repeat_alignment(True, 0.7, 2.0, 1) == "aligned"
+
+    def test_repeat_not_detected_when_stagnation_high_but_text_not_repeat(self):
+        # high stagnation but text not flagged → under-detection
+        assert compute_semantic_repeat_alignment(False, 0.8, 2.0, 1) == "repeat_not_detected"
+
+    # --- state does NOT expect repeat ---
+
+    def test_text_repeat_no_stagnation_when_low_stagnation_and_text_repeat(self):
+        # low stagnation + text flagged as repeat → over-detection or local word-overlap
+        assert compute_semantic_repeat_alignment(True, 0.2, 2.0, 1) == "text_repeat_no_stagnation"
+
+    def test_neutral_when_neither_stagnation_nor_text_repeat(self):
+        assert compute_semantic_repeat_alignment(False, 0.0, 1.0, 0) == "neutral"
+
+    # --- uncertain band (high stagnation + high conflict + high unresolved) ---
+
+    def test_weak_alignment_when_stagnation_and_conflict_and_unresolved_all_high(self):
+        # could be circular disagreement rather than simple repetition
+        assert compute_semantic_repeat_alignment(True, 0.7, 5.0, 3) == "weak_alignment"
+
+    def test_weak_alignment_at_conflict_boundary(self):
+        assert compute_semantic_repeat_alignment(False, 0.5, 4.0, 2) == "weak_alignment"
+
+    # --- boundary values ---
+
+    def test_aligned_at_stagnation_boundary(self):
+        # exactly at stagnation=0.5, conflict below threshold
+        assert compute_semantic_repeat_alignment(True, 0.5, 3.0, 1) == "aligned"
+
+    def test_neutral_just_below_stagnation_threshold(self):
+        assert compute_semantic_repeat_alignment(False, 0.49, 2.0, 1) == "neutral"
+
+    def test_aligned_when_stagnation_high_conflict_high_but_unresolved_low(self):
+        # high conflict but unresolved=1 → uncertain condition NOT met → aligned
+        assert compute_semantic_repeat_alignment(True, 0.7, 5.0, 1) == "aligned"
+
+    def test_aligned_when_stagnation_high_unresolved_high_but_conflict_low(self):
+        # high unresolved but conflict < 4.0 → uncertain condition NOT met → aligned
+        assert compute_semantic_repeat_alignment(True, 0.7, 3.0, 3) == "aligned"
+
+    # --- general ---
+
+    def test_returns_string(self):
+        assert isinstance(compute_semantic_repeat_alignment(False, 0.0, 0.0, 0), str)
+
+    def test_all_five_outcomes_are_distinct(self):
+        outcomes = {
+            compute_semantic_repeat_alignment(True, 0.7, 2.0, 1),   # aligned
+            compute_semantic_repeat_alignment(False, 0.8, 2.0, 1),  # repeat_not_detected
+            compute_semantic_repeat_alignment(True, 0.2, 2.0, 1),   # text_repeat_no_stagnation
+            compute_semantic_repeat_alignment(True, 0.7, 5.0, 3),   # weak_alignment
+            compute_semantic_repeat_alignment(False, 0.0, 1.0, 0),  # neutral
         }
         assert len(outcomes) == 5
