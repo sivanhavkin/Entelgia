@@ -38,6 +38,7 @@ from entelgia.response_evaluator import (
     is_semantic_repeat,
     creates_pressure,
     shows_resolution,
+    compute_pressure_alignment,
 )
 
 
@@ -652,3 +653,47 @@ class TestEvaluateDialogueMovementWithSignals:
         if result["semantic_repeat"]:
             expected -= 0.20
         assert result["score"] == pytest.approx(max(0.0, min(1.0, expected)))
+
+
+# ---------------------------------------------------------------------------
+# 14.  compute_pressure_alignment
+# ---------------------------------------------------------------------------
+
+
+class TestComputePressureAlignment:
+    def test_aligned_when_meta_high_and_dialogue_true(self):
+        assert compute_pressure_alignment(6.0, True) == "aligned"
+
+    def test_aligned_at_exact_threshold_with_dialogue_true(self):
+        assert compute_pressure_alignment(5.0, True) == "aligned"
+
+    def test_mismatch_internal_not_expressed_when_meta_high_and_dialogue_false(self):
+        assert compute_pressure_alignment(7.5, False) == "mismatch_internal_not_expressed"
+
+    def test_mismatch_text_more_pressured_when_meta_low_and_dialogue_true(self):
+        assert compute_pressure_alignment(2.0, True) == "mismatch_text_more_pressured_than_state"
+
+    def test_neutral_when_meta_low_and_dialogue_false(self):
+        assert compute_pressure_alignment(1.0, False) == "neutral"
+
+    def test_neutral_at_zero_pressure(self):
+        assert compute_pressure_alignment(0.0, False) == "neutral"
+
+    def test_just_below_threshold_with_dialogue_false_is_neutral(self):
+        assert compute_pressure_alignment(4.99, False) == "neutral"
+
+    def test_just_below_threshold_with_dialogue_true_is_mismatch_text(self):
+        assert compute_pressure_alignment(4.99, True) == "mismatch_text_more_pressured_than_state"
+
+    def test_returns_string(self):
+        result = compute_pressure_alignment(3.0, False)
+        assert isinstance(result, str)
+
+    def test_all_four_outcomes_are_distinct(self):
+        outcomes = {
+            compute_pressure_alignment(8.0, True),
+            compute_pressure_alignment(8.0, False),
+            compute_pressure_alignment(2.0, True),
+            compute_pressure_alignment(2.0, False),
+        }
+        assert len(outcomes) == 4
