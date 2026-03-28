@@ -664,14 +664,18 @@ class TestComputePressureAlignment:
     def test_aligned_when_meta_high_and_dialogue_true(self):
         assert compute_pressure_alignment(6.0, True) == "aligned"
 
-    def test_aligned_at_exact_threshold_with_dialogue_true(self):
-        assert compute_pressure_alignment(5.0, True) == "aligned"
+    def test_exact_threshold_not_high_with_dialogue_true(self):
+        # 5.0 is not strictly > 5.0, so it falls into "text_more_pressured_than_state"
+        assert compute_pressure_alignment(5.0, True) == "text_more_pressured_than_state"
 
-    def test_mismatch_internal_not_expressed_when_meta_high_and_dialogue_false(self):
-        assert compute_pressure_alignment(7.5, False) == "mismatch_internal_not_expressed"
+    def test_just_above_threshold_is_high_with_dialogue_true(self):
+        assert compute_pressure_alignment(5.01, True) == "aligned"
 
-    def test_mismatch_text_more_pressured_when_meta_low_and_dialogue_true(self):
-        assert compute_pressure_alignment(2.0, True) == "mismatch_text_more_pressured_than_state"
+    def test_internal_not_expressed_when_meta_high_and_dialogue_false(self):
+        assert compute_pressure_alignment(7.5, False) == "internal_not_expressed"
+
+    def test_text_more_pressured_when_meta_low_and_dialogue_true(self):
+        assert compute_pressure_alignment(1.0, True) == "text_more_pressured_than_state"
 
     def test_neutral_when_meta_low_and_dialogue_false(self):
         assert compute_pressure_alignment(1.0, False) == "neutral"
@@ -682,8 +686,8 @@ class TestComputePressureAlignment:
     def test_just_below_threshold_with_dialogue_false_is_neutral(self):
         assert compute_pressure_alignment(4.99, False) == "neutral"
 
-    def test_just_below_threshold_with_dialogue_true_is_mismatch_text(self):
-        assert compute_pressure_alignment(4.99, True) == "mismatch_text_more_pressured_than_state"
+    def test_just_below_threshold_with_dialogue_true_is_text_more_pressured(self):
+        assert compute_pressure_alignment(4.99, True) == "text_more_pressured_than_state"
 
     def test_returns_string(self):
         result = compute_pressure_alignment(3.0, False)
@@ -693,7 +697,7 @@ class TestComputePressureAlignment:
         outcomes = {
             compute_pressure_alignment(8.0, True),
             compute_pressure_alignment(8.0, False),
-            compute_pressure_alignment(2.0, True),
-            compute_pressure_alignment(2.0, False),
+            compute_pressure_alignment(1.0, True),
+            compute_pressure_alignment(1.0, False),
         }
         assert len(outcomes) == 4

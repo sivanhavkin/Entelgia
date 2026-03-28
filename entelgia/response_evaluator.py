@@ -629,7 +629,8 @@ def evaluate_dialogue_movement_with_signals(
 # ---------------------------------------------------------------------------
 
 # DrivePressure threshold above which meta pressure is considered "high".
-# Range is 0.0–10.0; 5.0 is the midpoint.
+# Range is 0.0–10.0; meta pressure is high when strictly greater than 5.0
+# (the midpoint), so the flag only activates for genuinely elevated pressure.
 _META_PRESSURE_HIGH_THRESHOLD: float = 5.0
 
 
@@ -656,17 +657,17 @@ def compute_pressure_alignment(
         One of:
 
         * ``"aligned"`` — meta pressure is high **and** dialogue pressure is True.
-        * ``"mismatch_internal_not_expressed"`` — meta pressure is high but the
+        * ``"internal_not_expressed"`` — meta pressure is high but the
           text shows no pressure (internal state not expressed).
-        * ``"mismatch_text_more_pressured_than_state"`` — meta pressure is low
+        * ``"text_more_pressured_than_state"`` — meta pressure is low
           but the text signals pressure (text exceeds internal state).
         * ``"neutral"`` — meta pressure is low and dialogue pressure is False.
     """
-    meta_high = meta_pressure >= _META_PRESSURE_HIGH_THRESHOLD
+    meta_high = meta_pressure > _META_PRESSURE_HIGH_THRESHOLD
     if meta_high and dialogue_pressure:
         return "aligned"
     if meta_high and not dialogue_pressure:
-        return "mismatch_internal_not_expressed"
+        return "internal_not_expressed"
     if not meta_high and dialogue_pressure:
-        return "mismatch_text_more_pressured_than_state"
+        return "text_more_pressured_than_state"
     return "neutral"
