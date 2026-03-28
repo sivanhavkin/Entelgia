@@ -628,10 +628,12 @@ def evaluate_dialogue_movement_with_signals(
 # Step 3 — Pressure synchronisation (measurement only)
 # ---------------------------------------------------------------------------
 
-# DrivePressure threshold above which meta pressure is considered "high".
-# Range is 0.0–10.0; meta pressure is high when strictly greater than 5.0
-# (the midpoint), so the flag only activates for genuinely elevated pressure.
-_META_PRESSURE_HIGH_THRESHOLD: float = 5.0
+# Banded DrivePressure thresholds (scale 0.0–10.0).
+# Values at or below LOW  → no pressure (False).
+# Values at or above HIGH → high pressure (True).
+# Values strictly between LOW and HIGH → uncertain (grey zone).
+_META_PRESSURE_LOW_THRESHOLD: float = 2.5
+_META_PRESSURE_HIGH_THRESHOLD: float = 4.5
 
 
 def compute_pressure_alignment(
@@ -642,6 +644,9 @@ def compute_pressure_alignment(
 
     This is a **measurement-only** function.  It does not influence engine
     behaviour, score weights, or Fixy logic.
+
+    A banded approach is used so that mid-range values (2.5–4.5) are treated
+    as uncertain rather than forced into a binary decision.
 
     Parameters
     ----------
@@ -656,18 +661,28 @@ def compute_pressure_alignment(
     str
         One of:
 
-        * ``"aligned"`` — meta pressure is high **and** dialogue pressure is True.
-        * ``"internal_not_expressed"`` — meta pressure is high but the
-          text shows no pressure (internal state not expressed).
-        * ``"text_more_pressured_than_state"`` — meta pressure is low
+        * ``"aligned"`` — meta pressure is high (≥ 4.5) **and** dialogue
+          pressure is True.
+        * ``"internal_not_expressed"`` — meta pressure is high (≥ 4.5) but
+          the text shows no pressure (internal state not expressed).
+        * ``"text_more_pressured_than_state"`` — meta pressure is low (≤ 2.5)
           but the text signals pressure (text exceeds internal state).
-        * ``"neutral"`` — meta pressure is low and dialogue pressure is False.
+        * ``"weak_alignment"`` — meta pressure is in the uncertain band
+          (2.5 < meta_pressure < 4.5); no strong conclusion can be drawn.
+        * ``"neutral"`` — meta pressure is low (≤ 2.5) and dialogue pressure
+          is False.
     """
-    meta_high = meta_pressure > _META_PRESSURE_HIGH_THRESHOLD
-    if meta_high and dialogue_pressure:
-        return "aligned"
-    if meta_high and not dialogue_pressure:
-        return "internal_not_expressed"
-    if not meta_high and dialogue_pressure:
+    if meta_pressure >= _META_PRESSURE_HIGH_THRESHOLD:
+        meta_flag: bool | str = True
+    elif meta_pressure <= _META_PRESSURE_LOW_THRESHOLD:
+        meta_flag = False
+    else:
+        meta_flag = "uncertain"
+
+    if meta_flag == "uncertain":
+        return "weak_alignment"
+    if meta_flag is True:
+        return "aligned" if dialogue_pressure else "internal_not_expressed"
+    if dialogue_pressure:
         return "text_more_pressured_than_state"
     return "neutral"

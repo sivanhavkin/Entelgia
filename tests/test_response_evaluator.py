@@ -661,21 +661,27 @@ class TestEvaluateDialogueMovementWithSignals:
 
 
 class TestComputePressureAlignment:
+    # --- high band (>= 4.5) ---
+
     def test_aligned_when_meta_high_and_dialogue_true(self):
         assert compute_pressure_alignment(6.0, True) == "aligned"
 
-    def test_exact_threshold_not_high_with_dialogue_true(self):
-        # 5.0 is not strictly > 5.0, so it falls into "text_more_pressured_than_state"
-        assert compute_pressure_alignment(5.0, True) == "text_more_pressured_than_state"
-
-    def test_just_above_threshold_is_high_with_dialogue_true(self):
-        assert compute_pressure_alignment(5.01, True) == "aligned"
+    def test_aligned_at_high_threshold_with_dialogue_true(self):
+        assert compute_pressure_alignment(4.5, True) == "aligned"
 
     def test_internal_not_expressed_when_meta_high_and_dialogue_false(self):
         assert compute_pressure_alignment(7.5, False) == "internal_not_expressed"
 
+    def test_internal_not_expressed_at_high_threshold_dialogue_false(self):
+        assert compute_pressure_alignment(4.5, False) == "internal_not_expressed"
+
+    # --- low band (<= 2.5) ---
+
     def test_text_more_pressured_when_meta_low_and_dialogue_true(self):
         assert compute_pressure_alignment(1.0, True) == "text_more_pressured_than_state"
+
+    def test_text_more_pressured_at_low_threshold_dialogue_true(self):
+        assert compute_pressure_alignment(2.5, True) == "text_more_pressured_than_state"
 
     def test_neutral_when_meta_low_and_dialogue_false(self):
         assert compute_pressure_alignment(1.0, False) == "neutral"
@@ -683,21 +689,35 @@ class TestComputePressureAlignment:
     def test_neutral_at_zero_pressure(self):
         assert compute_pressure_alignment(0.0, False) == "neutral"
 
-    def test_just_below_threshold_with_dialogue_false_is_neutral(self):
-        assert compute_pressure_alignment(4.99, False) == "neutral"
+    def test_neutral_at_low_threshold_dialogue_false(self):
+        assert compute_pressure_alignment(2.5, False) == "neutral"
 
-    def test_just_below_threshold_with_dialogue_true_is_text_more_pressured(self):
-        assert compute_pressure_alignment(4.99, True) == "text_more_pressured_than_state"
+    # --- uncertain band (2.5 < meta_pressure < 4.5) ---
+
+    def test_weak_alignment_in_uncertain_band_dialogue_true(self):
+        assert compute_pressure_alignment(3.5, True) == "weak_alignment"
+
+    def test_weak_alignment_in_uncertain_band_dialogue_false(self):
+        assert compute_pressure_alignment(3.5, False) == "weak_alignment"
+
+    def test_weak_alignment_just_above_low_threshold(self):
+        assert compute_pressure_alignment(2.51, True) == "weak_alignment"
+
+    def test_weak_alignment_just_below_high_threshold(self):
+        assert compute_pressure_alignment(4.49, False) == "weak_alignment"
+
+    # --- general ---
 
     def test_returns_string(self):
         result = compute_pressure_alignment(3.0, False)
         assert isinstance(result, str)
 
-    def test_all_four_outcomes_are_distinct(self):
+    def test_all_five_outcomes_are_distinct(self):
         outcomes = {
-            compute_pressure_alignment(8.0, True),
-            compute_pressure_alignment(8.0, False),
-            compute_pressure_alignment(1.0, True),
-            compute_pressure_alignment(1.0, False),
+            compute_pressure_alignment(8.0, True),    # aligned
+            compute_pressure_alignment(8.0, False),   # internal_not_expressed
+            compute_pressure_alignment(1.0, True),    # text_more_pressured_than_state
+            compute_pressure_alignment(3.5, True),    # weak_alignment
+            compute_pressure_alignment(1.0, False),   # neutral
         }
-        assert len(outcomes) == 4
+        assert len(outcomes) == 5
