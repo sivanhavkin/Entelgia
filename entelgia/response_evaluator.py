@@ -714,67 +714,49 @@ _STAGNATION_HIGH: float = 0.5
 
 def compute_resolution_alignment(
     dialogue_resolution: bool,
-    unresolved_count: int,
-    conflict: float,
-    stagnation: float,
+    unresolved_count: int = 0,
+    conflict: float = 0.0,
+    stagnation: float = 0.0,
 ) -> str:
-    """Compare the text-level resolution signal with internal dialogue state.
+    """Classify the resolution alignment based solely on the dialogue move.
 
     This is a **measurement-only** function.  It does not influence engine
     behaviour, score weights, or Fixy logic.
 
-    The internal state is considered to *expect* resolution when:
-    * ``unresolved_count`` is high (≥ 2) — there are open claims that could
-      be narrowed or decided, **and**
-    * ``conflict`` is elevated (≥ 4.0) — tension is present, making
-      resolution meaningful.
+    Resolution is derived exclusively from ``dialogue_resolution`` — whether
+    the response itself commits to a position, explicitly narrows possibilities,
+    excludes alternatives, or synthesises a contradiction into closure.
 
-    When stagnation is also high (≥ 0.5) the expectation is treated as
-    *uncertain* because stagnation is more consistent with circular repetition
-    than with genuine resolution movement.
+    Internal state variables (``unresolved_count``, ``conflict``,
+    ``stagnation``) are accepted for backward compatibility but are **not**
+    used to infer resolution.  Changes in those values (e.g. a decrease in
+    unresolved count or a shift in conflict level) do not constitute dialogue
+    resolution and must not produce alignment signals on their own.
 
     Parameters
     ----------
     dialogue_resolution:
         The ``resolution`` flag from
         :func:`evaluate_dialogue_movement_with_signals`, indicating whether
-        the generated text signals narrowing, concession, or collapse.
+        the generated text itself signals commitment, narrowing, or closure.
     unresolved_count:
-        Number of currently unresolved claims / open questions (0–5).
+        Accepted for backward compatibility; not used.
     conflict:
-        Agent conflict index (0.0–10.0); higher values indicate greater
-        internal tension between drives.
+        Accepted for backward compatibility; not used.
     stagnation:
-        Stagnation level for the current turn (0.0–1.0); 1.0 means the
-        dialogue has been on the same topic for ≥ 4 consecutive turns.
+        Accepted for backward compatibility; not used.
 
     Returns
     -------
     str
         One of:
 
-        * ``"aligned"`` — state expects resolution **and** the text signals
-          resolution.
-        * ``"resolution_not_expressed"`` — state expects resolution but the
-          text shows no resolution signal (under-detection candidate).
-        * ``"text_resolved_no_state_pressure"`` — text signals resolution but
-          state does not indicate elevated tension (over-detection candidate).
-        * ``"weak_alignment"`` — state expectation is uncertain (high
-          stagnation alongside high unresolved/conflict); no strong conclusion.
-        * ``"neutral"`` — neither state nor text indicates resolution pressure.
+        * ``"aligned"`` — the text itself signals resolution.
+        * ``"neutral"`` — the text does not signal resolution; no alignment
+          conclusion can be drawn.
     """
-    state_expects = (
-        unresolved_count >= _UNRESOLVED_COUNT_HIGH
-        and conflict >= _CONFLICT_HIGH
-    )
-    uncertain = state_expects and stagnation >= _STAGNATION_HIGH
-
-    if uncertain:
-        return "weak_alignment"
-    if state_expects:
-        return "aligned" if dialogue_resolution else "resolution_not_expressed"
     if dialogue_resolution:
-        return "text_resolved_no_state_pressure"
+        return "aligned"
     return "neutral"
 
 
