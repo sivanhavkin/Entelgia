@@ -403,6 +403,50 @@ class TestCreatesPressure:
         # A purely neutral question with no challenge markers must not trigger.
         assert creates_pressure("Is consciousness a product of the brain?") is False
 
+    # --- assertion-based challenge phrases (Layer 5) ---
+
+    def test_misses_that_triggers(self):
+        # "misses that" — declarative challenge to the other claim, no "?" needed.
+        assert creates_pressure("That argument misses that agency requires more than causation.") is True
+
+    def test_ignores_that_triggers(self):
+        # "ignores that" — exposes an unconsidered factor.
+        assert creates_pressure("The position ignores that experience is not reducible to function.") is True
+
+    def test_assumes_that_triggers(self):
+        # "assumes that" — exposes a hidden premise without a question mark.
+        assert creates_pressure("The view assumes that consciousness is substrate-independent.") is True
+
+    def test_you_seem_to_triggers(self):
+        # "you seem to" — implicit challenge to framing or stance.
+        assert creates_pressure("You seem to conflate correlation with causation here.") is True
+
+    def test_theres_no_guarantee_triggers(self):
+        # "there's no guarantee" — challenges the reliability of the claim.
+        assert creates_pressure("There's no guarantee that the framework survives this counterexample.") is True
+
+    def test_there_is_no_guarantee_triggers(self):
+        # "there is no guarantee" — uncontracted variant.
+        assert creates_pressure("There is no guarantee that coherence is preserved under revision.") is True
+
+    def test_fails_to_consider_triggers(self):
+        # "fails to consider" — explicit declarative critique of omission.
+        assert creates_pressure("This account fails to consider the role of embodiment.") is True
+
+    def test_overlooks_triggers(self):
+        # "overlooks" — exposes an unconsidered dimension.
+        assert creates_pressure("The argument overlooks the distinction between types and tokens.") is True
+
+    def test_assertion_no_question_mark_still_triggers(self):
+        # Core requirement: assertion phrases must fire without any "?" present.
+        sentence = "That account misses that identity requires continuity over time."
+        assert "?" not in sentence
+        assert creates_pressure(sentence) is True
+
+    def test_assertion_case_insensitive(self):
+        # Assertion-phrase matching must be case-insensitive.
+        assert creates_pressure("THAT FRAMING IGNORES THAT CONTEXT SHAPES MEANING.") is True
+
 
 class TestShowsResolution:
     def test_we_conclude_triggers(self):
