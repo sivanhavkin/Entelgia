@@ -4312,6 +4312,9 @@ class Agent:
         # Raw draft storage — populated each turn for debug logging only;
         # never stored in long-term memory.
         self._last_raw_draft: str = ""
+        # ── Post-turn evaluation scores (set by speak(); logged by MainScript) ──
+        self._last_eval_score: float = 0.0
+        self._last_dialogue_score: float = 0.0
         # ── Anti-repetition form tracking ─────────────────────────────────────
         # Tracks the last 3 rhetorical forms used by this agent.  The same
         # form must not be used more than 2 consecutive turns.
@@ -6304,18 +6307,10 @@ class Agent:
 
         # ── Evaluation scores (measurement only) ──────────────────────────────────
         # Independent quality signals — do NOT influence engine behaviour.
-        _eval_score = _eval_response(out, _history_texts)
-        logger.info(
-            "[EVAL] agent=%s linguistic_score=%.2f",
-            self.name,
-            _eval_score,
-        )
-        _dialogue_score = _eval_dialogue(out, _history_texts)
-        logger.info(
-            "[DIALOGUE] agent=%s dialogue_score=%.2f",
-            self.name,
-            _dialogue_score,
-        )
+        # Scores are stored on self and logged by MainScript after the response
+        # is printed so that [EVAL] and [DIALOGUE] appear after the visible output.
+        self._last_eval_score = _eval_response(out, _history_texts)
+        self._last_dialogue_score = _eval_dialogue(out, _history_texts)
         # ─────────────────────────────────────────────────────────────────────────
 
         return out
@@ -7808,6 +7803,19 @@ class MainScript:
 
             # Display meta-cognitive state for this speaker
             self.print_meta_state(speaker, _meta_actions)
+
+            # Log evaluation scores after the visible response block so that
+            # [EVAL] and [DIALOGUE] appear below the agent output in the log.
+            logger.info(
+                "[EVAL] agent=%s linguistic_score=%.2f",
+                speaker.name,
+                speaker._last_eval_score,
+            )
+            logger.info(
+                "[DIALOGUE] agent=%s dialogue_score=%.2f",
+                speaker.name,
+                speaker._last_dialogue_score,
+            )
 
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             # Skipped entirely when enable_observer is False or
