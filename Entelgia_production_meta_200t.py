@@ -185,6 +185,7 @@ try:
         HIGH_VALUE_MOVES as _PE_HIGH_VALUE_MOVES,
     )
     from entelgia.response_evaluator import evaluate_response as _eval_response
+    from entelgia.response_evaluator import evaluate_dialogue_movement as _eval_dialogue
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -388,6 +389,9 @@ except ImportError:
         return []
 
     def _eval_response(response, context):  # type: ignore[no-redef]
+        return 0.0
+
+    def _eval_dialogue(response, context):  # type: ignore[no-redef]
         return 0.0
 
 
@@ -6247,13 +6251,19 @@ class Agent:
         self.update_drives_after_turn(kind, emo, float(inten))
         # ─────────────────────────────────────────────────────────────────────────
 
-        # ── Evaluation score (measurement only) ───────────────────────────────────
-        # Independent quality signal — does NOT influence engine behaviour.
+        # ── Evaluation scores (measurement only) ──────────────────────────────────
+        # Independent quality signals — do NOT influence engine behaviour.
         _eval_score = _eval_response(out, _history_texts)
         logger.info(
-            "[EVAL] agent=%s evaluation_score=%.2f",
+            "[EVAL] agent=%s linguistic_score=%.2f",
             self.name,
             _eval_score,
+        )
+        _dialogue_score = _eval_dialogue(out, _history_texts)
+        logger.info(
+            "[DIALOGUE] agent=%s dialogue_score=%.2f",
+            self.name,
+            _dialogue_score,
         )
         # ─────────────────────────────────────────────────────────────────────────
 

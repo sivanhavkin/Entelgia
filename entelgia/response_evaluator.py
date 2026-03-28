@@ -2,28 +2,41 @@
 # -*- coding: utf-8 -*-
 
 """
-Response Evaluator for Entelgia — quality measurement layer.
+Response Evaluator for Entelgia — quality and dialogue-movement measurement.
 
-Provides an independent evaluation score for each generated response.
-This score is **measurement-only** and does not influence any engine
-behaviour, thresholds, or Fixy logic.
+Provides two independent, measurement-only scores for each generated response.
+Neither score influences engine behaviour, thresholds, or Fixy logic.
 
-The ``evaluate_response`` score is designed to be complementary to the
-progress-enforcer ``engine_score``: while ``engine_score`` measures
-*argumentative progress* (move-type analysis), ``evaluate_response``
-measures *linguistic quality* of the response text.
+Step 1 — Linguistic quality (``evaluate_response``)
+----------------------------------------------------
+Measures writing quality independently of dialogue position.
 
 Scoring components (all additive, result clamped to [0.0, 1.0])
-----------------------------------------------------------------
 +0.25  lexical diversity   — type-token ratio of content words
 +0.20  specificity         — concrete nouns, numbers, named concepts
 +0.20  sentence complexity — average tokens per sentence (moderate is best)
 +0.20  depth               — word-count in the productive range (50–300)
 −0.10  per-hedge cluster   — vague/filler phrases (up to −0.30)
 
+Step 2 — Dialogue movement (``evaluate_dialogue_movement``)
+-----------------------------------------------------------
+Measures whether the response moved the conversation forward.
+
+Scoring components
++0.15  new claim          — response is not too similar to the last turn
++0.15  pressure           — response creates tension or sharpens disagreement
++0.25  resolution         — response narrows, decides, concedes, or collapses
+−0.20  semantic repeat    — response is too similar to recent dialogue history
+Base score: 0.40
+
 Public API
 ----------
 evaluate_response(response, context) -> float
+evaluate_dialogue_movement(response, context) -> float
+is_new_claim(response, context) -> bool
+is_semantic_repeat(response, context) -> bool
+creates_pressure(response) -> bool
+shows_resolution(response) -> bool
 """
 
 from __future__ import annotations
@@ -79,6 +92,53 @@ _IDEAL_AVG_TOKENS_HIGH = 25
 # Word-count range for the depth score
 _DEPTH_LOW = 50
 _DEPTH_HIGH = 300
+
+# ---------------------------------------------------------------------------
+# Dialogue-movement constants
+# ---------------------------------------------------------------------------
+
+# Similarity threshold above which a response is not considered a new claim
+_NEW_CLAIM_SIMILARITY_THRESHOLD = 0.75
+
+# Similarity threshold above which a response is considered a semantic repeat
+_SEMANTIC_REPEAT_THRESHOLD = 0.82
+
+# How many recent context turns to consider for semantic-repeat detection
+_RECENT_TURNS_WINDOW = 5
+
+# Keywords that signal argumentative pressure / contradiction.
+# Intentionally kept as simple substrings for the measurement-only heuristic —
+# some false positives are acceptable at this stage.
+_PRESSURE_KEYWORDS: List[str] = [
+    "but",
+    "however",
+    "fails",
+    "cannot",
+    "contradiction",
+    "inconsistent",
+    "yet",
+    "nevertheless",
+    "counter",
+    "refute",
+    "undermines",
+    "incompatible",
+]
+
+# Keywords that signal resolution, narrowing, or collapse
+_RESOLUTION_KEYWORDS: List[str] = [
+    "i was wrong",
+    "we must reject",
+    "this fails",
+    "cannot both",
+    "we conclude",
+    "therefore we must",
+    "it follows that",
+    "we can conclude",
+    "this settles",
+    "must be abandoned",
+    "forces us to accept",
+    "the answer is",
+]
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -162,7 +222,7 @@ def _hedge_penalty(text: str) -> float:
 
 
 def evaluate_response(response: str, context: Sequence[str]) -> float:
-    """Evaluate the linguistic quality of *response*.
+    """Evaluate the linguistic quality of *response* (Step 1 score).
 
     Parameters
     ----------
@@ -176,7 +236,7 @@ def evaluate_response(response: str, context: Sequence[str]) -> float:
     Returns
     -------
     float
-        Quality score in [0.0, 1.0].  Higher is better.
+        Linguistic quality score in [0.0, 1.0].  Higher is better.
     """
     if not response or not response.strip():
         return 0.0
@@ -200,3 +260,99 @@ def evaluate_response(response: str, context: Sequence[str]) -> float:
     )
 
     return max(0.0, min(1.0, raw))
+
+
+# ---------------------------------------------------------------------------
+# Step 2 — Dialogue-movement helpers
+# ---------------------------------------------------------------------------
+
+
+def _word_overlap(text_a: str, text_b: str) -> float:
+    """Jaccard-like word overlap between two texts (content words only)."""
+    set_a = {t for t in _tokenize(text_a) if t not in _STOP_WORDS}
+    set_b = {t for t in _tokenize(text_b) if t not in _STOP_WORDS}
+    if not set_a and not set_b:
+        return 1.0
+    if not set_a or not set_b:
+        return 0.0
+    return len(set_a & set_b) / len(set_a | set_b)
+
+
+def _similarity_to_last(response: str, context: Sequence[str]) -> float:
+    """Return word-overlap similarity between *response* and the last context turn."""
+    if not context:
+        return 0.0
+    return _word_overlap(response, context[-1])
+
+
+def _similarity_to_recent(response: str, context: Sequence[str]) -> float:
+    """Return the maximum word-overlap similarity between *response* and
+    the most recent *_RECENT_TURNS_WINDOW* context turns."""
+    if not context:
+        return 0.0
+    window = context[-_RECENT_TURNS_WINDOW:]
+    return max(_word_overlap(response, turn) for turn in window)
+
+
+def is_new_claim(response: str, context: Sequence[str]) -> bool:
+    """Return True if *response* differs enough from the last turn to count
+    as a new claim (similarity below *_NEW_CLAIM_SIMILARITY_THRESHOLD*)."""
+    return _similarity_to_last(response, context) < _NEW_CLAIM_SIMILARITY_THRESHOLD
+
+
+def is_semantic_repeat(response: str, context: Sequence[str]) -> bool:
+    """Return True if *response* is too similar to recent turns even if the
+    exact wording changed (similarity above *_SEMANTIC_REPEAT_THRESHOLD*)."""
+    return _similarity_to_recent(response, context) > _SEMANTIC_REPEAT_THRESHOLD
+
+
+def creates_pressure(response: str) -> bool:
+    """Return True if *response* contains words that signal argumentative
+    pressure, tension, contradiction, or sharpened disagreement."""
+    lower = response.lower()
+    return any(k in lower for k in _PRESSURE_KEYWORDS)
+
+
+def shows_resolution(response: str) -> bool:
+    """Return True if *response* signals resolution, narrowing, concession,
+    rejection, or collapse of a position."""
+    lower = response.lower()
+    return any(k in lower for k in _RESOLUTION_KEYWORDS)
+
+
+def evaluate_dialogue_movement(response: str, context: Sequence[str]) -> float:
+    """Evaluate how much *response* moved the dialogue forward (Step 2 score).
+
+    This is a **measurement-only** heuristic — it does not influence engine
+    behaviour, thresholds, or Fixy logic.
+
+    Parameters
+    ----------
+    response:
+        The generated agent response text.
+    context:
+        Recent dialogue history (list of plain-text turns), most recent last.
+
+    Returns
+    -------
+    float
+        Dialogue-movement score in [0.0, 1.0].  Higher means more movement.
+    """
+    if not response or not response.strip():
+        return 0.0
+
+    score = 0.40  # base
+
+    if is_new_claim(response, context):
+        score += 0.15
+
+    if creates_pressure(response):
+        score += 0.15
+
+    if shows_resolution(response):
+        score += 0.25
+
+    if is_semantic_repeat(response, context):
+        score -= 0.20
+
+    return max(0.0, min(1.0, score))
