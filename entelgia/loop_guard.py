@@ -445,7 +445,7 @@ class DialogueLoopDetector:
         # A loop cannot be confirmed from a single agent's output.
         present_roles = {t.get("role") for t in recent}
         if "Socrates" not in present_roles or "Athena" not in present_roles:
-            logger.info(
+            logger.debug(
                 "[FIXY-GATE] skipped: waiting for both agents (have=%s) at turn %d",
                 sorted(present_roles),
                 turn_count,
