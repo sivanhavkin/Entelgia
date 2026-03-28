@@ -182,6 +182,9 @@ try:
     )
     from entelgia.response_evaluator import evaluate_response as _eval_response
     from entelgia.response_evaluator import evaluate_dialogue_movement as _eval_dialogue
+    from entelgia.response_evaluator import (
+        evaluate_dialogue_movement_with_signals as _eval_dialogue_signals,
+    )
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -388,6 +391,9 @@ except ImportError:
 
     def _eval_dialogue(response, context):  # type: ignore[no-redef]
         return 0.0
+
+    def _eval_dialogue_signals(response, context):  # type: ignore[no-redef]
+        return {"score": 0.0, "new_claim": False, "pressure": False, "resolution": False, "semantic_repeat": False}
 
 
 # Optional: FastAPI for REST API
@@ -4315,6 +4321,12 @@ class Agent:
         # ── Post-turn evaluation scores (set by speak(); logged by MainScript) ──
         self._last_eval_score: float = 0.0
         self._last_dialogue_score: float = 0.0
+        self._last_dialogue_signals: dict = {
+            "new_claim": False,
+            "pressure": False,
+            "resolution": False,
+            "semantic_repeat": False,
+        }
         # ── Anti-repetition form tracking ─────────────────────────────────────
         # Tracks the last 3 rhetorical forms used by this agent.  The same
         # form must not be used more than 2 consecutive turns.
@@ -6310,7 +6322,14 @@ class Agent:
         # Scores are stored on self and logged by MainScript after the response
         # is printed so that [EVAL] and [DIALOGUE] appear after the visible output.
         self._last_eval_score = _eval_response(out, _history_texts)
-        self._last_dialogue_score = _eval_dialogue(out, _history_texts)
+        _dialogue_sigs = _eval_dialogue_signals(out, _history_texts)
+        self._last_dialogue_score = _dialogue_sigs["score"]
+        self._last_dialogue_signals = {
+            "new_claim": _dialogue_sigs["new_claim"],
+            "pressure": _dialogue_sigs["pressure"],
+            "resolution": _dialogue_sigs["resolution"],
+            "semantic_repeat": _dialogue_sigs["semantic_repeat"],
+        }
         # ─────────────────────────────────────────────────────────────────────────
 
         return out
@@ -7812,9 +7831,13 @@ class MainScript:
                 speaker._last_eval_score,
             )
             logger.info(
-                "[DIALOGUE] agent=%s dialogue_score=%.2f",
+                "[DIALOGUE] agent=%s dialogue_score=%.2f new_claim=%s pressure=%s resolution=%s semantic_repeat=%s",
                 speaker.name,
                 speaker._last_dialogue_score,
+                speaker._last_dialogue_signals["new_claim"],
+                speaker._last_dialogue_signals["pressure"],
+                speaker._last_dialogue_signals["resolution"],
+                speaker._last_dialogue_signals["semantic_repeat"],
             )
 
             # Interactive Fixy (need-based) or legacy scheduled Fixy
