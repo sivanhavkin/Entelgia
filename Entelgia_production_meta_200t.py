@@ -188,6 +188,7 @@ try:
     from entelgia.response_evaluator import evaluate_dialogue_movement as _eval_dialogue
     from entelgia.response_evaluator import (
         evaluate_dialogue_movement_with_signals as _eval_dialogue_signals,
+        compute_pressure_alignment as _compute_pressure_alignment,
     )
 
     ENTELGIA_ENHANCED = True
@@ -399,6 +400,9 @@ except ImportError:
 
     def _eval_dialogue_signals(response, context):  # type: ignore[no-redef]
         return {"score": 0.0, "new_claim": False, "pressure": False, "resolution": False, "semantic_repeat": False}
+
+    def _compute_pressure_alignment(meta_pressure, dialogue_pressure):  # type: ignore[no-redef]
+        return "neutral"
 
 
 # Optional: FastAPI for REST API
@@ -4314,6 +4318,8 @@ class Agent:
             "resolution": False,
             "semantic_repeat": False,
         }
+        # Pressure synchronisation (measurement only) — set by speak(), logged by MainScript.
+        self._last_pressure_sync: str = "neutral"
         # ── Anti-repetition form tracking ─────────────────────────────────────
         self._last_response_forms: deque = deque(maxlen=3)
         self._last_template_families: deque = deque(maxlen=3)
@@ -6279,6 +6285,13 @@ class Agent:
             "resolution": _dialogue_sigs["resolution"],
             "semantic_repeat": _dialogue_sigs["semantic_repeat"],
         }
+        # ── Pressure synchronisation (measurement only) ───────────────────────────
+        # Compare meta pressure (internal DrivePressure) with dialogue-level
+        # pressure signal.  Result stored for MainScript to log as [PRESSURE-SYNC].
+        self._last_pressure_sync = _compute_pressure_alignment(
+            self.drive_pressure,
+            _dialogue_sigs["pressure"],
+        )
         # ─────────────────────────────────────────────────────────────────────────
 
         return out
@@ -7798,7 +7811,13 @@ class MainScript:
                 speaker._last_dialogue_signals["resolution"],
                 speaker._last_dialogue_signals["semantic_repeat"],
             )
-
+            logger.info(
+                "[PRESSURE-SYNC] agent=%s meta_pressure=%.2f dialogue_pressure=%s alignment=%s",
+                speaker.name,
+                speaker.drive_pressure,
+                speaker._last_dialogue_signals["pressure"],
+                speaker._last_pressure_sync,
+            )
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             # Skipped entirely when enable_observer is False or
             # fixy_interventions_enabled is False

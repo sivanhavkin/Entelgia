@@ -38,6 +38,14 @@ is_new_claim(response, context) -> bool
 is_semantic_repeat(response, context) -> bool
 creates_pressure(response) -> bool
 shows_resolution(response) -> bool
+
+Step 3 — Pressure synchronisation (``compute_pressure_alignment``)
+-------------------------------------------------------------------
+Measurement-only comparison layer between the agent's internal
+DrivePressure (meta signal) and the dialogue-pressure flag (text signal).
+Does not influence engine behaviour, scores, or Fixy logic.
+
+compute_pressure_alignment(meta_pressure, dialogue_pressure) -> str
 """
 
 from __future__ import annotations
@@ -614,3 +622,51 @@ def evaluate_dialogue_movement_with_signals(
         resolution=_resolution,
         semantic_repeat=_semantic_repeat,
     )
+
+
+# ---------------------------------------------------------------------------
+# Step 3 — Pressure synchronisation (measurement only)
+# ---------------------------------------------------------------------------
+
+# DrivePressure threshold above which meta pressure is considered "high".
+# Range is 0.0–10.0; 5.0 is the midpoint.
+_META_PRESSURE_HIGH_THRESHOLD: float = 5.0
+
+
+def compute_pressure_alignment(
+    meta_pressure: float,
+    dialogue_pressure: bool,
+) -> str:
+    """Compare meta (internal) pressure with dialogue (text) pressure.
+
+    This is a **measurement-only** function.  It does not influence engine
+    behaviour, score weights, or Fixy logic.
+
+    Parameters
+    ----------
+    meta_pressure:
+        The agent's current DrivePressure scalar (0.0–10.0).
+    dialogue_pressure:
+        The ``pressure`` flag from :func:`evaluate_dialogue_movement_with_signals`,
+        indicating whether the generated text contains argumentative pressure.
+
+    Returns
+    -------
+    str
+        One of:
+
+        * ``"aligned"`` — meta pressure is high **and** dialogue pressure is True.
+        * ``"mismatch_internal_not_expressed"`` — meta pressure is high but the
+          text shows no pressure (internal state not expressed).
+        * ``"mismatch_text_more_pressured_than_state"`` — meta pressure is low
+          but the text signals pressure (text exceeds internal state).
+        * ``"neutral"`` — meta pressure is low and dialogue pressure is False.
+    """
+    meta_high = meta_pressure >= _META_PRESSURE_HIGH_THRESHOLD
+    if meta_high and dialogue_pressure:
+        return "aligned"
+    if meta_high and not dialogue_pressure:
+        return "mismatch_internal_not_expressed"
+    if not meta_high and dialogue_pressure:
+        return "mismatch_text_more_pressured_than_state"
+    return "neutral"
