@@ -125,6 +125,41 @@ _PRESSURE_KEYWORDS: List[str] = [
     "incompatible",
 ]
 
+# Phrase fragments that signal assumption-challenging or structural instability.
+# These extend _PRESSURE_KEYWORDS with patterns that challenge hidden premises
+# or expose framing incompatibilities without using explicit contradiction words.
+_PRESSURE_PHRASES: List[str] = [
+    "you assume",
+    "why assume",
+    "what if",
+    "how do you know",
+    "are you not just",
+    "doesn't that",
+    "does that not",
+    "why overlook",
+    "tilted long before",
+    "already stacked",
+    "cannot hold",
+    "pull in opposite directions",
+    "hidden premise",
+    "that presupposes",
+    "you're assuming",
+    "you are assuming",
+    "is that not just",
+]
+
+# Compiled regex patterns for structural pressure signals.
+# Catches rhetorical question forms that challenge framing or stability.
+_PRESSURE_PATTERNS: List[re.Pattern[str]] = [
+    # Negation-contracted rhetorical question, e.g. "Doesn't this collapse?"
+    # The optional apostrophe (') also handles informal spellings like "doesnt".
+    re.compile(
+        r"\b(?:doesn'?t|isn'?t|aren'?t|wasn'?t|weren'?t|can'?t|won'?t"
+        r"|wouldn'?t|shouldn'?t|couldn'?t)\b[^.!?]*\?",
+        re.IGNORECASE,
+    ),
+]
+
 # Keywords that signal resolution, narrowing, or collapse
 _RESOLUTION_KEYWORDS: List[str] = [
     "i was wrong",
@@ -139,6 +174,41 @@ _RESOLUTION_KEYWORDS: List[str] = [
     "must be abandoned",
     "forces us to accept",
     "the answer is",
+    # Mutual exclusion
+    "one must yield",
+    "one excludes the other",
+    "one force always has to yield",
+    "cannot operate simultaneously",
+    # Tradeoff forcing
+    "you cannot have both",
+    "for one to happen, the other must",
+    # Collapse / narrowing
+    "the loop closes",
+    "the drive fades",
+    "one side has to give",
+    "this narrows the issue to",
+    "cannot coexist",
+    "must give way",
+    "one has to give",
+    "forced to choose",
+]
+
+# Compiled regex patterns for structural resolution signals.
+# Catches exclusion and tradeoff constructs not covered by plain keywords.
+_RESOLUTION_PATTERNS: List[re.Pattern[str]] = [
+    # "either X or Y" exclusion structure
+    re.compile(r"\beither\b[^.!?]+\bor\b[^.!?]*[.!?]", re.IGNORECASE),
+    # "if X holds / is true, Y cannot" tradeoff structure
+    re.compile(
+        r"\bif\b[^.!?]+\bcannot\b[^.!?]*\b(?:hold|stand|work|coexist|both)\b",
+        re.IGNORECASE,
+    ),
+    # "one (side|force|…) (must|always|has to) (yield|give|collapse)" collapse structure
+    re.compile(
+        r"\bone (?:of them|side|force)(?: (?:always|must|has to|always has to))?"
+        r" ?(?:yield|give|collapse)\b",
+        re.IGNORECASE,
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -308,17 +378,43 @@ def is_semantic_repeat(response: str, context: Sequence[str]) -> bool:
 
 
 def creates_pressure(response: str) -> bool:
-    """Return True if *response* contains words that signal argumentative
-    pressure, tension, contradiction, or sharpened disagreement."""
+    """Return True if *response* contains words or structural patterns that
+    signal argumentative pressure, tension, contradiction, or sharpened
+    disagreement.
+
+    Detection uses three layers:
+    1. ``_PRESSURE_KEYWORDS`` — explicit contradiction / tension vocabulary.
+    2. ``_PRESSURE_PHRASES`` — phrase fragments that challenge assumptions or
+       expose framing instability.
+    3. ``_PRESSURE_PATTERNS`` — structural regex patterns (e.g. negation-based
+       rhetorical questions).
+    """
     lower = response.lower()
-    return any(k in lower for k in _PRESSURE_KEYWORDS)
+    if any(k in lower for k in _PRESSURE_KEYWORDS):
+        return True
+    if any(phrase in lower for phrase in _PRESSURE_PHRASES):
+        return True
+    if any(p.search(response) for p in _PRESSURE_PATTERNS):
+        return True
+    return False
 
 
 def shows_resolution(response: str) -> bool:
     """Return True if *response* signals resolution, narrowing, concession,
-    rejection, or collapse of a position."""
+    rejection, or collapse of a position.
+
+    Detection uses two layers:
+    1. ``_RESOLUTION_KEYWORDS`` — explicit conclusion / exclusion vocabulary
+       and phrase fragments.
+    2. ``_RESOLUTION_PATTERNS`` — structural regex patterns (e.g. either/or
+       exclusion, conditional tradeoff, collapse phrasing).
+    """
     lower = response.lower()
-    return any(k in lower for k in _RESOLUTION_KEYWORDS)
+    if any(k in lower for k in _RESOLUTION_KEYWORDS):
+        return True
+    if any(p.search(response) for p in _RESOLUTION_PATTERNS):
+        return True
+    return False
 
 
 def evaluate_dialogue_movement(response: str, context: Sequence[str]) -> float:
