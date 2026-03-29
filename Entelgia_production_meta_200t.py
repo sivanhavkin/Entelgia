@@ -140,6 +140,7 @@ try:
         DialogueRewriter,
         TOPIC_CLUSTERS,
         _TOPIC_TO_CLUSTER,
+        CONCEPTUAL_LOOP as _CONCEPTUAL_LOOP,
     )
     from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
     from entelgia.topic_style import (
@@ -7876,6 +7877,20 @@ class MainScript:
                 _force_choice_pending = False
 
             self.dialog.append({"role": speaker.name, "text": out})
+
+            # ── Conceptual loop → stagnation bump ─────────────────────────
+            # When a conceptual dependency loop is detected, speak() will not
+            # pick it up via Jaccard (wording may differ).  Wire the structural
+            # signal into _last_stagnation so the meta-state stays coherent.
+            if _CONCEPTUAL_LOOP in _active_loop_modes:
+                speaker._last_stagnation = min(
+                    1.0, speaker._last_stagnation + _PE_STAGNATION_INCREMENT
+                )
+                logger.info(
+                    "[STAGNATION] agent=%s conceptual_loop → stagnation bumped to %.2f",
+                    speaker.name,
+                    speaker._last_stagnation,
+                )
 
             speaker.store_turn(out, topic_label, source="stm")
             self.log_turn(speaker.name, out, topic_label)

@@ -31,12 +31,14 @@ LOOP_REPETITION = "loop_repetition"
 WEAK_CONFLICT = "weak_conflict"
 PREMATURE_SYNTHESIS = "premature_synthesis"
 TOPIC_STAGNATION = "topic_stagnation"
+CONCEPTUAL_LOOP = "conceptual_loop"
 
 # Minimum turns required before each check fires
 _MIN_TURNS_REPETITION = 4
 _MIN_TURNS_CONFLICT = 6
 _MIN_TURNS_SYNTHESIS = 5
 _MIN_TURNS_STAGNATION = 6
+_MIN_TURNS_CONCEPTUAL_LOOP = 4
 
 # ---------------------------------------------------------------------------
 # Synthesis phrases that signal premature convergence
@@ -194,6 +196,94 @@ _NOVELTY_CLUSTER_HIT_THRESHOLD: int = 1
 
 # Number of active novelty clusters required to suppress a loop declaration
 _NOVELTY_SUPPRESS_THRESHOLD: int = 1
+
+# ---------------------------------------------------------------------------
+# Conceptual dependency loop detection
+# ---------------------------------------------------------------------------
+# Detects circular dependency arguments: "A depends on B" in one turn,
+# "B depends on A" in another — regardless of surface wording.
+# Lightweight structural heuristic; no wording similarity required.
+
+# Stop-words excluded when normalising concept phrases
+_CONCEPT_STOPWORDS: frozenset = frozenset(
+    {
+        "the", "a", "an", "and", "or", "of", "to", "in", "is", "are",
+        "was", "were", "it", "this", "that", "which", "who", "what",
+        "how", "why", "when", "be", "been", "being", "have", "has",
+        "had", "do", "does", "did", "all", "any", "some", "no", "not",
+        "so", "but", "if", "as", "at", "by", "for", "with", "from",
+        "on", "its", "our", "can", "will", "would", "could", "should",
+        "may", "might", "must", "than", "then", "only", "also", "just",
+        "very", "even", "both", "each", "into", "onto", "upon", "about",
+        "such", "more", "most",
+    }
+)
+
+# Forward dependency: "A <phrase> B" means A depends on B
+_DEP_FWD_RE: re.Pattern = re.compile(
+    r"\b([\w]+(?:\s+[\w]+){0,2})\s+"
+    r"(?:"
+    r"depends\s+on|relies\s+on|requires|needs|presupposes|rests\s+on"
+    r"|stems\s+from|follows\s+from|emerges\s+from|derives\s+from"
+    r"|grounded\s+in|based\s+on|contingent\s+on|conditional\s+on"
+    r"|cannot\s+exist\s+without|is\s+impossible\s+without"
+    r")\s+"
+    r"([\w]+(?:\s+[\w]+){0,2})\b"
+)
+
+# Reverse dependency: "B <phrase> A" means A depends on B
+_DEP_REV_RE: re.Pattern = re.compile(
+    r"\b([\w]+(?:\s+[\w]+){0,2})\s+"
+    r"(?:"
+    r"enables|underlies|grounds|makes\s+possible|gives\s+rise\s+to"
+    r"|is\s+the\s+foundation\s+of|is\s+prior\s+to|provides\s+the\s+basis\s+for"
+    r")\s+"
+    r"([\w]+(?:\s+[\w]+){0,2})\b"
+)
+
+# Minimum Jaccard overlap for two concept sets to be treated as the same axis
+_AXIS_MATCH_THRESHOLD: float = 0.3
+
+
+def _concept_key(phrase: str) -> frozenset:
+    """Normalise a short phrase into a frozenset of significant content tokens."""
+    tokens = re.findall(r"[a-z]+", phrase.lower())
+    return frozenset(t for t in tokens if t not in _CONCEPT_STOPWORDS and len(t) >= 3)
+
+
+def _concept_overlap(a: frozenset, b: frozenset) -> float:
+    """Jaccard overlap between two concept frozensets."""
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _extract_dep_pairs(text: str) -> List[Tuple[frozenset, frozenset]]:
+    """Extract (dependent, dependency) concept pairs from *text*.
+
+    Searches for forward phrases ("A depends on B") and reverse phrases
+    ("B enables A").  Both are normalised to (dependent, dependency) order.
+    Returns a list of ``(frozenset, frozenset)`` pairs.
+    """
+    text_lower = text.lower()
+    pairs: List[Tuple[frozenset, frozenset]] = []
+
+    # Forward: "A <dep phrase> B" → A depends on B
+    for m in _DEP_FWD_RE.finditer(text_lower):
+        left = _concept_key(m.group(1))
+        right = _concept_key(m.group(2))
+        if left and right:
+            pairs.append((left, right))
+
+    # Reverse: "B <rev phrase> A" → A depends on B (swap roles)
+    for m in _DEP_REV_RE.finditer(text_lower):
+        enabler = _concept_key(m.group(1))
+        enabled = _concept_key(m.group(2))
+        if enabler and enabled:
+            pairs.append((enabled, enabler))
+
+    return pairs
+
 
 # ---------------------------------------------------------------------------
 # Generic mediation phrases Fixy must avoid when loop conditions exist
@@ -485,13 +575,22 @@ class DialogueLoopDetector:
             turn_count >= _MIN_TURNS_SYNTHESIS
             and self._check_premature_synthesis(recent)
         )
+        # Signal E: conceptual dependency loop — circular justification
+        # (self-contained compound check; satisfies the two-condition gate alone)
+        sig_conceptual_loop = (
+            turn_count >= _MIN_TURNS_CONCEPTUAL_LOOP
+            and self._check_conceptual_dependency_loop(recent)
+        )
 
         # ── Two-condition gate ─────────────────────────────────────────────
         # A loop is real only when at least 2 conditions confirm it.
-        # weak_conflict and premature_synthesis already embed two co-occurring
-        # patterns and are treated as inherently satisfying the gate.
+        # weak_conflict, premature_synthesis, and conceptual_loop already embed
+        # two co-occurring patterns and are treated as inherently satisfying the gate.
         two_condition_met = (
-            active_signal_count >= 2 or sig_weak_conflict or sig_premature_synth
+            active_signal_count >= 2
+            or sig_weak_conflict
+            or sig_premature_synth
+            or sig_conceptual_loop
         )
 
         if not two_condition_met:
@@ -506,8 +605,10 @@ class DialogueLoopDetector:
         # Linguistic repetition alone does not constitute a structural loop.
         # If the most recent turns introduce a new metric, case, decision,
         # testable claim, or abstraction shift, suppress the loop declaration.
+        # Exception: conceptual_loop is a structural signal (not wording-based)
+        # and is not suppressed by novelty indicators.
         novelty_clusters, novelty_count = self._check_novelty_present(recent)
-        if novelty_count >= _NOVELTY_SUPPRESS_THRESHOLD:
+        if novelty_count >= _NOVELTY_SUPPRESS_THRESHOLD and not sig_conceptual_loop:
             logger.info(
                 "[FIXY-SUPPRESS] semantic overlap only; no structural loop — "
                 "novelty clusters present: %s at turn %d",
@@ -551,6 +652,13 @@ class DialogueLoopDetector:
             modes.append(TOPIC_STAGNATION)
             logger.info(
                 "[FIXY-LOOP] detected: topic_stagnation at turn %d",
+                turn_count,
+            )
+
+        if sig_conceptual_loop:
+            modes.append(CONCEPTUAL_LOOP)
+            logger.info(
+                "[FIXY-LOOP] detected: conceptual_dependency_loop at turn %d",
                 turn_count,
             )
 
@@ -817,6 +925,63 @@ class DialogueLoopDetector:
                 active.append(cluster_name)
 
         return active, len(active)
+
+    def _check_conceptual_dependency_loop(self, turns: List[Dict[str, str]]) -> bool:
+        """Detect circular dependency between the same pair of concepts.
+
+        Scans each turn for dependency relationships using structural phrase
+        markers ("A depends on B", "B enables A", etc.).  A conceptual loop
+        is flagged when the same pair of concept-sets appears with **reversed**
+        dependency direction within the recent window:
+
+            Turn N:  "A depends on B"
+            Turn M:  "B depends on A"
+
+        This detects mutual-dependency cycles and circular justification
+        regardless of surface wording changes between turns.
+
+        Returns
+        -------
+        ``True`` when at least one dependency-direction flip is found.
+        """
+        if len(turns) < _MIN_TURNS_CONCEPTUAL_LOOP:
+            return False
+
+        # Collect all (dependent, dependency) pairs from the window
+        all_pairs: List[Tuple[frozenset, frozenset]] = []
+        for t in turns:
+            all_pairs.extend(_extract_dep_pairs(t.get("text", "")))
+
+        if len(all_pairs) < 2:
+            return False
+
+        # Check every pair of extracted dependencies for a direction flip.
+        # Flip: (A→B) and (B→A) on the same conceptual axis.
+        for i in range(len(all_pairs)):
+            for j in range(i + 1, len(all_pairs)):
+                a1, b1 = all_pairs[i]
+                a2, b2 = all_pairs[j]
+                # Same direction → not a loop
+                same_dir = (
+                    _concept_overlap(a1, a2) >= _AXIS_MATCH_THRESHOLD
+                    and _concept_overlap(b1, b2) >= _AXIS_MATCH_THRESHOLD
+                )
+                # Flipped direction → same axis, reversed dependency
+                flipped = (
+                    _concept_overlap(a1, b2) >= _AXIS_MATCH_THRESHOLD
+                    and _concept_overlap(b1, a2) >= _AXIS_MATCH_THRESHOLD
+                )
+                if flipped and not same_dir:
+                    logger.debug(
+                        "[CONCEPTUAL-LOOP] dependency flip: (%s→%s) vs (%s→%s)",
+                        a1,
+                        b1,
+                        a2,
+                        b2,
+                    )
+                    return True
+
+        return False
 
 
 class PhraseBanList:

@@ -26,6 +26,10 @@ from entelgia.loop_guard import (
     WEAK_CONFLICT,
     PREMATURE_SYNTHESIS,
     TOPIC_STAGNATION,
+    CONCEPTUAL_LOOP,
+    _concept_key,
+    _concept_overlap,
+    _extract_dep_pairs,
 )
 from entelgia.fixy_interactive import FixyMode, _LOOP_MODE_POLICY
 from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
@@ -652,6 +656,208 @@ def test_detect_two_conditions_gate_passes_with_signals_a_and_c():
     assert (
         LOOP_REPETITION in modes
     ), f"Expected loop_repetition with Signals A+C active; got {modes}"
+
+
+# ---------------------------------------------------------------------------
+# Conceptual dependency loop detection helpers
+# ---------------------------------------------------------------------------
+
+
+class TestConceptKey:
+    def test_strips_stopwords(self):
+        key = _concept_key("the freedom of reason")
+        assert "the" not in key
+        assert "of" not in key
+        assert "freedom" in key
+        assert "reason" in key
+
+    def test_filters_short_tokens(self):
+        key = _concept_key("a b freedom")
+        assert "a" not in key
+        assert "b" not in key
+        assert "freedom" in key
+
+    def test_empty_phrase(self):
+        assert _concept_key("") == frozenset()
+
+    def test_normalises_to_lowercase(self):
+        key = _concept_key("Freedom REASON")
+        assert "freedom" in key
+        assert "reason" in key
+
+
+class TestConceptOverlap:
+    def test_identical_sets(self):
+        a = frozenset({"freedom", "will"})
+        assert _concept_overlap(a, a) == 1.0
+
+    def test_disjoint_sets(self):
+        a = frozenset({"freedom"})
+        b = frozenset({"justice"})
+        assert _concept_overlap(a, b) == 0.0
+
+    def test_partial_overlap(self):
+        a = frozenset({"freedom", "will"})
+        b = frozenset({"freedom", "reason"})
+        score = _concept_overlap(a, b)
+        assert 0.0 < score < 1.0
+
+    def test_empty_sets(self):
+        assert _concept_overlap(frozenset(), frozenset({"x"})) == 0.0
+        assert _concept_overlap(frozenset({"x"}), frozenset()) == 0.0
+
+
+class TestExtractDepPairs:
+    def test_forward_depends_on(self):
+        pairs = _extract_dep_pairs("Freedom depends on justice in society.")
+        assert len(pairs) >= 1
+        left, right = pairs[0]
+        assert "freedom" in left
+        assert "justice" in right
+
+    def test_forward_requires(self):
+        pairs = _extract_dep_pairs("Virtue requires knowledge to function properly.")
+        assert len(pairs) >= 1
+        left, right = pairs[0]
+        assert "virtue" in left
+        assert "knowledge" in right
+
+    def test_reverse_enables(self):
+        pairs = _extract_dep_pairs("Justice enables freedom in a well-ordered state.")
+        assert len(pairs) >= 1
+        # reverse: "justice enables freedom" → (freedom, justice) — freedom depends on justice
+        dependent, dependency = pairs[0]
+        assert "freedom" in dependent
+        assert "justice" in dependency
+
+    def test_no_dep_phrase(self):
+        pairs = _extract_dep_pairs("Freedom is important. Justice matters too.")
+        assert pairs == []
+
+    def test_empty_text(self):
+        assert _extract_dep_pairs("") == []
+
+
+# ---------------------------------------------------------------------------
+# Conceptual dependency loop — _check_conceptual_dependency_loop
+# ---------------------------------------------------------------------------
+
+
+class TestCheckConceptualDependencyLoop:
+    def test_detects_simple_circular_dep(self):
+        """freedom depends on justice + justice depends on freedom → loop."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "Freedom depends on justice to be meaningful.",
+                "But justice itself depends on freedom to emerge.",
+                "Without freedom, justice cannot be defined.",
+                "And freedom requires justice as its precondition.",
+            ]
+        )
+        result = detector._check_conceptual_dependency_loop(turns)
+        assert result, "Should detect mutual dependency loop"
+
+    def test_no_loop_for_unidirectional_dep(self):
+        """All turns say the same direction (A→B) — no loop."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "Knowledge requires evidence to be valid.",
+                "Knowledge also requires reasoning as its basis.",
+                "Knowledge is grounded in observation.",
+                "Knowledge depends on logic to hold.",
+            ]
+        )
+        result = detector._check_conceptual_dependency_loop(turns)
+        assert not result, "Unidirectional dependency should not trigger loop"
+
+    def test_no_loop_for_unrelated_concepts(self):
+        """Different concepts in each turn — no axis overlap."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "Freedom depends on justice.",
+                "Health requires nutrition to sustain itself.",
+                "Technology enables productivity in modern life.",
+                "Courage requires wisdom as its foundation.",
+            ]
+        )
+        result = detector._check_conceptual_dependency_loop(turns)
+        assert not result, "Unrelated axes should not trigger loop"
+
+    def test_minimum_turns_gate(self):
+        """Fewer than _MIN_TURNS_CONCEPTUAL_LOOP turns → no detection."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "Freedom depends on justice.",
+                "Justice depends on freedom.",
+                "This is circular.",
+            ]
+        )
+        result = detector._check_conceptual_dependency_loop(turns)
+        assert not result, "Should not fire with fewer than 4 turns"
+
+    def test_detects_enables_reversal(self):
+        """'B enables A' followed by 'A enables B' → conceptual loop."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "Order enables freedom within a stable community.",
+                "But freedom itself enables order through voluntary compliance.",
+                "Without order, freedom cannot persist.",
+                "And order only becomes possible where freedom already exists.",
+            ]
+        )
+        result = detector._check_conceptual_dependency_loop(turns)
+        assert result, "Should detect reverse-phrase conceptual loop"
+
+
+# ---------------------------------------------------------------------------
+# Conceptual dependency loop — integration via detect()
+# ---------------------------------------------------------------------------
+
+
+class TestDetectConceptualLoop:
+    def test_detect_conceptual_loop_integration(self):
+        """detect() should include CONCEPTUAL_LOOP in modes when circular dep found."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "Freedom depends on justice to be meaningful in practice.",
+                "But justice itself depends on freedom in order to emerge.",
+                "Without freedom, justice cannot be properly defined at all.",
+                "And freedom requires justice as its fundamental precondition.",
+            ]
+        )
+        modes = detector.detect(turns, turn_count=4)
+        assert CONCEPTUAL_LOOP in modes, f"Expected conceptual_loop, got {modes}"
+
+    def test_conceptual_loop_not_suppressed_by_novelty(self):
+        """CONCEPTUAL_LOOP should appear even when novelty indicators are present."""
+        detector = DialogueLoopDetector()
+        # Mix circular dependency language with novelty markers
+        turns = _make_turns(
+            [
+                "Therefore, freedom depends on justice — this implies a new framework.",
+                "Specifically, justice depends on freedom, which leads to a measurable criterion.",
+                "Freedom is impossible without justice, consequently this entails a contradiction.",
+                "Justice cannot exist without freedom — it follows that neither can stand alone.",
+            ]
+        )
+        modes = detector.detect(turns, turn_count=4)
+        assert CONCEPTUAL_LOOP in modes, (
+            f"CONCEPTUAL_LOOP should survive novelty suppressor; got {modes}"
+        )
+
+    def test_conceptual_loop_policy_in_agent_policy(self):
+        """_LOOP_AGENT_POLICY should map conceptual_loop to MECHANIZE."""
+        assert _LOOP_AGENT_POLICY.get("conceptual_loop") == AgentMode.MECHANIZE
+
+    def test_conceptual_loop_policy_in_fixy_policy(self):
+        """_LOOP_MODE_POLICY should map conceptual_loop to FORCE_MECHANISM."""
+        assert _LOOP_MODE_POLICY.get("conceptual_loop") == FixyMode.FORCE_MECHANISM
 
 
 if __name__ == "__main__":
