@@ -27,6 +27,7 @@ from entelgia.loop_guard import (
     PREMATURE_SYNTHESIS,
     TOPIC_STAGNATION,
     CONCEPTUAL_LOOP,
+    AXIS_STAGNATION,
     _concept_key,
     _concept_overlap,
     _extract_dep_pairs,
@@ -388,6 +389,7 @@ def test_loop_mode_policy_covers_all_failure_modes():
         WEAK_CONFLICT,
         PREMATURE_SYNTHESIS,
         TOPIC_STAGNATION,
+        AXIS_STAGNATION,
     ):
         assert (
             failure_mode in _LOOP_MODE_POLICY
@@ -429,6 +431,7 @@ def test_agent_loop_policy_covers_all_failure_modes():
         WEAK_CONFLICT,
         PREMATURE_SYNTHESIS,
         TOPIC_STAGNATION,
+        AXIS_STAGNATION,
     ):
         assert (
             failure_mode in _LOOP_AGENT_POLICY
@@ -964,6 +967,221 @@ class TestCheckSameAxis:
             "same_axis (keyword overlap) alone must NOT produce CONCEPTUAL_LOOP; "
             f"got modes={modes}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Axis stagnation detection — _check_axis_stagnation() and AXIS_STAGNATION
+# ---------------------------------------------------------------------------
+
+
+class TestAxisStagnation:
+    """Tests for the axis_stagnation failure mode.
+
+    Axis stagnation fires when:
+      1. same_axis — turns operate on the same conceptual axis.
+      2. no_new_dimension — no concrete case, metric, test, definition, or commitment.
+      3. continued_argumentation — opposition/persistence markers in >= half the turns.
+      4. no_resolution — no synthesis/convergence phrases.
+
+    It does NOT rely on wording similarity between turns (unlike loop_repetition)
+    and does NOT require a dependency-direction flip (unlike conceptual_loop).
+    """
+
+    # Oscillating turns: same core vocabulary (justice/freedom/liberty),
+    # alternating inseparable/separable positions, no novelty keywords.
+    # Jaccard threshold 0.40 is satisfied because each turn shares
+    # {justice, freedom, liberty, separate} with the others.
+    _OSCILLATING_TURNS = [
+        "justice freedom inseparable justice freedom liberty cannot separate persist",
+        "freedom justice separable freedom justice liberty must separate remains",
+        "justice freedom inseparable justice freedom liberty cannot separate always",
+        "freedom justice separable freedom justice liberty must separate never",
+        "justice freedom inseparable justice freedom liberty impossible separate remains",
+        "freedom justice separable freedom justice liberty impossible conflate persist",
+    ]
+
+    def _make_oscillating(self):
+        return _make_turns(self._OSCILLATING_TURNS)
+
+    def test_fires_for_oscillating_axis_without_new_dimension(self):
+        """AXIS_STAGNATION must fire for pure oscillation with no structural progress."""
+        detector = DialogueLoopDetector()
+        turns = self._make_oscillating()
+        result = detector._check_axis_stagnation(turns)
+        assert result is True, (
+            "_check_axis_stagnation must return True for oscillating turns "
+            "on the same axis with no new dimension"
+        )
+
+    def test_detect_includes_axis_stagnation_in_modes(self):
+        """detect() must include AXIS_STAGNATION for an oscillating dialogue."""
+        detector = DialogueLoopDetector()
+        turns = self._make_oscillating()
+        modes = detector.detect(turns, turn_count=6)
+        assert AXIS_STAGNATION in modes, (
+            f"AXIS_STAGNATION must appear in detect() modes; got {modes}"
+        )
+
+    def test_does_not_fire_when_concrete_case_introduced(self):
+        """AXIS_STAGNATION must NOT fire when a concrete case is introduced."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            self._OSCILLATING_TURNS[:4]
+            + [
+                # Turn 5: introduces concrete case keywords
+                "justice freedom inseparable liberty consider specifically this "
+                "historical example scenario concrete case evidence",
+                # Turn 6: responds in kind
+                "freedom justice separable liberty distinct concepts based "
+                "concrete study empirical instance illustrate",
+            ]
+        )
+        result = detector._check_axis_stagnation(turns)
+        assert result is False, (
+            "_check_axis_stagnation must return False when a concrete case is present"
+        )
+
+    def test_does_not_fire_when_resolution_occurs(self):
+        """AXIS_STAGNATION must NOT fire when synthesis/resolution phrases appear."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            self._OSCILLATING_TURNS[:5]
+            + [
+                # Turn 6: resolution / synthesis phrase
+                "justice freedom inseparable both are needed together they complement",
+            ]
+        )
+        result = detector._check_axis_stagnation(turns)
+        assert result is False, (
+            "_check_axis_stagnation must return False when synthesis/resolution is present"
+        )
+
+    def test_does_not_fire_when_axis_is_diverse(self):
+        """AXIS_STAGNATION must NOT fire when turns cover diverse topics."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "What is the nature of mathematical truth and formal proof?",
+                "Evolution shaped the neural architecture of the human brain.",
+                "Economic incentives determine institutional behaviour and policy.",
+                "Aesthetic beauty emerges from the formal properties of an artwork.",
+                "Climate change requires coordinated international policy responses.",
+                "Quantum mechanics challenges classical notions of causality.",
+            ]
+        )
+        result = detector._check_axis_stagnation(turns)
+        assert result is False, (
+            "_check_axis_stagnation must return False when turns are topically diverse"
+        )
+
+    def test_does_not_fire_below_minimum_turns(self):
+        """AXIS_STAGNATION must NOT fire when fewer than 6 turns are available."""
+        detector = DialogueLoopDetector()
+        # Only 4 turns — below _MIN_TURNS_AXIS_STAGNATION
+        turns = _make_turns(self._OSCILLATING_TURNS[:4])
+        result = detector._check_axis_stagnation(turns)
+        assert result is False, (
+            "_check_axis_stagnation must not fire with fewer than 6 turns"
+        )
+
+    def test_does_not_fire_when_measurable_condition_present(self):
+        """AXIS_STAGNATION must NOT fire when a measurable condition is introduced."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            self._OSCILLATING_TURNS[:4]
+            + [
+                # Turn 5: introduces measurable / metric keywords
+                "justice freedom inseparable liberty must measure quantif benchmark "
+                "metric criterion scale index ratio",
+                "freedom justice separable liberty must separate metric threshold score",
+            ]
+        )
+        result = detector._check_axis_stagnation(turns)
+        assert result is False, (
+            "_check_axis_stagnation must return False when a measurable condition appears"
+        )
+
+    def test_does_not_fire_when_test_scenario_present(self):
+        """AXIS_STAGNATION must NOT fire when a test scenario is introduced."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            self._OSCILLATING_TURNS[:4]
+            + [
+                "justice freedom inseparable liberty testable falsif predict verif "
+                "hypothesis observable empirically experiment",
+                "freedom justice separable liberty testable claim predict verif",
+            ]
+        )
+        result = detector._check_axis_stagnation(turns)
+        assert result is False, (
+            "_check_axis_stagnation must return False when a test scenario appears"
+        )
+
+    def test_axis_stagnation_not_suppressed_by_novelty_suppressor(self):
+        """AXIS_STAGNATION must survive the novelty suppressor in detect().
+
+        The novelty suppressor only checks the last 2 turns; axis_stagnation
+        performs its own full-window check and is explicitly exempt from the
+        suppressor gate.
+        """
+        detector = DialogueLoopDetector()
+        turns = self._make_oscillating()
+        # Confirm no novelty in last 2 turns (suppressor inactive for these turns)
+        modes = detector.detect(turns, turn_count=6)
+        assert AXIS_STAGNATION in modes, (
+            f"AXIS_STAGNATION must survive the novelty suppressor; got {modes}"
+        )
+
+    def test_axis_stagnation_policy_in_fixy_policy(self):
+        """_LOOP_MODE_POLICY must map axis_stagnation to a non-MEDIATE mode."""
+        from entelgia.fixy_interactive import _LOOP_MODE_POLICY, FixyMode
+
+        assert "axis_stagnation" in _LOOP_MODE_POLICY, (
+            "_LOOP_MODE_POLICY must have an entry for 'axis_stagnation'"
+        )
+        assert _LOOP_MODE_POLICY["axis_stagnation"] != FixyMode.MEDIATE, (
+            "axis_stagnation must not fall back to the generic MEDIATE mode"
+        )
+
+    def test_axis_stagnation_policy_in_agent_policy(self):
+        """_LOOP_AGENT_POLICY must map axis_stagnation to AgentMode.CONCRETIZE."""
+        from entelgia.dialogue_engine import _LOOP_AGENT_POLICY, AgentMode
+
+        assert "axis_stagnation" in _LOOP_AGENT_POLICY, (
+            "_LOOP_AGENT_POLICY must have an entry for 'axis_stagnation'"
+        )
+        assert _LOOP_AGENT_POLICY["axis_stagnation"] == AgentMode.CONCRETIZE
+
+    def test_axis_stagnation_rewrite_mode_in_policy(self):
+        """_LOOP_REWRITE_MODE_POLICY must map axis_stagnation to force_case."""
+        from entelgia.fixy_interactive import _LOOP_REWRITE_MODE_POLICY, FixyMode
+
+        assert "axis_stagnation" in _LOOP_REWRITE_MODE_POLICY, (
+            "_LOOP_REWRITE_MODE_POLICY must have an entry for 'axis_stagnation'"
+        )
+        assert _LOOP_REWRITE_MODE_POLICY["axis_stagnation"] == FixyMode.FORCE_CASE
+
+    def test_axis_stagnation_novelty_rule_in_dialogue_rewriter(self):
+        """DialogueRewriter._NOVELTY_RULES must contain an entry for axis_stagnation."""
+        rewriter = DialogueRewriter()
+        assert AXIS_STAGNATION in rewriter._NOVELTY_RULES, (
+            "DialogueRewriter._NOVELTY_RULES must contain an entry for AXIS_STAGNATION"
+        )
+        rule = rewriter._NOVELTY_RULES[AXIS_STAGNATION]
+        assert isinstance(rule, str) and len(rule) > 10, (
+            "AXIS_STAGNATION novelty rule must be a non-trivial instruction string"
+        )
+
+    def test_axis_stagnation_constant_value(self):
+        """AXIS_STAGNATION constant must equal 'axis_stagnation'."""
+        assert AXIS_STAGNATION == "axis_stagnation"
+
+    def test_returns_bool(self):
+        """_check_axis_stagnation must always return a plain bool."""
+        detector = DialogueLoopDetector()
+        turns = self._make_oscillating()
+        result = detector._check_axis_stagnation(turns)
+        assert isinstance(result, bool)
 
 
 if __name__ == "__main__":

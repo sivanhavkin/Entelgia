@@ -51,6 +51,7 @@ _LOOP_AGENT_POLICY: Dict[str, str] = {
     "premature_synthesis": AgentMode.CONTRADICT,
     "topic_stagnation": AgentMode.PIVOT,
     "conceptual_loop": AgentMode.MECHANIZE,
+    "axis_stagnation": AgentMode.CONCRETIZE,
 }
 
 # Mode-specific instruction appended to the seed

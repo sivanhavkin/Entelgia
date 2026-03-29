@@ -104,6 +104,7 @@ _LOOP_MODE_POLICY: Dict[str, str] = {
     "topic_stagnation": FixyMode.FORCE_NEW_DOMAIN,
     "fixy_mediation_loop": FixyMode.FORCE_SHORT_ANSWER,
     "conceptual_loop": FixyMode.FORCE_MECHANISM,
+    "axis_stagnation": FixyMode.CONCRETIZE,
 }
 
 # Rotation list for loop_repetition / fixy_mediation_loop — cycles through
@@ -135,6 +136,7 @@ _LOOP_REWRITE_MODE_POLICY: Dict[str, str] = {
     "topic_stagnation": FixyMode.FORCE_METRIC,  # break stagnation with a new criterion
     "fixy_mediation_loop": FixyMode.FORCE_DEFINITION,  # clarify what's being argued
     "conceptual_loop": FixyMode.FORCE_DEFINITION,  # demand operational definition to break the cycle
+    "axis_stagnation": FixyMode.FORCE_CASE,  # force a concrete case to break the oscillation
     "circular_reasoning": FixyMode.FORCE_CASE,
     "high_conflict_no_resolution": FixyMode.FORCE_CHOICE,
     "shallow_discussion": FixyMode.FORCE_TEST,
