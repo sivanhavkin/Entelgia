@@ -6,11 +6,13 @@ Loop Guard for Entelgia — v2.9.0
 Detects dialogue failure modes, suppresses repeated phrases, and rewrites
 stale context into a sharper structured prompt before the next LLM call.
 
-Four explicit failure modes are recognised:
+Five explicit failure modes are recognised:
   loop_repetition      — same ideas return in slightly different wording
   weak_conflict        — agents appear to disagree but no hard contradiction holds
   premature_synthesis  — dialogue converges too early into "both are needed"
   topic_stagnation     — topic label changes but semantic cluster stays the same
+  axis_stagnation      — persistent conceptual axis with no structural progress
+                         (same core concept, new phrasing, but no new dimension)
 
 Two utility classes complete the system:
   PhraseBanList        — tracks overused n-grams and injects "do not repeat" text
@@ -53,6 +55,7 @@ WEAK_CONFLICT = "weak_conflict"
 PREMATURE_SYNTHESIS = "premature_synthesis"
 TOPIC_STAGNATION = "topic_stagnation"
 CONCEPTUAL_LOOP = "conceptual_loop"
+AXIS_STAGNATION = "axis_stagnation"
 
 # Minimum turns required before each check fires
 _MIN_TURNS_REPETITION = 4
@@ -60,6 +63,7 @@ _MIN_TURNS_CONFLICT = 6
 _MIN_TURNS_SYNTHESIS = 5
 _MIN_TURNS_STAGNATION = 6
 _MIN_TURNS_CONCEPTUAL_LOOP = 4
+_MIN_TURNS_AXIS_STAGNATION = 6
 
 # ---------------------------------------------------------------------------
 # Same-axis embedding detection thresholds
@@ -274,6 +278,56 @@ _DEP_REV_RE: re.Pattern = re.compile(
 
 # Minimum Jaccard overlap for two concept sets to be treated as the same axis
 _AXIS_MATCH_THRESHOLD: float = 0.3
+
+# ---------------------------------------------------------------------------
+# Axis stagnation detection
+# ---------------------------------------------------------------------------
+# Markers that indicate continued argumentation without resolution.
+# Presence in a turn signals that an agent is asserting or persisting in a
+# position rather than introducing a new dimension or agreeing.
+_AXIS_ARGUMENTATION_MARKERS: frozenset = frozenset(
+    {
+        "but",
+        "however",
+        "disagree",
+        "challenge",
+        "wrong",
+        "actually",
+        "still",
+        "insist",
+        "maintain",
+        "remains",
+        "nevertheless",
+        "nonetheless",
+        "opposite",
+        "contrary",
+        "persist",
+        "refuse",
+        "reject",
+        "cannot",
+        "must",
+        "never",
+        "always",
+        "impossible",
+        "necessary",
+    }
+)
+
+# Structural novelty clusters used by _check_axis_stagnation to determine
+# whether a new dimension has been introduced in the window.
+# Only the five structural clusters are checked here — the "advancement"
+# cluster (_NOVELTY_ADVANCEMENT_KEYWORDS) is deliberately excluded because
+# words like "therefore" and "consequently" appear naturally in oscillating
+# argumentation without indicating real structural progress.
+# Word-boundary regex (`\b`) is used at match time to prevent short roots
+# such as "rate" from matching inside longer words like "separate".
+_AXIS_STRUCTURAL_NOVELTY_CLUSTERS: Dict[str, frozenset] = {
+    "metric": _NOVELTY_METRIC_KEYWORDS,
+    "case": _NOVELTY_CASE_KEYWORDS,
+    "decision": _NOVELTY_DECISION_KEYWORDS,
+    "test": _NOVELTY_TEST_KEYWORDS,
+    "definition": _NOVELTY_DEFINITION_KEYWORDS,
+}
 
 
 def _concept_key(phrase: str) -> frozenset:
@@ -612,16 +666,24 @@ class DialogueLoopDetector:
             turn_count >= _MIN_TURNS_CONCEPTUAL_LOOP
             and self._check_conceptual_dependency_loop(recent)
         )
+        # Signal F: persistent axis without structural progress — conceptual oscillation
+        # (self-contained compound check; satisfies the two-condition gate alone)
+        sig_axis_stagnation = (
+            turn_count >= _MIN_TURNS_AXIS_STAGNATION
+            and self._check_axis_stagnation(recent)
+        )
 
         # ── Two-condition gate ─────────────────────────────────────────────
         # A loop is real only when at least 2 conditions confirm it.
-        # weak_conflict, premature_synthesis, and conceptual_loop already embed
-        # two co-occurring patterns and are treated as inherently satisfying the gate.
+        # weak_conflict, premature_synthesis, conceptual_loop, and axis_stagnation
+        # already embed two co-occurring patterns and are treated as inherently
+        # satisfying the gate.
         two_condition_met = (
             active_signal_count >= 2
             or sig_weak_conflict
             or sig_premature_synth
             or sig_conceptual_loop
+            or sig_axis_stagnation
         )
 
         if not two_condition_met:
@@ -636,10 +698,14 @@ class DialogueLoopDetector:
         # Linguistic repetition alone does not constitute a structural loop.
         # If the most recent turns introduce a new metric, case, decision,
         # testable claim, or abstraction shift, suppress the loop declaration.
-        # Exception: conceptual_loop is a structural signal (not wording-based)
-        # and is not suppressed by novelty indicators.
+        # Exception: conceptual_loop and axis_stagnation are structural signals
+        # (not wording-based) and are not suppressed by novelty indicators.
         novelty_clusters, novelty_count = self._check_novelty_present(recent)
-        if novelty_count >= _NOVELTY_SUPPRESS_THRESHOLD and not sig_conceptual_loop:
+        if (
+            novelty_count >= _NOVELTY_SUPPRESS_THRESHOLD
+            and not sig_conceptual_loop
+            and not sig_axis_stagnation
+        ):
             logger.info(
                 "[FIXY-SUPPRESS] semantic overlap only; no structural loop — "
                 "novelty clusters present: %s at turn %d",
@@ -690,6 +756,13 @@ class DialogueLoopDetector:
             modes.append(CONCEPTUAL_LOOP)
             logger.info(
                 "[FIXY-LOOP] detected: conceptual_dependency_loop at turn %d",
+                turn_count,
+            )
+
+        if sig_axis_stagnation:
+            modes.append(AXIS_STAGNATION)
+            logger.info(
+                "[FIXY-LOOP] detected: axis_stagnation at turn %d",
                 turn_count,
             )
 
@@ -1014,6 +1087,93 @@ class DialogueLoopDetector:
 
         return False
 
+    def _check_axis_stagnation(self, turns: List[Dict[str, str]]) -> bool:
+        """Detect persistent conceptual axis without structural progress.
+
+        This failure mode fires when dialogue is intellectually active (agents
+        are continuing to argue) but structurally stuck — they keep circling the
+        same conceptual axis with new phrasing but without ever introducing a
+        new dimension.
+
+        All four conditions must hold simultaneously:
+
+        1. **same_axis** — recent turns operate on the same conceptual axis,
+           regardless of surface wording variation (via ``check_same_axis``).
+        2. **no_new_dimension** — no structural novelty (concrete case,
+           measurable condition, test scenario, forced distinction, or
+           commitment) appears anywhere in the window.  The "advancement"
+           cluster is deliberately excluded here because words like
+           "therefore" and "consequently" appear naturally in oscillating
+           argumentation without advancing the structure.
+        3. **continued_argumentation** — at least half the turns contain
+           opposition or persistence markers, indicating active assertion
+           without agreement.
+        4. **no_resolution** — no synthesis / convergence phrases are present.
+
+        This is distinct from ``_check_conceptual_dependency_loop`` (which
+        requires a dependency-direction flip) and ``_check_repetition`` (which
+        requires high wording similarity between pairs of turns).
+
+        Returns
+        -------
+        ``True`` when all four conditions are simultaneously met.
+        """
+        if len(turns) < _MIN_TURNS_AXIS_STAGNATION:
+            return False
+
+        # Condition 1: same conceptual axis across the window
+        if not self.check_same_axis(turns):
+            return False
+
+        # Condition 2: no structural dimension introduced across the full window.
+        # Only checks five structural clusters — the "advancement" cluster is
+        # excluded because words like "therefore", "consequently" appear in
+        # oscillating argumentation without indicating structural progress.
+        # Word-boundary regex is used to avoid false positives from short roots
+        # such as "rate" (a metric keyword) matching inside "separate" or
+        # "inseparable".
+        all_text = " ".join(t.get("text", "").lower() for t in turns)
+        for cluster_name, keywords in _AXIS_STRUCTURAL_NOVELTY_CLUSTERS.items():
+            hits = sum(
+                1
+                for kw in keywords
+                if re.search(r"\b" + re.escape(kw), all_text)
+            )
+            if hits >= _NOVELTY_CLUSTER_HIT_THRESHOLD:
+                logger.debug(
+                    "[AXIS-STAGNATION] cluster %r present in window — not stagnant",
+                    cluster_name,
+                )
+                return False
+
+        # Condition 3: continued argumentation — at least half of the turns
+        # contain opposition or persistence markers.  Word-boundary regex
+        # is used to prevent short markers such as "but" or "still" from
+        # matching inside unrelated words (e.g. "distill", "subtract").
+        arg_count = sum(
+            1
+            for t in turns
+            if any(
+                re.search(r"\b" + re.escape(m) + r"\b", t.get("text", "").lower())
+                for m in _AXIS_ARGUMENTATION_MARKERS
+            )
+        )
+        if arg_count < max(2, len(turns) // 2):
+            return False
+
+        # Condition 4: no resolution — no synthesis / convergence phrases.
+        for t in turns:
+            if any(ph in t.get("text", "").lower() for ph in _SYNTHESIS_PHRASES):
+                return False
+
+        logger.debug(
+            "[AXIS-STAGNATION] same_axis=True no_dimension=True "
+            "arg_count=%d/%d no_resolution=True",
+            arg_count,
+            len(turns),
+        )
+        return True
+
     def check_same_axis(self, turns: List[Dict[str, str]]) -> bool:
         """Return ``True`` when recent turns are operating on the same conceptual axis.
 
@@ -1204,6 +1364,11 @@ class DialogueRewriter:
         TOPIC_STAGNATION: (
             "next response MUST pivot to a new conceptual domain — stay connected "
             "to the thread but introduce a genuinely different angle"
+        ),
+        AXIS_STAGNATION: (
+            "next response MUST introduce a concrete case, testable claim, measurable "
+            "distinction, or explicit commitment — do NOT restate the same position "
+            "on the same axis without adding a new structural dimension"
         ),
         # Structural rewrite modes — injected when Fixy selects a targeted mode
         "force_metric": (
