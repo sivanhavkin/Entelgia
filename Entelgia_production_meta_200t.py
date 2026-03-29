@@ -7892,6 +7892,32 @@ class MainScript:
                     speaker._last_stagnation,
                 )
 
+            # ── Same-axis embedding check (supporting signal only) ─────────
+            # Embeddings detect whether recent turns share the same conceptual
+            # axis (high thematic similarity regardless of wording change).
+            # This signal does NOT trigger stagnation on its own.  It is only
+            # acted upon when combined with an active structural loop signal,
+            # closing the gap between expressed dialogue and internal state.
+            if self._loop_detector is not None and _active_loop_modes:
+                _agent_turns_for_axis = [
+                    t
+                    for t in self.dialog[-(self._loop_detector.window * 2) :]
+                    if t.get("role") not in ("Fixy", "seed")
+                ]
+                _same_axis = self._loop_detector.check_same_axis(_agent_turns_for_axis)
+                if _same_axis:
+                    speaker._last_stagnation = min(
+                        1.0, speaker._last_stagnation + _PE_STAGNATION_INCREMENT
+                    )
+                    speaker._last_dialogue_signals["semantic_repeat"] = True
+                    logger.info(
+                        "[AXIS-EMBED] agent=%s same_axis=True + loop_modes=%s"
+                        " → stagnation=%.2f semantic_repeat=True",
+                        speaker.name,
+                        _active_loop_modes,
+                        speaker._last_stagnation,
+                    )
+
             speaker.store_turn(out, topic_label, source="stm")
             self.log_turn(speaker.name, out, topic_label)
 

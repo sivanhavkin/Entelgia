@@ -25,6 +25,27 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Optional embedding support — reuses circularity_guard's model cache so that
+# only one copy of the transformer is held in memory.  Falls back to Jaccard
+# keyword overlap when sentence-transformers or sklearn are unavailable.
+# ---------------------------------------------------------------------------
+try:
+    from entelgia.circularity_guard import (  # type: ignore[attr-defined]
+        _get_semantic_model as _get_axis_model,
+        _SEMANTIC_AVAILABLE as _AXIS_EMBED_AVAILABLE,
+    )
+    from sklearn.metrics.pairwise import (  # type: ignore[import]
+        cosine_similarity as _axis_cosine_sim,
+    )
+except ImportError:
+    _AXIS_EMBED_AVAILABLE: bool = False
+
+    def _get_axis_model() -> None:  # type: ignore[misc]
+        return None
+
+    _axis_cosine_sim = None  # type: ignore[assignment]
+
+# ---------------------------------------------------------------------------
 # Failure-mode constants (used as string tokens throughout the system)
 # ---------------------------------------------------------------------------
 LOOP_REPETITION = "loop_repetition"
@@ -39,6 +60,16 @@ _MIN_TURNS_CONFLICT = 6
 _MIN_TURNS_SYNTHESIS = 5
 _MIN_TURNS_STAGNATION = 6
 _MIN_TURNS_CONCEPTUAL_LOOP = 4
+
+# ---------------------------------------------------------------------------
+# Same-axis embedding detection thresholds
+# ---------------------------------------------------------------------------
+#: Mean pairwise cosine similarity above which recent turns are deemed to be
+#: operating on the same conceptual axis (embedding path).
+_AXIS_EMBEDDING_SIMILARITY_THRESHOLD: float = 0.82
+
+#: Mean pairwise Jaccard overlap used when embeddings are unavailable.
+_AXIS_JACCARD_THRESHOLD: float = 0.40
 
 # ---------------------------------------------------------------------------
 # Synthesis phrases that signal premature convergence
@@ -982,6 +1013,93 @@ class DialogueLoopDetector:
                     return True
 
         return False
+
+    def check_same_axis(self, turns: List[Dict[str, str]]) -> bool:
+        """Return ``True`` when recent turns are operating on the same conceptual axis.
+
+        Uses embedding cosine similarity (via sentence-transformers / sklearn) when
+        available, falling back to mean pairwise Jaccard keyword overlap.
+
+        A high mean pairwise similarity across the recent turn window indicates the
+        dialogue is thematically concentrated — the agents are circling the same
+        conceptual domain even if individual wording varies.
+
+        **Important**: this is a supporting signal only.  It does NOT trigger
+        stagnation or loop detection on its own.  It is designed to be combined
+        with a structural loop signal so that:
+
+        .. code-block:: python
+
+            if same_axis and loop_pattern_detected:
+                semantic_repeat = True
+                stagnation += delta
+
+        Parameters
+        ----------
+        turns:
+            Recent agent turns to inspect (Fixy excluded).
+
+        Returns
+        -------
+        ``True`` when mean pairwise similarity exceeds the relevant threshold.
+        """
+        texts = []
+        for t in turns:
+            text = t.get("text", "").strip()
+            if text:
+                texts.append(text)
+        if len(texts) < 2:
+            return False
+
+        if _AXIS_EMBED_AVAILABLE and _axis_cosine_sim is not None:
+            model = _get_axis_model()
+            if model is not None:
+                try:
+                    embeddings = model.encode(texts)
+                    sim_matrix = _axis_cosine_sim(embeddings, embeddings)
+                    n = len(texts)
+                    total, count = 0.0, 0
+                    for i in range(n):
+                        for j in range(i + 1, n):
+                            total += float(sim_matrix[i][j])
+                            count += 1
+                    if count == 0:
+                        return False
+                    mean_sim = total / count
+                    same_axis = mean_sim >= _AXIS_EMBEDDING_SIMILARITY_THRESHOLD
+                    logger.debug(
+                        "[AXIS-EMBED] mean_pairwise_cosine=%.3f threshold=%.3f same_axis=%s",
+                        mean_sim,
+                        _AXIS_EMBEDDING_SIMILARITY_THRESHOLD,
+                        same_axis,
+                    )
+                    return same_axis
+                except Exception as exc:
+                    logger.warning(
+                        "[AXIS-EMBED] embedding failed: %s — falling back to Jaccard", exc
+                    )
+
+        # Jaccard fallback: mean pairwise keyword overlap across the window
+        kw_sets = [self._keywords(text) for text in texts]
+        total_j, count_j = 0.0, 0
+        for i in range(len(kw_sets)):
+            for j in range(i + 1, len(kw_sets)):
+                a, b = kw_sets[i], kw_sets[j]
+                if not a or not b:
+                    continue
+                total_j += len(a & b) / len(a | b)
+                count_j += 1
+        if count_j == 0:
+            return False
+        mean_jaccard = total_j / count_j
+        same_axis = mean_jaccard >= _AXIS_JACCARD_THRESHOLD
+        logger.debug(
+            "[AXIS-EMBED] fallback mean_jaccard=%.3f threshold=%.3f same_axis=%s",
+            mean_jaccard,
+            _AXIS_JACCARD_THRESHOLD,
+            same_axis,
+        )
+        return same_axis
 
 
 class PhraseBanList:

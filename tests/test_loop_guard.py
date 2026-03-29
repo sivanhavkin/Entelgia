@@ -30,6 +30,8 @@ from entelgia.loop_guard import (
     _concept_key,
     _concept_overlap,
     _extract_dep_pairs,
+    _AXIS_EMBEDDING_SIMILARITY_THRESHOLD,
+    _AXIS_JACCARD_THRESHOLD,
 )
 from entelgia.fixy_interactive import FixyMode, _LOOP_MODE_POLICY
 from entelgia.dialogue_engine import AgentMode, _LOOP_AGENT_POLICY
@@ -725,10 +727,12 @@ class TestExtractDepPairs:
     def test_reverse_enables(self):
         pairs = _extract_dep_pairs("Justice enables freedom in a well-ordered state.")
         assert len(pairs) >= 1
-        # reverse: "justice enables freedom" → (freedom, justice) — freedom depends on justice
-        dependent, dependency = pairs[0]
-        assert "freedom" in dependent
-        assert "justice" in dependency
+        # reverse: "justice enables freedom" → normalised to (freedom, justice)
+        # because _extract_dep_pairs returns (dependent, dependency) order:
+        # enabled=freedom, enabler=justice → freedom depends on justice
+        left, right = pairs[0]  # left=dependent, right=dependency
+        assert "freedom" in left
+        assert "justice" in right
 
     def test_no_dep_phrase(self):
         pairs = _extract_dep_pairs("Freedom is important. Justice matters too.")
@@ -858,6 +862,108 @@ class TestDetectConceptualLoop:
     def test_conceptual_loop_policy_in_fixy_policy(self):
         """_LOOP_MODE_POLICY should map conceptual_loop to FORCE_MECHANISM."""
         assert _LOOP_MODE_POLICY.get("conceptual_loop") == FixyMode.FORCE_MECHANISM
+
+
+# ---------------------------------------------------------------------------
+# Embedding-based same-axis detection — check_same_axis()
+# ---------------------------------------------------------------------------
+# NOTE: In the test environment sentence-transformers is not installed, so
+# all tests exercise the Jaccard fallback path.  The embedding path is tested
+# at the interface level (returns bool, obeys constraints).
+
+
+class TestCheckSameAxis:
+    """Tests for DialogueLoopDetector.check_same_axis()."""
+
+    def test_returns_true_for_thematically_concentrated_turns(self):
+        """Turns sharing the same narrow vocabulary should return same_axis=True.
+
+        Uses keyword-dense text to exercise the Jaccard fallback path reliably
+        without requiring sentence-transformers to be installed.
+        """
+        detector = DialogueLoopDetector()
+        # High keyword overlap across all turns (same core concept cluster)
+        turns = _make_turns(
+            [
+                "freedom autonomy liberty independence personal freedom choices",
+                "autonomy liberty freedom independence fundamental choices personal",
+                "liberty freedom autonomy personal independence choices fundamental",
+                "independence freedom liberty autonomy choices personal fundamental",
+            ]
+        )
+        result = detector.check_same_axis(turns)
+        assert result is True, "Concentrated turns should be on the same axis"
+
+    def test_returns_false_for_diverse_topics(self):
+        """Turns from unrelated domains should return same_axis=False."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "What is the nature of mathematical truth and proof?",
+                "Evolution shaped the neural architecture of the human brain.",
+                "Economic incentives determine institutional behaviour and policy.",
+                "Aesthetic beauty emerges from the formal properties of an artwork.",
+            ]
+        )
+        result = detector.check_same_axis(turns)
+        assert result is False, "Diverse turns should NOT be on the same axis"
+
+    def test_returns_false_for_fewer_than_two_turns(self):
+        """Single-turn input cannot establish axis — must return False."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(["Freedom depends on justice."])
+        result = detector.check_same_axis(turns)
+        assert result is False, "Single turn cannot establish same-axis"
+
+    def test_returns_false_for_empty_turns(self):
+        """Empty turn list → False."""
+        detector = DialogueLoopDetector()
+        result = detector.check_same_axis([])
+        assert result is False
+
+    def test_returns_bool(self):
+        """check_same_axis must always return a plain bool."""
+        detector = DialogueLoopDetector()
+        turns = _make_turns(
+            [
+                "consciousness neural brain experience consciousness neural",
+                "neural consciousness brain experience neural consciousness",
+                "brain consciousness neural experience brain consciousness",
+                "experience neural consciousness brain experience neural",
+            ]
+        )
+        result = detector.check_same_axis(turns)
+        assert isinstance(result, bool), "check_same_axis must return bool"
+
+    def test_thresholds_are_exposed(self):
+        """Threshold constants must be importable and within plausible bounds."""
+        assert 0.0 < _AXIS_EMBEDDING_SIMILARITY_THRESHOLD < 1.0
+        assert 0.0 < _AXIS_JACCARD_THRESHOLD < 1.0
+
+    def test_same_axis_does_not_produce_conceptual_loop_alone(self):
+        """check_same_axis=True must NOT cause CONCEPTUAL_LOOP in detect().
+
+        CONCEPTUAL_LOOP requires a structural dependency-direction flip; high
+        keyword similarity alone is not sufficient to produce that failure mode.
+        """
+        detector = DialogueLoopDetector()
+        # High keyword overlap → same_axis fires; but NO dependency phrases → no dep flip
+        turns = _make_turns(
+            [
+                "freedom autonomy liberty independence personal freedom choices",
+                "autonomy liberty freedom independence fundamental choices personal",
+                "liberty freedom autonomy personal independence choices fundamental",
+                "independence freedom liberty autonomy choices personal fundamental",
+            ]
+        )
+        # Confirm same_axis fires on this input
+        assert detector.check_same_axis(turns) is True
+        # detect() must NOT report CONCEPTUAL_LOOP (no dep-flip phrases present)
+        modes = detector.detect(turns, turn_count=4)
+        assert CONCEPTUAL_LOOP not in modes, (
+            "same_axis (keyword overlap) alone must NOT produce CONCEPTUAL_LOOP; "
+            f"got modes={modes}"
+        )
 
 
 if __name__ == "__main__":
