@@ -7879,22 +7879,9 @@ class MainScript:
 
             speaker.store_turn(out, topic_label, source="stm")
             self.log_turn(speaker.name, out, topic_label)
-            self.print_agent(speaker, out)
 
-            # Collect meta-actions performed this turn
-            _meta_actions: List[str] = []
-
-            # Freudian slip attempt after each non-Fixy turn
-            if speaker.name != "Fixy":
-                slip = speaker.apply_freudian_slip(topic_label)
-                if slip is not None:
-                    _meta_actions.append("freudian_slip")
-
-            # Display meta-cognitive state for this speaker
-            self.print_meta_state(speaker, _meta_actions)
-
-            # Log evaluation scores after the visible response block so that
-            # [EVAL] and [DIALOGUE] appear below the agent output in the log.
+            # Log evaluation scores before the visible response so that
+            # [EVAL] and [DIALOGUE] appear before the agent output in the log.
             logger.info(
                 "[EVAL] agent=%s linguistic_score=%.2f",
                 speaker.name,
@@ -7909,6 +7896,20 @@ class MainScript:
                 speaker._last_dialogue_signals["resolution"],
                 speaker._last_dialogue_signals["semantic_repeat"],
             )
+
+            self.print_agent(speaker, out)
+
+            # Collect meta-actions performed this turn
+            _meta_actions: List[str] = []
+
+            # Freudian slip attempt after each non-Fixy turn
+            if speaker.name != "Fixy":
+                slip = speaker.apply_freudian_slip(topic_label)
+                if slip is not None:
+                    _meta_actions.append("freudian_slip")
+
+            # Display meta-cognitive state for this speaker
+            self.print_meta_state(speaker, _meta_actions)
             logger.info(
                 "[PRESSURE-SYNC] agent=%s meta_pressure=%.2f dialogue_pressure=%s alignment=%s",
                 speaker.name,
