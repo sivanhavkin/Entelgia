@@ -1159,17 +1159,13 @@ def _compute_fatigue(energy: float) -> tuple[float, str]:
 
 ### Logging
 
-**`[FATIGUE]`** — emitted every turn inside `Agent.speak()`:
-
-```text
-[FATIGUE] agent=Socrates level=0.68 state=medium energy=43.0
-```
-
 **`[FATIGUE-INJECT]`** — emitted at `DEBUG` level when a fatigue modifier is injected into the prompt (energy 35–60 only):
 
 ```text
 [FATIGUE-INJECT] agent=Socrates fatigue=0.68 state=medium energy=43.0
 ```
+
+Fatigue score and state are visible turn-by-turn in the META display (see below) and do not generate a separate per-turn `INFO` log line.
 
 **`[LOOP-DIAG]`** — emitted every turn in `MainScript._run_loop()` after `speak()` returns, to make structural vs. fatigue causes explicitly visible side-by-side:
 

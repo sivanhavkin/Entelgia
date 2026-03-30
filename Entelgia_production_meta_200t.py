@@ -5621,13 +5621,6 @@ class Agent:
         _fatigue, _fatigue_state = _compute_fatigue(self.energy_level)
         self._last_fatigue = _fatigue
         self._last_fatigue_state = _fatigue_state
-        logger.info(
-            "[FATIGUE] agent=%s level=%.2f state=%s energy=%.1f",
-            self.name,
-            _fatigue,
-            _fatigue_state,
-            self.energy_level,
-        )
 
         # ── Energy status: regime label derived from energy level ─────────────
         _energy_status = _compute_energy_status(self.energy_level)
