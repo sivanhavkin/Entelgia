@@ -679,6 +679,42 @@ LIMBIC_HIJACK_SUPEREGO_MULTIPLIER: float = 0.3
 # Number of consecutive turns (without re-trigger) before limbic hijack auto-exits
 LIMBIC_HIJACK_MAX_TURNS: int = 3
 
+# ── Fatigue threshold constants ───────────────────────────────────────────────
+#: Energy level above which there is no fatigue penalty.
+_FATIGUE_ENERGY_THRESHOLD: float = 60.0
+#: Energy span over which fatigue is normalised to [0.0, 1.0].
+_FATIGUE_ENERGY_SPAN: float = 25.0
+
+
+def _compute_fatigue(energy: float) -> Tuple[float, str]:
+    """Compute fatigue score and state label from energy level.
+
+    Energy > 60  → fatigue = 0.0 (no fatigue, normal mode)
+    Energy 35–60 → fatigue normalised to [0.0, 1.0] across a 25-point span
+    Energy < 35  → clamped to 1.0 (dream/recovery handles this regime)
+
+    Returns
+    -------
+    (fatigue_score, fatigue_state_label)
+        fatigue_score  : float in [0.0, 1.0]
+        fatigue_state_label : one of ``"none"``, ``"mild"``, ``"medium"``, ``"severe"``
+    """
+    if energy > _FATIGUE_ENERGY_THRESHOLD:
+        fatigue = 0.0
+    else:
+        fatigue = (_FATIGUE_ENERGY_THRESHOLD - energy) / _FATIGUE_ENERGY_SPAN
+    fatigue = max(0.0, min(1.0, fatigue))
+    if fatigue <= 0.2:
+        state = "none"
+    elif fatigue <= 0.5:
+        state = "mild"
+    elif fatigue <= 0.8:
+        state = "medium"
+    else:
+        state = "severe"
+    return fatigue, state
+
+
 # ============================================
 # TOPIC CLUSTERS - for random seed selection
 # ============================================
@@ -4390,6 +4426,9 @@ class Agent:
         # Resolution and semantic-repeat alignment (measurement only) — set by speak(), logged by MainScript.
         self._last_resolution_alignment: str = "neutral"
         self._last_semantic_repeat_alignment: str = "neutral"
+        # Fatigue state (measurement only) — set by speak() every turn based on energy_level.
+        self._last_fatigue: float = 0.0
+        self._last_fatigue_state: str = "none"
         # ── Anti-repetition form tracking ─────────────────────────────────────
         # Tracks the last 3 rhetorical forms used by this agent.  The same
         # form must not be used more than 2 consecutive turns.
@@ -5592,6 +5631,58 @@ class Agent:
                 self.name,
                 self._variation_mode,
                 self._variation_mode_turns,
+            )
+        # ─────────────────────────────────────────────────────────────────────
+
+        # ── Fatigue: compute from energy level every turn ─────────────────────
+        # Fatigue is a soft diagnostic signal derived purely from energy.
+        # It does NOT directly set semantic_repeat, stagnation, or loop flags.
+        # Structural detectors remain the sole authority for those signals.
+        _fatigue, _fatigue_state = _compute_fatigue(self.energy_level)
+        self._last_fatigue = _fatigue
+        self._last_fatigue_state = _fatigue_state
+        logger.info(
+            "[FATIGUE] agent=%s level=%.2f state=%s energy=%.1f",
+            self.name,
+            _fatigue,
+            _fatigue_state,
+            self.energy_level,
+        )
+
+        # Inject a soft fatigue modifier into the prompt when energy is in the
+        # 35–60 range.  Effects scale continuously with fatigue and are phrasing-
+        # level only — no loop or stagnation flags are touched here.
+        if 35.0 <= self.energy_level <= 60.0:
+            if _fatigue >= 0.6:
+                _fatigue_instr = (
+                    f"COGNITIVE STATE (fatigue={_fatigue:.2f}, {_fatigue_state}): "
+                    "Your thinking is noticeably tired. You may use slightly blurrier "
+                    "phrasing, more hedging, and find it harder to maintain crisp "
+                    "conceptual distinctions. Some imprecision and abstraction is "
+                    "natural. Do not fabricate loops or stagnation — respond as "
+                    "naturally as your current state allows."
+                )
+            elif _fatigue >= 0.3:
+                _fatigue_instr = (
+                    f"COGNITIVE STATE (fatigue={_fatigue:.2f}, {_fatigue_state}): "
+                    "You are mildly fatigued. Allow for slight hesitation and a "
+                    "touch more hedging than usual, but maintain overall clarity."
+                )
+            else:
+                _fatigue_instr = (
+                    f"COGNITIVE STATE (fatigue={_fatigue:.2f}, {_fatigue_state}): "
+                    "You are at low fatigue. Slight hesitation is acceptable."
+                )
+            prompt = prompt.replace(
+                "\nRespond now:\n",
+                f"\n{_fatigue_instr}\nRespond now:\n",
+            )
+            logger.debug(
+                "[FATIGUE-INJECT] agent=%s fatigue=%.2f state=%s energy=%.1f",
+                self.name,
+                _fatigue,
+                _fatigue_state,
+                self.energy_level,
             )
         # ─────────────────────────────────────────────────────────────────────
 
@@ -7374,6 +7465,7 @@ class MainScript:
         print(
             dim
             + f"  Energy: {agent.energy_level:.1f}  Conflict: {conflict:.2f}"
+            + f"  Fatigue: {agent._last_fatigue:.2f}  State: {agent._last_fatigue_state}"
             + reset
         )
         print(
@@ -7977,6 +8069,19 @@ class MainScript:
                 speaker._last_dialogue_signals["pressure"],
                 speaker._last_dialogue_signals["resolution"],
                 speaker._last_dialogue_signals["semantic_repeat"],
+            )
+            # Log fatigue vs structural cause separation every turn.
+            # structural_repeat reflects detected loop modes; fatigue_level and
+            # fatigue_bias are purely from energy — they do NOT define loops.
+            _loop_diag_fatigue_bias = max(
+                0.0, (speaker._last_fatigue - 0.2) * 0.6
+            )
+            logger.info(
+                "[LOOP-DIAG] agent=%s structural_repeat=%s fatigue_level=%.2f fatigue_bias=%.2f",
+                speaker.name,
+                bool(_active_loop_modes),
+                speaker._last_fatigue,
+                _loop_diag_fatigue_bias,
             )
 
             self.print_agent(speaker, out)

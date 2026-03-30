@@ -1111,6 +1111,116 @@ A session is considered working when:
 
 ---
 
+## 22) Fatigue Tagging & Gradual Fatigue Effects (v5.1.0)
+
+### Overview
+
+**Fatigue** is an explicit diagnostic layer derived solely from `energy_level`. It is distinct from structural loop detection (repetition, stagnation, conceptual loops) and must never directly set those signals. Its purpose is to make energy-driven output degradation *observable and separable* from genuine conceptual stagnation, so that post-session debugging can clearly distinguish:
+
+* **real structural stagnation** — detected by `DialogueLoopDetector`, progress-enforcer, or axis-stagnation checks
+* **fatigue-driven decline** — softer phrasing, hedging, and reduced conceptual sharpness caused by low energy
+
+### Fatigue Computation (`_compute_fatigue`)
+
+```python
+# Module-level constants
+_FATIGUE_ENERGY_THRESHOLD: float = 60.0   # energy above this → no fatigue
+_FATIGUE_ENERGY_SPAN:      float = 25.0   # normalisation range (60 → 35)
+
+def _compute_fatigue(energy: float) -> tuple[float, str]:
+    if energy > _FATIGUE_ENERGY_THRESHOLD:
+        fatigue = 0.0
+    else:
+        fatigue = (_FATIGUE_ENERGY_THRESHOLD - energy) / _FATIGUE_ENERGY_SPAN
+    fatigue = max(0.0, min(1.0, fatigue))
+    if fatigue <= 0.2:   state = "none"
+    elif fatigue <= 0.5: state = "mild"
+    elif fatigue <= 0.8: state = "medium"
+    else:                state = "severe"
+    return fatigue, state
+```
+
+### Three Energy Regimes
+
+| Energy range | Regime | Fatigue effect |
+|---|---|---|
+| `> 60` | **Normal** | `fatigue = 0.0`; no prompt modifier injected |
+| `35 – 60` | **Gradual degradation** | Fatigue scales from 0.0 → 1.0; phrasing-level modifier injected |
+| `< 35` | **Dream / recovery** | Fatigue clamped at 1.0; automatic dream cycle handles recovery — no additional speech penalty layer |
+
+### Four Fatigue State Labels
+
+| Score range | Label | Prompt effect |
+|---|---|---|
+| `0.0 – 0.2` | `none` | No modifier |
+| `0.2 – 0.5` | `mild` | Slight hesitation; allow mild hedging |
+| `0.5 – 0.8` | `medium` | Blurrier phrasing; harder to maintain crisp distinctions |
+| `0.8 – 1.0` | `severe` | Noticeably tired; more abstraction and imprecision natural |
+
+### Logging
+
+**`[FATIGUE]`** — emitted every turn inside `Agent.speak()`:
+
+```text
+[FATIGUE] agent=Socrates level=0.68 state=medium energy=43.0
+```
+
+**`[FATIGUE-INJECT]`** — emitted at `DEBUG` level when a fatigue modifier is injected into the prompt (energy 35–60 only):
+
+```text
+[FATIGUE-INJECT] agent=Socrates fatigue=0.68 state=medium energy=43.0
+```
+
+**`[LOOP-DIAG]`** — emitted every turn in `MainScript._run_loop()` after `speak()` returns, to make structural vs. fatigue causes explicitly visible side-by-side:
+
+```text
+[LOOP-DIAG] agent=Socrates structural_repeat=False fatigue_level=0.68 fatigue_bias=0.29
+[LOOP-DIAG] agent=Athena  structural_repeat=True  fatigue_level=0.08 fatigue_bias=0.00
+```
+
+`fatigue_bias = max(0.0, (fatigue_level − 0.2) × 0.6)` — scales only above the `"none"` threshold so that a zero/near-zero fatigue level always produces a zero bias, making the two sources visually distinguishable at a glance.
+
+### META Display
+
+`print_meta_state()` appends fatigue info to the **Energy** line:
+
+```text
+  Energy: 43.0  Conflict: 2.10  Fatigue: 0.68  State: medium
+```
+
+### Agent State Fields
+
+| Field | Type | Default | Set by |
+|---|---|---|---|
+| `_last_fatigue` | `float` | `0.0` | `speak()` every turn |
+| `_last_fatigue_state` | `str` | `"none"` | `speak()` every turn |
+
+### Prompt Injection (35–60 range only)
+
+When `35.0 ≤ energy_level ≤ 60.0`, a `COGNITIVE STATE` instruction is injected just before `\nRespond now:\n`. The wording scales with fatigue level:
+
+| Fatigue | Instruction emphasis |
+|---|---|
+| `< 0.3` | Low fatigue: slight hesitation acceptable |
+| `0.3 – 0.6` | Mild fatigue: allow hedging, maintain clarity |
+| `≥ 0.6` | Noticeable fatigue: blurrier phrasing and abstraction natural; no fabricated loops |
+
+### Strict Separation Constraint
+
+Fatigue **must not** directly assign structural signals. The following is explicitly forbidden:
+
+```python
+# FORBIDDEN — fatigue must NOT define loop or stagnation flags directly
+if energy < 60:
+    semantic_repeat = True     # ← wrong
+    stagnation = 1.0           # ← wrong
+    conceptual_loop = True     # ← wrong
+```
+
+Structural detectors (`DialogueLoopDetector`, progress-enforcer, Jaccard stagnation metric) remain the sole authority for those signals. Fatigue may make weaker output *more likely* but cannot declare a structural problem by itself.
+
+---
+
 ## Appendix: Config Expectations (Example)
 
 All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.py`.
@@ -1215,5 +1325,10 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 
 * `LIMBIC_HIJACK_SUPEREGO_MULTIPLIER = 0.3` — fraction of SuperEgo strength applied during hijack
 * `LIMBIC_HIJACK_MAX_TURNS = 3` — auto-exit after this many consecutive non-re-triggered turns
+
+**Fatigue constants** (module-level, not `Config` fields):
+
+* `_FATIGUE_ENERGY_THRESHOLD = 60.0` — energy above this → no fatigue; prompt modifier not injected
+* `_FATIGUE_ENERGY_SPAN = 25.0` — normalisation span used to map energy [35, 60] → fatigue [0.0, 1.0]
 
 ---
