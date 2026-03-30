@@ -7455,6 +7455,7 @@ class MainScript:
         bar = "─" * 54
         dim = Fore.WHITE + Style.DIM
         reset = Style.RESET_ALL
+        orange = "\033[38;5;208m"
         print(dim + bar + reset)
         print(dim + f"[META: {agent.name}]" + reset)
         print(
@@ -7462,10 +7463,17 @@ class MainScript:
             + f"  Id: {ide:.1f}  Ego: {ego:.1f}  SuperEgo: {sup:.1f}  SA: {sa:.2f}"
             + reset
         )
+        _fatigue_str = (
+            reset
+            + orange
+            + f"  Fatigue: {agent._last_fatigue:.2f}  State: {agent._last_fatigue_state}"
+            if agent.energy_level < _FATIGUE_ENERGY_THRESHOLD
+            else ""
+        )
         print(
             dim
             + f"  Energy: {agent.energy_level:.1f}  Conflict: {conflict:.2f}"
-            + f"  Fatigue: {agent._last_fatigue:.2f}  State: {agent._last_fatigue_state}"
+            + _fatigue_str
             + reset
         )
         print(
