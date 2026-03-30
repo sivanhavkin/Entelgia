@@ -689,6 +689,28 @@ LIMBIC_HIJACK_MAX_TURNS: int = 3
 _FATIGUE_ENERGY_THRESHOLD: float = 60.0
 #: Energy span over which fatigue is normalised to [0.0, 1.0].
 _FATIGUE_ENERGY_SPAN: float = 25.0
+#: Energy level below which the dream/recovery cycle is triggered.
+_ENERGY_DREAM_THRESHOLD: float = 35.0
+
+
+def _compute_energy_status(energy: float) -> str:
+    """Return the energy regime label for the given energy level.
+
+    Three regimes mirror the fatigue computation:
+      energy > 60  → ``"normal"``    (no fatigue cost)
+      35 ≤ energy ≤ 60 → ``"degrading"`` (gradual fatigue, prompt modifier injected)
+      energy < 35  → ``"dream"``     (dream/recovery cycle)
+
+    Returns
+    -------
+    str
+        One of ``"normal"``, ``"degrading"``, or ``"dream"``.
+    """
+    if energy > _FATIGUE_ENERGY_THRESHOLD:
+        return "normal"
+    if energy >= _ENERGY_DREAM_THRESHOLD:
+        return "degrading"
+    return "dream"
 
 
 def _compute_fatigue(energy: float) -> Tuple[float, str]:
@@ -4416,6 +4438,8 @@ class Agent:
         # Fatigue state (measurement only) — set by speak() every turn based on energy_level.
         self._last_fatigue: float = 0.0
         self._last_fatigue_state: str = "none"
+        # Energy status (measurement only) — set by speak() every turn; reflects energy regime.
+        self._last_energy_status: str = "normal"
         # ── Anti-repetition form tracking ─────────────────────────────────────
         self._last_response_forms: deque = deque(maxlen=3)
         self._last_template_families: deque = deque(maxlen=3)
@@ -5602,6 +5626,16 @@ class Agent:
             self.name,
             _fatigue,
             _fatigue_state,
+            self.energy_level,
+        )
+
+        # ── Energy status: regime label derived from energy level ─────────────
+        _energy_status = _compute_energy_status(self.energy_level)
+        self._last_energy_status = _energy_status
+        logger.info(
+            "[ENERGY-STATUS] agent=%s status=%s energy=%.1f",
+            self.name,
+            _energy_status,
             self.energy_level,
         )
 
@@ -7416,6 +7450,7 @@ class MainScript:
             reset
             + orange
             + f"  Fatigue: {agent._last_fatigue:.2f}  State: {agent._last_fatigue_state}"
+            + f"  Status: {agent._last_energy_status}"
             if agent.energy_level < _FATIGUE_ENERGY_THRESHOLD
             else ""
         )

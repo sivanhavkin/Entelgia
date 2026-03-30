@@ -22,7 +22,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from Entelgia_production_meta import _compute_fatigue, _FATIGUE_ENERGY_THRESHOLD, _FATIGUE_ENERGY_SPAN
+from Entelgia_production_meta import (
+    _compute_fatigue,
+    _compute_energy_status,
+    _FATIGUE_ENERGY_THRESHOLD,
+    _FATIGUE_ENERGY_SPAN,
+    _ENERGY_DREAM_THRESHOLD,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +263,131 @@ class TestFatigueDoesNotControlLoopFlags:
         assert observed == valid_states, (
             f"Not all states reachable — observed: {observed}, expected: {valid_states}"
         )
+
+
+# ============================================================================
+# H. _compute_energy_status: three-regime label
+# ============================================================================
+
+
+class TestComputeEnergyStatus:
+    """_compute_energy_status() must return the correct regime label for each energy band."""
+
+    @pytest.mark.parametrize(
+        "energy, expected_status",
+        [
+            # Normal regime: energy > 60
+            (60.1, "normal"),
+            (70.0, "normal"),
+            (100.0, "normal"),
+            # Boundary: exactly at threshold → degrading (not normal; > is strict)
+            (60.0, "degrading"),
+            # Degrading regime: 35 ≤ energy ≤ 60
+            (59.4, "degrading"),
+            (47.5, "degrading"),
+            (35.0, "degrading"),
+            # Dream regime: energy < 35
+            (34.9, "dream"),
+            (20.0, "dream"),
+            (0.0, "dream"),
+            (-10.0, "dream"),
+        ],
+    )
+    def test_energy_status_label(self, energy, expected_status):
+        status = _compute_energy_status(energy)
+        print(f"\n  energy={energy:6.1f}  status={status!r}")
+        assert status == expected_status, (
+            f"energy={energy}: expected status={expected_status!r}, got {status!r}"
+        )
+
+    def test_all_three_statuses_reachable(self):
+        """All three energy status labels must be reachable."""
+        valid_statuses = {"normal", "degrading", "dream"}
+        observed = set()
+        for e_int in range(-5, 111):
+            status = _compute_energy_status(float(e_int))
+            assert status in valid_statuses, (
+                f"Unexpected status {status!r} for energy={float(e_int)}"
+            )
+            observed.add(status)
+        assert observed == valid_statuses, (
+            f"Not all statuses reachable — observed: {observed}, expected: {valid_statuses}"
+        )
+
+    def test_constants_define_boundaries(self):
+        """_FATIGUE_ENERGY_THRESHOLD and _ENERGY_DREAM_THRESHOLD must be the regime boundaries."""
+        # Just above threshold → normal
+        assert _compute_energy_status(_FATIGUE_ENERGY_THRESHOLD + 0.1) == "normal"
+        # At threshold → degrading (strictly-greater-than condition)
+        assert _compute_energy_status(_FATIGUE_ENERGY_THRESHOLD) == "degrading"
+        # Just below threshold → degrading
+        assert _compute_energy_status(_FATIGUE_ENERGY_THRESHOLD - 0.1) == "degrading"
+        # At dream threshold → degrading (>= dream boundary)
+        assert _compute_energy_status(_ENERGY_DREAM_THRESHOLD) == "degrading"
+        # Just below dream threshold → dream
+        assert _compute_energy_status(_ENERGY_DREAM_THRESHOLD - 0.1) == "dream"
+
+    def test_return_type_is_str(self):
+        """_compute_energy_status must always return a str."""
+        for energy in [-100.0, 0.0, 35.0, 47.5, 60.0, 75.0]:
+            result = _compute_energy_status(energy)
+            assert isinstance(result, str), (
+                f"Expected str, got {type(result)} for energy={energy}"
+            )
+
+
+# ============================================================================
+# I. Agent._last_energy_status initialised to "normal"
+# ============================================================================
+
+
+class TestAgentEnergyStatusInit:
+    """Agent must initialise _last_energy_status to 'normal'."""
+
+    def _make_agent(self):
+        from unittest.mock import MagicMock
+        from Entelgia_production_meta import (
+            Agent,
+            BehaviorCore,
+            Config,
+            ConsciousCore,
+            EmotionCore,
+            LanguageCore,
+            MemoryCore,
+        )
+
+        cfg = Config()
+        memory = MemoryCore(db_path=cfg.db_path)
+        emotion = MagicMock(spec=EmotionCore)
+        behavior = MagicMock(spec=BehaviorCore)
+        language = LanguageCore()
+        conscious = MagicMock(spec=ConsciousCore)
+        llm = MagicMock()
+        llm.generate.return_value = "test response"
+
+        return Agent(
+            name="Socrates",
+            model="gpt-4o-mini",
+            color="",
+            llm=llm,
+            memory=memory,
+            emotion=emotion,
+            behavior=behavior,
+            language=language,
+            conscious=conscious,
+            persona="Test persona.",
+            use_enhanced=False,
+            cfg=cfg,
+        )
+
+    def test_initial_energy_status_is_normal(self):
+        agent = self._make_agent()
+        print(f"\n  _last_energy_status initialised to: {agent._last_energy_status!r}")
+        assert agent._last_energy_status == "normal"
+
+    def test_energy_status_field_is_str(self):
+        agent = self._make_agent()
+        assert isinstance(agent._last_energy_status, str)
 
 
 if __name__ == "__main__":

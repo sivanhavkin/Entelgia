@@ -1182,11 +1182,15 @@ def _compute_fatigue(energy: float) -> tuple[float, str]:
 
 ### META Display
 
-`print_meta_state()` appends fatigue info to the **Energy** line:
+`print_meta_state()` appends fatigue info and the energy status to the **Energy** line. The `Status` field shows the energy regime (`"normal"` / `"degrading"` / `"dream"`):
 
 ```text
-  Energy: 43.0  Conflict: 2.10  Fatigue: 0.68  State: medium
+  Energy: 43.0  Conflict: 2.10  Fatigue: 0.68  State: medium  Status: degrading
+  Energy: 59.4  Conflict: 2.74  Fatigue: 0.02  State: none    Status: degrading
+  Energy: 28.0  Conflict: 3.00  Fatigue: 1.00  State: severe  Status: dream
 ```
+
+The fatigue and status fields are shown in orange and are only appended when `energy_level < _FATIGUE_ENERGY_THRESHOLD` (i.e. in the degrading or dream regime). When energy is normal (`> 60`), the line shows only `Energy: …  Conflict: …`.
 
 ### Agent State Fields
 
@@ -1194,6 +1198,27 @@ def _compute_fatigue(energy: float) -> tuple[float, str]:
 |---|---|---|---|
 | `_last_fatigue` | `float` | `0.0` | `speak()` every turn |
 | `_last_fatigue_state` | `str` | `"none"` | `speak()` every turn |
+| `_last_energy_status` | `str` | `"normal"` | `speak()` every turn |
+
+### Energy Status Computation (`_compute_energy_status`)
+
+```python
+# Module-level constant
+_ENERGY_DREAM_THRESHOLD: float = 35.0
+
+def _compute_energy_status(energy: float) -> str:
+    if energy > _FATIGUE_ENERGY_THRESHOLD:   # > 60
+        return "normal"
+    if energy >= _ENERGY_DREAM_THRESHOLD:    # 35 ≤ energy ≤ 60
+        return "degrading"
+    return "dream"                           # < 35
+```
+
+**`[ENERGY-STATUS]`** — emitted every turn inside `Agent.speak()` immediately after `[FATIGUE]`:
+
+```text
+[ENERGY-STATUS] agent=Socrates status=degrading energy=59.4
+```
 
 ### Prompt Injection (35–60 range only)
 
