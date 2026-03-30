@@ -8160,7 +8160,7 @@ class MainScript:
                     )
 
             # Energy-based dream cycle: Fixy forces agents to sleep when energy is critically low
-            for _agent in (self.socrates, self.athena):
+            for _agent in (self.socrates, self.athena, self.fixy_agent):
                 if _agent.energy_level <= self.cfg.energy_safety_threshold:
                     self.dream_cycle(_agent, topic_label)
                     # Reset pair window after energy-triggered dream cycle too.
