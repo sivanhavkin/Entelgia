@@ -390,5 +390,148 @@ class TestAgentEnergyStatusInit:
         assert isinstance(agent._last_energy_status, str)
 
 
+# ============================================================================
+# J. Fatigue fields are consistent with post-drain energy_level after speak()
+# ============================================================================
+
+
+class TestFatiguePostDrainConsistency:
+    """After speak() returns, _last_fatigue/_last_fatigue_state/_last_energy_status
+    must be consistent with the agent's current energy_level, not with the
+    pre-drain value that existed at the start of the turn.
+
+    Regression test for the bug where energy_level shown in print_meta_state()
+    could be in the degrading range (35–60) while _last_fatigue was still 0.0
+    and _last_energy_status was still 'normal' (computed before the energy drain).
+    """
+
+    def _make_agent(self, start_energy: float):
+        """Create a minimal Agent instance with a specified starting energy."""
+        from unittest.mock import MagicMock
+        from Entelgia_production_meta import (
+            Agent,
+            BehaviorCore,
+            Config,
+            ConsciousCore,
+            EmotionCore,
+            LanguageCore,
+        )
+
+        cfg = Config()
+
+        llm = MagicMock()
+        llm.generate.return_value = "test response"
+
+        memory = MagicMock()
+        memory.get_agent_state.return_value = {
+            "id_strength": 5.0,
+            "ego_strength": 5.0,
+            "superego_strength": 5.0,
+            "self_awareness": 0.55,
+        }
+        memory.ltm_recent.return_value = []
+        memory.stm_load.return_value = []
+
+        emotion = MagicMock(spec=EmotionCore)
+        emotion.infer.return_value = ("neutral", 0.3)
+
+        behavior = MagicMock(spec=BehaviorCore)
+        language = LanguageCore()
+        conscious = ConsciousCore()
+
+        agent = Agent(
+            name="Socrates",
+            model="phi3",
+            color="",
+            llm=llm,
+            memory=memory,
+            emotion=emotion,
+            behavior=behavior,
+            language=language,
+            conscious=conscious,
+            persona="Test persona.",
+            use_enhanced=False,
+            cfg=cfg,
+        )
+        agent.energy_level = start_energy
+        return agent, cfg
+
+    def test_fatigue_fields_consistent_after_energy_drops_below_threshold(self):
+        """If energy drains from above 60 to below 60 during speak(), the cached
+        fatigue fields must reflect the post-drain energy, not the pre-drain energy.
+        """
+        import Entelgia_production_meta as _meta
+        from unittest.mock import patch
+        from Entelgia_production_meta import (
+            _compute_fatigue,
+            _compute_energy_status,
+            _FATIGUE_ENERGY_THRESHOLD,
+        )
+
+        # Start with energy comfortably above the fatigue threshold so that the
+        # pre-drain fatigue would be 0.0 / "none" / "normal".
+        agent, cfg = self._make_agent(start_energy=63.0)
+        assert agent.energy_level > _FATIGUE_ENERGY_THRESHOLD
+
+        # Call speak() with a minimal prior dialog so context is valid.
+        dialog = [{"role": "Athena", "text": "Let us explore consciousness."}]
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("seed text", dialog)
+
+        # After speak(), energy_level reflects the drained value.
+        post_drain_energy = agent.energy_level
+
+        # Compute the expected values from the post-drain energy.
+        expected_fatigue, expected_state = _compute_fatigue(post_drain_energy)
+        expected_status = _compute_energy_status(post_drain_energy)
+
+        print(
+            f"\n  post_drain_energy={post_drain_energy:.2f}"
+            f"  expected_fatigue={expected_fatigue:.3f}"
+            f"  expected_state={expected_state!r}"
+            f"  expected_status={expected_status!r}"
+        )
+        print(
+            f"  _last_fatigue={agent._last_fatigue:.3f}"
+            f"  _last_fatigue_state={agent._last_fatigue_state!r}"
+            f"  _last_energy_status={agent._last_energy_status!r}"
+        )
+
+        assert abs(agent._last_fatigue - expected_fatigue) < 1e-9, (
+            f"_last_fatigue ({agent._last_fatigue:.6f}) does not match "
+            f"_compute_fatigue(energy_level={post_drain_energy:.2f}) = {expected_fatigue:.6f}"
+        )
+        assert agent._last_fatigue_state == expected_state, (
+            f"_last_fatigue_state {agent._last_fatigue_state!r} != {expected_state!r} "
+            f"for post-drain energy={post_drain_energy:.2f}"
+        )
+        assert agent._last_energy_status == expected_status, (
+            f"_last_energy_status {agent._last_energy_status!r} != {expected_status!r} "
+            f"for post-drain energy={post_drain_energy:.2f}"
+        )
+
+    def test_no_stale_normal_status_when_energy_in_degrading_range(self):
+        """_last_energy_status must not be 'normal' when energy_level is in 35–60."""
+        import Entelgia_production_meta as _meta
+        from unittest.mock import patch
+        from Entelgia_production_meta import _FATIGUE_ENERGY_THRESHOLD, _ENERGY_DREAM_THRESHOLD
+
+        agent, cfg = self._make_agent(start_energy=63.0)
+        dialog = [{"role": "Athena", "text": "What is identity?"}]
+        with patch.object(_meta, "CFG", cfg):
+            agent.speak("seed text", dialog)
+
+        post_drain_energy = agent.energy_level
+        if _ENERGY_DREAM_THRESHOLD <= post_drain_energy <= _FATIGUE_ENERGY_THRESHOLD:
+            assert agent._last_energy_status != "normal", (
+                f"energy_level={post_drain_energy:.2f} is in degrading range "
+                f"but _last_energy_status is still 'normal'"
+            )
+            assert agent._last_fatigue > 0.0, (
+                f"energy_level={post_drain_energy:.2f} is in degrading range "
+                f"but _last_fatigue is still 0.0"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])

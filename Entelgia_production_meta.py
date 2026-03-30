@@ -6506,6 +6506,14 @@ class Agent:
         self._last_emotion_intensity = float(inten)
         self._last_response_kind = kind
         self.update_drives_after_turn(kind, emo, float(inten))
+        # Re-sync fatigue fields to the post-drain energy so that print_meta_state()
+        # and [LOOP-DIAG] logging reflect the same energy_level shown in the META
+        # display.  The prompt injection earlier in speak() correctly used the
+        # pre-drain energy; these cached fields are purely for observability.
+        self._last_fatigue, self._last_fatigue_state = _compute_fatigue(
+            self.energy_level
+        )
+        self._last_energy_status = _compute_energy_status(self.energy_level)
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Evaluation scores (measurement only) ──────────────────────────────────
