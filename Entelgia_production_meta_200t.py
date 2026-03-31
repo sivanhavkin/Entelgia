@@ -8372,24 +8372,6 @@ class MainScript:
                     if reason == "high_conflict_no_resolution":
                         _last_high_conflict_turn = self.turn_index
 
-            if self.turn_index % self.cfg.dream_every_n_turns == 0:
-                self.dream_cycle(self.socrates, topic_label)
-                self.dream_cycle(self.athena, topic_label)
-                # Reset pair window: Fixy must wait for a fresh pair after
-                # each dream cycle before it may evaluate again.
-                if self.interactive_fixy:
-                    self.interactive_fixy.notify_pair_reset(
-                        len(self.dialog), "dream_cycle"
-                    )
-                if self.cfg.show_meta:
-                    print(
-                        Fore.WHITE
-                        + Style.DIM
-                        + "[META-ACTION] Dream cycle completed; energy restored to 100"
-                        + Style.RESET_ALL
-                        + "\n"
-                    )
-
             # Energy-based dream cycle: Fixy forces agents to sleep when energy is critically low
             for _agent in (self.socrates, self.athena, self.fixy_agent):
                 if _agent.energy_level <= self.cfg.energy_safety_threshold:
