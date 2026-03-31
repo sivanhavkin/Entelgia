@@ -358,11 +358,12 @@ process_step(input)
 
 ### Dream Cycle Phases
 
-1. **Integration** — subconscious memories are merged into conscious memory; nothing is hard-deleted from long-term memory. Tagged with `provenance="dream_reflection"`.
-2. **Relevance filtering** — short-term memory entries that are not emotionally or operationally relevant (empty / whitespace-only) are forgotten.
-3. **Promotion** — high-salience STM entries are promoted to conscious LTM. Tagged with `provenance="dream_promotion"`.
-4. **Forgetting sweep** — `ltm_apply_forgetting_policy()` deletes any LTM records whose `expires_at` has passed.
-5. **Recharge** — `energy_level` is restored to 100.0.
+1. **Unresolved topic integration** — top-*k* pending unresolved topics (ranked by `intensity + conflict + log(repetition + 1)`) are reframed into dream insights, marked `"integrated"`, and their weight is reduced to `weight × 0.3`. Entries are **never deleted** — structure is preserved. Each resolved item is stored in LTM with `provenance="dream_resolution"`. Logged as `[DREAM-RESOLVE] agent=<name> resolved=<n> integrated=<m> remaining=<k>`.
+2. **Integration** — subconscious memories are merged into conscious memory; nothing is hard-deleted from long-term memory. Tagged with `provenance="dream_reflection"`.
+3. **Relevance filtering** — short-term memory entries that are not emotionally or operationally relevant (empty / whitespace-only) are forgotten.
+4. **Promotion** — high-salience STM entries are promoted to conscious LTM. Tagged with `provenance="dream_promotion"`.
+5. **Forgetting sweep** — `ltm_apply_forgetting_policy()` deletes any LTM records whose `expires_at` has passed.
+6. **Recharge** — `energy_level` is restored to 100.0.
 
 ### Integration Points
 

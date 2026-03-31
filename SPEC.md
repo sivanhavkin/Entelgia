@@ -375,13 +375,16 @@ Monitors `energy_level` against `safety_threshold`.
 | `energy_level` | Starts at 100.0; decreases per step |
 | `conscious_memory` | Active inputs accumulated during processing |
 | `subconscious_store` | Pending memories awaiting dream integration |
+| `unresolved_topics` | Structured store of pending topics (`topic`, `intensity`, `repetition`, `conflict`, `status`, `weight`) |
+| `dream_resolutions` | Records of dream-resolved topics (`type`, `topic`, `insight`) |
 | `regulator` | Attached `FixyRegulator` instance |
 
 ### Dream Cycle Phases
 
-1. **Integration** — `subconscious_store` entries appended to `conscious_memory`; no long-term memories are deleted.
-2. **Relevance filtering** — STM entries that are not emotionally or operationally relevant (empty/whitespace) are forgotten.
-3. **Recharge** — `energy_level` reset to 100.0.
+1. **Unresolved topic integration** — top-*k* pending unresolved topics (ranked by `intensity + conflict + log(repetition + 1)`) are reframed into dream insights, marked `"integrated"`, and their weight is reduced to `weight × 0.3`. Entries are **never deleted** — structure is preserved. Logged as `[DREAM-RESOLVE] agent=<name> resolved=<n> integrated=<m> remaining=<k>`.
+2. **Integration** — `subconscious_store` entries appended to `conscious_memory`; no long-term memories are deleted.
+3. **Relevance filtering** — STM entries that are not emotionally or operationally relevant (empty/whitespace) are forgotten.
+4. **Recharge** — `energy_level` reset to 100.0.
 
 ### Future Integration Notes
 

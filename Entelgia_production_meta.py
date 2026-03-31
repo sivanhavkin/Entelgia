@@ -85,6 +85,7 @@ except ImportError:
     )
 
 import json
+import math
 import os
 import random
 import re
@@ -4419,6 +4420,7 @@ class Agent:
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
+        self.unresolved_topics: List[Dict[str, Any]] = []  # structured unresolved topic store
         self._topic_history: List[frozenset] = []  # last N keyword sets for stagnation
         self._same_topic_turns: int = 0  # consecutive turns with same signature
         self._last_stagnation: float = 0.0
@@ -6110,6 +6112,31 @@ class Agent:
         # 1. Track open questions in this turn
         if "?" in out:
             self.open_questions = min(5, self.open_questions + 1)
+            # Register or update the structured unresolved topic entry.
+            _uq_topic = _active_topic or self._last_topic or ""
+            _existing_uq = next(
+                (
+                    t
+                    for t in self.unresolved_topics
+                    if t.get("topic") == _uq_topic and t.get("status") == "unresolved"
+                ),
+                None,
+            )
+            if _existing_uq is not None:
+                _existing_uq["repetition"] = _existing_uq.get("repetition", 1) + 1
+                _existing_uq["intensity"] = self.drive_pressure
+                _existing_uq["conflict"] = self.conflict_index()
+            else:
+                self.unresolved_topics.append(
+                    {
+                        "topic": _uq_topic,
+                        "intensity": self.drive_pressure,
+                        "repetition": 1,
+                        "conflict": self.conflict_index(),
+                        "status": "unresolved",
+                        "weight": 1.0,
+                    }
+                )
 
         # 2. Update stagnation tracking
         kws = _topic_keywords(out)
@@ -7661,6 +7688,61 @@ class MainScript:
 
         logger.info(f"Dream cycle {agent.name}: promoted={promoted}")
         agent.energy_level = AGENT_INITIAL_ENERGY
+
+        # ── Unresolved topic integration ──────────────────────────────────────────
+        # Select up to 3 top-salience unresolved items (intensity + conflict +
+        # log-repetition), reframe each, mark as integrated, and reduce weight.
+        # Do NOT reset the list — preserve structure for forward dialogue.
+        _top_k = 3
+        _pending = [
+            t for t in agent.unresolved_topics if t.get("status") == "unresolved"
+        ]
+        _pending.sort(
+            key=lambda t: (
+                float(t.get("intensity", 0.0))
+                + float(t.get("conflict", 0.0))
+                + math.log(int(t.get("repetition", 1)) + 1)
+            ),
+            reverse=True,
+        )
+        _resolved_now = 0
+        for _uq in _pending[:_top_k]:
+            _uq_topic = _uq.get("topic", "")
+            _uq_intensity = float(_uq.get("intensity", 0.0))
+            _uq_conflict = float(_uq.get("conflict", 0.0))
+            _uq_insight = (
+                f"Dream reflection on '{_uq_topic}': "
+                f"intensity {_uq_intensity:.2f}, conflict {_uq_conflict:.2f} — "
+                "this thread may hold unexamined assumptions worth revisiting."
+            )
+            _uq["status"] = "integrated"
+            _uq["weight"] = _uq.get("weight", 1.0) * 0.3
+            self.memory.ltm_insert(
+                agent=agent.name,
+                layer="conscious",
+                content=_uq_insight[:300],
+                topic=_uq_topic,
+                emotion="neutral",
+                emotion_intensity=0.0,
+                importance=float(_uq_intensity / 10.0),
+                source="dream",
+                provenance="dream_resolution",
+            )
+            _resolved_now += 1
+        _total_integrated = sum(
+            1 for t in agent.unresolved_topics if t.get("status") == "integrated"
+        )
+        _remaining = sum(
+            1 for t in agent.unresolved_topics if t.get("status") == "unresolved"
+        )
+        logger.info(
+            "[DREAM-RESOLVE] agent=%s resolved=%d integrated=%d remaining=%d",
+            agent.name,
+            _resolved_now,
+            _total_integrated,
+            _remaining,
+        )
+        # ─────────────────────────────────────────────────────────────────────────
 
         # Apply forgetting policy at the end of each dream cycle (Feature 1)
         purged = self.memory.ltm_apply_forgetting_policy()
