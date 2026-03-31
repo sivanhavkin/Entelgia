@@ -595,5 +595,205 @@ class TestPackageImports:
         assert matches
 
 
+# ============================================================================
+# Dream resolution (unresolved topic integration) tests
+# ============================================================================
+
+
+class TestEntelgiaAgentDreamResolve:
+    """Tests for dream-cycle unresolved topic integration."""
+
+    def _make_topic(self, topic, intensity=3.0, repetition=1, conflict=2.0):
+        return {
+            "topic": topic,
+            "intensity": intensity,
+            "repetition": repetition,
+            "conflict": conflict,
+            "status": "unresolved",
+            "weight": 1.0,
+        }
+
+    def test_unresolved_topics_starts_empty(self):
+        """unresolved_topics should be empty on initialisation."""
+        agent = EntelgiaAgent("Socrates")
+        _print_table(
+            ["Attribute", "Value", "Expected"],
+            [["unresolved_topics", agent.unresolved_topics, "[]"]],
+            title="Unresolved Topics Starts Empty",
+        )
+        assert agent.unresolved_topics == []
+
+    def test_dream_resolutions_starts_empty(self):
+        """dream_resolutions should be empty on initialisation."""
+        agent = EntelgiaAgent("Socrates")
+        assert agent.dream_resolutions == []
+
+    def test_select_top_unresolved_returns_pending_only(self):
+        """_select_top_unresolved should skip already-integrated items."""
+        agent = EntelgiaAgent("Socrates")
+        agent.unresolved_topics.append(self._make_topic("consciousness"))
+        agent.unresolved_topics.append(
+            {**self._make_topic("freedom"), "status": "integrated"}
+        )
+        selected = agent._select_top_unresolved()
+        _print_table(
+            ["selected_topics"],
+            [[str([t["topic"] for t in selected])]],
+            title="_select_top_unresolved Skips Integrated",
+        )
+        assert all(t["status"] == "unresolved" for t in selected)
+        assert len(selected) == 1
+        assert selected[0]["topic"] == "consciousness"
+
+    def test_select_top_unresolved_orders_by_salience(self):
+        """_select_top_unresolved should rank by intensity + conflict + log(repetition+1)."""
+        agent = EntelgiaAgent("Socrates")
+        agent.unresolved_topics.append(self._make_topic("low",  intensity=1.0, conflict=1.0, repetition=1))
+        agent.unresolved_topics.append(self._make_topic("high", intensity=5.0, conflict=4.0, repetition=3))
+        agent.unresolved_topics.append(self._make_topic("mid",  intensity=3.0, conflict=2.0, repetition=2))
+        selected = agent._select_top_unresolved()
+        _print_table(
+            ["rank", "topic", "intensity", "conflict", "repetition"],
+            [[i + 1, t["topic"], t["intensity"], t["conflict"], t["repetition"]] for i, t in enumerate(selected)],
+            title="_select_top_unresolved Salience Order",
+        )
+        assert selected[0]["topic"] == "high"
+
+    def test_select_top_unresolved_respects_k(self):
+        """_select_top_unresolved(k=2) should return at most 2 items."""
+        agent = EntelgiaAgent("Socrates")
+        for i in range(5):
+            agent.unresolved_topics.append(self._make_topic(f"topic_{i}"))
+        selected = agent._select_top_unresolved(k=2)
+        _print_table(
+            ["k", "returned"],
+            [[2, len(selected)]],
+            title="_select_top_unresolved Respects k",
+        )
+        assert len(selected) == 2
+
+    def test_generate_dream_insight_contains_topic(self):
+        """_generate_dream_insight should mention the topic name."""
+        agent = EntelgiaAgent("Socrates")
+        item = self._make_topic("free will", intensity=4.0, conflict=3.0)
+        insight = agent._generate_dream_insight(item)
+        _print_table(
+            ["insight_snippet"],
+            [[insight[:80]]],
+            title="_generate_dream_insight Contains Topic",
+        )
+        assert "free will" in insight
+
+    def test_generate_dream_insight_contains_intensity_and_conflict(self):
+        """_generate_dream_insight should include intensity and conflict values."""
+        agent = EntelgiaAgent("Socrates")
+        item = self._make_topic("ethics", intensity=4.5, conflict=3.1)
+        insight = agent._generate_dream_insight(item)
+        assert "4.50" in insight
+        assert "3.10" in insight
+
+    def test_dream_cycle_marks_unresolved_as_integrated(self):
+        """Dream cycle should change status from 'unresolved' to 'integrated'."""
+        agent = EntelgiaAgent("Socrates")
+        agent.unresolved_topics.append(self._make_topic("identity"))
+        agent._run_dream_cycle()
+        statuses = [t["status"] for t in agent.unresolved_topics]
+        _print_table(
+            ["topic", "status_after_dream"],
+            [[agent.unresolved_topics[0]["topic"], statuses[0]]],
+            title="Dream Marks Unresolved as Integrated",
+        )
+        assert statuses[0] == "integrated"
+
+    def test_dream_cycle_reduces_weight(self):
+        """Dream cycle should reduce unresolved topic weight by DREAM_WEIGHT_REDUCTION."""
+        agent = EntelgiaAgent("Socrates")
+        agent.unresolved_topics.append(self._make_topic("causality"))
+        agent._run_dream_cycle()
+        weight_after = agent.unresolved_topics[0]["weight"]
+        expected = pytest.approx(1.0 * EntelgiaAgent.DREAM_WEIGHT_REDUCTION)
+        _print_table(
+            ["weight_after", "expected"],
+            [[weight_after, EntelgiaAgent.DREAM_WEIGHT_REDUCTION]],
+            title="Dream Reduces Topic Weight",
+        )
+        assert weight_after == expected
+
+    def test_dream_cycle_preserves_unresolved_topic_entry(self):
+        """Dream cycle must not delete unresolved topic entries — only update status."""
+        agent = EntelgiaAgent("Socrates")
+        agent.unresolved_topics.append(self._make_topic("time"))
+        agent._run_dream_cycle()
+        _print_table(
+            ["unresolved_topics_count"],
+            [[len(agent.unresolved_topics)]],
+            title="Dream Preserves Topic Entries",
+        )
+        assert len(agent.unresolved_topics) == 1
+
+    def test_dream_cycle_does_not_globally_reset_unresolved(self):
+        """Dream cycle must not clear the entire unresolved_topics list."""
+        agent = EntelgiaAgent("Socrates")
+        agent.unresolved_topics.append(self._make_topic("motion"))
+        agent.unresolved_topics.append(self._make_topic("space"))
+        agent._run_dream_cycle()
+        assert len(agent.unresolved_topics) == 2
+
+    def test_dream_cycle_stores_dream_resolution(self):
+        """Each processed topic should produce a dream_resolution record."""
+        agent = EntelgiaAgent("Socrates")
+        agent.unresolved_topics.append(self._make_topic("virtue"))
+        agent._run_dream_cycle()
+        _print_table(
+            ["dream_resolutions_count", "type"],
+            [[len(agent.dream_resolutions), agent.dream_resolutions[0].get("type", "?")]],
+            title="Dream Stores Resolution Record",
+        )
+        assert len(agent.dream_resolutions) == 1
+        assert agent.dream_resolutions[0]["type"] == "dream_resolution"
+        assert agent.dream_resolutions[0]["topic"] == "virtue"
+        assert "insight" in agent.dream_resolutions[0]
+
+    def test_dream_cycle_leaves_excess_unresolved_topics_pending(self):
+        """Topics beyond top-k should remain 'unresolved' after dream."""
+        agent = EntelgiaAgent("Socrates")
+        k = EntelgiaAgent.DREAM_RESOLVE_TOP_K
+        for i in range(k + 2):
+            agent.unresolved_topics.append(self._make_topic(f"topic_{i}"))
+        agent._run_dream_cycle()
+        remaining = sum(
+            1 for t in agent.unresolved_topics if t.get("status") == "unresolved"
+        )
+        _print_table(
+            ["total", "k", "remaining_after_dream"],
+            [[k + 2, k, remaining]],
+            title="Topics Beyond top-k Remain Unresolved",
+        )
+        assert remaining == 2
+
+    def test_dream_cycle_processes_no_topics_when_none_pending(self):
+        """Dream cycle with no unresolved topics should produce no resolutions."""
+        agent = EntelgiaAgent("Socrates")
+        agent._run_dream_cycle()
+        assert agent.dream_resolutions == []
+
+    def test_dream_cycle_does_not_reprocess_integrated_topics(self):
+        """A topic already 'integrated' should not appear in dream_resolutions again."""
+        agent = EntelgiaAgent("Socrates")
+        topic = self._make_topic("knowledge")
+        agent.unresolved_topics.append(topic)
+        agent._run_dream_cycle()
+        count_after_first = len(agent.dream_resolutions)
+        agent._run_dream_cycle()
+        count_after_second = len(agent.dream_resolutions)
+        _print_table(
+            ["after_first_dream", "after_second_dream"],
+            [[count_after_first, count_after_second]],
+            title="Integrated Topics Not Reprocessed",
+        )
+        assert count_after_first == 1
+        assert count_after_second == 1  # no new resolution added
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
