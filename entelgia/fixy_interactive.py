@@ -13,12 +13,65 @@ defaulting to generic mediation / synthesis language.
 import re
 import logging
 from collections import deque
+from dataclasses import dataclass
 from typing import Dict, List, Tuple, Any, Optional
 
 # LLM Response Length Instruction
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Guidance move types
+# ---------------------------------------------------------------------------
+# These are the argumentative move types that Fixy can recommend to the next
+# speaker.  They overlap with (but are not identical to) the move types in
+# progress_enforcer: they are expressed at the *guidance* level, where Fixy
+# maps dialogue issues to coarse move recommendations.
+
+#: Move types Fixy can recommend via FixyGuidance.
+MOVE_TYPES: List[str] = [
+    "NEW_CLAIM",
+    "DIRECT_ATTACK",
+    "EXAMPLE",
+    "TEST",
+    "CONCESSION",
+    "NEW_FRAME",
+]
+
+
+# ---------------------------------------------------------------------------
+# Fixy guidance dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FixyGuidance:
+    """Next-turn guidance produced by Fixy after an intervention.
+
+    Populated by :meth:`InteractiveFixy.should_intervene` whenever Fixy
+    decides to intervene.  The caller (e.g. ``SeedGenerator``) reads this
+    to probabilistically bias the next agent's move selection.
+
+    Attributes
+    ----------
+    goal:
+        Short label for the dialogue objective Fixy is steering toward
+        (e.g. ``"define_test"``, ``"break_repetition"``).
+    preferred_move:
+        One of the :data:`MOVE_TYPES` that Fixy recommends for the next
+        turn (e.g. ``"TEST"``, ``"EXAMPLE"``).
+    confidence:
+        Strength of the recommendation in ``[0.0, 1.0]``.  Higher means
+        the bias applied to strategy weights is stronger.
+    reason:
+        Human-readable explanation of why this guidance was produced.
+    """
+
+    goal: str
+    preferred_move: str
+    confidence: float
+    reason: str
 
 # ---------------------------------------------------------------------------
 # Fixy response modes
@@ -231,6 +284,33 @@ _REASON_LABEL_MAP: Dict[str, str] = {
     ),
 }
 
+
+# ---------------------------------------------------------------------------
+# Reason → guidance defaults
+# ---------------------------------------------------------------------------
+# Maps each intervention reason to a (goal, preferred_move, base_confidence)
+# triple.  :meth:`InteractiveFixy._build_guidance` uses this to construct a
+# :class:`FixyGuidance` object and then adjusts confidence based on how many
+# times the same goal has appeared in ``recent_fixy_goals``.
+_REASON_GUIDANCE_MAP: Dict[str, Tuple[str, str, float]] = {
+    "loop_repetition":          ("break_repetition",         "NEW_FRAME",     0.7),
+    "weak_conflict":            ("sharpen_conflict",          "DIRECT_ATTACK", 0.6),
+    "premature_synthesis":      ("define_test",               "TEST",          0.7),
+    "topic_stagnation":         ("introduce_new_frame",       "NEW_FRAME",     0.6),
+    "circular_reasoning":       ("ground_argument",           "EXAMPLE",       0.7),
+    "high_conflict_no_resolution": ("find_common_ground",    "CONCESSION",    0.6),
+    "shallow_discussion":       ("deepen_argument",           "TEST",          0.6),
+    "synthesis_opportunity":    ("define_observable_marker",  "TEST",          0.65),
+    "fixy_mediation_loop":      ("clarify_terms",             "NEW_CLAIM",     0.6),
+    "axis_stagnation":          ("break_repetition",          "EXAMPLE",       0.65),
+    "conceptual_loop":          ("define_mechanism",          "NEW_CLAIM",     0.7),
+    "meta_reflection_needed":   ("reflect_on_progress",       "NEW_FRAME",     0.5),
+}
+
+#: Per-repetition confidence increment added when the same goal recurs in
+#: ``recent_fixy_goals``.  Keeps the boost modest so a single recurrence
+#: does not over-commit the recommendation.
+_GUIDANCE_CONFIDENCE_BOOST_PER_REPEAT: float = 0.1
 
 _FIXY_FORBIDDEN_CONCEPTS: List[str] = [
     "ethics",
@@ -688,6 +768,19 @@ class InteractiveFixy:
         except ImportError:  # pragma: no cover
             self._loop_detector = None
 
+        # ── Soft guidance state ───────────────────────────────────────────────
+        # Current next-turn guidance, populated by should_intervene.  None when
+        # Fixy has not (yet) issued guidance this session or the last guidance
+        # was reset.
+        self.fixy_guidance: Optional[FixyGuidance] = None
+        # How many consecutive times the active guidance was ignored by the
+        # receiving agent.  Incremented by record_agent_move when the agent's
+        # move does not match guidance.preferred_move; reset to 0 on compliance.
+        self.ignored_guidance_count: int = 0
+        # Short-term memory of the last 3 guidance goals issued by Fixy.  Used
+        # to boost confidence when the same goal recurs (signalling persistence).
+        self.recent_fixy_goals: deque = deque(maxlen=3)
+
     # ------------------------------------------------------------------
     # Pair-gating helper
     # ------------------------------------------------------------------
@@ -746,6 +839,123 @@ class InteractiveFixy:
         consecutive full-pair turns before honouring an agent stop signal.
         """
         return self._consecutive_full_pair_count
+
+    # ------------------------------------------------------------------
+    # Soft guidance helpers
+    # ------------------------------------------------------------------
+
+    def _build_guidance(self, reason: str) -> Optional[FixyGuidance]:
+        """Build a :class:`FixyGuidance` for *reason*, or ``None`` if unknown.
+
+        Looks up the default ``(goal, preferred_move, base_confidence)`` triple
+        from :data:`_REASON_GUIDANCE_MAP`, boosts confidence when the same goal
+        has appeared in :attr:`recent_fixy_goals`, and stores the goal into the
+        deque.
+
+        Parameters
+        ----------
+        reason:
+            Intervention reason string returned by :meth:`should_intervene`.
+
+        Returns
+        -------
+        :class:`FixyGuidance` or ``None`` when *reason* is not in the map.
+        """
+        entry = _REASON_GUIDANCE_MAP.get(reason)
+        if entry is None:
+            return None
+        goal, preferred_move, base_confidence = entry
+
+        # Boost confidence when the same goal has recurred recently (signal
+        # that the dialogue is persistently stuck on the same issue).
+        repeat_count = sum(1 for g in self.recent_fixy_goals if g == goal)
+        confidence = min(
+            1.0, base_confidence + _GUIDANCE_CONFIDENCE_BOOST_PER_REPEAT * repeat_count
+        )
+
+        # Record this goal for future recurrence detection.
+        self.recent_fixy_goals.append(goal)
+
+        guidance = FixyGuidance(
+            goal=goal,
+            preferred_move=preferred_move,
+            confidence=confidence,
+            reason=reason,
+        )
+        logger.info(
+            "[FIXY-GUIDANCE] goal=%r preferred_move=%r confidence=%.2f reason=%r",
+            goal,
+            preferred_move,
+            confidence,
+            reason,
+        )
+        return guidance
+
+    def record_agent_move(self, agent_move: str) -> None:
+        """Update the ignored-guidance counter based on the agent's actual move.
+
+        Call this once per agent turn (excluding Fixy turns) when guidance is
+        active.  If the agent's move matches :attr:`fixy_guidance.preferred_move`
+        the counter resets; otherwise it increments.
+
+        When ``ignored_guidance_count >= 2``, the confidence of the active
+        guidance is boosted slightly so that the bias applied to strategy
+        selection becomes stronger — a soft escalation of Fixy's recommendation.
+
+        Parameters
+        ----------
+        agent_move:
+            The move-type string classified for the agent's response (one of
+            :data:`MOVE_TYPES` or a value from ``progress_enforcer``).
+        """
+        if self.fixy_guidance is None:
+            return
+
+        if agent_move == self.fixy_guidance.preferred_move:
+            logger.info(
+                "[FIXY-GUIDANCE] agent followed guidance (%r) — resetting ignored count",
+                agent_move,
+            )
+            self.ignored_guidance_count = 0
+        else:
+            self.ignored_guidance_count += 1
+            logger.info(
+                "[FIXY-GUIDANCE] agent ignored guidance (move=%r, preferred=%r) "
+                "— ignored_count=%d",
+                agent_move,
+                self.fixy_guidance.preferred_move,
+                self.ignored_guidance_count,
+            )
+            # Soft escalation: boost confidence when guidance is repeatedly ignored
+            if self.ignored_guidance_count >= 2:
+                self.fixy_guidance.confidence = min(
+                    1.0, self.fixy_guidance.confidence + 0.1
+                )
+                logger.info(
+                    "[FIXY-GUIDANCE] guidance confidence boosted to %.2f"
+                    " after %d ignored turns",
+                    self.fixy_guidance.confidence,
+                    self.ignored_guidance_count,
+                )
+
+    def _intervene(self, reason: str) -> Tuple[bool, str]:
+        """Build guidance and return an intervention result.
+
+        All ``return (True, reason)`` paths in :meth:`should_intervene` go
+        through this helper so that :attr:`fixy_guidance` is always populated
+        when an intervention is triggered.
+
+        Parameters
+        ----------
+        reason:
+            Intervention reason string (e.g. ``"loop_repetition"``).
+
+        Returns
+        -------
+        ``(True, reason)`` — always.
+        """
+        self.fixy_guidance = self._build_guidance(reason)
+        return (True, reason)
 
     def should_intervene(
         self,
@@ -852,7 +1062,7 @@ class InteractiveFixy:
                     )
                     self._pending_rewrite_mode = None
                     self._soft_mode_forced = True
-                    return (True, primary)
+                    return self._intervene(primary)
 
                 # ── Hard-threshold gate: block hard modes before thresholds ────
                 candidate_mode = _LOOP_REWRITE_MODE_POLICY.get(
@@ -875,7 +1085,7 @@ class InteractiveFixy:
                     )
                     self._pending_rewrite_mode = None
                     self._soft_mode_forced = True
-                    return (True, primary)
+                    return self._intervene(primary)
 
                 # Select structural rewrite mode for the next agent's seed
                 rewrite_mode = _LOOP_REWRITE_MODE_POLICY.get(
@@ -889,7 +1099,7 @@ class InteractiveFixy:
                     current_topic,
                 )
                 # Use the first (highest-priority) failure mode as the reason
-                return (True, primary)
+                return self._intervene(primary)
             else:
                 logger.debug(
                     "[FIXY-GATE] skipped: insufficient structural repetition at turn %d",
@@ -923,7 +1133,7 @@ class InteractiveFixy:
             else:
                 self._pending_rewrite_mode = None
                 self._soft_mode_forced = True
-            return (True, "circular_reasoning")
+            return self._intervene("circular_reasoning")
 
         # Pattern 2: High conflict without synthesis (check every 6+ turns)
         if turn_count >= 6 and self._detect_high_conflict(last_10):
@@ -932,7 +1142,7 @@ class InteractiveFixy:
             else:
                 self._pending_rewrite_mode = None
                 self._soft_mode_forced = True
-            return (True, "high_conflict_no_resolution")
+            return self._intervene("high_conflict_no_resolution")
 
         # Pattern 3: Surface-level discussion for too long
         if turn_count >= 10 and self._detect_shallow_discussion(last_10):
@@ -941,7 +1151,7 @@ class InteractiveFixy:
             else:
                 self._pending_rewrite_mode = None
                 self._soft_mode_forced = True
-            return (True, "shallow_discussion")
+            return self._intervene("shallow_discussion")
 
         # Pattern 4: Missed synthesis opportunity
         if turn_count >= 5 and self._detect_synthesis_opportunity(last_10):
@@ -950,11 +1160,11 @@ class InteractiveFixy:
             else:
                 self._pending_rewrite_mode = None
                 self._soft_mode_forced = True
-            return (True, "synthesis_opportunity")
+            return self._intervene("synthesis_opportunity")
 
         # Pattern 5: Meta-reflection needed (every 15 turns)
         if turn_count > 15 and turn_count % 15 == 0:
-            return (True, "meta_reflection_needed")
+            return self._intervene("meta_reflection_needed")
 
         return (False, "")
 

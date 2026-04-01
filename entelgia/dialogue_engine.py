@@ -12,6 +12,9 @@ import logging
 import random
 from typing import Dict, List, Any, Tuple, Optional, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from entelgia.fixy_interactive import FixyGuidance
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -85,6 +88,24 @@ _AGENT_MODE_INSTRUCTION: Dict[str, str] = {
 # Used to detect and strip the prefix when the topic subsystem is disabled.
 _SEED_TOPIC_PREFIX = "TOPIC: \n"
 
+# ---------------------------------------------------------------------------
+# Fixy guidance bias constants
+# ---------------------------------------------------------------------------
+#: Additive weight increase applied to strategies that support the Fixy-
+#: recommended move type.  Scaled by guidance.confidence so a strong
+#: recommendation (confidence=1.0) raises the target strategy's weight by
+#: this full amount, while a weak one (confidence=0.5) applies half the boost.
+_GUIDANCE_BOOST: float = 0.25
+
+#: Weight reduction applied to strategies that conflict with the recommended
+#: move type (e.g. suppress "agree_and_expand" when guidance asks for attack).
+_GUIDANCE_SUPPRESS: float = 0.15
+
+#: Minimum strategy weight after suppression.  Prevents any strategy from
+#: reaching exactly 0 so the selection is never fully deterministic — Fixy
+#: biases the dialogue, it does not control it.
+_GUIDANCE_MIN_WEIGHT: float = 0.02
+
 
 class SeedGenerator:
     """Generates varied, context-aware dialogue seeds."""
@@ -123,6 +144,7 @@ class SeedGenerator:
         speaker: Any,  # Agent type
         turn_count: int,
         agent_mode: Optional[str] = None,
+        fixy_guidance: "Optional[FixyGuidance]" = None,
     ) -> str:
         """
         Generate contextual seed based on dialogue state.
@@ -132,12 +154,16 @@ class SeedGenerator:
         failure mode is active.  When ``AgentMode.NORMAL`` or ``None``, the
         seed is generated as before.
 
+        v5.1.0: *fixy_guidance* (optional :class:`FixyGuidance`) probabilistically
+        biases strategy selection toward the Fixy-recommended move type.
+
         Args:
             topic: Current topic label
             recent_turns: Recent dialogue turns
             speaker: Current speaker agent
             turn_count: Current turn number
             agent_mode: Optional AgentMode override injected when loop is active
+            fixy_guidance: Optional Fixy guidance to bias strategy weights
 
         Returns:
             Formatted seed instruction
@@ -156,7 +182,9 @@ class SeedGenerator:
                 conflict_level = 5.0
 
             # Select strategy based on dialogue state
-            strategy = self._select_strategy(turn_count, conflict_level, last_emotion)
+            strategy = self._select_strategy(
+                turn_count, conflict_level, last_emotion, fixy_guidance=fixy_guidance
+            )
 
             # Format seed
             template = self.SEED_TEMPLATES.get(
@@ -177,23 +205,32 @@ class SeedGenerator:
 
         seed_text = base + mode_instruction
         logger.debug(
-            "SeedGenerator.generate_seed: topic=%r agent_mode=%r seed_text=%r",
+            "SeedGenerator.generate_seed: topic=%r agent_mode=%r"
+            " guidance_move=%r seed_text=%r",
             topic,
             agent_mode,
+            fixy_guidance.preferred_move if fixy_guidance else None,
             seed_text,
         )
         return seed_text
 
     def _select_strategy(
-        self, turn_count: int, conflict_level: float, last_emotion: str
+        self, turn_count: int, conflict_level: float, last_emotion: str,
+        fixy_guidance: "Optional[FixyGuidance]" = None,
     ) -> str:
         """
         Select seed strategy based on dialogue state.
+
+        v5.1.0: *fixy_guidance* (optional :class:`FixyGuidance` from
+        ``InteractiveFixy``) probabilistically biases the strategy weights
+        toward the preferred move type when Fixy has detected an issue.  The
+        selection is **never forced** — guidance only adjusts weights.
 
         Args:
             turn_count: Current turn number
             conflict_level: Speaker's conflict index
             last_emotion: Emotion from last turn
+            fixy_guidance: Optional guidance from Fixy to bias strategy selection
 
         Returns:
             Strategy name
@@ -220,6 +257,49 @@ class SeedGenerator:
             "introduce_analogy": 0.10,
             "meta_reflect": 0.05,
         }
+
+        # ── Apply Fixy guidance bias ──────────────────────────────────────
+        # When Fixy has issued guidance, shift probability mass toward
+        # strategies that produce the recommended move type.  The bias
+        # magnitude scales with guidance.confidence.  No strategy weight
+        # is forced to zero — this is purely additive/subtractive.
+        if fixy_guidance is not None:
+            c = fixy_guidance.confidence
+            pm = fixy_guidance.preferred_move
+
+            # Map preferred_move → strategies to boost / suppress
+            _BOOST: Dict[str, List[str]] = {
+                "TEST":          ["explore_implication", "question_assumption"],
+                "EXAMPLE":       ["introduce_analogy"],
+                "CONCESSION":    ["agree_and_expand", "synthesize"],
+                "NEW_FRAME":     ["meta_reflect", "explore_implication"],
+                "NEW_CLAIM":     ["constructive_disagree", "question_assumption"],
+                "DIRECT_ATTACK": ["constructive_disagree"],
+            }
+            _SUPPRESS: Dict[str, List[str]] = {
+                "TEST":          ["agree_and_expand"],
+                "EXAMPLE":       ["agree_and_expand"],
+                "CONCESSION":    ["constructive_disagree"],
+                "NEW_FRAME":     ["agree_and_expand"],
+                "NEW_CLAIM":     ["agree_and_expand", "synthesize"],
+                "DIRECT_ATTACK": ["agree_and_expand", "synthesize"],
+            }
+
+            for strategy in _BOOST.get(pm, []):
+                if strategy in weights:
+                    weights[strategy] += _GUIDANCE_BOOST * c
+
+            for strategy in _SUPPRESS.get(pm, []):
+                if strategy in weights:
+                    weights[strategy] = max(
+                        _GUIDANCE_MIN_WEIGHT, weights[strategy] - _GUIDANCE_SUPPRESS
+                    )
+
+            logger.debug(
+                "[ENGINE-GUIDANCE] biased weights for preferred_move=%r confidence=%.2f",
+                pm,
+                c,
+            )
 
         strategies = list(weights.keys())
         probabilities = list(weights.values())
@@ -351,6 +431,7 @@ class DialogueEngine:
         speaker: Any,  # Agent
         turn_count: int,
         agent_mode: Optional[str] = None,
+        fixy_guidance: "Optional[FixyGuidance]" = None,
     ) -> str:
         """
         Generate contextual seed for speaker.
@@ -358,12 +439,16 @@ class DialogueEngine:
         v2.9.0: *agent_mode* is forwarded to ``SeedGenerator.generate_seed``
         so that loop-aware mode instructions are embedded in the seed.
 
+        v5.1.0: *fixy_guidance* is forwarded to probabilistically bias
+        strategy weights toward the Fixy-recommended move type.
+
         Args:
             topic: Current topic
             dialog_history: Recent dialogue
             speaker: Current speaker
             turn_count: Turn number
             agent_mode: Optional AgentMode constant (injected when loop active)
+            fixy_guidance: Optional Fixy guidance to bias strategy weights
 
         Returns:
             Seed instruction string
@@ -372,7 +457,8 @@ class DialogueEngine:
             dialog_history[-5:] if len(dialog_history) >= 5 else dialog_history
         )
         return self.seed_generator.generate_seed(
-            topic, recent_turns, speaker, turn_count, agent_mode=agent_mode
+            topic, recent_turns, speaker, turn_count,
+            agent_mode=agent_mode, fixy_guidance=fixy_guidance,
         )
 
     def should_allow_fixy(
