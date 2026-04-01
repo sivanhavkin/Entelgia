@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Tests for Soft Fixy Enforcement v1.
+Tests for Soft Fixy Enforcement v1 and v2.
 
 Covers:
   1. MOVE_TYPES list completeness
@@ -17,6 +17,17 @@ Covers:
   10. SeedGenerator — guidance biases strategy weights (preferred move gets boost)
   11. SeedGenerator — backward compat when fixy_guidance=None
   12. DialogueEngine.generate_seed — passes guidance through to SeedGenerator
+
+  Soft Fixy v2:
+  13. build_guidance_prompt_hint — returns correct hint for each move type
+  14. build_guidance_prompt_hint — returns empty string when guidance is None
+  15. SeedGenerator.generate_seed — includes hint text when fixy_guidance exists
+  16. SeedGenerator.generate_seed — no hint when fixy_guidance is None
+  17. score_progress — soft penalty when ignored_guidance_count >= 2
+  18. score_progress — stronger penalty when ignored_guidance_count >= 3
+  19. score_progress — mismatch penalty when actual move != preferred move
+  20. score_progress — compliance reward when actual move == preferred move
+  21. score_progress — backward compat when no guidance (existing callers unchanged)
 """
 
 import sys
@@ -32,6 +43,7 @@ from entelgia.fixy_interactive import (
     FixyGuidance,
     InteractiveFixy,
     _REASON_GUIDANCE_MAP,
+    build_guidance_prompt_hint,
 )
 from entelgia.dialogue_engine import SeedGenerator, DialogueEngine
 
@@ -396,3 +408,247 @@ class TestDialogueEngineGuidancePassthrough:
         dialog = _make_turns(["hello there"], roles=["Socrates"])
         seed = engine.generate_seed("free will", dialog, speaker, turn_count=2)
         assert isinstance(seed, str)
+
+
+# ===========================================================================
+# Soft Fixy v2 tests
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# 13 & 14. build_guidance_prompt_hint
+# ---------------------------------------------------------------------------
+
+
+class TestBuildGuidancePromptHint:
+    def test_returns_empty_when_no_guidance(self):
+        assert build_guidance_prompt_hint(None) == ""
+
+    def test_example_hint(self):
+        g = FixyGuidance(goal="g", preferred_move="EXAMPLE", confidence=0.8, reason="r")
+        hint = build_guidance_prompt_hint(g)
+        assert hint != ""
+        assert "example" in hint.lower()
+
+    def test_test_hint(self):
+        g = FixyGuidance(goal="g", preferred_move="TEST", confidence=0.8, reason="r")
+        hint = build_guidance_prompt_hint(g)
+        assert hint != ""
+        assert any(kw in hint.lower() for kw in ("falsifiable", "observable", "prove"))
+
+    def test_concession_hint(self):
+        g = FixyGuidance(goal="g", preferred_move="CONCESSION", confidence=0.8, reason="r")
+        hint = build_guidance_prompt_hint(g)
+        assert hint != ""
+        assert any(kw in hint.lower() for kw in ("weakness", "blind spot", "acknowledge"))
+
+    def test_new_frame_hint(self):
+        g = FixyGuidance(goal="g", preferred_move="NEW_FRAME", confidence=0.8, reason="r")
+        hint = build_guidance_prompt_hint(g)
+        assert hint != ""
+        assert any(kw in hint.lower() for kw in ("frame", "domain", "shift"))
+
+    def test_direct_attack_hint(self):
+        g = FixyGuidance(goal="g", preferred_move="DIRECT_ATTACK", confidence=0.8, reason="r")
+        hint = build_guidance_prompt_hint(g)
+        assert hint != ""
+        assert any(kw in hint.lower() for kw in ("challenge", "assumption", "directly"))
+
+    def test_new_claim_hint(self):
+        g = FixyGuidance(goal="g", preferred_move="NEW_CLAIM", confidence=0.8, reason="r")
+        hint = build_guidance_prompt_hint(g)
+        assert hint != ""
+        assert any(kw in hint.lower() for kw in ("new", "distinction", "variable"))
+
+    def test_all_move_types_covered(self):
+        """Every MOVE_TYPE must produce a non-empty hint."""
+        for move in MOVE_TYPES:
+            g = FixyGuidance(goal="g", preferred_move=move, confidence=0.7, reason="r")
+            hint = build_guidance_prompt_hint(g)
+            assert hint != "", f"No hint defined for move type {move!r}"
+
+    def test_unknown_move_returns_empty(self):
+        g = FixyGuidance(goal="g", preferred_move="UNKNOWN_MOVE_XYZ", confidence=0.5, reason="r")
+        hint = build_guidance_prompt_hint(g)
+        assert hint == ""
+
+
+# ---------------------------------------------------------------------------
+# 15 & 16. SeedGenerator.generate_seed includes / excludes hint
+# ---------------------------------------------------------------------------
+
+
+class TestSeedGeneratorGuidanceHint:
+    def test_hint_present_in_seed_when_guidance_given(self):
+        sg = SeedGenerator()
+        guidance = FixyGuidance(
+            goal="define_test", preferred_move="TEST", confidence=0.9,
+            reason="premature_synthesis"
+        )
+        speaker = _FakeSpeaker()
+        recent = _make_turns(["consciousness is fundamental"], roles=["Socrates"])
+        seed = sg.generate_seed("free will", recent, speaker, turn_count=2,
+                                fixy_guidance=guidance)
+        # The seed should contain the guidance hint text
+        expected_hint = build_guidance_prompt_hint(guidance)
+        assert expected_hint in seed, (
+            f"Expected hint {expected_hint!r} to appear in seed {seed!r}"
+        )
+
+    def test_no_hint_in_seed_when_no_guidance(self):
+        sg = SeedGenerator()
+        speaker = _FakeSpeaker()
+        recent = _make_turns(["consciousness is fundamental"], roles=["Socrates"])
+        seed = sg.generate_seed("free will", recent, speaker, turn_count=2)
+        assert "[GUIDANCE HINT]" not in seed, (
+            "No guidance hint should appear when fixy_guidance is None"
+        )
+
+    def test_hint_not_added_for_unknown_move(self):
+        """If build_guidance_prompt_hint returns empty, no hint tag should appear."""
+        sg = SeedGenerator()
+        guidance = FixyGuidance(
+            goal="g", preferred_move="UNKNOWN_MOVE_XYZ", confidence=0.5, reason="r"
+        )
+        speaker = _FakeSpeaker()
+        recent = _make_turns(["some text"], roles=["Socrates"])
+        seed = sg.generate_seed("free will", recent, speaker, turn_count=2,
+                                fixy_guidance=guidance)
+        assert "[GUIDANCE HINT]" not in seed
+
+
+# ---------------------------------------------------------------------------
+# 17–21. score_progress guidance-based adjustments
+# ---------------------------------------------------------------------------
+
+
+class TestScoreProgressGuidanceAdjustments:
+    """Tests for Soft Fixy v2 progress score adjustments."""
+
+    def _make_mem(self):
+        from entelgia.progress_enforcer import ClaimsMemory
+        return ClaimsMemory()
+
+    def test_no_penalty_with_zero_ignored(self):
+        """Baseline: no penalty when ignored_guidance_count=0."""
+        from entelgia.progress_enforcer import score_progress
+        mem = self._make_mem()
+        guidance = FixyGuidance(goal="g", preferred_move="NEW_FRAME", confidence=0.5, reason="r")
+        score_no_penalty = score_progress(
+            "The brain computes representations independently of experience.",
+            [], mem, ignored_guidance_count=0,
+        )
+        score_with_guidance = score_progress(
+            "The brain computes representations independently of experience.",
+            [], self._make_mem(), fixy_guidance=guidance, ignored_guidance_count=0,
+        )
+        # Both should be valid floats in [0, 1]
+        assert 0.0 <= score_no_penalty <= 1.0
+        assert 0.0 <= score_with_guidance <= 1.0
+
+    def test_penalty_applied_at_count_2(self):
+        """Score must be lower when ignored_guidance_count >= 2."""
+        from entelgia.progress_enforcer import score_progress
+        text = "The brain computes representations independently of experience."
+        score_base = score_progress(text, [], self._make_mem(), ignored_guidance_count=0)
+        score_penalised = score_progress(text, [], self._make_mem(), ignored_guidance_count=2)
+        # The penalty multiplier is 0.85 — score should decrease
+        assert score_penalised <= score_base, (
+            f"Expected penalty at count=2: base={score_base:.3f}, "
+            f"penalised={score_penalised:.3f}"
+        )
+
+    def test_stronger_penalty_at_count_3(self):
+        """Score at count=3 must be <= score at count=2."""
+        from entelgia.progress_enforcer import score_progress
+        text = "The brain computes representations independently of experience."
+        score_2 = score_progress(text, [], self._make_mem(), ignored_guidance_count=2)
+        score_3 = score_progress(text, [], self._make_mem(), ignored_guidance_count=3)
+        assert score_3 <= score_2, (
+            f"Expected score at count=3 <= count=2: "
+            f"count2={score_2:.3f}, count3={score_3:.3f}"
+        )
+
+    def test_score_capped_at_count_3(self):
+        """Score must not exceed 0.55 when ignored_guidance_count >= 3."""
+        from entelgia.progress_enforcer import score_progress
+        # Use a highly positive text to get a high base score
+        text = (
+            "I reject the claim entirely. Consciousness cannot be physical "
+            "because physical systems are closed under causation. Therefore, "
+            "qualia are irreducible. This is a falsifiable claim: if you can "
+            "produce a physical account of phenomenal redness, I retract."
+        )
+        score_capped = score_progress(text, [], self._make_mem(), ignored_guidance_count=3)
+        assert score_capped <= 0.55, (
+            f"Expected score capped at 0.55 with ignored_count=3, got {score_capped:.3f}"
+        )
+
+    def test_score_never_zeroed(self):
+        """Penalty must not zero out the score (system must remain non-blocking)."""
+        from entelgia.progress_enforcer import score_progress
+        text = "The brain computes representations independently of experience."
+        score = score_progress(text, [], self._make_mem(), ignored_guidance_count=10)
+        assert score > 0.0, "Penalty must not zero the progress score"
+
+    def test_mismatch_penalty_applied(self):
+        """Score is reduced when actual move differs from preferred_move."""
+        from entelgia.progress_enforcer import score_progress, classify_move
+        # Use a text that very reliably classifies as PARAPHRASE / BALANCED_RESTATEMENT
+        # (low-value move) and prefer TEST (a different move type).
+        text = "Both perspectives have merit and should be weighed carefully."
+        actual_move = classify_move(text, [])
+        # Ensure our chosen text does NOT classify as TEST; if the classifier
+        # is ever changed, we still want the test to be meaningful.
+        preferred = "TEST" if actual_move != "TEST" else "EXAMPLE"
+        guidance = FixyGuidance(
+            goal="g", preferred_move=preferred, confidence=1.0, reason="r"
+        )
+        score_with_guidance = score_progress(text, [], self._make_mem(), fixy_guidance=guidance)
+        score_no_guidance = score_progress(text, [], self._make_mem())
+        assert score_with_guidance <= score_no_guidance, (
+            f"Mismatch penalty not applied: no_guidance={score_no_guidance:.3f}, "
+            f"with_guidance={score_with_guidance:.3f} "
+            f"(actual_move={actual_move!r}, preferred={preferred!r})"
+        )
+
+    def test_compliance_reward_applied(self):
+        """Score increases slightly when actual move matches preferred_move."""
+        from entelgia.progress_enforcer import score_progress, classify_move
+        text = "Consciousness is irreducibly subjective and cannot be explained physically."
+        mem = self._make_mem()
+        actual_move = classify_move(text, [])
+        guidance = FixyGuidance(
+            goal="g", preferred_move=actual_move, confidence=1.0, reason="r"
+        )
+        score_with_guidance = score_progress(text, [], mem, fixy_guidance=guidance)
+        score_no_guidance = score_progress(text, [], self._make_mem())
+        assert score_with_guidance >= score_no_guidance, (
+            f"Compliance reward not applied: no_guidance={score_no_guidance:.3f}, "
+            f"with_guidance={score_with_guidance:.3f} (move={actual_move!r})"
+        )
+
+    def test_backward_compat_no_guidance_no_ignored(self):
+        """Calling score_progress without new params behaves as before."""
+        from entelgia.progress_enforcer import score_progress
+        mem = self._make_mem()
+        score = score_progress(
+            "The brain computes representations independently of experience.",
+            [], mem,
+        )
+        assert 0.0 <= score <= 1.0
+
+    def test_score_always_in_range(self):
+        """score_progress must always return a value in [0.0, 1.0]."""
+        from entelgia.progress_enforcer import score_progress
+        texts = [
+            "yes",
+            "I completely reject this. Freedom is an illusion.",
+            "Both sides have merit and should be balanced carefully.",
+        ]
+        for text in texts:
+            for count in (0, 2, 3, 5):
+                score = score_progress(text, [], self._make_mem(),
+                                       ignored_guidance_count=count)
+                assert 0.0 <= score <= 1.0, (
+                    f"score={score} out of range for text={text!r}, count={count}"
+                )

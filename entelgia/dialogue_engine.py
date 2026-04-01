@@ -203,13 +203,22 @@ class SeedGenerator:
         if agent_mode and agent_mode != AgentMode.NORMAL:
             mode_instruction = _AGENT_MODE_INSTRUCTION.get(agent_mode, "")
 
-        seed_text = base + mode_instruction
+        # Append guidance content hint when Fixy has issued guidance
+        guidance_hint = ""
+        if fixy_guidance is not None:
+            from entelgia.fixy_interactive import build_guidance_prompt_hint
+            raw_hint = build_guidance_prompt_hint(fixy_guidance)
+            if raw_hint:
+                guidance_hint = "\n[GUIDANCE HINT] " + raw_hint
+
+        seed_text = base + mode_instruction + guidance_hint
         logger.debug(
             "SeedGenerator.generate_seed: topic=%r agent_mode=%r"
-            " guidance_move=%r seed_text=%r",
+            " guidance_move=%r guidance_hint=%r seed_text=%r",
             topic,
             agent_mode,
             fixy_guidance.preferred_move if fixy_guidance else None,
+            guidance_hint or None,
             seed_text,
         )
         return seed_text
