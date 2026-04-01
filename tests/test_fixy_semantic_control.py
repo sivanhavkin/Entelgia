@@ -63,14 +63,19 @@ Covers:
   41. Loop check runs when stagnation > 0
   42. Loop check runs when repeated_moves=True
   43. Loop check runs when ignored_recently=True
+  44. Loop check runs when unresolved_rising=True
 
   score_progress integration
-  44. Semantic loop lowers progress score
-  45. Full compliance boosts progress score
-  46. Non-compliance lowers progress score
-  47. Backward compatibility — validation_result=None leaves score unchanged
-  48. Backward compatibility — loop_result=None leaves score unchanged
-  49. Score never goes below 0.0 after loop adjustment
+  45. Semantic loop lowers progress score
+  46. Full compliance boosts progress score
+  47. Non-compliance lowers progress score
+  48. Backward compatibility — validation_result=None leaves score unchanged
+  49. Backward compatibility — loop_result=None leaves score unchanged
+  50. Score never goes below 0.0 after loop adjustment
+
+  Constants
+  51. VALIDATED_MOVE_TYPES content check
+  52. LOOP_BREAKING_MOVES content check
 """
 
 import sys
@@ -875,6 +880,31 @@ def test_evaluate_reply_loop_triggered_by_ignored_recently():
         fixy_guidance=guidance,
         recent_texts=["Prev."],
         ignored_recently=True,
+    )
+    assert loop_result.reason != "loop_check_not_triggered"
+
+
+def test_evaluate_reply_loop_triggered_by_unresolved_rising():
+    class _DualLLM:
+        def __init__(self):
+            self._calls = 0
+
+        def generate(self, model, prompt, **kw):
+            self._calls += 1
+            if self._calls == 1:
+                return json.dumps(
+                    {"compliant": True, "partial": False, "confidence": 0.8, "reason": "ok"}
+                )
+            return json.dumps({"is_loop": False, "confidence": 0.6, "reason": "ok"})
+
+    guidance = _make_guidance("EXAMPLE", 0.8)
+    ctrl = FixySemanticController(llm=_DualLLM(), model="stub")
+    _, loop_result = ctrl.evaluate_reply(
+        "Athena",
+        "Some text.",
+        fixy_guidance=guidance,
+        recent_texts=["Prev."],
+        unresolved_rising=True,
     )
     assert loop_result.reason != "loop_check_not_triggered"
 
