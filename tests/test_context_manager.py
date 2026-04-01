@@ -466,8 +466,9 @@ class TestTopicsDisabledInContextManager:
 
 
 class TestAgentStateInPrompt:
-    """Verify that id, ego, superego, self_awareness, energy, pressure, and
-    emotion all appear in the prompt built by ContextManager."""
+    """Verify that all agent state variables appear in the prompt built by
+    ContextManager: id, ego, sup, sa, energy, pressure, conflict, unresolved,
+    stagnation, emotion, kind, temp, dissent, drive_combo."""
 
     def setup_method(self):
         self.cm = ContextManager()
@@ -487,42 +488,35 @@ class TestAgentStateInPrompt:
             dialog_tail=[],
             stm=[],
             ltm=[],
-            debate_profile={"style": "analytical"},
+            debate_profile={"style": "analytical", "drive_combo": "high_id", "dissent_level": 0.35},
             energy=72.5,
             pressure=3.40,
             emotion="curious",
             emotion_intensity=0.65,
+            conflict=2.10,
+            unresolved=3,
+            stagnation=0.25,
+            kind="assertive",
+            temp=0.72,
+            dissent=0.35,
+            drive_combo="high_id",
         )
         defaults.update(overrides)
         return self.cm.build_enriched_context(**defaults)
 
+    # ── drive variables ────────────────────────────────────────────────────
+
     def test_id_drive_in_prompt(self):
-        prompt = self._build()
-        assert "id=" in prompt
+        assert "id=" in self._build()
 
     def test_ego_drive_in_prompt(self):
-        prompt = self._build()
-        assert "ego=" in prompt
+        assert "ego=" in self._build()
 
     def test_superego_drive_in_prompt(self):
-        prompt = self._build()
-        assert "sup=" in prompt
+        assert "sup=" in self._build()
 
     def test_self_awareness_in_prompt(self):
-        prompt = self._build()
-        assert "sa=" in prompt
-
-    def test_energy_in_prompt(self):
-        prompt = self._build()
-        assert "energy=" in prompt
-
-    def test_pressure_in_prompt(self):
-        prompt = self._build()
-        assert "pressure=" in prompt
-
-    def test_emotion_in_prompt(self):
-        prompt = self._build()
-        assert "emotion=" in prompt
+        assert "sa=" in self._build()
 
     def test_drive_values_match(self):
         """The exact drive values passed in must appear in the prompt."""
@@ -532,15 +526,59 @@ class TestAgentStateInPrompt:
         assert "sup=7.5" in prompt
         assert "sa=0.80" in prompt
 
+    # ── state variables ────────────────────────────────────────────────────
+
+    def test_energy_in_prompt(self):
+        assert "energy=" in self._build()
+
+    def test_pressure_in_prompt(self):
+        assert "pressure=" in self._build()
+
+    def test_conflict_in_prompt(self):
+        assert "conflict=" in self._build()
+
+    def test_unresolved_in_prompt(self):
+        assert "unresolved=" in self._build()
+
+    def test_stagnation_in_prompt(self):
+        assert "stagnation=" in self._build()
+
+    def test_emotion_in_prompt(self):
+        assert "emotion=" in self._build()
+
+    def test_kind_in_prompt(self):
+        assert "kind=" in self._build()
+
+    def test_temp_in_prompt(self):
+        assert "temp=" in self._build()
+
+    def test_dissent_in_prompt(self):
+        assert "dissent=" in self._build()
+
+    def test_drive_combo_in_prompt(self):
+        assert "combo=" in self._build()
+
     def test_state_values_match(self):
         """The exact state values passed in must appear in the prompt."""
         prompt = self._build()
         assert "energy=72.5" in prompt
         assert "pressure=3.40" in prompt
+        assert "conflict=2.10" in prompt
+        assert "unresolved=3" in prompt
+        assert "stagnation=0.25" in prompt
         assert "emotion=curious" in prompt
+        assert "kind=assertive" in prompt
+        assert "temp=0.72" in prompt
+
+    def test_emotion_sanitized(self):
+        """Emotion strings with special characters must be stripped before injection."""
+        prompt = self._build(emotion="hap\npy\x00test")
+        # The sanitised version 'happytest' must be in the prompt, not the raw value
+        assert "\n" not in prompt.split("[State:")[1].split("]")[0]
+        assert "\x00" not in prompt
 
     def test_state_defaults_when_not_provided(self):
-        """When state params are omitted the prompt still contains the keys."""
+        """When state params are omitted the prompt still contains all keys."""
         defaults = dict(
             agent_name="Athena",
             agent_lang="en",
@@ -558,9 +596,9 @@ class TestAgentStateInPrompt:
             debate_profile={"style": "integrative"},
         )
         prompt = self.cm.build_enriched_context(**defaults)
-        assert "energy=" in prompt
-        assert "pressure=" in prompt
-        assert "emotion=" in prompt
+        for key in ("energy=", "pressure=", "conflict=", "unresolved=",
+                    "stagnation=", "emotion=", "kind=", "temp="):
+            assert key in prompt, f"Expected '{key}' in prompt"
 
 
 if __name__ == "__main__":

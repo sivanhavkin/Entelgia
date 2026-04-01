@@ -177,6 +177,13 @@ class ContextManager:
         pressure: float = 0.0,
         emotion: str = "neutral",
         emotion_intensity: float = 0.0,
+        conflict: float = 0.0,
+        unresolved: int = 0,
+        stagnation: float = 0.0,
+        kind: str = "",
+        temp: float = 0.65,
+        dissent: float = 0.0,
+        drive_combo: str = "",
     ) -> str:
         """
         Build rich context with smart truncation and memory integration.
@@ -203,6 +210,13 @@ class ContextManager:
             pressure: Current drive pressure of the agent.
             emotion: Current dominant emotion label.
             emotion_intensity: Intensity of the current emotion (0–1).
+            conflict: Current drive conflict index.
+            unresolved: Number of open/unresolved questions.
+            stagnation: Current stagnation score (0–1).
+            kind: Last response kind label (e.g., 'reflective', 'assertive').
+            temp: LLM temperature used last turn.
+            dissent: Dissent level from debate profile.
+            drive_combo: Drive combination label from debate profile.
 
         Returns:
             Formatted prompt string
@@ -246,6 +260,13 @@ class ContextManager:
             pressure=pressure,
             emotion=emotion,
             emotion_intensity=emotion_intensity,
+            conflict=conflict,
+            unresolved=unresolved,
+            stagnation=stagnation,
+            kind=kind,
+            temp=temp,
+            dissent=dissent,
+            drive_combo=drive_combo,
         )
 
         return prompt
@@ -310,6 +331,13 @@ class ContextManager:
         pressure: float = 0.0,
         emotion: str = "neutral",
         emotion_intensity: float = 0.0,
+        conflict: float = 0.0,
+        unresolved: int = 0,
+        stagnation: float = 0.0,
+        kind: str = "",
+        temp: float = 0.65,
+        dissent: float = 0.0,
+        drive_combo: str = "",
     ) -> str:
         """
         Format enriched prompt with all context.
@@ -331,6 +359,13 @@ class ContextManager:
             pressure: Current drive pressure of the agent.
             emotion: Current dominant emotion label.
             emotion_intensity: Intensity of the current emotion (0–1).
+            conflict: Current drive conflict index.
+            unresolved: Number of open/unresolved questions.
+            stagnation: Current stagnation score (0–1).
+            kind: Last response kind label.
+            temp: LLM temperature used last turn.
+            dissent: Dissent level from debate profile.
+            drive_combo: Drive combination label from debate profile.
 
         Returns:
             Formatted prompt
@@ -351,18 +386,28 @@ class ContextManager:
         sa_str = drives.get("self_awareness", 0.55)
         prompt += f"[Drives: id={id_str:.1f} ego={ego_str:.1f} sup={sup_str:.1f} sa={sa_str:.2f}]\n"
 
-        # Add runtime agent state
-        # Sanitize emotion to word characters and hyphens only to prevent injection
+        # Add runtime agent state (all key state variables)
+        # Sanitize string fields to word characters and hyphens only to prevent injection
         safe_emotion = re.sub(r"[^\w\-]", "", emotion)[:32] or "neutral"
+        safe_kind = re.sub(r"[^\w\-]", "", kind)[:32]
+        safe_combo = re.sub(r"[^\w\-]", "", drive_combo)[:32]
         prompt += (
             f"[State: energy={energy:.1f}"
             f" pressure={pressure:.2f}"
-            f" emotion={safe_emotion}({emotion_intensity:.2f})]\n"
+            f" conflict={conflict:.2f}"
+            f" unresolved={unresolved}"
+            f" stagnation={stagnation:.2f}"
+            f" emotion={safe_emotion}({emotion_intensity:.2f})"
+            f" kind={safe_kind}"
+            f" temp={temp:.2f}"
+            f"]\n"
         )
 
-        # Add debate style
+        # Add debate style with combo and dissent
         style = debate_profile.get("style", "integrative")
-        prompt += f"[Style: {style}]\n\n"
+        _profile_combo = safe_combo or debate_profile.get("drive_combo", "")
+        _profile_dissent = dissent if dissent else debate_profile.get("dissent_level", 0.0)
+        prompt += f"[Style: {style} | combo={_profile_combo} | dissent={_profile_dissent:.2f}]\n\n"
 
         prompt += f"SEED: {user_seed}\n\n"
 

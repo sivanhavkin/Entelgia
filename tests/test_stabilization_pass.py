@@ -67,6 +67,11 @@ def _make_agent(cfg_overrides=None, last_topic=""):
     agent._last_emotion_intensity = 0.5
     agent.energy_level = 100.0
     agent.drive_pressure = 2.0
+    agent._last_stagnation = 0.0
+    agent.open_questions = 0
+    agent._last_response_kind = "reflective"
+    agent._last_temperature = 0.65
+    agent.conflict_index = MagicMock(return_value=0.0)
     agent.topic_style = ""
     agent.topic_cluster = ""
     agent._last_topic = last_topic
@@ -87,7 +92,13 @@ def _make_agent(cfg_overrides=None, last_topic=""):
 
     agent._extract_topic_from_seed = _meta.Agent._extract_topic_from_seed
     agent.debate_profile = MagicMock(
-        return_value={"style": "reflective", "tone": "calm", "depth": 0.7}
+        return_value={
+            "style": "reflective",
+            "tone": "calm",
+            "depth": 0.7,
+            "drive_combo": "balanced",
+            "dissent_level": 0.0,
+        }
     )
     return agent, memory, cfg
 
