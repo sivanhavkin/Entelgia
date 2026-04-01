@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **1456 tests** (1456 collected) in 34 suites:
+Entelgia ships with comprehensive test coverage across **1574 tests** (1574 collected) in 36 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -824,3 +824,27 @@ Tests verify `entelgia/response_evaluator.py` — the measurement-only turn-leve
 - ✅ **`compute_pressure_alignment`** — five labels: `aligned`, `internal_not_expressed`, `text_more_pressured_than_state`, `weak_alignment`, `neutral`; both threshold boundaries (`2.5`, `4.5`) and grey-zone edges (`2.51`, `4.49`) verified
 - ✅ **`compute_resolution_alignment`** — derives from `dialogue_resolution` only; returns `aligned` or `neutral`; internal state parameters have no effect
 - ✅ **`compute_semantic_repeat_alignment`** — five labels; boundary values and distinctness contract verified
+
+---
+
+### 🎯 Fixy Soft Enforcement Tests (45 tests)
+
+```bash
+pytest tests/test_fixy_soft_enforcement.py -v
+```
+
+Tests verify Soft Fixy Enforcement v1 and v2 across `entelgia/fixy_interactive.py`, `entelgia/dialogue_engine.py`, and `entelgia/progress_enforcer.py`:
+
+- ✅ **`MOVE_TYPES` completeness** — all required move type strings present and unique
+- ✅ **`FixyGuidance` construction** — dataclass fields accessible; `confidence` is mutable
+- ✅ **`_build_guidance` reason mapping** — known reasons produce correct `(goal, preferred_move, confidence)`; unknown reasons return `None`; all mapped reasons build guidance
+- ✅ **Confidence boost on goal recurrence** — `_build_guidance` bumps confidence when the same goal already appears in `recent_fixy_goals`; `recent_fixy_goals` maxlen enforced
+- ✅ **`record_agent_move` — compliance** — matching move resets `ignored_guidance_count` to 0; no-guidance is a no-op
+- ✅ **`record_agent_move` — non-compliance** — non-matching move increments `ignored_guidance_count`; confidence boosted after 2+ ignored turns; confidence capped at 1.0
+- ✅ **`should_intervene` — guidance populated** — `fixy_guidance` set on intervention; `preferred_move` is a known move type
+- ✅ **`should_intervene` — no intervention** — `fixy_guidance` is `None` when Fixy does not intervene
+- ✅ **`SeedGenerator` strategy bias** — guidance biases strategy weights; does not force a single strategy; backward compat when `fixy_guidance=None`
+- ✅ **`DialogueEngine.generate_seed` passthrough** — guidance forwarded to `SeedGenerator` without error; backward compat with no guidance
+- ✅ **`build_guidance_prompt_hint`** — returns empty string for `None`; returns non-empty, content-appropriate hint for each move type (`EXAMPLE`, `TEST`, `CONCESSION`, `NEW_FRAME`, `DIRECT_ATTACK`, `NEW_CLAIM`); all `MOVE_TYPES` covered; unknown move returns empty string
+- ✅ **Hint injection in seed** — hint text present in seed when guidance given; `[GUIDANCE HINT]` absent when guidance is `None`; no hint tag for unrecognised move
+- ✅ **`score_progress` guidance adjustments** — no penalty at count 0; penalty applied at count ≥ 2 (`×0.85`); stronger penalty at count ≥ 3 (`×0.75`); score capped at 0.55 at count ≥ 3; penalty never zeroes score; mismatch penalty reduces score; compliance reward increases score; backward compat without new params; score always in `[0.0, 1.0]`
