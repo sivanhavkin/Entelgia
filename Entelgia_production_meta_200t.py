@@ -3675,10 +3675,10 @@ class TopicManager:
         Returns the new topic label (the internal pointer is updated).
         """
         current = self.current()
+        # Determine current cluster (use loop_guard constants if available)
         current_cluster: Optional[str] = None
         if ENTELGIA_ENHANCED:
             try:
-                # Determine current cluster (use loop_guard constants if available)
                 current_cluster = _TOPIC_TO_CLUSTER.get(current)
             except Exception:
                 current_cluster = None
@@ -5442,16 +5442,17 @@ class Agent:
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
+        # Extract topic from seed (used for memory selection and topic anchors).
+        # When topics are disabled, force to "" to prevent any topic-related
+        # processing from running via the extracted label.
+        topic = (
+            self._extract_topic_from_seed(user_seed)
+            if topic_pipeline_enabled(CFG)
+            else ""
+        )
+
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
-            # Extract topic from seed; suppress when topics are disabled so that
-            # memory retrieval is not biased by stale or irrelevant topic strings.
-            if topic_pipeline_enabled(CFG):
-                topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-                topic = topic_match.group(1) if topic_match else ""
-            else:
-                topic = ""
-
             ltm = self.memory_integration.retrieve_relevant_memories(
                 agent_name=self.name,
                 current_topic=topic,
@@ -5515,6 +5516,7 @@ class Agent:
             )
 
         # Use ContextManager to build enriched prompt
+        _debate_prof = self.debate_profile()
         prompt = self.context_mgr.build_enriched_context(
             agent_name=self.name,
             agent_lang=lang,
@@ -5524,13 +5526,42 @@ class Agent:
             dialog_tail=dialog_tail,
             stm=stm,
             ltm=ltm,
-            debate_profile=self.debate_profile(),
+            debate_profile=_debate_prof,
             show_pronoun=CFG.show_pronoun,
             agent_pronoun=agent_pronoun,
             web_context=web_context,
             topic_style=self.topic_style,
             topics_enabled=topic_pipeline_enabled(CFG),
+            energy=self.energy_level,
+            pressure=self.drive_pressure,
+            emotion=self._last_emotion,
+            emotion_intensity=self._last_emotion_intensity,
+            conflict=self.conflict_index(),
+            unresolved=self.open_questions,
+            stagnation=self._last_stagnation,
+            kind=self._last_response_kind,
+            temp=self._last_temperature,
+            dissent=float(_debate_prof.get("dissent_level", 0.0)),
+            drive_combo=str(_debate_prof.get("drive_combo", "")),
         )
+
+        # ── Topic Anchors: inject topic constraint before generation ──────────
+        _topic_anchors_enh = (
+            TOPIC_ANCHORS.get(topic, []) if topic_pipeline_enabled(CFG) else []
+        )
+        if topic_pipeline_enabled(CFG) and topic and _topic_anchors_enh:
+            topic_constraint = (
+                f"\n\nTopic constraint:\n"
+                f"The active topic is: {topic}.\n"
+                "Your response must stay within this topic.\n"
+                f"Use at least one of these concepts naturally: {', '.join(_topic_anchors_enh)}.\n"
+            )
+            if "\nRespond now:\n" in prompt:
+                prompt = prompt.replace(
+                    "\nRespond now:\n", topic_constraint + "\nRespond now:\n"
+                )
+            else:
+                prompt += topic_constraint
 
         return prompt
 
@@ -5640,9 +5671,11 @@ class Agent:
             )
 
         # ── Variation mode injection ──────────────────────────────────────────
+        # Rotate variation mode when the same mode has been used too long.
         _agent_modes = _VARIATION_MODES.get(self.name, [])
         if _agent_modes:
             if self._variation_mode_turns >= _VARIATION_MODE_MAX_CONSECUTIVE:
+                # Rotate to next mode in the list
                 _curr_idx = (
                     _agent_modes.index(self._variation_mode)
                     if self._variation_mode in _agent_modes
@@ -6316,6 +6349,9 @@ class Agent:
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Style-redundancy check (soft, non-blocking) ───────────────────────────
+        # If the final response is very similar to the last one from this agent,
+        # log a STYLE-REDUNDANCY warning to encourage variation in future turns.
+        # This is a diagnostic signal only — the response is never blocked.
         _own_texts_for_sim = [
             t.get("text", "")
             for t in dialog_tail
@@ -6333,6 +6369,8 @@ class Agent:
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Template family gate ──────────────────────────────────────────────────
+        # If the same opener template family has been used ≥ _TEMPLATE_FAMILY_REPEAT_LIMIT
+        # consecutive turns, regenerate once with an explicit family ban.
         _current_family = _detect_template_family(out)
         _family_history = list(self._last_template_families)
         _family_repeat_count = 0
@@ -6369,7 +6407,7 @@ class Agent:
             _new_family = _detect_template_family(_family_raw)
             if _new_family != _current_family:
                 out = _family_raw
-                _current_family = _new_family
+                _current_family = _new_family  # update for deque storage below
                 logger.info(
                     "[TEMPLATE-FAMILY] agent=%s — new family=%s after regeneration",
                     self.name,
@@ -6393,8 +6431,10 @@ class Agent:
                 _current_family,
                 _family_repeat_count + 1,
             )
+        # Store form and family for next turn's anti-repetition check
         self._last_response_forms.append(_response_form)
         self._last_template_families.append(_current_family)
+        # Update variation mode turn counter
         self._variation_mode_turns += 1
         # ─────────────────────────────────────────────────────────────────────────
 
@@ -8846,7 +8886,13 @@ def _print_llm_config_summary(cfg: "Config") -> None:
 def run_cli():
     """Run command line interface - 200-turn no-timeout dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=0, show_meta=True)
+    CFG = Config(
+        max_turns=200,
+        timeout_minutes=0,
+        show_meta=True,
+        topics_enabled=False,
+        topic_manager_enabled=False,
+    )
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(

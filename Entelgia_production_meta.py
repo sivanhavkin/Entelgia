@@ -5344,7 +5344,7 @@ class Agent:
                 logger.debug(
                     "[TOPIC-ANCHOR-FORBID-DEBUG] agent=%s prev_topic=%r items=%r",
                     self.name,
-                    _last_topic,
+                    self._last_topic,
                     forbidden,
                 )
         elif topic_pipeline_enabled(CFG) and _prev_anchors:
@@ -8871,7 +8871,13 @@ def _print_llm_config_summary(cfg: "Config") -> None:
 def run_cli():
     """Run command line interface - configurable timeout dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=30, show_meta=True)
+    CFG = Config(
+        max_turns=200,
+        timeout_minutes=30,
+        show_meta=True,
+        topics_enabled=False,
+        topic_manager_enabled=False,
+    )
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(
