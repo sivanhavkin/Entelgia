@@ -133,6 +133,7 @@ try:
     )
     from entelgia.web_research import maybe_add_web_context, clear_research_caches
     from entelgia.fixy_research_trigger import clear_trigger_cooldown
+    from entelgia.fixy_semantic_control import FixySemanticController
 
     # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
     from entelgia.loop_guard import (
@@ -180,6 +181,7 @@ try:
         update_claims_memory as _pe_update_claims,
         get_claims_memory as _pe_get_claims_memory,
         add_progress_score as _pe_add_score,
+        replace_last_progress_score as _pe_replace_last_score,
         add_move_type as _pe_add_move,
         get_recent_scores as _pe_get_scores,
         get_recent_move_types as _pe_get_moves,
@@ -385,6 +387,9 @@ except ImportError:
         return _DummyClaimsMemory()
 
     def _pe_add_score(agent_name, score):  # type: ignore[no-redef]
+        pass
+
+    def _pe_replace_last_score(agent_name, score):  # type: ignore[no-redef]
         pass
 
     def _pe_add_move(agent_name, move_type):  # type: ignore[no-redef]
@@ -626,7 +631,7 @@ LLM_OUTPUT_CONTRACT = (
 )
 
 # Per-agent behavioral contracts injected at generation time.
-# These define output logic and allowed moves, not tone or style labels.
+# These define role goals and allowed move variation — not rigid output shapes.
 LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "SOCRATES ROLE GOAL: Expose a weak assumption, contradiction, or hidden dependency.\n"
     "Allowed forms (vary each turn): direct statement | short critique | pointed question | contrast | concrete example.\n"
@@ -2465,7 +2470,7 @@ def _strip_scaffold_labels(text: str) -> str:
     """Strip leaked output-contract labels from agent response.
 
     The LLM is instructed not to emit numbered sections or labels such as
-    'Claim:', 'Mechanism:', '1.', '2.', '3.', but occasionally
+    'Claim:', 'Supporting Reason:', '1.', '2.', '3.', but occasionally
     leaks them anyway.  This function removes such markers while preserving
     the underlying content.
     """
@@ -3128,7 +3133,8 @@ def classify_response_form(text: str) -> str:
 
 
 # Template families — groups of repeated opener patterns that, when used
-# consecutively, signal rhetorical lock-in.
+# consecutively, signal rhetorical lock-in.  Each family maps to a list of
+# compiled patterns that detect the opener variant.
 _TEMPLATE_FAMILIES: Dict[str, List[re.Pattern]] = {
     "challenge_openers": [
         re.compile(r"^blunt challenge\s*:", re.IGNORECASE),
@@ -3158,6 +3164,7 @@ _TEMPLATE_FAMILIES: Dict[str, List[re.Pattern]] = {
     ],
 }
 
+# Max consecutive uses of the same template family before a forced re-generation.
 _TEMPLATE_FAMILY_REPEAT_LIMIT: int = 2
 
 
@@ -3179,6 +3186,7 @@ _ABSTRACT_NOUNS_RE: re.Pattern = re.compile(
     re.IGNORECASE,
 )
 
+# Phrases that indicate a concrete mechanism or example is present.
 _MECHANISM_PATTERNS: re.Pattern = re.compile(
     r"\b(because|since|when|if|unless|causes|leads to|results in|"
     r"for example|such as|consider|imagine|specifically|"
@@ -3186,11 +3194,18 @@ _MECHANISM_PATTERNS: re.Pattern = re.compile(
     re.IGNORECASE,
 )
 
-_ABSTRACTION_PENALTY_NOUN_THRESHOLD: int = 3
+_ABSTRACTION_PENALTY_NOUN_THRESHOLD: int = (
+    3  # ≥ this many abstract nouns triggers check
+)
 
 
 def _check_abstraction_penalty(text: str) -> bool:
-    """Return True if *text* is generic philosophical wallpaper."""
+    """Return True if *text* is generic philosophical wallpaper.
+
+    Fires when ≥ _ABSTRACTION_PENALTY_NOUN_THRESHOLD abstract nouns appear
+    without any concrete mechanism indicator.  The caller should regenerate
+    once when this returns True.
+    """
     if not text:
         return False
     abstract_count = len(_ABSTRACT_NOUNS_RE.findall(text))
@@ -3200,6 +3215,9 @@ def _check_abstraction_penalty(text: str) -> bool:
 
 
 # ── Variation modes per agent ────────────────────────────────────────────────
+# Each agent rotates through a set of named modes.  The same mode may not be
+# used more than 2 consecutive turns unless conflict state forces it.
+
 _VARIATION_MODES: Dict[str, List[str]] = {
     "Socrates": [
         "skeptical",
@@ -3661,6 +3679,7 @@ class TopicManager:
         Returns the new topic label (the internal pointer is updated).
         """
         current = self.current()
+        # Determine current cluster (use loop_guard constants if available)
         current_cluster: Optional[str] = None
         if ENTELGIA_ENHANCED:
             try:
@@ -3668,6 +3687,7 @@ class TopicManager:
             except Exception:
                 current_cluster = None
 
+        # Build candidates from other clusters
         candidates = []
         for topic in self.topics:
             if topic == current:
@@ -3678,6 +3698,7 @@ class TopicManager:
                     candidate_cluster = _TOPIC_TO_CLUSTER.get(topic)
                 except Exception:
                     candidate_cluster = None
+            # Accept if different cluster (or unmapped)
             if current_cluster is None or candidate_cluster != current_cluster:
                 candidates.append(topic)
 
@@ -3686,11 +3707,13 @@ class TopicManager:
             try:
                 self.i = self.topics.index(new_topic)
             except ValueError:
+                # Safety: just advance normally if topic not in list
                 self.advance_round()
                 return self.current()
             logger.info("TopicManager: cluster pivot from %r → %r", current, new_topic)
             return new_topic
 
+        # Fallback: normal advance if no cross-cluster candidate found
         self.advance_round()
         return self.current()
 
@@ -4442,13 +4465,18 @@ class Agent:
         self._last_fatigue_state: str = "none"
         # Energy status (measurement only) — set by speak() every turn; reflects energy regime.
         self._last_energy_status: str = "normal"
+        # Progress score (set by speak(); adjusted by semantic validation in MainScript).
+        self._last_pe_score: float = 0.0
         # ── Anti-repetition form tracking ─────────────────────────────────────
+        # Tracks the last 3 rhetorical forms used by this agent.  The same
+        # form must not be used more than 2 consecutive turns.
         self._last_response_forms: deque = deque(maxlen=3)
+        # Tracks the last 3 template families used (e.g. "challenge_openers").
         self._last_template_families: deque = deque(maxlen=3)
         # ── Variation mode per agent ───────────────────────────────────────────
         _modes = _VARIATION_MODES.get(name, ["default"])
         self._variation_mode: str = _modes[0]
-        self._variation_mode_turns: int = 0
+        self._variation_mode_turns: int = 0  # consecutive turns in current mode
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -4730,6 +4758,12 @@ class Agent:
         )
         drain = min(drain, CFG.energy_drain_max * 2.0)
         self.energy_level = max(0.0, self.energy_level - drain)
+
+    @staticmethod
+    def _extract_topic_from_seed(seed: str) -> str:
+        """Return the topic label from a structured seed string, or '' if absent."""
+        m = re.search(r"TOPIC:\s*([^\n]+)", seed)
+        return m.group(1).strip() if m else ""
 
     def _fetch_affective_ltm_supplement(
         self, existing: List[Dict[str, Any]]
@@ -5145,13 +5179,14 @@ class Agent:
         # When topics are disabled, force _current_topic to "" so that all
         # topic-gated STM/LTM filtering and anchor injection are fully
         # suppressed regardless of what the seed string contains.
-        if topic_pipeline_enabled(CFG):
-            _topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-            _current_topic = _topic_match.group(1).strip() if _topic_match else ""
-            _current_cluster = self.topic_cluster or ""
-        else:
-            _current_topic = ""
-            _current_cluster = ""
+        _current_topic = (
+            self._extract_topic_from_seed(user_seed)
+            if topic_pipeline_enabled(CFG)
+            else ""
+        )
+        _current_cluster = (
+            (self.topic_cluster or "") if topic_pipeline_enabled(CFG) else ""
+        )
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -5172,7 +5207,7 @@ class Agent:
                     )
             stm = stm_filtered[-stm_tail:]
         else:
-            stm = self.memory.stm_load(self.name)[-stm_tail:]
+            stm = all_stm[-stm_tail:]
 
         # ── Topic-gated LTM ────────────────────────────────────────────────
         # Fetch extra candidates so filtering leaves enough relevant entries.
@@ -5411,16 +5446,17 @@ class Agent:
         # Get more LTM entries for better selection
         all_ltm = self.memory.ltm_recent(self.name, limit=20, layer="conscious")
 
+        # Extract topic from seed (used for memory selection and topic anchors).
+        # When topics are disabled, force to "" to prevent any topic-related
+        # processing from running via the extracted label.
+        topic = (
+            self._extract_topic_from_seed(user_seed)
+            if topic_pipeline_enabled(CFG)
+            else ""
+        )
+
         # Use enhanced memory integration if available
         if self.memory_integration and all_ltm:
-            # Extract topic from seed; suppress when topics are disabled so that
-            # memory retrieval is not biased by stale or irrelevant topic strings.
-            if topic_pipeline_enabled(CFG):
-                topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-                topic = topic_match.group(1) if topic_match else ""
-            else:
-                topic = ""
-
             ltm = self.memory_integration.retrieve_relevant_memories(
                 agent_name=self.name,
                 current_topic=topic,
@@ -5512,6 +5548,24 @@ class Agent:
             dissent=float(_debate_prof.get("dissent_level", 0.0)),
             drive_combo=str(_debate_prof.get("drive_combo", "")),
         )
+
+        # ── Topic Anchors: inject topic constraint before generation ──────────
+        _topic_anchors_enh = (
+            TOPIC_ANCHORS.get(topic, []) if topic_pipeline_enabled(CFG) else []
+        )
+        if topic_pipeline_enabled(CFG) and topic and _topic_anchors_enh:
+            topic_constraint = (
+                f"\n\nTopic constraint:\n"
+                f"The active topic is: {topic}.\n"
+                "Your response must stay within this topic.\n"
+                f"Use at least one of these concepts naturally: {', '.join(_topic_anchors_enh)}.\n"
+            )
+            if "\nRespond now:\n" in prompt:
+                prompt = prompt.replace(
+                    "\nRespond now:\n", topic_constraint + "\nRespond now:\n"
+                )
+            else:
+                prompt += topic_constraint
 
         return prompt
 
@@ -5621,9 +5675,11 @@ class Agent:
             )
 
         # ── Variation mode injection ──────────────────────────────────────────
+        # Rotate variation mode when the same mode has been used too long.
         _agent_modes = _VARIATION_MODES.get(self.name, [])
         if _agent_modes:
             if self._variation_mode_turns >= _VARIATION_MODE_MAX_CONSECUTIVE:
+                # Rotate to next mode in the list
                 _curr_idx = (
                     _agent_modes.index(self._variation_mode)
                     if self._variation_mode in _agent_modes
@@ -6297,6 +6353,9 @@ class Agent:
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Style-redundancy check (soft, non-blocking) ───────────────────────────
+        # If the final response is very similar to the last one from this agent,
+        # log a STYLE-REDUNDANCY warning to encourage variation in future turns.
+        # This is a diagnostic signal only — the response is never blocked.
         _own_texts_for_sim = [
             t.get("text", "")
             for t in dialog_tail
@@ -6314,6 +6373,8 @@ class Agent:
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Template family gate ──────────────────────────────────────────────────
+        # If the same opener template family has been used ≥ _TEMPLATE_FAMILY_REPEAT_LIMIT
+        # consecutive turns, regenerate once with an explicit family ban.
         _current_family = _detect_template_family(out)
         _family_history = list(self._last_template_families)
         _family_repeat_count = 0
@@ -6350,7 +6411,7 @@ class Agent:
             _new_family = _detect_template_family(_family_raw)
             if _new_family != _current_family:
                 out = _family_raw
-                _current_family = _new_family
+                _current_family = _new_family  # update for deque storage below
                 logger.info(
                     "[TEMPLATE-FAMILY] agent=%s — new family=%s after regeneration",
                     self.name,
@@ -6374,8 +6435,10 @@ class Agent:
                 _current_family,
                 _family_repeat_count + 1,
             )
+        # Store form and family for next turn's anti-repetition check
         self._last_response_forms.append(_response_form)
         self._last_template_families.append(_current_family)
+        # Update variation mode turn counter
         self._variation_mode_turns += 1
         # ─────────────────────────────────────────────────────────────────────────
 
@@ -6484,6 +6547,8 @@ class Agent:
                     _pe_score,
                     _pe_regen_score,
                 )
+        # Store the final progress score for access by MainScript after speak() returns.
+        self._last_pe_score = _pe_score
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Emotion inference (on final text, after all post-processing) ──────────
@@ -7448,6 +7513,14 @@ class MainScript:
             self._loop_detector = DialogueLoopDetector()
             self._phrase_ban = PhraseBanList()
             self._dialogue_rewriter = DialogueRewriter()
+            # Semantic validation and loop-detection controller (FixySemanticController).
+            # Only instantiate when the observer (Fixy) is enabled to avoid extra
+            # Fixy-model LLM calls when users disable Fixy for performance/cost.
+            self.semantic_controller = (
+                FixySemanticController(self.llm, cfg.model_fixy)
+                if cfg.enable_observer
+                else None
+            )
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
@@ -7455,6 +7528,7 @@ class MainScript:
             self._loop_detector = None
             self._phrase_ban = None
             self._dialogue_rewriter = None
+            self.semantic_controller = None
 
         if not cfg.enable_observer:
             logger.info("Observer (Fixy) disabled via enable_observer=False")
@@ -8128,6 +8202,68 @@ class MainScript:
 
             self.dialog.append({"role": speaker.name, "text": out})
 
+            # ── Semantic validation and loop detection (FixySemanticController) ─────
+            # Call evaluate_reply after each non-Fixy agent turn to check guidance
+            # compliance and detect semantic loops.  Results are logged and fed back
+            # into the progress score to penalise non-compliance and looping.
+            if (
+                self.semantic_controller is not None
+                and speaker.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                _current_fixy_guidance = (
+                    self.interactive_fixy.fixy_guidance
+                    if self.interactive_fixy is not None
+                    else None
+                )
+                _recent_same_speaker_texts = [
+                    t.get("text", "")
+                    for t in self.dialog
+                    if t.get("role") == speaker.name and t.get("text", "").strip()
+                ][-4:-1]  # up to 3 prior turns from this speaker; [-1] is the current turn
+                try:
+                    _validation_result, _loop_result = (
+                        self.semantic_controller.evaluate_reply(
+                            speaker=speaker.name,
+                            text=out,
+                            fixy_guidance=_current_fixy_guidance,
+                            recent_texts=_recent_same_speaker_texts,
+                            stagnation=speaker._last_stagnation,
+                            repeated_moves=bool(_active_loop_modes),
+                            ignored_recently=(
+                                self.interactive_fixy.ignored_guidance_count >= 1
+                                if self.interactive_fixy is not None
+                                else False
+                            ),
+                            unresolved_rising=(speaker.open_questions >= 2),
+                        )
+                    )
+                    if self.cfg.show_meta:
+                        print(
+                            f"[FIXY-VALIDATION] speaker={speaker.name}"
+                            f" compliant={_validation_result.compliant}"
+                        )
+                        print(
+                            f"[FIXY-LOOP] speaker={speaker.name}"
+                            f" is_loop={_loop_result.is_loop}"
+                        )
+                    _progress_score = speaker._last_pe_score
+                    if not _validation_result.compliant:
+                        _progress_score *= 0.85
+                    if _loop_result.is_loop:
+                        _progress_score *= 0.75
+                    speaker._last_pe_score = _progress_score
+                    # Propagate the adjusted score back into the progress-enforcer
+                    # history so that semantic penalties affect stagnation tracking.
+                    _pe_replace_last_score(speaker.name, _progress_score)
+                except Exception:
+                    logger.warning(
+                        "[FIXY-VALIDATION] evaluate_reply failed for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────────
+
             # ── Conceptual loop → stagnation bump ─────────────────────────
             # When a conceptual dependency loop is detected, speak() will not
             # pick it up via Jaccard (wording may differ).  Wire the structural
@@ -8764,7 +8900,13 @@ def _print_llm_config_summary(cfg: "Config") -> None:
 def run_cli():
     """Run command line interface - 200-turn no-timeout dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=0, show_meta=True)
+    CFG = Config(
+        max_turns=200,
+        timeout_minutes=0,
+        show_meta=True,
+        topics_enabled=False,
+        topic_manager_enabled=False,
+    )
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(

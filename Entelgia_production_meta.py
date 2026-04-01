@@ -129,6 +129,7 @@ try:
     )
     from entelgia.web_research import maybe_add_web_context, clear_research_caches
     from entelgia.fixy_research_trigger import clear_trigger_cooldown
+    from entelgia.fixy_semantic_control import FixySemanticController
 
     # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
     from entelgia.loop_guard import (
@@ -176,6 +177,7 @@ try:
         update_claims_memory as _pe_update_claims,
         get_claims_memory as _pe_get_claims_memory,
         add_progress_score as _pe_add_score,
+        replace_last_progress_score as _pe_replace_last_score,
         add_move_type as _pe_add_move,
         get_recent_scores as _pe_get_scores,
         get_recent_move_types as _pe_get_moves,
@@ -380,6 +382,9 @@ except ImportError:
         return _DummyClaimsMemory()
 
     def _pe_add_score(agent_name, score):  # type: ignore[no-redef]
+        pass
+
+    def _pe_replace_last_score(agent_name, score):  # type: ignore[no-redef]
         pass
 
     def _pe_add_move(agent_name, move_type):  # type: ignore[no-redef]
@@ -4455,6 +4460,8 @@ class Agent:
         self._last_fatigue_state: str = "none"
         # Energy status (measurement only) — set by speak() every turn; reflects energy regime.
         self._last_energy_status: str = "normal"
+        # Progress score (set by speak(); adjusted by semantic validation in MainScript).
+        self._last_pe_score: float = 0.0
         # ── Anti-repetition form tracking ─────────────────────────────────────
         # Tracks the last 3 rhetorical forms used by this agent.  The same
         # form must not be used more than 2 consecutive turns.
@@ -5173,7 +5180,7 @@ class Agent:
             else ""
         )
         _current_cluster = (
-            self.topic_cluster or "" if topic_pipeline_enabled(CFG) else ""
+            (self.topic_cluster or "") if topic_pipeline_enabled(CFG) else ""
         )
 
         # ── Topic-gated STM ────────────────────────────────────────────────
@@ -5341,7 +5348,7 @@ class Agent:
                 logger.debug(
                     "[TOPIC-ANCHOR-FORBID-DEBUG] agent=%s prev_topic=%r items=%r",
                     self.name,
-                    _last_topic,
+                    self._last_topic,
                     forbidden,
                 )
         elif topic_pipeline_enabled(CFG) and _prev_anchors:
@@ -6535,6 +6542,8 @@ class Agent:
                     _pe_score,
                     _pe_regen_score,
                 )
+        # Store the final progress score for access by MainScript after speak() returns.
+        self._last_pe_score = _pe_score
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Emotion inference (on final text, after all post-processing) ──────────
@@ -7499,6 +7508,14 @@ class MainScript:
             self._loop_detector = DialogueLoopDetector()
             self._phrase_ban = PhraseBanList()
             self._dialogue_rewriter = DialogueRewriter()
+            # Semantic validation and loop-detection controller (FixySemanticController).
+            # Only instantiate when the observer (Fixy) is enabled to avoid extra
+            # Fixy-model LLM calls when users disable Fixy for performance/cost.
+            self.semantic_controller = (
+                FixySemanticController(self.llm, cfg.model_fixy)
+                if cfg.enable_observer
+                else None
+            )
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
@@ -7506,6 +7523,7 @@ class MainScript:
             self._loop_detector = None
             self._phrase_ban = None
             self._dialogue_rewriter = None
+            self.semantic_controller = None
 
         if not cfg.enable_observer:
             logger.info("Observer (Fixy) disabled via enable_observer=False")
@@ -8169,6 +8187,68 @@ class MainScript:
 
             self.dialog.append({"role": speaker.name, "text": out})
 
+            # ── Semantic validation and loop detection (FixySemanticController) ─────
+            # Call evaluate_reply after each non-Fixy agent turn to check guidance
+            # compliance and detect semantic loops.  Results are logged and fed back
+            # into the progress score to penalise non-compliance and looping.
+            if (
+                self.semantic_controller is not None
+                and speaker.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                _current_fixy_guidance = (
+                    self.interactive_fixy.fixy_guidance
+                    if self.interactive_fixy is not None
+                    else None
+                )
+                _recent_same_speaker_texts = [
+                    t.get("text", "")
+                    for t in self.dialog
+                    if t.get("role") == speaker.name and t.get("text", "").strip()
+                ][-4:-1]  # up to 3 prior turns from this speaker; [-1] is the current turn
+                try:
+                    _validation_result, _loop_result = (
+                        self.semantic_controller.evaluate_reply(
+                            speaker=speaker.name,
+                            text=out,
+                            fixy_guidance=_current_fixy_guidance,
+                            recent_texts=_recent_same_speaker_texts,
+                            stagnation=speaker._last_stagnation,
+                            repeated_moves=bool(_active_loop_modes),
+                            ignored_recently=(
+                                self.interactive_fixy.ignored_guidance_count >= 1
+                                if self.interactive_fixy is not None
+                                else False
+                            ),
+                            unresolved_rising=(speaker.open_questions >= 2),
+                        )
+                    )
+                    if self.cfg.show_meta:
+                        print(
+                            f"[FIXY-VALIDATION] speaker={speaker.name}"
+                            f" compliant={_validation_result.compliant}"
+                        )
+                        print(
+                            f"[FIXY-LOOP] speaker={speaker.name}"
+                            f" is_loop={_loop_result.is_loop}"
+                        )
+                    _progress_score = speaker._last_pe_score
+                    if not _validation_result.compliant:
+                        _progress_score *= 0.85
+                    if _loop_result.is_loop:
+                        _progress_score *= 0.75
+                    speaker._last_pe_score = _progress_score
+                    # Propagate the adjusted score back into the progress-enforcer
+                    # history so that semantic penalties affect stagnation tracking.
+                    _pe_replace_last_score(speaker.name, _progress_score)
+                except Exception:
+                    logger.warning(
+                        "[FIXY-VALIDATION] evaluate_reply failed for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────────
+
             # ── Conceptual loop → stagnation bump ─────────────────────────
             # When a conceptual dependency loop is detected, speak() will not
             # pick it up via Jaccard (wording may differ).  Wire the structural
@@ -8805,7 +8885,13 @@ def _print_llm_config_summary(cfg: "Config") -> None:
 def run_cli():
     """Run command line interface - configurable timeout dialogue."""
     global CFG
-    CFG = Config(max_turns=200, timeout_minutes=30, show_meta=True)
+    CFG = Config(
+        max_turns=200,
+        timeout_minutes=30,
+        show_meta=True,
+        topics_enabled=False,
+        topic_manager_enabled=False,
+    )
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(

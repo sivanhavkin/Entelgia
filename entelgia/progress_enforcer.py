@@ -411,6 +411,18 @@ def add_progress_score(agent_name: str, score: float) -> None:
     _agent_progress_scores[agent_name].append(score)
 
 
+def replace_last_progress_score(agent_name: str, score: float) -> None:
+    """Replace the most recently recorded progress score for *agent_name*.
+
+    Used to apply post-generation penalties (e.g. semantic non-compliance or
+    loop detection) so that stagnation tracking reflects the adjusted score.
+    No-op when no score has been recorded yet.
+    """
+    history = _agent_progress_scores.get(agent_name)
+    if history:
+        history[-1] = score
+
+
 def get_recent_scores(agent_name: str) -> List[float]:
     """Return recent progress scores for *agent_name*."""
     return list(_agent_progress_scores.get(agent_name, []))
