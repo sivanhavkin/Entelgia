@@ -173,6 +173,10 @@ class ContextManager:
         web_context: str = "",
         topic_style: str = "",
         topics_enabled: bool = True,
+        energy: float = 100.0,
+        pressure: float = 0.0,
+        emotion: str = "neutral",
+        emotion_intensity: float = 0.0,
     ) -> str:
         """
         Build rich context with smart truncation and memory integration.
@@ -195,6 +199,10 @@ class ContextManager:
                 ``False``, ``topic_style`` is suppressed regardless of the
                 value passed by the caller, ensuring no topic-related
                 instructions appear in the prompt.
+            energy: Current energy level of the agent (0–100).
+            pressure: Current drive pressure of the agent.
+            emotion: Current dominant emotion label.
+            emotion_intensity: Intensity of the current emotion (0–1).
 
         Returns:
             Formatted prompt string
@@ -234,6 +242,10 @@ class ContextManager:
             agent_pronoun=agent_pronoun,
             web_context=web_context,
             topic_style=topic_style,
+            energy=energy,
+            pressure=pressure,
+            emotion=emotion,
+            emotion_intensity=emotion_intensity,
         )
 
         return prompt
@@ -294,6 +306,10 @@ class ContextManager:
         agent_pronoun: Optional[str] = None,
         web_context: str = "",
         topic_style: str = "",
+        energy: float = 100.0,
+        pressure: float = 0.0,
+        emotion: str = "neutral",
+        emotion_intensity: float = 0.0,
     ) -> str:
         """
         Format enriched prompt with all context.
@@ -311,6 +327,10 @@ class ContextManager:
             agent_pronoun: Pronoun to display (e.g., "he", "she")
             web_context: Optional external knowledge block from web research
             topic_style: Optional style instruction derived from the seed topic cluster
+            energy: Current energy level of the agent (0–100).
+            pressure: Current drive pressure of the agent.
+            emotion: Current dominant emotion label.
+            emotion_intensity: Intensity of the current emotion (0–1).
 
         Returns:
             Formatted prompt
@@ -328,7 +348,17 @@ class ContextManager:
         id_str = drives.get("id_strength", 5.0)
         ego_str = drives.get("ego_strength", 5.0)
         sup_str = drives.get("superego_strength", 5.0)
-        prompt += f"[Drives: id={id_str:.1f} ego={ego_str:.1f} val={sup_str:.1f}]\n"
+        sa_str = drives.get("self_awareness", 0.55)
+        prompt += f"[Drives: id={id_str:.1f} ego={ego_str:.1f} sup={sup_str:.1f} sa={sa_str:.2f}]\n"
+
+        # Add runtime agent state
+        # Sanitize emotion to word characters and hyphens only to prevent injection
+        safe_emotion = re.sub(r"[^\w\-]", "", emotion)[:32] or "neutral"
+        prompt += (
+            f"[State: energy={energy:.1f}"
+            f" pressure={pressure:.2f}"
+            f" emotion={safe_emotion}({emotion_intensity:.2f})]\n"
+        )
 
         # Add debate style
         style = debate_profile.get("style", "integrative")

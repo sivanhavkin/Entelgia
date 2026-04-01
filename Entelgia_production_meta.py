@@ -5252,7 +5252,16 @@ class Agent:
         )
 
         prof = self.debate_profile()
-        prompt += f"[Drives: id={self.drives.get('id_strength', 5.0):.1f} ego={self.drives.get('ego_strength', 5.0):.1f}]\n"
+        prompt += (
+            f"[Drives: id={self.drives.get('id_strength', 5.0):.1f}"
+            f" ego={self.drives.get('ego_strength', 5.0):.1f}"
+            f" sup={self.drives.get('superego_strength', 5.0):.1f}]\n"
+        )
+        prompt += (
+            f"[State: energy={self.energy_level:.1f}"
+            f" pressure={self.drive_pressure:.2f}"
+            f" emotion={self._last_emotion}({self._last_emotion_intensity:.2f})]\n"
+        )
         prompt += f"[Style: {prof['style'][:30]}]\n\n"
 
         for turn in dialog_tail[-5:]:
@@ -5503,6 +5512,10 @@ class Agent:
             web_context=web_context,
             topic_style=self.topic_style,
             topics_enabled=topic_pipeline_enabled(CFG),
+            energy=self.energy_level,
+            pressure=self.drive_pressure,
+            emotion=self._last_emotion,
+            emotion_intensity=self._last_emotion_intensity,
         )
 
         # ── Topic Anchors: inject topic constraint before generation ──────────

@@ -460,5 +460,108 @@ class TestTopicsDisabledInContextManager:
         ), "High-importance but off-topic memory must rank second"
 
 
+# ---------------------------------------------------------------------------
+# Agent state variables in prompt
+# ---------------------------------------------------------------------------
+
+
+class TestAgentStateInPrompt:
+    """Verify that id, ego, superego, self_awareness, energy, pressure, and
+    emotion all appear in the prompt built by ContextManager."""
+
+    def setup_method(self):
+        self.cm = ContextManager()
+
+    def _build(self, **overrides):
+        defaults = dict(
+            agent_name="Socrates",
+            agent_lang="en",
+            persona="A philosopher.",
+            drives={
+                "id_strength": 6.0,
+                "ego_strength": 5.0,
+                "superego_strength": 7.5,
+                "self_awareness": 0.80,
+            },
+            user_seed="What is consciousness?",
+            dialog_tail=[],
+            stm=[],
+            ltm=[],
+            debate_profile={"style": "analytical"},
+            energy=72.5,
+            pressure=3.40,
+            emotion="curious",
+            emotion_intensity=0.65,
+        )
+        defaults.update(overrides)
+        return self.cm.build_enriched_context(**defaults)
+
+    def test_id_drive_in_prompt(self):
+        prompt = self._build()
+        assert "id=" in prompt
+
+    def test_ego_drive_in_prompt(self):
+        prompt = self._build()
+        assert "ego=" in prompt
+
+    def test_superego_drive_in_prompt(self):
+        prompt = self._build()
+        assert "sup=" in prompt
+
+    def test_self_awareness_in_prompt(self):
+        prompt = self._build()
+        assert "sa=" in prompt
+
+    def test_energy_in_prompt(self):
+        prompt = self._build()
+        assert "energy=" in prompt
+
+    def test_pressure_in_prompt(self):
+        prompt = self._build()
+        assert "pressure=" in prompt
+
+    def test_emotion_in_prompt(self):
+        prompt = self._build()
+        assert "emotion=" in prompt
+
+    def test_drive_values_match(self):
+        """The exact drive values passed in must appear in the prompt."""
+        prompt = self._build()
+        assert "id=6.0" in prompt
+        assert "ego=5.0" in prompt
+        assert "sup=7.5" in prompt
+        assert "sa=0.80" in prompt
+
+    def test_state_values_match(self):
+        """The exact state values passed in must appear in the prompt."""
+        prompt = self._build()
+        assert "energy=72.5" in prompt
+        assert "pressure=3.40" in prompt
+        assert "emotion=curious" in prompt
+
+    def test_state_defaults_when_not_provided(self):
+        """When state params are omitted the prompt still contains the keys."""
+        defaults = dict(
+            agent_name="Athena",
+            agent_lang="en",
+            persona="A systems thinker.",
+            drives={
+                "id_strength": 5.0,
+                "ego_strength": 5.0,
+                "superego_strength": 5.0,
+                "self_awareness": 0.55,
+            },
+            user_seed="What is truth?",
+            dialog_tail=[],
+            stm=[],
+            ltm=[],
+            debate_profile={"style": "integrative"},
+        )
+        prompt = self.cm.build_enriched_context(**defaults)
+        assert "energy=" in prompt
+        assert "pressure=" in prompt
+        assert "emotion=" in prompt
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])

@@ -65,6 +65,8 @@ def _make_agent(cfg_overrides=None, last_topic=""):
     agent.memory = memory
     agent._last_emotion = "curious"
     agent._last_emotion_intensity = 0.5
+    agent.energy_level = 100.0
+    agent.drive_pressure = 2.0
     agent.topic_style = ""
     agent.topic_cluster = ""
     agent._last_topic = last_topic
