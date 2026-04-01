@@ -129,7 +129,11 @@ try:
     )
     from entelgia.web_research import maybe_add_web_context, clear_research_caches
     from entelgia.fixy_research_trigger import clear_trigger_cooldown
-    from entelgia.fixy_semantic_control import FixySemanticController
+    from entelgia.fixy_semantic_control import (
+        FixySemanticController,
+        apply_validation_to_progress as _apply_validation_to_progress,
+        apply_loop_to_progress as _apply_loop_to_progress,
+    )
 
     # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
     from entelgia.loop_guard import (
@@ -8233,14 +8237,51 @@ class MainScript:
                             f" is_loop={_loop_result.is_loop}"
                         )
                     _progress_score = speaker._last_pe_score
-                    if not _validation_result.compliant:
-                        _progress_score *= 0.85
-                    if _loop_result.is_loop:
-                        _progress_score *= 0.75
+                    _ignored_count = (
+                        self.interactive_fixy.ignored_guidance_count
+                        if self.interactive_fixy is not None
+                        else 0
+                    )
+                    _progress_score = _apply_validation_to_progress(
+                        _progress_score, _validation_result, _ignored_count
+                    )
+                    _progress_score = _apply_loop_to_progress(
+                        _progress_score, _loop_result
+                    )
+                    # Mirror loop result into dialogue semantic_repeat signal
+                    # and recompute alignment so [SEMANTIC-REPEAT-SYNC] stays coherent.
+                    speaker._last_dialogue_signals["semantic_repeat"] = (
+                        _loop_result.is_loop
+                    )
+                    speaker._last_semantic_repeat_alignment = (
+                        _compute_semantic_repeat_alignment(
+                            _loop_result.is_loop,
+                            speaker._last_stagnation,
+                            speaker.conflict_index(),
+                            speaker.open_questions,
+                        )
+                    )
+                    # Propagate results into Fixy state: update loop pressure,
+                    # bias guidance toward loop-breaking moves, and track
+                    # ignored_guidance_count.
+                    if self.interactive_fixy is not None:
+                        self.interactive_fixy.record_semantic_loop(_loop_result)
+                        self.interactive_fixy.record_guidance_compliance(
+                            _validation_result
+                        )
                     speaker._last_pe_score = _progress_score
                     # Propagate the adjusted score back into the progress-enforcer
                     # history so that semantic penalties affect stagnation tracking.
                     _pe_replace_last_score(speaker.name, _progress_score)
+                    logger.info(
+                        "[FIXY-COUPLING] speaker=%s compliant=%s is_loop=%s"
+                        " progress_after=%.2f semantic_repeat=%s",
+                        speaker.name,
+                        _validation_result.compliant,
+                        _loop_result.is_loop,
+                        _progress_score,
+                        speaker._last_dialogue_signals["semantic_repeat"],
+                    )
                 except Exception:
                     logger.warning(
                         "[FIXY-VALIDATION] evaluate_reply failed for agent=%s",

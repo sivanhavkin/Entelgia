@@ -679,8 +679,8 @@ def apply_loop_to_progress(
 
     Rules (section 12.3 of spec):
 
-    * Semantic loop detected → ×0.75
-    * Loop with confidence >= 0.75 → also cap at 0.50
+    * Semantic loop detected → ×0.70
+    * Loop with confidence >= 0.80 → also cap at 0.50
 
     Parameters
     ----------
@@ -695,8 +695,8 @@ def apply_loop_to_progress(
         Adjusted progress score clamped to [0.0, 1.0].
     """
     if loop_result.is_loop:
-        progress_score *= 0.75
-        if loop_result.confidence >= 0.75:
+        progress_score *= 0.70
+        if loop_result.confidence >= 0.80:
             progress_score = min(progress_score, 0.50)
 
     return float(max(0.0, min(1.0, progress_score)))
