@@ -177,6 +177,7 @@ try:
         update_claims_memory as _pe_update_claims,
         get_claims_memory as _pe_get_claims_memory,
         add_progress_score as _pe_add_score,
+        replace_last_progress_score as _pe_replace_last_score,
         add_move_type as _pe_add_move,
         get_recent_scores as _pe_get_scores,
         get_recent_move_types as _pe_get_moves,
@@ -381,6 +382,9 @@ except ImportError:
         return _DummyClaimsMemory()
 
     def _pe_add_score(agent_name, score):  # type: ignore[no-redef]
+        pass
+
+    def _pe_replace_last_score(agent_name, score):  # type: ignore[no-redef]
         pass
 
     def _pe_add_move(agent_name, move_type):  # type: ignore[no-redef]
@@ -5176,7 +5180,7 @@ class Agent:
             else ""
         )
         _current_cluster = (
-            self.topic_cluster or "" if topic_pipeline_enabled(CFG) else ""
+            (self.topic_cluster or "") if topic_pipeline_enabled(CFG) else ""
         )
 
         # ── Topic-gated STM ────────────────────────────────────────────────
@@ -7505,7 +7509,13 @@ class MainScript:
             self._phrase_ban = PhraseBanList()
             self._dialogue_rewriter = DialogueRewriter()
             # Semantic validation and loop-detection controller (FixySemanticController).
-            self.semantic_controller = FixySemanticController(self.llm, cfg.model_fixy)
+            # Only instantiate when the observer (Fixy) is enabled to avoid extra
+            # Fixy-model LLM calls when users disable Fixy for performance/cost.
+            self.semantic_controller = (
+                FixySemanticController(self.llm, cfg.model_fixy)
+                if cfg.enable_observer
+                else None
+            )
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
@@ -8213,20 +8223,24 @@ class MainScript:
                             unresolved_rising=(speaker.open_questions >= 2),
                         )
                     )
-                    print(
-                        f"[FIXY-VALIDATION] speaker={speaker.name}"
-                        f" compliant={_validation_result.compliant}"
-                    )
-                    print(
-                        f"[FIXY-LOOP] speaker={speaker.name}"
-                        f" is_loop={_loop_result.is_loop}"
-                    )
+                    if self.cfg.show_meta:
+                        print(
+                            f"[FIXY-VALIDATION] speaker={speaker.name}"
+                            f" compliant={_validation_result.compliant}"
+                        )
+                        print(
+                            f"[FIXY-LOOP] speaker={speaker.name}"
+                            f" is_loop={_loop_result.is_loop}"
+                        )
                     _progress_score = speaker._last_pe_score
                     if not _validation_result.compliant:
                         _progress_score *= 0.85
                     if _loop_result.is_loop:
                         _progress_score *= 0.75
                     speaker._last_pe_score = _progress_score
+                    # Propagate the adjusted score back into the progress-enforcer
+                    # history so that semantic penalties affect stagnation tracking.
+                    _pe_replace_last_score(speaker.name, _progress_score)
                 except Exception:
                     logger.warning(
                         "[FIXY-VALIDATION] evaluate_reply failed for agent=%s",
