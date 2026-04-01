@@ -441,7 +441,11 @@ class FixySemanticController:
         if result.compliant and result.confidence < COMPLIANCE_CONFIDENCE_THRESHOLD:
             result.compliant = False
             result.partial = True
-            result.reason = "low_confidence_treated_as_non_compliant"
+            original_reason = result.reason
+            if original_reason:
+                result.reason = f"{original_reason}; low_confidence_treated_as_non_compliant"
+            else:
+                result.reason = "low_confidence_treated_as_non_compliant"
 
         logger.info(
             "[FIXY-VALIDATION] speaker=%s expected=%s compliant=%s partial=%s"
