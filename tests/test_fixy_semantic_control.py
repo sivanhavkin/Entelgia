@@ -574,7 +574,7 @@ def test_apply_loop_low_confidence():
     )
     base = 0.8
     adjusted = apply_loop_to_progress(base, result)
-    assert adjusted == pytest.approx(base * 0.75, abs=1e-6)
+    assert adjusted == pytest.approx(base * 0.70, abs=1e-6)
     # Below confidence threshold — no cap at 0.50
     assert adjusted > 0.50
 
@@ -585,7 +585,7 @@ def test_apply_loop_high_confidence():
     )
     base = 0.8
     adjusted = apply_loop_to_progress(base, result)
-    # ×0.75 then cap at 0.50
+    # ×0.70 then cap at 0.50
     assert adjusted <= 0.50
 
 
