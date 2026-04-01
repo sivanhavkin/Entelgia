@@ -18,7 +18,7 @@ Public API
 ----------
 extract_claims(text)                          -> list[str]
 classify_move(text, history)                  -> str   (move-type constant)
-score_progress(text, history, claims_memory)  -> float (0.0 – 1.0)
+score_progress(text, history, claims_memory, *, fixy_guidance=None, ignored_guidance_count=0)  -> float (0.0 – 1.0)
 detect_stagnation(recent_turns, scores)       -> bool
 get_intervention_policy(stagnation_reason)    -> str
 get_regeneration_instruction()                -> str
@@ -45,7 +45,7 @@ import logging
 import re
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
@@ -693,6 +693,9 @@ def score_progress(
     text: str,
     history: List[str],
     claims_memory: ClaimsMemory,
+    *,
+    fixy_guidance: "Optional[Any]" = None,
+    ignored_guidance_count: int = 0,
 ) -> float:
     """Heuristic progress score in [0.0, 1.0].
 
@@ -718,6 +721,30 @@ def score_progress(
     + 0.20  strong contradiction detected (contradiction_strength > 0.7)
     + 0.20  significant domain / vocabulary shift vs. recent history
     + 0.30  resolution attempt (additional bonus on top of base +0.20)
+
+    Soft Fixy guidance adjustments (v5.2.0)
+    ----------------------------------------
+    ×0.85   ignored_guidance_count >= 2 (soft penalty for repeated ignore)
+    ×0.75   ignored_guidance_count >= 3 (stronger penalty); also caps at 0.55
+    −0.05×c  actual move differs from preferred_move (mismatch penalty)
+    +0.05×c  actual move matches preferred_move (compliance reward)
+
+    Parameters
+    ----------
+    text:
+        The agent response to score.
+    history:
+        Recent dialogue history as plain-text strings.
+    claims_memory:
+        Per-agent claims state tracker.
+    fixy_guidance:
+        Optional :class:`~entelgia.fixy_interactive.FixyGuidance` issued by
+        Fixy before this turn.  When provided, *preferred_move* and
+        *confidence* are used to compute a mismatch penalty or compliance
+        reward.
+    ignored_guidance_count:
+        Number of consecutive turns where the agent did not follow Fixy
+        guidance.  Used to apply a soft multiplier penalty.
     """
     move = classify_move(text, history)
     new_claims = extract_claims(text)
@@ -778,6 +805,40 @@ def score_progress(
         score += 0.20
     if resolution_bonus:
         score += 0.30
+
+    # ------------------------------------------------------------------
+    # Soft Fixy guidance adjustments (v5.2.0)
+    # ------------------------------------------------------------------
+    # 1. Penalty for repeatedly ignoring Fixy guidance — multiplicative so
+    #    it degrades gracefully; never zeroes the score.
+    if ignored_guidance_count >= 3:
+        score *= 0.75
+        score = min(score, 0.55)
+    elif ignored_guidance_count >= 2:
+        score *= 0.85
+
+    # 2. Mismatch / compliance adjustment based on the preferred move type.
+    if fixy_guidance is not None:
+        c = fixy_guidance.confidence
+        if move == fixy_guidance.preferred_move:
+            score += 0.05 * c
+            logger.debug(
+                "[PROGRESS-GUIDANCE] compliance bonus +%.3f (move=%r confidence=%.2f)",
+                0.05 * c,
+                move,
+                c,
+            )
+        else:
+            mismatch_penalty = 0.05 * c
+            score = max(0.0, score - mismatch_penalty)
+            logger.debug(
+                "[PROGRESS-GUIDANCE] mismatch penalty -%.3f"
+                " (actual=%r preferred=%r confidence=%.2f)",
+                mismatch_penalty,
+                move,
+                fixy_guidance.preferred_move,
+                c,
+            )
 
     # Clamp to [0.0, 1.0]
     return float(max(0.0, min(1.0, score)))

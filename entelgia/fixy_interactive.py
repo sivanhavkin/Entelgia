@@ -73,6 +73,47 @@ class FixyGuidance:
     confidence: float
     reason: str
 
+
+# ---------------------------------------------------------------------------
+# Guidance → content hint mapping
+# ---------------------------------------------------------------------------
+
+#: Maps each preferred move type to a short advisory hint that is appended
+#: to the generation prompt when Fixy guidance is active.  The hint steers
+#: the *content style* of the reply without mandating any particular wording.
+_MOVE_CONTENT_HINTS: Dict[str, str] = {
+    "EXAMPLE":       "Provide one concrete real-world example, not only abstract reasoning.",
+    "TEST":          "State one observable or falsifiable condition that could prove your claim wrong.",
+    "CONCESSION":    "Acknowledge one real weakness or blind spot in your own position.",
+    "NEW_FRAME":     "Shift the discussion into a new frame or domain instead of repeating the same abstraction.",
+    "DIRECT_ATTACK": "Directly challenge the strongest assumption in the other side's claim.",
+    "NEW_CLAIM":     "Introduce one genuinely new variable or distinction, not just a rewording.",
+}
+
+
+def build_guidance_prompt_hint(fixy_guidance: Optional[FixyGuidance]) -> str:
+    """Return a short advisory hint derived from *fixy_guidance*.
+
+    The hint is appended softly to the generation prompt so that the agent's
+    content style is nudged toward the move type Fixy recommends.  It is
+    purely advisory — the agent is not required to follow it exactly.
+
+    Parameters
+    ----------
+    fixy_guidance:
+        Active :class:`FixyGuidance` issued by Fixy, or ``None``.
+
+    Returns
+    -------
+    str
+        A non-empty hint string when *fixy_guidance* is provided and its
+        ``preferred_move`` is recognised; an empty string otherwise.
+    """
+    if fixy_guidance is None:
+        return ""
+    return _MOVE_CONTENT_HINTS.get(fixy_guidance.preferred_move, "")
+
+
 # ---------------------------------------------------------------------------
 # Fixy response modes
 # ---------------------------------------------------------------------------
