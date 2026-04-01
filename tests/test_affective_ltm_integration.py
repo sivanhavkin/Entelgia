@@ -94,6 +94,13 @@ def _make_agent(cfg_overrides=None):
     agent.memory = memory
     agent._last_emotion = "curious"
     agent._last_emotion_intensity = 0.6
+    agent.energy_level = 100.0
+    agent.drive_pressure = 2.0
+    agent._last_stagnation = 0.0
+    agent.open_questions = 0
+    agent._last_response_kind = "reflective"
+    agent._last_temperature = 0.65
+    agent.conflict_index = MagicMock(return_value=0.0)
     agent.topic_style = ""
     agent.topic_cluster = ""
     agent._last_topic = ""
@@ -153,6 +160,8 @@ def _make_agent(cfg_overrides=None):
             "style": "reflective",
             "tone": "calm",
             "depth": 0.7,
+            "drive_combo": "balanced",
+            "dissent_level": 0.0,
         }
     )
 

@@ -5252,8 +5252,28 @@ class Agent:
         )
 
         prof = self.debate_profile()
-        prompt += f"[Drives: id={self.drives.get('id_strength', 5.0):.1f} ego={self.drives.get('ego_strength', 5.0):.1f}]\n"
-        prompt += f"[Style: {prof['style'][:30]}]\n\n"
+        prompt += (
+            f"[Drives: id={self.drives.get('id_strength', 5.0):.1f}"
+            f" ego={self.drives.get('ego_strength', 5.0):.1f}"
+            f" sup={self.drives.get('superego_strength', 5.0):.1f}"
+            f" sa={self.drives.get('self_awareness', 0.55):.2f}]\n"
+        )
+        prompt += (
+            f"[State: energy={self.energy_level:.1f}"
+            f" pressure={self.drive_pressure:.2f}"
+            f" conflict={self.conflict_index():.2f}"
+            f" unresolved={self.open_questions}"
+            f" stagnation={self._last_stagnation:.2f}"
+            f" emotion={self._last_emotion}({self._last_emotion_intensity:.2f})"
+            f" kind={self._last_response_kind}"
+            f" temp={self._last_temperature:.2f}"
+            f"]\n"
+        )
+        prompt += (
+            f"[Style: {prof['style'][:30]}"
+            f" | combo={prof.get('drive_combo', '')}"
+            f" | dissent={prof.get('dissent_level', 0.0):.2f}]\n\n"
+        )
 
         for turn in dialog_tail[-5:]:
             role = turn.get("role", "").upper()[:3]
@@ -5488,6 +5508,7 @@ class Agent:
             )
 
         # Use ContextManager to build enriched prompt
+        _debate_prof = self.debate_profile()
         prompt = self.context_mgr.build_enriched_context(
             agent_name=self.name,
             agent_lang=lang,
@@ -5497,12 +5518,23 @@ class Agent:
             dialog_tail=dialog_tail,
             stm=stm,
             ltm=ltm,
-            debate_profile=self.debate_profile(),
+            debate_profile=_debate_prof,
             show_pronoun=CFG.show_pronoun,
             agent_pronoun=agent_pronoun,
             web_context=web_context,
             topic_style=self.topic_style,
             topics_enabled=topic_pipeline_enabled(CFG),
+            energy=self.energy_level,
+            pressure=self.drive_pressure,
+            emotion=self._last_emotion,
+            emotion_intensity=self._last_emotion_intensity,
+            conflict=self.conflict_index(),
+            unresolved=self.open_questions,
+            stagnation=self._last_stagnation,
+            kind=self._last_response_kind,
+            temp=self._last_temperature,
+            dissent=float(_debate_prof.get("dissent_level", 0.0)),
+            drive_combo=str(_debate_prof.get("drive_combo", "")),
         )
 
         # ── Topic Anchors: inject topic constraint before generation ──────────
