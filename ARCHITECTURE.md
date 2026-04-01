@@ -631,3 +631,143 @@ All backends share the same timeout, retry, and caching infrastructure. HTTP req
 All API keys are read from environment variables (`.env` file) and never hard-coded.
 
 ---
+
+## 23) Fixy Semantic Control Layer (`entelgia/fixy_semantic_control.py`, v5.3.0)
+
+### Purpose
+
+A unified semantic validation and loop-detection controller attached to Fixy's guidance system.  It addresses a systematic weakness where Fixy asks for concrete examples, falsifiable tests, or concessions but debate agents produce abstractions while still receiving relatively high progress scores.
+
+### Role Separation
+
+| Role | Component |
+|---|---|
+| Guidance source / spokesperson | `InteractiveFixy` (existing) |
+| Semantic compliance judge | `FixySemanticController.validate_guidance_compliance()` |
+| Semantic repetition judge | `FixySemanticController.detect_semantic_loop()` |
+| Validated targets | Socrates, Athena (Fixy is **not** validated in v1) |
+
+### Core Classes
+
+#### `ValidationResult`
+
+```python
+@dataclass
+class ValidationResult:
+    speaker: str
+    expected_move: str   # move type Fixy requested
+    compliant: bool
+    partial: bool
+    confidence: float    # [0.0, 1.0]
+    reason: str
+```
+
+#### `LoopCheckResult`
+
+```python
+@dataclass
+class LoopCheckResult:
+    speaker: str
+    is_loop: bool
+    confidence: float    # [0.0, 1.0]
+    reason: str
+```
+
+#### `FixySemanticController`
+
+```python
+class FixySemanticController:
+    def __init__(self, llm, model): ...
+    def validate_guidance_compliance(speaker, text, expected_move) -> ValidationResult: ...
+    def detect_semantic_loop(speaker, text, recent_texts) -> LoopCheckResult: ...
+    def evaluate_reply(speaker, text, fixy_guidance, recent_texts, *, stagnation, repeated_moves, ignored_recently, unresolved_rising) -> tuple[ValidationResult, LoopCheckResult]: ...
+```
+
+### Validated Move Types (v1 scope)
+
+Only `EXAMPLE`, `TEST`, and `CONCESSION` are validated in v1.  All other move types return a default compliant result with `confidence=0.5` and `reason="validation_not_required_for_move_type"`.
+
+### Lightweight Pre-Signal Heuristics
+
+`quick_example_hint(text)` and `quick_test_hint(text)` provide a cheap pre-signal based on surface keywords.  They are **never the final authority** — they enrich debug info and help decide whether LLM validation is strongly needed.
+
+### Loop Detection Trigger Gate
+
+`detect_semantic_loop` is gated in `evaluate_reply` — it only runs when at least one trigger condition is true:
+
+* `stagnation > 0.0`
+* `repeated_moves` (move-type repetition detected)
+* `ignored_recently` (Fixy guidance was ignored in recent turns)
+* `unresolved_rising` (count of unresolved claims is growing)
+
+### Safe JSON Parsing
+
+All LLM responses are parsed via `_safe_parse_validation` and `_safe_parse_loop`.  On any parse failure or LLM exception, a low-confidence fallback result is returned.  **The dialogue engine never crashes** because the validator fails.
+
+### Fixy State Integration
+
+Two new methods on `InteractiveFixy`:
+
+| Method | Effect |
+|---|---|
+| `record_guidance_compliance(result)` | Full compliance → resets `ignored_guidance_count`; partial → no change; non-compliance → increments counter, boosts confidence after ≥ 2 ignores |
+| `record_semantic_loop(result)` | Loop detected → increments `semantic_loop_count`, boosts `fixy_guidance.confidence` by 0.1 |
+
+New attribute `semantic_loop_count: int` tracks cumulative loops across the session.
+
+### Progress Score Coupling
+
+`score_progress()` in `entelgia/progress_enforcer.py` accepts two new optional keyword parameters `validation_result` and `loop_result` and applies soft adjustments via two pure-function helpers:
+
+**`apply_validation_to_progress(score, result, ignored_guidance_count)`**
+
+| Condition | Effect |
+|---|---|
+| Full compliance | `+0.05 × confidence` |
+| Partial compliance | `−0.03` |
+| Non-compliance | `×0.85` |
+| Repeated non-compliance (`ignored_guidance_count ≥ 3`) | cap at `0.55` |
+| `validation_not_required_for_move_type` / `no_guidance_active` | no change |
+
+**`apply_loop_to_progress(score, result)`**
+
+| Condition | Effect |
+|---|---|
+| `is_loop=True` | `×0.75` |
+| `is_loop=True` and `confidence ≥ 0.75` | also cap at `0.50` |
+| `is_loop=False` | no change |
+
+All adjustments are **soft** — scores never drop to zero, responses are never rejected.
+
+### Loop-Breaking Moves
+
+When a semantic loop is detected, future Fixy guidance is biased toward loop-breaking move types:
+
+```python
+LOOP_BREAKING_MOVES = ["EXAMPLE", "TEST", "CONCESSION", "NEW_FRAME"]
+```
+
+### Logging
+
+| Tag | Emitted when |
+|---|---|
+| `[FIXY-VALIDATION]` | After every LLM compliance check |
+| `[FIXY-LOOP]` | After every LLM loop check, and when state updates occur |
+
+Example log lines:
+```
+[FIXY-VALIDATION] speaker=Athena expected=EXAMPLE compliant=False partial=True confidence=0.61 reason=abstract_not_concrete
+[FIXY-LOOP] speaker=Socrates is_loop=True confidence=0.83 reason=rephrases_same_conditioning_argument
+```
+
+### Scope Boundaries (v1)
+
+This version does **not**:
+- validate Fixy's own output
+- validate move types beyond EXAMPLE, TEST, CONCESSION
+- compare against full conversation history
+- use embeddings
+- run multiple LLM checks per turn
+- apply hard constraints
+
+---

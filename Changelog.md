@@ -46,6 +46,23 @@ All notable changes to this project will be documented in this file. The format 
 - **`compute_resolution_alignment()` and `compute_semantic_repeat_alignment()` measurement signals** (`entelgia/response_evaluator.py`) — passive per-turn alignment between text-detected resolution/semantic-repeat signals and internal dialogue state. Emitted as `[RESOLUTION-SYNC]` and `[SEMANTIC-REPEAT-SYNC]` log lines. (#362, #363)
 - **Dialogue pressure feedback loop** — soft exponential-weighted moving average (EWM) upward nudge from text-detected pressure into `drive_pressure`: `_PRESSURE_FEEDBACK_ALPHA = 0.15`, upward-only (existing `compute_drive_pressure` decay handles the downward direction), capped at `10.0`. Max single-turn delta is `α × (10 − current)` ≤ 1.5, diminishing as pressure rises. (#361)
 - **Stagnation metric: `_topic_keywords()` and `_keyword_jaccard()`** (`Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`) — replaces the MD5 hash-based exact-match comparison with Jaccard similarity on keyword frozensets. `_JACCARD_STAGNATION_THRESHOLD = 0.35` and `_PE_STAGNATION_INCREMENT = 0.25` are new named constants. Progress-enforcer stagnation detections now feed back into `_last_stagnation` (capped at 1.0), ensuring the meta-state scalar reflects detected behavioural stagnation. (#364)
+- **New module `entelgia/fixy_semantic_control.py` — Fixy Semantic Control Layer (v5.3.0)** — a unified semantic validation and loop-detection controller attached to Fixy's guidance system. Addresses a systematic weakness where Fixy asks for concrete examples, falsifiable tests, or concessions but debate agents produce abstractions while still receiving relatively high progress scores:
+  - **`ValidationResult`** dataclass — `(speaker, expected_move, compliant, partial, confidence, reason)`. Produced by the LLM-backed compliance validator.
+  - **`LoopCheckResult`** dataclass — `(speaker, is_loop, confidence, reason)`. Produced by the LLM-backed loop detector.
+  - **`FixySemanticController`** — main controller class constructed with `(llm, model)`:
+    - `validate_guidance_compliance(speaker, text, expected_move)` — checks whether the reply satisfies the move type Fixy requested. Only validates `EXAMPLE`, `TEST`, `CONCESSION` in v1; all other move types return a default compliant result (`confidence=0.5`, `reason="validation_not_required_for_move_type"`).
+    - `detect_semantic_loop(speaker, text, recent_texts)` — LLM-backed check whether the current reply repeats the same core argument as the last 2–3 turns from the same speaker.
+    - `evaluate_reply(speaker, text, fixy_guidance, recent_texts, *, stagnation, repeated_moves, ignored_recently, unresolved_rising)` — combined entry point; runs both checks with trigger gating (loop check only runs when at least one trigger condition is true).
+  - **Lightweight heuristics** — `quick_example_hint(text)` and `quick_test_hint(text)` provide a cheap pre-signal based on surface keywords; never the final authority.
+  - **Safe JSON parsing** — `_safe_parse_validation` and `_safe_parse_loop` fall back to low-confidence default results on any LLM error or parse failure; the dialogue engine never crashes because the validator fails.
+  - **`apply_validation_to_progress(score, result, ignored_guidance_count) → float`** — pure function that applies guidance compliance coupling to a base progress score: full compliance `+0.05×c`, partial `−0.03`, non-compliance `×0.85`, repeated non-compliance (≥ 3) caps at `0.55`.
+  - **`apply_loop_to_progress(score, result) → float`** — pure function that applies semantic loop coupling: `×0.75` on loop; additionally caps at `0.50` when `confidence ≥ 0.75`.
+  - **`VALIDATED_MOVE_TYPES`** — `frozenset({"EXAMPLE", "TEST", "CONCESSION"})`.
+  - **`LOOP_BREAKING_MOVES`** — `["EXAMPLE", "TEST", "CONCESSION", "NEW_FRAME"]`; used to bias future Fixy guidance when a semantic loop is confirmed.
+- **`record_guidance_compliance(result)` method on `InteractiveFixy`** (`entelgia/fixy_interactive.py`) — updates `ignored_guidance_count` from a `ValidationResult`: full compliance resets the counter; partial compliance leaves it unchanged; non-compliance increments it and boosts `fixy_guidance.confidence` by `0.1` after 2 consecutive non-compliant turns.
+- **`record_semantic_loop(result)` method on `InteractiveFixy`** (`entelgia/fixy_interactive.py`) — processes a `LoopCheckResult`: increments the new `semantic_loop_count` attribute when `is_loop=True` and boosts `fixy_guidance.confidence` by `0.1`.
+- **`semantic_loop_count: int` attribute on `InteractiveFixy`** — cumulative count of semantic loops recorded via `record_semantic_loop()`.  Initialised to `0`.
+- **`[FIXY-VALIDATION]` and `[FIXY-LOOP]` log lines** — emitted at `INFO` level after every semantic compliance check and loop-state update respectively. Format: `[FIXY-VALIDATION] speaker=Athena expected=EXAMPLE compliant=False partial=True confidence=0.61 reason=abstract_not_concrete`; `[FIXY-LOOP] speaker=Socrates is_loop=True confidence=0.83 reason=rephrases_same_conditioning_argument`.
 - **`_MOVE_CONTENT_HINTS` dict** (`entelgia/fixy_interactive.py`) — maps each `preferred_move` type (`EXAMPLE`, `TEST`, `CONCESSION`, `NEW_FRAME`, `DIRECT_ATTACK`, `NEW_CLAIM`) to a short advisory string that steers the content style of the agent's reply without mandating exact wording. (#380)
 - **`build_guidance_prompt_hint(fixy_guidance) → str`** (`entelgia/fixy_interactive.py`) — returns the hint string for the active `preferred_move` from `_MOVE_CONTENT_HINTS`; returns an empty string when `fixy_guidance` is `None` or the move is unrecognised. Purely advisory — no validation or forced compliance. (#380)
 - **Guidance hint injection in `SeedGenerator.generate_seed`** (`entelgia/dialogue_engine.py`) — when `fixy_guidance` is set, `generate_seed` appends `\n[GUIDANCE HINT] <hint>` to the seed text via `build_guidance_prompt_hint`. No effect when guidance is `None` or the move is unrecognised (empty hint is not appended). Backward-compatible — callers that do not pass `fixy_guidance` are unaffected. (#380)
@@ -122,6 +139,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Changed
 
+- **`score_progress()` signature extended with semantic adjustment parameters (v5.3.0)** (`entelgia/progress_enforcer.py`) — two new keyword-only parameters `validation_result` (default `None`) and `loop_result` (default `None`) accepted. When provided, `apply_validation_to_progress` and `apply_loop_to_progress` from `entelgia/fixy_semantic_control` are applied after the existing guidance adjustments. All existing callers are unaffected — both new params are keyword-only with safe `None` defaults.
 - **Fixy perspective-driven prompt language** — all `_MODE_PROMPTS` entries and `_REASON_LABEL_MAP` entries in `entelgia/fixy_interactive.py` rewritten from instruction-driven / control-system framing to perspective-based dialogue participation. Removed procedural labels (`Pattern:`, `Your role:`, `Deadlock:`, `Next move:`, `Loop:`) and trailing imperative step directives (`"Shift the frame entirely."`, `"Name the missing distinction."`). Fixy now observes and reflects rather than commands: e.g. `"The exchange has remained at an abstract level."` instead of `"Pattern: the exchange has remained abstract — shift the frame entirely."` (#342, #343, #344, #345)
 - **`STRUCTURED_MEDIATION` no longer instructs Fixy to suggest a direction** — removed the explicit `"Then suggest a direction:"` step from the `STRUCTURED_MEDIATION` prompt template. Fixy illuminates the structure of disagreement without imposing a resolution path. (#345)
 - **`generate_fixy_analysis()` fallback `dialogue_read`** — replaced the procedural fallback string (`"Detected failure mode: {reason}."`) with a neutral observation. (#345)
@@ -130,6 +148,7 @@ All notable changes to this project will be documented in this file. The format 
 - **`README.md` restructured** — test section collapsed to a single count line (`1274 tests across 33 suites`) with full breakdown in `tests/README.md`; configuration reference extracted to `docs/CONFIGURATION.md`; core feature descriptions trimmed; version table limited to 5 most recent releases; package structure section moved to `PACKAGE_STRUCTURE.md`; new `🧠 LLM Backends Explained` section added before installation steps. (#324, #325, #326, #327, #328)
 - **README Ollama installation note** — added `⚠️ Note` callout under the Ollama step in *What the installer does*, directing users to the Manual Installation section if automatic Ollama setup fails. (#329)
 - **Black formatting applied** — `Entelgia_production_meta.py` and `Entelgia_production_meta_200t.py` reformatted: `_SENSITIVE_KEYS` set literal expanded from single line to multi-line style to satisfy Black's 88-character limit. (#330)
+- **Black formatting applied to semantic control files** — `entelgia/fixy_semantic_control.py`, `entelgia/fixy_interactive.py`, and `tests/test_fixy_semantic_control.py` reformatted to satisfy Black's 88-character line limit.
 
 ### Fixed
 
@@ -141,6 +160,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Tests
 
+- **`test_fixy_semantic_control.py`** (52 new tests) — full coverage of `FixySemanticController`, `ValidationResult`, `LoopCheckResult`, `apply_validation_to_progress`, `apply_loop_to_progress`, `record_guidance_compliance`, `record_semantic_loop`, `evaluate_reply`, `score_progress` integration, and backward compatibility.
 - **`TestStagedInterventionLadder`** (26 new tests in `tests/test_fixy_improvements.py`) — covers: staged mode constants, hard-intervention threshold gating, `_soft_mode_forced` behaviour, prompt label validation (no `Deadlock:`, `Next move:`, `Loop:` in output), `generate_fixy_analysis()` output structure and fallback, and NEW_CLAIM detection gate. (#342)
 - **`TestFixyInterventionsEnabled`** (4 new tests in `tests/test_enable_observer.py`) — default is `False`; interventions blocked when disabled; triggered when enabled; `enable_observer=False` still wins. (#340)
 - **`TestTopicManagerEnabledSwitch`** (5 new tests in `tests/test_topic_enforcer.py`) — default is `False`; both `topics_enabled` and `topic_manager_enabled` must be `True` to instantiate; `topics_enabled=False` always wins regardless of `topic_manager_enabled`. (#340)
@@ -148,7 +168,7 @@ All notable changes to this project will be documented in this file. The format 
 - **`TestPerspectiveDrivenOutput`** (6 new tests in `tests/test_fixy_improvements.py`) — asserts no `Pattern:` or `Your role:` in any `_MODE_PROMPTS` entry; `STRUCTURED_MEDIATION` does not ask Fixy to "suggest a direction"; `_REASON_LABEL_MAP` entries contain no forbidden imperative endings and each includes at least one perspective-based phrase. (#345)
 - **`TestGenerateFixyAnalysis`** (1 new test in `tests/test_fixy_improvements.py`) — `dialogue_read` fallback avoids procedural labels. (#345)
 - **Stop-signal counter tests** (3 new tests in `tests/test_fixy_improvements.py`) — counter increments on successive gate-passes; resets on pair-gate failure; stays at `0` when gate never passes. (#333)
-- **Total test count**: **1270 tests** across **33 suites**.
+- **Total test count**: **1508 tests** across **35 suites**.
 
 ---
 

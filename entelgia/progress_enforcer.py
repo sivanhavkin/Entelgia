@@ -696,6 +696,8 @@ def score_progress(
     *,
     fixy_guidance: "Optional[Any]" = None,
     ignored_guidance_count: int = 0,
+    validation_result: "Optional[Any]" = None,
+    loop_result: "Optional[Any]" = None,
 ) -> float:
     """Heuristic progress score in [0.0, 1.0].
 
@@ -729,6 +731,13 @@ def score_progress(
     −0.05×c  actual move differs from preferred_move (mismatch penalty)
     +0.05×c  actual move matches preferred_move (compliance reward)
 
+    Semantic validation adjustments (v5.3.0)
+    -----------------------------------------
+    Applies :func:`~entelgia.fixy_semantic_control.apply_validation_to_progress`
+    and :func:`~entelgia.fixy_semantic_control.apply_loop_to_progress` when
+    *validation_result* or *loop_result* are provided.  These adjustments are
+    soft and never reduce the score to zero.
+
     Parameters
     ----------
     text:
@@ -745,6 +754,14 @@ def score_progress(
     ignored_guidance_count:
         Number of consecutive turns where the agent did not follow Fixy
         guidance.  Used to apply a soft multiplier penalty.
+    validation_result:
+        Optional :class:`~entelgia.fixy_semantic_control.ValidationResult`
+        from the semantic compliance check.  When provided, guidance
+        compliance coupling (section 12.1) is applied.
+    loop_result:
+        Optional :class:`~entelgia.fixy_semantic_control.LoopCheckResult`
+        from the semantic loop detector.  When provided, loop coupling
+        (section 12.3) is applied.
     """
     move = classify_move(text, history)
     new_claims = extract_claims(text)
@@ -839,6 +856,29 @@ def score_progress(
                 fixy_guidance.preferred_move,
                 c,
             )
+
+    # ------------------------------------------------------------------
+    # Semantic validation and loop adjustments (v5.3.0)
+    # ------------------------------------------------------------------
+    # 3. Guidance compliance coupling from FixySemanticController
+    if validation_result is not None:
+        try:
+            from entelgia.fixy_semantic_control import apply_validation_to_progress
+
+            score = apply_validation_to_progress(
+                score, validation_result, ignored_guidance_count
+            )
+        except Exception:
+            pass  # Never crash the dialogue engine
+
+    # 4. Semantic loop coupling from FixySemanticController
+    if loop_result is not None:
+        try:
+            from entelgia.fixy_semantic_control import apply_loop_to_progress
+
+            score = apply_loop_to_progress(score, loop_result)
+        except Exception:
+            pass  # Never crash the dialogue engine
 
     # Clamp to [0.0, 1.0]
     return float(max(0.0, min(1.0, score)))

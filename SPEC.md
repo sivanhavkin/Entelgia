@@ -341,6 +341,37 @@ Fixy escalates through five levels rather than jumping straight to hard interven
 * **Topic drift**
 * **Persona collapse**
 
+### Soft Guidance System (`FixyGuidance`)
+
+After each intervention, Fixy emits a `FixyGuidance` dataclass `(goal, preferred_move, confidence, reason)` that biases the next agent's seed-strategy selection toward a recommended move type (`EXAMPLE`, `TEST`, `CONCESSION`, etc.) without forcing it.  `record_agent_move()` tracks compliance and escalates `confidence` after 2 consecutive ignores.
+
+### Semantic Compliance & Loop Detection (`entelgia/fixy_semantic_control.py`, v5.3.0)
+
+A unified semantic control layer attached to the guidance system:
+
+| Component | Purpose |
+|---|---|
+| `FixySemanticController` | LLM-backed validator and loop detector |
+| `ValidationResult` | Dataclass: `(speaker, expected_move, compliant, partial, confidence, reason)` |
+| `LoopCheckResult` | Dataclass: `(speaker, is_loop, confidence, reason)` |
+
+**Validation** — Only `EXAMPLE`, `TEST`, `CONCESSION` are validated in v1.  An LLM prompt checks the reply against the corresponding rule set and returns a JSON compliance verdict.  Lightweight pre-signal heuristics (`quick_example_hint`, `quick_test_hint`) provide an early hint but are never the final authority.
+
+**Loop detection** — triggered when any of: `stagnation > 0.0`, `repeated_moves`, `ignored_recently`, or `unresolved_rising` is true.  Compares the current reply against the last 2–3 turns from the same speaker.
+
+**Fixy state updates** — `record_guidance_compliance()` adjusts `ignored_guidance_count` based on the compliance verdict; `record_semantic_loop()` increments `semantic_loop_count` and boosts `fixy_guidance.confidence`.
+
+**Progress coupling** — `apply_validation_to_progress()` and `apply_loop_to_progress()` are pure functions consumed by `score_progress()`:
+
+* Full compliance → `+0.05 × confidence`
+* Partial compliance → `−0.03`
+* Non-compliance → `×0.85`; repeated non-compliance (≥ 3) caps score at `0.55`
+* Semantic loop → `×0.75`; high-confidence loop (≥ 0.75) also caps at `0.50`
+
+**This layer is always soft** — no rejection, regeneration, blocking, or retry.  Detect, score, bias, penalise only.
+
+Log tags: `[FIXY-VALIDATION]`, `[FIXY-LOOP]`.
+
 ### Intervention style
 
 * perspective-driven (observational, not commanding)

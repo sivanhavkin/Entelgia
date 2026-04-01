@@ -78,6 +78,17 @@ from .topic_enforcer import (
     ACCEPT_THRESHOLD,
     SOFT_REANCHOR_THRESHOLD,
 )
+from .fixy_semantic_control import (
+    ValidationResult,
+    LoopCheckResult,
+    FixySemanticController,
+    VALIDATED_MOVE_TYPES,
+    LOOP_BREAKING_MOVES,
+    quick_example_hint,
+    quick_test_hint,
+    apply_validation_to_progress,
+    apply_loop_to_progress,
+)
 
 __all__ = [
     "DialogueEngine",
@@ -138,6 +149,15 @@ __all__ = [
     "topic_pipeline_enabled",
     "ACCEPT_THRESHOLD",
     "SOFT_REANCHOR_THRESHOLD",
+    "ValidationResult",
+    "LoopCheckResult",
+    "FixySemanticController",
+    "VALIDATED_MOVE_TYPES",
+    "LOOP_BREAKING_MOVES",
+    "quick_example_hint",
+    "quick_test_hint",
+    "apply_validation_to_progress",
+    "apply_loop_to_progress",
 ]
 
 __version__ = "5.0.0"
