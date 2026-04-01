@@ -627,7 +627,7 @@ LLM_OUTPUT_CONTRACT = (
 )
 
 # Per-agent behavioral contracts injected at generation time.
-# These define output logic and allowed moves, not tone or style labels.
+# These define role goals and allowed move variation — not rigid output shapes.
 LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "SOCRATES ROLE GOAL: Expose a weak assumption, contradiction, or hidden dependency.\n"
     "Allowed forms (vary each turn): direct statement | short critique | pointed question | contrast | concrete example.\n"
@@ -2466,7 +2466,7 @@ def _strip_scaffold_labels(text: str) -> str:
     """Strip leaked output-contract labels from agent response.
 
     The LLM is instructed not to emit numbered sections or labels such as
-    'Claim:', 'Mechanism:', '1.', '2.', '3.', but occasionally
+    'Claim:', 'Supporting Reason:', '1.', '2.', '3.', but occasionally
     leaks them anyway.  This function removes such markers while preserving
     the underlying content.
     """
@@ -3129,7 +3129,8 @@ def classify_response_form(text: str) -> str:
 
 
 # Template families — groups of repeated opener patterns that, when used
-# consecutively, signal rhetorical lock-in.
+# consecutively, signal rhetorical lock-in.  Each family maps to a list of
+# compiled patterns that detect the opener variant.
 _TEMPLATE_FAMILIES: Dict[str, List[re.Pattern]] = {
     "challenge_openers": [
         re.compile(r"^blunt challenge\s*:", re.IGNORECASE),
@@ -3159,6 +3160,7 @@ _TEMPLATE_FAMILIES: Dict[str, List[re.Pattern]] = {
     ],
 }
 
+# Max consecutive uses of the same template family before a forced re-generation.
 _TEMPLATE_FAMILY_REPEAT_LIMIT: int = 2
 
 
@@ -3180,6 +3182,7 @@ _ABSTRACT_NOUNS_RE: re.Pattern = re.compile(
     re.IGNORECASE,
 )
 
+# Phrases that indicate a concrete mechanism or example is present.
 _MECHANISM_PATTERNS: re.Pattern = re.compile(
     r"\b(because|since|when|if|unless|causes|leads to|results in|"
     r"for example|such as|consider|imagine|specifically|"
@@ -3187,11 +3190,18 @@ _MECHANISM_PATTERNS: re.Pattern = re.compile(
     re.IGNORECASE,
 )
 
-_ABSTRACTION_PENALTY_NOUN_THRESHOLD: int = 3
+_ABSTRACTION_PENALTY_NOUN_THRESHOLD: int = (
+    3  # ≥ this many abstract nouns triggers check
+)
 
 
 def _check_abstraction_penalty(text: str) -> bool:
-    """Return True if *text* is generic philosophical wallpaper."""
+    """Return True if *text* is generic philosophical wallpaper.
+
+    Fires when ≥ _ABSTRACTION_PENALTY_NOUN_THRESHOLD abstract nouns appear
+    without any concrete mechanism indicator.  The caller should regenerate
+    once when this returns True.
+    """
     if not text:
         return False
     abstract_count = len(_ABSTRACT_NOUNS_RE.findall(text))
@@ -3201,6 +3211,9 @@ def _check_abstraction_penalty(text: str) -> bool:
 
 
 # ── Variation modes per agent ────────────────────────────────────────────────
+# Each agent rotates through a set of named modes.  The same mode may not be
+# used more than 2 consecutive turns unless conflict state forces it.
+
 _VARIATION_MODES: Dict[str, List[str]] = {
     "Socrates": [
         "skeptical",
@@ -3665,10 +3678,12 @@ class TopicManager:
         current_cluster: Optional[str] = None
         if ENTELGIA_ENHANCED:
             try:
+                # Determine current cluster (use loop_guard constants if available)
                 current_cluster = _TOPIC_TO_CLUSTER.get(current)
             except Exception:
                 current_cluster = None
 
+        # Build candidates from other clusters
         candidates = []
         for topic in self.topics:
             if topic == current:
@@ -3679,6 +3694,7 @@ class TopicManager:
                     candidate_cluster = _TOPIC_TO_CLUSTER.get(topic)
                 except Exception:
                     candidate_cluster = None
+            # Accept if different cluster (or unmapped)
             if current_cluster is None or candidate_cluster != current_cluster:
                 candidates.append(topic)
 
@@ -3687,11 +3703,13 @@ class TopicManager:
             try:
                 self.i = self.topics.index(new_topic)
             except ValueError:
+                # Safety: just advance normally if topic not in list
                 self.advance_round()
                 return self.current()
             logger.info("TopicManager: cluster pivot from %r → %r", current, new_topic)
             return new_topic
 
+        # Fallback: normal advance if no cross-cluster candidate found
         self.advance_round()
         return self.current()
 
@@ -4446,12 +4464,15 @@ class Agent:
         # Progress score (set by speak(); adjusted by semantic validation in MainScript).
         self._last_pe_score: float = 0.0
         # ── Anti-repetition form tracking ─────────────────────────────────────
+        # Tracks the last 3 rhetorical forms used by this agent.  The same
+        # form must not be used more than 2 consecutive turns.
         self._last_response_forms: deque = deque(maxlen=3)
+        # Tracks the last 3 template families used (e.g. "challenge_openers").
         self._last_template_families: deque = deque(maxlen=3)
         # ── Variation mode per agent ───────────────────────────────────────────
         _modes = _VARIATION_MODES.get(name, ["default"])
         self._variation_mode: str = _modes[0]
-        self._variation_mode_turns: int = 0
+        self._variation_mode_turns: int = 0  # consecutive turns in current mode
         logger.info(f"Agent initialized: {name} (enhanced={self.use_enhanced})")
 
     def conflict_index(self) -> float:
@@ -4733,6 +4754,12 @@ class Agent:
         )
         drain = min(drain, CFG.energy_drain_max * 2.0)
         self.energy_level = max(0.0, self.energy_level - drain)
+
+    @staticmethod
+    def _extract_topic_from_seed(seed: str) -> str:
+        """Return the topic label from a structured seed string, or '' if absent."""
+        m = re.search(r"TOPIC:\s*([^\n]+)", seed)
+        return m.group(1).strip() if m else ""
 
     def _fetch_affective_ltm_supplement(
         self, existing: List[Dict[str, Any]]
@@ -5148,13 +5175,14 @@ class Agent:
         # When topics are disabled, force _current_topic to "" so that all
         # topic-gated STM/LTM filtering and anchor injection are fully
         # suppressed regardless of what the seed string contains.
-        if topic_pipeline_enabled(CFG):
-            _topic_match = re.search(r"TOPIC:\s*([^\n]+)", user_seed)
-            _current_topic = _topic_match.group(1).strip() if _topic_match else ""
-            _current_cluster = self.topic_cluster or ""
-        else:
-            _current_topic = ""
-            _current_cluster = ""
+        _current_topic = (
+            self._extract_topic_from_seed(user_seed)
+            if topic_pipeline_enabled(CFG)
+            else ""
+        )
+        _current_cluster = (
+            self.topic_cluster or "" if topic_pipeline_enabled(CFG) else ""
+        )
 
         # ── Topic-gated STM ────────────────────────────────────────────────
         # Only include STM entries whose topic matches the current topic.
@@ -5175,7 +5203,7 @@ class Agent:
                     )
             stm = stm_filtered[-stm_tail:]
         else:
-            stm = self.memory.stm_load(self.name)[-stm_tail:]
+            stm = all_stm[-stm_tail:]
 
         # ── Topic-gated LTM ────────────────────────────────────────────────
         # Fetch extra candidates so filtering leaves enough relevant entries.
@@ -5232,8 +5260,28 @@ class Agent:
         )
 
         prof = self.debate_profile()
-        prompt += f"[Drives: id={self.drives.get('id_strength', 5.0):.1f} ego={self.drives.get('ego_strength', 5.0):.1f}]\n"
-        prompt += f"[Style: {prof['style'][:30]}]\n\n"
+        prompt += (
+            f"[Drives: id={self.drives.get('id_strength', 5.0):.1f}"
+            f" ego={self.drives.get('ego_strength', 5.0):.1f}"
+            f" sup={self.drives.get('superego_strength', 5.0):.1f}"
+            f" sa={self.drives.get('self_awareness', 0.55):.2f}]\n"
+        )
+        prompt += (
+            f"[State: energy={self.energy_level:.1f}"
+            f" pressure={self.drive_pressure:.2f}"
+            f" conflict={self.conflict_index():.2f}"
+            f" unresolved={self.open_questions}"
+            f" stagnation={self._last_stagnation:.2f}"
+            f" emotion={self._last_emotion}({self._last_emotion_intensity:.2f})"
+            f" kind={self._last_response_kind}"
+            f" temp={self._last_temperature:.2f}"
+            f"]\n"
+        )
+        prompt += (
+            f"[Style: {prof['style'][:30]}"
+            f" | combo={prof.get('drive_combo', '')}"
+            f" | dissent={prof.get('dissent_level', 0.0):.2f}]\n\n"
+        )
 
         for turn in dialog_tail[-5:]:
             role = turn.get("role", "").upper()[:3]
