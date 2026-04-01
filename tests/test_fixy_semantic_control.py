@@ -86,6 +86,25 @@ Covers:
   56. Guidance preferred_move updated to loop-breaking move when non-loop-breaking
   57. Guidance preferred_move unchanged when already a loop-breaking move
   58. Guidance bias rotates through multiple loop-breaking moves
+
+  False-positive prevention (strict validator policy)
+  59. EXAMPLE — abstract philosophical reply → non-compliant
+  60. EXAMPLE — metaphor only → non-compliant
+  61. EXAMPLE — vague "for example" phrase without real specifics → non-compliant
+  62. TEST — general skepticism → non-compliant
+  63. TEST — "we need evidence" with no concrete condition → non-compliant
+  64. TEST — rhetorical challenge without observable criterion → non-compliant
+  65. CONCESSION — fake concession that immediately cancels → non-compliant
+  66. CONCESSION — trivial concession that doesn't weaken position → non-compliant
+  67. CONCESSION — attack on other side disguised as concession → non-compliant
+  68. EXAMPLE positive control — concrete case → compliant
+  69. TEST positive control — specific falsifiable condition → compliant
+  70. CONCESSION positive control — genuine weakness acknowledged → compliant
+
+  Confidence threshold
+  71. Compliant result with confidence >= 0.70 → remains compliant
+  72. Compliant result with confidence < 0.70 → becomes non-compliant with partial=True
+  73. Non-compliant result with low confidence → unchanged (still non-compliant)
 """
 
 import sys
@@ -102,6 +121,7 @@ from entelgia.fixy_semantic_control import (
     FixySemanticController,
     VALIDATED_MOVE_TYPES,
     LOOP_BREAKING_MOVES,
+    COMPLIANCE_CONFIDENCE_THRESHOLD,
     quick_example_hint,
     quick_test_hint,
     apply_validation_to_progress,
@@ -1142,3 +1162,399 @@ def test_guidance_bias_rotates_across_multiple_loops():
         seen_moves.append(fixy.fixy_guidance.preferred_move)
     # Should have used more than one distinct loop-breaking move
     assert len(set(seen_moves)) > 1
+
+
+# ---------------------------------------------------------------------------
+# False-positive prevention — EXAMPLE
+# ---------------------------------------------------------------------------
+
+
+def test_example_false_positive_abstract_philosophical():
+    """Abstract philosophical reasoning must not be marked as a concrete example."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.88,
+            "reason": "abstract_reasoning_no_specific_scenario",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates",
+        "Freedom is the condition of self-determination. Where there is no autonomy, there is no genuine agency.",
+        "EXAMPLE",
+    )
+    assert result.compliant is False
+
+
+def test_example_false_positive_metaphor_only():
+    """A metaphor without a concrete scenario must not count as an example."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.82,
+            "reason": "metaphor_only_no_real_scenario",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Athena",
+        "It is like a river that knows no boundaries — it flows wherever the landscape allows.",
+        "EXAMPLE",
+    )
+    assert result.compliant is False
+
+
+def test_example_false_positive_vague_phrase():
+    """A vague 'for example' phrase without real specifics must not be compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": True,
+            "confidence": 0.76,
+            "reason": "example_phrase_without_real_specifics",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates",
+        "For example, one can imagine a situation where this principle applies broadly.",
+        "EXAMPLE",
+    )
+    assert result.compliant is False
+
+
+# ---------------------------------------------------------------------------
+# False-positive prevention — TEST
+# ---------------------------------------------------------------------------
+
+
+def test_test_false_positive_general_skepticism():
+    """General skepticism without a testable condition must not be compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "only_rhetorical_doubt_no_observable_condition",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Athena",
+        "I remain sceptical. These claims have not been rigorously examined and need scrutiny.",
+        "TEST",
+    )
+    assert result.compliant is False
+
+
+def test_test_false_positive_vague_need_for_evidence():
+    """'We need evidence' without defining a concrete condition must not be compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.83,
+            "reason": "vague_demand_for_proof_no_testable_condition",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates",
+        "We need more evidence before accepting this claim. Science demands rigour.",
+        "TEST",
+    )
+    assert result.compliant is False
+
+
+def test_test_false_positive_rhetorical_challenge():
+    """A rhetorical challenge without an observable criterion must not be compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.81,
+            "reason": "rhetorical_challenge_no_falsifiable_criterion",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Athena",
+        "Can you even prove this? What would convince you otherwise? I challenge you to try.",
+        "TEST",
+    )
+    assert result.compliant is False
+
+
+# ---------------------------------------------------------------------------
+# False-positive prevention — CONCESSION
+# ---------------------------------------------------------------------------
+
+
+def test_concession_false_positive_fake_self_cancelling():
+    """A concession that immediately cancels itself must not be fully compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": True,
+            "confidence": 0.78,
+            "reason": "fake_concession_immediately_cancelled",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates",
+        "One might argue my position has weaknesses, but in reality it handles every case perfectly.",
+        "CONCESSION",
+    )
+    assert result.compliant is False
+
+
+def test_concession_false_positive_trivial():
+    """Admitting something trivial that does not weaken the speaker's position must not count."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.80,
+            "reason": "trivial_admission_does_not_weaken_position",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Athena",
+        "Of course, no argument is perfectly expressed — word choice can always be improved.",
+        "CONCESSION",
+    )
+    assert result.compliant is False
+
+
+def test_concession_false_positive_attack_disguised():
+    """An attack on the other side disguised as a concession must not be compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.84,
+            "reason": "attack_on_other_side_not_own_weakness",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates",
+        "I concede that your position is popular — but popular views are often wrong, as history shows.",
+        "CONCESSION",
+    )
+    assert result.compliant is False
+
+
+# ---------------------------------------------------------------------------
+# Positive controls — strict validator still allows genuine compliance
+# ---------------------------------------------------------------------------
+
+
+def test_example_positive_control_concrete_case():
+    """A genuinely concrete, specific case must remain compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": True,
+            "partial": False,
+            "confidence": 0.92,
+            "reason": "specific_event_identifiable_actors_concrete_outcome",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Athena",
+        "In 2008, Iceland's parliament passed emergency legislation within 48 hours to nationalise its three major banks after their simultaneous collapse.",
+        "EXAMPLE",
+    )
+    assert result.compliant is True
+    assert result.partial is False
+
+
+def test_test_positive_control_specific_falsifiable():
+    """A genuine falsifiable condition must remain compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": True,
+            "partial": False,
+            "confidence": 0.91,
+            "reason": "specific_observable_condition_clearly_stated",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates",
+        "If mindfulness training reduces cortisol, we should see a measurable drop in salivary cortisol within four weeks in a randomised controlled trial.",
+        "TEST",
+    )
+    assert result.compliant is True
+    assert result.partial is False
+
+
+def test_concession_positive_control_genuine_weakness():
+    """A genuine acknowledgement of a real weakness in one's own position must remain compliant."""
+    llm = _ReturnLLM(
+        {
+            "compliant": True,
+            "partial": False,
+            "confidence": 0.90,
+            "reason": "genuine_limitation_in_own_position_acknowledged",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance(
+        "Athena",
+        "I must admit my argument relies heavily on self-reported data, which introduces a serious measurement bias that I have not adequately addressed.",
+        "CONCESSION",
+    )
+    assert result.compliant is True
+    assert result.partial is False
+
+
+# ---------------------------------------------------------------------------
+# Confidence threshold
+# ---------------------------------------------------------------------------
+
+
+def test_confidence_threshold_high_remains_compliant():
+    """A compliant result with confidence >= COMPLIANCE_CONFIDENCE_THRESHOLD must remain compliant."""
+    # Use a value clearly above the threshold
+    high_confidence = COMPLIANCE_CONFIDENCE_THRESHOLD + 0.05
+    llm = _ReturnLLM(
+        {
+            "compliant": True,
+            "partial": False,
+            "confidence": high_confidence,
+            "reason": "borderline_but_acceptable",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance("Socrates", "Some valid example text.", "EXAMPLE")
+    assert result.compliant is True
+    assert "low_confidence_treated_as_non_compliant" not in result.reason
+
+
+def test_confidence_threshold_low_demotes_compliant():
+    """A compliant result with confidence < COMPLIANCE_CONFIDENCE_THRESHOLD must be demoted.
+
+    The original reason from the LLM should be preserved as a prefix so logs remain
+    actionable — the demotion suffix is appended rather than replacing the original.
+    """
+    # Use a value clearly below the threshold
+    low_confidence = COMPLIANCE_CONFIDENCE_THRESHOLD - 0.08
+    llm = _ReturnLLM(
+        {
+            "compliant": True,
+            "partial": False,
+            "confidence": low_confidence,
+            "reason": "abstract_but_possibly_relevant",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance("Athena", "Some abstract text.", "EXAMPLE")
+    assert result.compliant is False
+    assert result.partial is True
+    # Original reason must be preserved and demotion suffix must be appended
+    assert "abstract_but_possibly_relevant" in result.reason
+    assert "low_confidence_treated_as_non_compliant" in result.reason
+    assert result.confidence == pytest.approx(low_confidence)
+
+
+def test_confidence_threshold_non_compliant_unchanged():
+    """A non-compliant result with low confidence must stay non-compliant (no unintended changes)."""
+    low_confidence = COMPLIANCE_CONFIDENCE_THRESHOLD - 0.15
+    llm = _ReturnLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": low_confidence,
+            "reason": "no_example_found",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.validate_guidance_compliance("Socrates", "Pure abstraction.", "EXAMPLE")
+    assert result.compliant is False
+    assert result.partial is False
+    assert result.reason == "no_example_found"
+
+
+# ---------------------------------------------------------------------------
+# Prompt content assertions — verify strict-rejection bias text is present
+# ---------------------------------------------------------------------------
+
+
+class _CaptureLLM:
+    """Stub LLM that records the most recently received prompt, then returns a preset JSON."""
+
+    def __init__(self, payload: dict):
+        self._payload = payload
+        self.last_prompt: str = ""
+
+    def generate(self, model, prompt, **kw):
+        self.last_prompt = prompt
+        return json.dumps(self._payload)
+
+
+_STRICT_REJECTION_PHRASES = [
+    "Be strict.",
+    "compliant=false",
+    "false positive",
+]
+
+
+def test_example_prompt_contains_strict_rejection_bias():
+    """The EXAMPLE validator prompt must contain the strict-rejection bias instructions."""
+    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_example"})
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    ctrl.validate_guidance_compliance("Socrates", "Some reply.", "EXAMPLE")
+    for phrase in _STRICT_REJECTION_PHRASES:
+        assert phrase in llm.last_prompt, f"Expected {phrase!r} in EXAMPLE prompt"
+
+
+def test_example_prompt_contains_disallowed_patterns():
+    """The EXAMPLE prompt must list abstract, metaphor, and hypothetical as non-compliant patterns."""
+    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_example"})
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    ctrl.validate_guidance_compliance("Athena", "Some reply.", "EXAMPLE")
+    for phrase in ("abstract", "metaphor", "hypothetical"):
+        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in EXAMPLE prompt non-compliant list"
+
+
+def test_test_prompt_contains_strict_rejection_bias():
+    """The TEST validator prompt must contain the strict-rejection bias instructions."""
+    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"})
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    ctrl.validate_guidance_compliance("Socrates", "Some reply.", "TEST")
+    for phrase in _STRICT_REJECTION_PHRASES:
+        assert phrase in llm.last_prompt, f"Expected {phrase!r} in TEST prompt"
+
+
+def test_test_prompt_contains_disallowed_patterns():
+    """The TEST prompt must list rhetorical doubt, skepticism, and vague demands as non-compliant."""
+    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"})
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    ctrl.validate_guidance_compliance("Athena", "Some reply.", "TEST")
+    for phrase in ("rhetorical", "skepticism", "vague"):
+        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in TEST prompt non-compliant list"
+
+
+def test_concession_prompt_contains_strict_rejection_bias():
+    """The CONCESSION validator prompt must contain the strict-rejection bias instructions."""
+    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_concession"})
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    ctrl.validate_guidance_compliance("Socrates", "Some reply.", "CONCESSION")
+    for phrase in _STRICT_REJECTION_PHRASES:
+        assert phrase in llm.last_prompt, f"Expected {phrase!r} in CONCESSION prompt"
+
+
+def test_concession_prompt_contains_disallowed_patterns():
+    """The CONCESSION prompt must list fake concession, trivial, and attacks as non-compliant."""
+    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_concession"})
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    ctrl.validate_guidance_compliance("Athena", "Some reply.", "CONCESSION")
+    for phrase in ("fake", "trivial", "attacks"):
+        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in CONCESSION prompt non-compliant list"
