@@ -55,6 +55,11 @@ LOOP_BREAKING_MOVES: List[str] = [
     "NEW_FRAME",
 ]
 
+#: Minimum validator confidence required to grant compliance.
+#: Results with confidence below this threshold are demoted to non-compliant
+#: (partial=True) to prevent false positives from uncertain LLM judgements.
+COMPLIANCE_CONFIDENCE_THRESHOLD: float = 0.70
+
 # ---------------------------------------------------------------------------
 # Result dataclasses
 # ---------------------------------------------------------------------------
@@ -160,12 +165,25 @@ def quick_test_hint(text: str) -> bool:
 _EXAMPLE_PROMPT_TEMPLATE = """\
 You are validating whether a reply actually contains a concrete real-world example.
 
-Rules:
-- A valid example must describe a specific situation, event, or action.
-- Pure abstraction, metaphor, or generalized reasoning does NOT count.
-- A vague example-like phrase without a real scenario does NOT count.
+Be strict.
+If the reply does not clearly satisfy the requirement, mark compliant=false.
+If uncertain, prefer compliant=false rather than a false positive.
+Do not reward replies that merely sound relevant.
+
+A valid example MUST include:
+- a specific situation, event, or scenario
+- identifiable actors, roles, or participants
+- a concrete action, decision, or consequence
+
+A reply is NOT compliant if it is:
+- abstract reasoning
+- metaphor only
+- general commentary
+- a hypothetical without a concrete scenario
+- an example-like phrase without real specifics
 
 Speaker: {speaker}
+
 Reply:
 {text}
 
@@ -180,12 +198,23 @@ Return valid JSON only:
 _TEST_PROMPT_TEMPLATE = """\
 You are validating whether a reply contains a real falsifiable or observable test.
 
-Rules:
-- A valid test must define what evidence, condition, or observable outcome would support or weaken the claim.
-- Pure philosophical doubt or rhetorical challenge does NOT count.
-- A vague call for evidence does NOT count unless the reply itself defines a testable condition.
+Be strict.
+If the reply does not clearly satisfy the requirement, mark compliant=false.
+If uncertain, prefer compliant=false rather than a false positive.
+Do not reward replies that merely sound relevant.
+
+A valid test MUST include:
+- a specific observable condition, outcome, or event
+- a clear statement of what would count as supporting or weakening the claim
+
+A reply is NOT compliant if it only includes:
+- rhetorical doubt
+- general skepticism
+- abstract discussion of evidence
+- vague demands for proof without defining a testable condition
 
 Speaker: {speaker}
+
 Reply:
 {text}
 
@@ -200,12 +229,22 @@ Return valid JSON only:
 _CONCESSION_PROMPT_TEMPLATE = """\
 You are validating whether a reply contains a real concession.
 
-Rules:
-- A valid concession must acknowledge a genuine limitation, blind spot, weakness, uncertainty, or vulnerability in the speaker's own position.
-- A fake concession that immediately cancels itself out does NOT count.
-- Pure attack on the other side does NOT count.
+Be strict.
+If the reply does not clearly satisfy the requirement, mark compliant=false.
+If uncertain, prefer compliant=false rather than a false positive.
+Do not reward replies that merely sound relevant.
+
+A valid concession MUST include:
+- a genuine weakness, limitation, uncertainty, blind spot, or vulnerability
+- this weakness must belong to the speaker's own position
+
+A reply is NOT compliant if it:
+- attacks the other side only
+- uses a fake concession that immediately cancels itself
+- admits something trivial without weakening the speaker's position
 
 Speaker: {speaker}
+
 Reply:
 {text}
 
@@ -397,6 +436,12 @@ class FixySemanticController:
             )
 
         result = _safe_parse_validation(raw, speaker, expected_move)
+
+        # Low-confidence compliance is treated as non-compliant to avoid false positives
+        if result.compliant and result.confidence < COMPLIANCE_CONFIDENCE_THRESHOLD:
+            result.compliant = False
+            result.partial = True
+            result.reason = "low_confidence_treated_as_non_compliant"
 
         logger.info(
             "[FIXY-VALIDATION] speaker=%s expected=%s compliant=%s partial=%s"
