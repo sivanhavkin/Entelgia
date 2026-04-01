@@ -821,6 +821,10 @@ class InteractiveFixy:
         # Short-term memory of the last 3 guidance goals issued by Fixy.  Used
         # to boost confidence when the same goal recurs (signalling persistence).
         self.recent_fixy_goals: deque = deque(maxlen=3)
+        # Cumulative count of semantic loops detected via FixySemanticController.
+        # Incremented by record_semantic_loop; used to escalate future Fixy
+        # guidance pressure toward loop-breaking move types.
+        self.semantic_loop_count: int = 0
 
     # ------------------------------------------------------------------
     # Pair-gating helper
@@ -978,6 +982,118 @@ class InteractiveFixy:
                     self.fixy_guidance.confidence,
                     self.ignored_guidance_count,
                 )
+
+    def record_guidance_compliance(self, result: "Any") -> None:
+        """Update ignored-guidance state from a semantic :class:`~entelgia.fixy_semantic_control.ValidationResult`.
+
+        Complements :meth:`record_agent_move` with finer-grained compliance
+        semantics derived from LLM validation rather than move-type matching.
+
+        Behaviour:
+
+        * Full compliance (``compliant=True``, ``partial=False``) — resets
+          :attr:`ignored_guidance_count` to 0.
+        * Partial compliance (``partial=True``) — does not reset the counter;
+          treats as weak compliance without granting the full reset bonus.
+        * Non-compliance — increments :attr:`ignored_guidance_count` and
+          applies the same confidence-boost escalation as
+          :meth:`record_agent_move`.
+
+        Parameters
+        ----------
+        result:
+            A :class:`~entelgia.fixy_semantic_control.ValidationResult`
+            instance.  Type-annotated as ``Any`` to avoid a circular import at
+            the top of this module.
+        """
+        if self.fixy_guidance is None:
+            return
+        reason = getattr(result, "reason", "")
+        if reason in ("validation_not_required_for_move_type", "no_guidance_active"):
+            return
+
+        compliant = getattr(result, "compliant", False)
+        partial = getattr(result, "partial", False)
+        confidence = getattr(result, "confidence", 0.5)
+
+        if compliant and not partial:
+            logger.info(
+                "[FIXY-VALIDATION] full compliance (speaker=%r expected=%r"
+                " confidence=%.2f) — resetting ignored count",
+                getattr(result, "speaker", "?"),
+                getattr(result, "expected_move", "?"),
+                confidence,
+            )
+            self.ignored_guidance_count = 0
+        elif partial:
+            logger.info(
+                "[FIXY-VALIDATION] partial compliance (speaker=%r expected=%r"
+                " confidence=%.2f) — not resetting ignored count",
+                getattr(result, "speaker", "?"),
+                getattr(result, "expected_move", "?"),
+                confidence,
+            )
+            # Weak compliance: do not reset, do not increment
+        else:
+            self.ignored_guidance_count += 1
+            logger.info(
+                "[FIXY-VALIDATION] non-compliance (speaker=%r expected=%r"
+                " confidence=%.2f) — ignored_count=%d",
+                getattr(result, "speaker", "?"),
+                getattr(result, "expected_move", "?"),
+                confidence,
+                self.ignored_guidance_count,
+            )
+            if self.ignored_guidance_count >= 2:
+                self.fixy_guidance.confidence = min(
+                    1.0, self.fixy_guidance.confidence + 0.1
+                )
+                logger.info(
+                    "[FIXY-VALIDATION] guidance confidence boosted to %.2f"
+                    " after %d non-compliant turns",
+                    self.fixy_guidance.confidence,
+                    self.ignored_guidance_count,
+                )
+
+    def record_semantic_loop(self, result: "Any") -> None:
+        """Update loop-pressure state from a :class:`~entelgia.fixy_semantic_control.LoopCheckResult`.
+
+        When a semantic loop is detected:
+
+        * Increments :attr:`semantic_loop_count`.
+        * Boosts :attr:`fixy_guidance` confidence slightly so that the next
+          Fixy guidance signal is stronger.
+
+        Parameters
+        ----------
+        result:
+            A :class:`~entelgia.fixy_semantic_control.LoopCheckResult`
+            instance.  Type-annotated as ``Any`` to avoid a circular import.
+        """
+        is_loop = getattr(result, "is_loop", False)
+        confidence = getattr(result, "confidence", 0.5)
+        speaker = getattr(result, "speaker", "?")
+
+        if not is_loop:
+            return
+
+        self.semantic_loop_count += 1
+        logger.info(
+            "[FIXY-LOOP] semantic loop recorded (speaker=%r confidence=%.2f"
+            " total_loops=%d)",
+            speaker,
+            confidence,
+            self.semantic_loop_count,
+        )
+
+        if self.fixy_guidance is not None:
+            self.fixy_guidance.confidence = min(
+                1.0, self.fixy_guidance.confidence + 0.1
+            )
+            logger.info(
+                "[FIXY-LOOP] guidance confidence boosted to %.2f after semantic loop",
+                self.fixy_guidance.confidence,
+            )
 
     def _intervene(self, reason: str) -> Tuple[bool, str]:
         """Build guidance and return an intervention result.
