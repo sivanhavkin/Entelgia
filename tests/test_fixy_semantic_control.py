@@ -76,6 +76,16 @@ Covers:
   Constants
   51. VALIDATED_MOVE_TYPES content check
   52. LOOP_BREAKING_MOVES content check
+
+  semantic_repeat follows loop result
+  53. semantic_repeat=True after loop detected
+  54. semantic_repeat=False after no-loop result
+  55. semantic_repeat follows latest result (alternating True/False)
+
+  Loop-breaking guidance bias
+  56. Guidance preferred_move updated to loop-breaking move when non-loop-breaking
+  57. Guidance preferred_move unchanged when already a loop-breaking move
+  58. Guidance bias rotates through multiple loop-breaking moves
 """
 
 import sys
@@ -1037,3 +1047,98 @@ def test_validated_move_types_content():
 def test_loop_breaking_moves_content():
     for move in ("EXAMPLE", "TEST", "CONCESSION", "NEW_FRAME"):
         assert move in LOOP_BREAKING_MOVES
+
+
+# ---------------------------------------------------------------------------
+# semantic_repeat follows loop result
+# ---------------------------------------------------------------------------
+
+
+def test_semantic_repeat_true_after_loop():
+    """record_semantic_loop sets semantic_repeat=True when is_loop=True."""
+    fixy = _make_fixy()
+    assert fixy.semantic_repeat is False  # default
+    result = LoopCheckResult(
+        speaker="Socrates", is_loop=True, confidence=0.8, reason="rephrasing"
+    )
+    fixy.record_semantic_loop(result)
+    assert fixy.semantic_repeat is True
+
+
+def test_semantic_repeat_false_after_no_loop():
+    """record_semantic_loop sets semantic_repeat=False when is_loop=False."""
+    fixy = _make_fixy()
+    # Prime it to True first
+    loop_true = LoopCheckResult(
+        speaker="Socrates", is_loop=True, confidence=0.8, reason="rephrasing"
+    )
+    fixy.record_semantic_loop(loop_true)
+    assert fixy.semantic_repeat is True
+
+    loop_false = LoopCheckResult(
+        speaker="Socrates", is_loop=False, confidence=0.8, reason="new_argument"
+    )
+    fixy.record_semantic_loop(loop_false)
+    assert fixy.semantic_repeat is False
+
+
+def test_semantic_repeat_follows_latest_result():
+    """semantic_repeat always reflects the most recent LoopCheckResult."""
+    fixy = _make_fixy()
+    results = [True, False, True, False]
+    for is_loop in results:
+        r = LoopCheckResult(
+            speaker="Athena", is_loop=is_loop, confidence=0.7, reason="check"
+        )
+        fixy.record_semantic_loop(r)
+        assert fixy.semantic_repeat is is_loop
+
+
+# ---------------------------------------------------------------------------
+# Loop-breaking guidance bias
+# ---------------------------------------------------------------------------
+
+
+def test_guidance_biased_toward_loop_breaking_when_non_loop_move():
+    """When loop detected and preferred_move is not a loop-breaker, it should be updated."""
+    from entelgia.fixy_interactive import _SEMANTIC_LOOP_BIAS_MOVES
+
+    fixy = _make_fixy()
+    # NEW_CLAIM is not a loop-breaking move
+    fixy.fixy_guidance = _make_guidance(preferred_move="NEW_CLAIM", confidence=0.5)
+    result = LoopCheckResult(
+        speaker="Socrates", is_loop=True, confidence=0.8, reason="rephrasing"
+    )
+    fixy.record_semantic_loop(result)
+    # The preferred_move should now be a loop-breaking move
+    assert fixy.fixy_guidance.preferred_move in _SEMANTIC_LOOP_BIAS_MOVES
+
+
+def test_guidance_not_biased_when_already_loop_breaking():
+    """When preferred_move is already a loop-breaker, it should stay unchanged."""
+    fixy = _make_fixy()
+    fixy.fixy_guidance = _make_guidance(preferred_move="EXAMPLE", confidence=0.5)
+    result = LoopCheckResult(
+        speaker="Socrates", is_loop=True, confidence=0.8, reason="rephrasing"
+    )
+    fixy.record_semantic_loop(result)
+    # EXAMPLE is already a loop-breaking move — should remain unchanged
+    assert fixy.fixy_guidance.preferred_move == "EXAMPLE"
+
+
+def test_guidance_bias_rotates_across_multiple_loops():
+    """Repeated loop detections cycle through different loop-breaking moves."""
+    from entelgia.fixy_interactive import _SEMANTIC_LOOP_BIAS_MOVES
+
+    fixy = _make_fixy()
+    seen_moves = []
+    for _ in range(len(_SEMANTIC_LOOP_BIAS_MOVES) + 1):
+        # Reset guidance to a non-loop-breaking move each iteration
+        fixy.fixy_guidance = _make_guidance(preferred_move="NEW_CLAIM", confidence=0.5)
+        r = LoopCheckResult(
+            speaker="Socrates", is_loop=True, confidence=0.8, reason="rephrasing"
+        )
+        fixy.record_semantic_loop(r)
+        seen_moves.append(fixy.fixy_guidance.preferred_move)
+    # Should have used more than one distinct loop-breaking move
+    assert len(set(seen_moves)) > 1
