@@ -378,6 +378,19 @@ _ROTATION_TRIGGER_REASONS: frozenset = frozenset(
     {"loop_repetition", "fixy_mediation_loop", "circular_reasoning"}
 )
 
+#: Guidance move types that break semantic loops.  When :meth:`InteractiveFixy.record_semantic_loop`
+#: detects a loop and the active guidance preferred move is not already in this
+#: set, the preferred move is updated to the next entry in this list (rotating
+#: by :attr:`InteractiveFixy.semantic_loop_count`) to bias future generation
+#: toward genuinely novel moves.  Mirrors ``LOOP_BREAKING_MOVES`` in
+#: :mod:`entelgia.fixy_semantic_control` to avoid a circular import.
+_SEMANTIC_LOOP_BIAS_MOVES: List[str] = [
+    "EXAMPLE",
+    "TEST",
+    "CONCESSION",
+    "NEW_FRAME",
+]
+
 # Number of recent Fixy intervention texts to retain for deduplication.
 # The prompt instructs the LLM not to repeat the same framings or examples
 # used in the last _INTERVENTION_DEDUP_WINDOW interventions.
@@ -825,6 +838,11 @@ class InteractiveFixy:
         # Incremented by record_semantic_loop; used to escalate future Fixy
         # guidance pressure toward loop-breaking move types.
         self.semantic_loop_count: int = 0
+        # Latest semantic-loop detection result.  Updated every time
+        # record_semantic_loop() is called — True when the most recent check
+        # flagged a loop, False otherwise.  Callers may read this to wire the
+        # signal into broader dialogue-state tracking (e.g. semantic_repeat).
+        self.semantic_repeat: bool = False
 
     # ------------------------------------------------------------------
     # Pair-gating helper
@@ -1058,11 +1076,20 @@ class InteractiveFixy:
     def record_semantic_loop(self, result: "Any") -> None:
         """Update loop-pressure state from a :class:`~entelgia.fixy_semantic_control.LoopCheckResult`.
 
+        Always updates :attr:`semantic_repeat` to mirror ``result.is_loop`` so
+        that callers can read the flag without checking the result object
+        directly.
+
         When a semantic loop is detected:
 
         * Increments :attr:`semantic_loop_count`.
         * Boosts :attr:`fixy_guidance` confidence slightly so that the next
           Fixy guidance signal is stronger.
+        * When the active guidance ``preferred_move`` is not already a
+          loop-breaking move, rotates it to the next entry in
+          :data:`_SEMANTIC_LOOP_BIAS_MOVES` so that future generation is
+          biased toward genuinely novel moves (EXAMPLE, TEST, CONCESSION,
+          NEW_FRAME).
 
         Parameters
         ----------
@@ -1073,6 +1100,9 @@ class InteractiveFixy:
         is_loop = getattr(result, "is_loop", False)
         confidence = getattr(result, "confidence", 0.5)
         speaker = getattr(result, "speaker", "?")
+
+        # Always mirror the latest loop-detection outcome.
+        self.semantic_repeat = bool(is_loop)
 
         if not is_loop:
             return
@@ -1094,6 +1124,21 @@ class InteractiveFixy:
                 "[FIXY-LOOP] guidance confidence boosted to %.2f after semantic loop",
                 self.fixy_guidance.confidence,
             )
+            # Bias preferred_move toward loop-breaking moves when the current
+            # guidance is not already requesting one.  Rotates through
+            # _SEMANTIC_LOOP_BIAS_MOVES so repeated loops cycle through all
+            # loop-breaking move types rather than always landing on the same
+            # one.
+            if self.fixy_guidance.preferred_move not in _SEMANTIC_LOOP_BIAS_MOVES:
+                bias_move = _SEMANTIC_LOOP_BIAS_MOVES[
+                    (self.semantic_loop_count - 1) % len(_SEMANTIC_LOOP_BIAS_MOVES)
+                ]
+                logger.info(
+                    "[FIXY-LOOP] biasing preferred_move %r → %r after semantic loop",
+                    self.fixy_guidance.preferred_move,
+                    bias_move,
+                )
+                self.fixy_guidance.preferred_move = bias_move
 
     def _intervene(self, reason: str) -> Tuple[bool, str]:
         """Build guidance and return an intervention result.
