@@ -342,7 +342,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 1456 total tests across 34 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator) |
+| **Unit Tests** | `pytest` | Runs 1508 total tests across 35 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator, fixy soft enforcement, fixy semantic control) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -848,3 +848,83 @@ Tests verify Soft Fixy Enforcement v1 and v2 across `entelgia/fixy_interactive.p
 - ✅ **`build_guidance_prompt_hint`** — returns empty string for `None`; returns non-empty, content-appropriate hint for each move type (`EXAMPLE`, `TEST`, `CONCESSION`, `NEW_FRAME`, `DIRECT_ATTACK`, `NEW_CLAIM`); all `MOVE_TYPES` covered; unknown move returns empty string
 - ✅ **Hint injection in seed** — hint text present in seed when guidance given; `[GUIDANCE HINT]` absent when guidance is `None`; no hint tag for unrecognised move
 - ✅ **`score_progress` guidance adjustments** — no penalty at count 0; penalty applied at count ≥ 2 (`×0.85`); stronger penalty at count ≥ 3 (`×0.75`); score capped at 0.55 at count ≥ 3; penalty never zeroes score; mismatch penalty reduces score; compliance reward increases score; backward compat without new params; score always in `[0.0, 1.0]`
+
+---
+
+### 🧠 Fixy Semantic Control Tests (52 tests)
+
+```bash
+pytest tests/test_fixy_semantic_control.py -v
+```
+
+Tests verify the integrated Fixy semantic validation and loop-detection layer (`entelgia/fixy_semantic_control.py`) and its coupling to `entelgia/fixy_interactive.py` and `entelgia/progress_enforcer.py`:
+
+**Validation — `validate_guidance_compliance`**
+- ✅ **EXAMPLE compliant** — concrete real-world scenario → `compliant=True`
+- ✅ **EXAMPLE non-compliant** — pure abstraction → `compliant=False`
+- ✅ **TEST compliant** — falsifiable observable condition → `compliant=True`
+- ✅ **TEST non-compliant** — vague call for evidence → `compliant=False`
+- ✅ **CONCESSION compliant** — genuine limitation acknowledged → `compliant=True`
+- ✅ **CONCESSION fake** — self-cancelling concession → `partial=True` or `compliant=False`
+- ✅ **Non-validated move types** — `NEW_CLAIM`, `DIRECT_ATTACK`, etc. return default compliant result (`confidence=0.5`, `reason="validation_not_required_for_move_type"`)
+
+**Loop detection — `detect_semantic_loop`**
+- ✅ **Loop detected** — same argument rewritten 2–3 ways → `is_loop=True`
+- ✅ **No loop** — clearly new distinction introduced → `is_loop=False`
+- ✅ **No recent texts** — empty input returns `is_loop=False`, `reason="no_recent_texts_to_compare"`
+
+**Heuristics**
+- ✅ **`quick_example_hint`** — positive and negative signal verified
+- ✅ **`quick_test_hint`** — positive and negative signal verified
+
+**Safe JSON parsing & error handling**
+- ✅ **Malformed JSON in validation** → `ValidationResult` fallback (`confidence=0.3`, `reason="validator_parse_failed"`)
+- ✅ **Malformed JSON in loop check** → `LoopCheckResult` fallback (`is_loop=False`, `reason="loop_parse_failed"`)
+- ✅ **LLM exception in validation** → fallback returned, no crash
+- ✅ **LLM exception in loop detection** → fallback returned, no crash
+
+**`apply_validation_to_progress`**
+- ✅ Full compliance raises score by `0.05 × confidence`
+- ✅ Partial compliance lowers score by `0.03`
+- ✅ Non-compliance multiplies by `0.85`
+- ✅ Repeated non-compliance (`ignored_guidance_count ≥ 3`) caps at `0.55`
+- ✅ `validation_not_required_for_move_type` — score unchanged
+- ✅ `no_guidance_active` — score unchanged
+
+**`apply_loop_to_progress`**
+- ✅ No loop → score unchanged
+- ✅ Low-confidence loop → `×0.75` only; score stays above `0.50`
+- ✅ High-confidence loop (≥ 0.75) → `×0.75` and cap at `0.50`
+- ✅ `is_loop=False` → no change
+
+**`InteractiveFixy` integration**
+- ✅ `record_guidance_compliance` — full compliance resets `ignored_guidance_count`
+- ✅ `record_guidance_compliance` — non-compliance increments counter
+- ✅ `record_guidance_compliance` — partial compliance leaves counter unchanged
+- ✅ `record_guidance_compliance` — boosts `fixy_guidance.confidence` after 2 non-compliant turns
+- ✅ `record_guidance_compliance` — no-op when no active guidance
+- ✅ `record_guidance_compliance` — skips for `validation_not_required_for_move_type`
+- ✅ `record_semantic_loop` — loop increments `semantic_loop_count`
+- ✅ `record_semantic_loop` — non-loop leaves `semantic_loop_count` unchanged
+- ✅ `record_semantic_loop` — loop boosts `fixy_guidance.confidence`
+- ✅ `record_semantic_loop` — no crash when `fixy_guidance` is `None`
+
+**`evaluate_reply`**
+- ✅ No active guidance → neutral `ValidationResult` (`reason="no_guidance_active"`)
+- ✅ Loop check skipped when no trigger conditions (`reason="loop_check_not_triggered"`)
+- ✅ Loop check runs when `stagnation > 0`
+- ✅ Loop check runs when `repeated_moves=True`
+- ✅ Loop check runs when `ignored_recently=True`
+- ✅ Loop check runs when `unresolved_rising=True`
+
+**`score_progress` integration**
+- ✅ Semantic loop lowers progress score vs. baseline
+- ✅ Full compliance boosts progress score vs. baseline
+- ✅ Non-compliance lowers progress score vs. baseline
+- ✅ Backward compatibility — `validation_result=None` leaves score in `[0.0, 1.0]`
+- ✅ Backward compatibility — `loop_result=None` leaves score in `[0.0, 1.0]`
+- ✅ Score never goes below `0.0` after loop adjustment
+
+**Constants**
+- ✅ `VALIDATED_MOVE_TYPES` contains `EXAMPLE`, `TEST`, `CONCESSION` and excludes `NEW_CLAIM`
+- ✅ `LOOP_BREAKING_MOVES` contains `EXAMPLE`, `TEST`, `CONCESSION`, `NEW_FRAME`

@@ -546,10 +546,7 @@ class FixySemanticController:
 
         # --- Semantic loop detection (gated by trigger conditions) ---
         should_check_loop = (
-            stagnation > 0.0
-            or repeated_moves
-            or ignored_recently
-            or unresolved_rising
+            stagnation > 0.0 or repeated_moves or ignored_recently or unresolved_rising
         )
 
         if should_check_loop and recent_texts:

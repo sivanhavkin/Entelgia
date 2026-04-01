@@ -82,12 +82,12 @@ class FixyGuidance:
 #: to the generation prompt when Fixy guidance is active.  The hint steers
 #: the *content style* of the reply without mandating any particular wording.
 _MOVE_CONTENT_HINTS: Dict[str, str] = {
-    "EXAMPLE":       "Provide one concrete real-world example, not only abstract reasoning.",
-    "TEST":          "State one observable or falsifiable condition that could prove your claim wrong.",
-    "CONCESSION":    "Acknowledge one real weakness or blind spot in your own position.",
-    "NEW_FRAME":     "Shift the discussion into a new frame or domain instead of repeating the same abstraction.",
+    "EXAMPLE": "Provide one concrete real-world example, not only abstract reasoning.",
+    "TEST": "State one observable or falsifiable condition that could prove your claim wrong.",
+    "CONCESSION": "Acknowledge one real weakness or blind spot in your own position.",
+    "NEW_FRAME": "Shift the discussion into a new frame or domain instead of repeating the same abstraction.",
     "DIRECT_ATTACK": "Directly challenge the strongest assumption in the other side's claim.",
-    "NEW_CLAIM":     "Introduce one genuinely new variable or distinction, not just a rewording.",
+    "NEW_CLAIM": "Introduce one genuinely new variable or distinction, not just a rewording.",
 }
 
 
@@ -334,18 +334,18 @@ _REASON_LABEL_MAP: Dict[str, str] = {
 # :class:`FixyGuidance` object and then adjusts confidence based on how many
 # times the same goal has appeared in ``recent_fixy_goals``.
 _REASON_GUIDANCE_MAP: Dict[str, Tuple[str, str, float]] = {
-    "loop_repetition":          ("break_repetition",         "NEW_FRAME",     0.7),
-    "weak_conflict":            ("sharpen_conflict",          "DIRECT_ATTACK", 0.6),
-    "premature_synthesis":      ("define_test",               "TEST",          0.7),
-    "topic_stagnation":         ("introduce_new_frame",       "NEW_FRAME",     0.6),
-    "circular_reasoning":       ("ground_argument",           "EXAMPLE",       0.7),
-    "high_conflict_no_resolution": ("find_common_ground",    "CONCESSION",    0.6),
-    "shallow_discussion":       ("deepen_argument",           "TEST",          0.6),
-    "synthesis_opportunity":    ("define_observable_marker",  "TEST",          0.65),
-    "fixy_mediation_loop":      ("clarify_terms",             "NEW_CLAIM",     0.6),
-    "axis_stagnation":          ("break_repetition",          "EXAMPLE",       0.65),
-    "conceptual_loop":          ("define_mechanism",          "NEW_CLAIM",     0.7),
-    "meta_reflection_needed":   ("reflect_on_progress",       "NEW_FRAME",     0.5),
+    "loop_repetition": ("break_repetition", "NEW_FRAME", 0.7),
+    "weak_conflict": ("sharpen_conflict", "DIRECT_ATTACK", 0.6),
+    "premature_synthesis": ("define_test", "TEST", 0.7),
+    "topic_stagnation": ("introduce_new_frame", "NEW_FRAME", 0.6),
+    "circular_reasoning": ("ground_argument", "EXAMPLE", 0.7),
+    "high_conflict_no_resolution": ("find_common_ground", "CONCESSION", 0.6),
+    "shallow_discussion": ("deepen_argument", "TEST", 0.6),
+    "synthesis_opportunity": ("define_observable_marker", "TEST", 0.65),
+    "fixy_mediation_loop": ("clarify_terms", "NEW_CLAIM", 0.6),
+    "axis_stagnation": ("break_repetition", "EXAMPLE", 0.65),
+    "conceptual_loop": ("define_mechanism", "NEW_CLAIM", 0.7),
+    "meta_reflection_needed": ("reflect_on_progress", "NEW_FRAME", 0.5),
 }
 
 #: Per-repetition confidence increment added when the same goal recurs in

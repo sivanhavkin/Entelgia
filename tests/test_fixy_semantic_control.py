@@ -100,7 +100,6 @@ from entelgia.fixy_semantic_control import (
 from entelgia.fixy_interactive import FixyGuidance, InteractiveFixy
 import entelgia.progress_enforcer as pe
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -375,7 +374,9 @@ def test_quick_example_hint_negative():
 
 
 def test_quick_test_hint_positive():
-    assert quick_test_hint("If the treatment works, then we would show a measurable effect.")
+    assert quick_test_hint(
+        "If the treatment works, then we would show a measurable effect."
+    )
 
 
 def test_quick_test_hint_negative():
@@ -809,6 +810,7 @@ def test_evaluate_reply_loop_triggered_by_stagnation():
             "is_loop": False,
         }
     )
+
     # Provide two responses: one for validation, one for loop
     class _DualLLM:
         def __init__(self):
@@ -818,9 +820,16 @@ def test_evaluate_reply_loop_triggered_by_stagnation():
             self._calls += 1
             if self._calls == 1:
                 return json.dumps(
-                    {"compliant": True, "partial": False, "confidence": 0.8, "reason": "ok"}
+                    {
+                        "compliant": True,
+                        "partial": False,
+                        "confidence": 0.8,
+                        "reason": "ok",
+                    }
                 )
-            return json.dumps({"is_loop": False, "confidence": 0.7, "reason": "new_arg"})
+            return json.dumps(
+                {"is_loop": False, "confidence": 0.7, "reason": "new_arg"}
+            )
 
     ctrl = FixySemanticController(llm=_DualLLM(), model="stub")
     _, loop_result = ctrl.evaluate_reply(
@@ -843,7 +852,12 @@ def test_evaluate_reply_loop_triggered_by_repeated_moves():
             self._calls += 1
             if self._calls == 1:
                 return json.dumps(
-                    {"compliant": True, "partial": False, "confidence": 0.8, "reason": "ok"}
+                    {
+                        "compliant": True,
+                        "partial": False,
+                        "confidence": 0.8,
+                        "reason": "ok",
+                    }
                 )
             return json.dumps({"is_loop": True, "confidence": 0.8, "reason": "loop"})
 
@@ -868,7 +882,12 @@ def test_evaluate_reply_loop_triggered_by_ignored_recently():
             self._calls += 1
             if self._calls == 1:
                 return json.dumps(
-                    {"compliant": True, "partial": False, "confidence": 0.8, "reason": "ok"}
+                    {
+                        "compliant": True,
+                        "partial": False,
+                        "confidence": 0.8,
+                        "reason": "ok",
+                    }
                 )
             return json.dumps({"is_loop": False, "confidence": 0.6, "reason": "ok"})
 
@@ -893,7 +912,12 @@ def test_evaluate_reply_loop_triggered_by_unresolved_rising():
             self._calls += 1
             if self._calls == 1:
                 return json.dumps(
-                    {"compliant": True, "partial": False, "confidence": 0.8, "reason": "ok"}
+                    {
+                        "compliant": True,
+                        "partial": False,
+                        "confidence": 0.8,
+                        "reason": "ok",
+                    }
                 )
             return json.dumps({"is_loop": False, "confidence": 0.6, "reason": "ok"})
 
@@ -922,9 +946,7 @@ def test_score_progress_semantic_loop_lowers():
     loop_r = LoopCheckResult(
         speaker="Socrates", is_loop=True, confidence=0.8, reason="loop"
     )
-    score_with_loop = pe.score_progress(
-        text, history, mem, loop_result=loop_r
-    )
+    score_with_loop = pe.score_progress(text, history, mem, loop_result=loop_r)
     score_without = pe.score_progress(text, history, pe.get_claims_memory("Athena"))
     # Score with loop should be lower
     assert score_with_loop <= score_without
