@@ -8538,10 +8538,11 @@ class MainScript:
                     self.dialog, self.turn_index, current_topic=topic_label
                 )
                 # ── Executive Cortex: override Fixy should_intervene / mode ──────────
-                # When IntegrationCore sets enforce_fixy=True it means a loop or
-                # stagnation pattern was detected that Fixy's own heuristics may have
-                # missed (e.g. superficial compliance, pressure misalignment).  Force
-                # the intervention and remap the Fixy mode to the cortex directive.
+                # When IntegrationCore sets enforce_fixy=True it currently signals a
+                # FIXY_AUTHORITY_OVERRIDE directive (e.g. supervisor/safety escalation),
+                # not generic stagnation or pressure-misalignment detection. In that
+                # case we force the intervention and remap Fixy mode to the cortex
+                # directive.
                 _cortex_overlay: str = ""
                 if _cortex_decision is not None:
                     _cortex_overlay = self._integration_core.build_prompt_overlay(
