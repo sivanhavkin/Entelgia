@@ -175,8 +175,8 @@ class TestOutputContract:
 
     def test_output_contract_enforces_sentence_limit(self):
         lower = LLM_OUTPUT_CONTRACT.lower()
-        # Contract must provide length guidance (dynamic, not a fixed hard cap)
-        assert "length is dynamic" in lower or "sentences" in lower
+        # Contract must provide length guidance (word cap)
+        assert "200 words" in lower or "up to" in lower
 
     def test_output_contract_no_broad_preamble(self):
         lower = LLM_OUTPUT_CONTRACT.lower()

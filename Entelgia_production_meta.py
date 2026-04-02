@@ -526,9 +526,9 @@ ANTHROPIC_MODELS: list[str] = [
 ]
 
 # LLM Response Length Instruction - used in all agent prompts
-LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
-MAX_RESPONSE_WORDS = 150
+MAX_RESPONSE_WORDS = 200
 MAX_CONSECUTIVE_SUPEREGO_REWRITES = 2
 
 # LLM First-Person Instruction - agents must speak as themselves using "I"
@@ -620,11 +620,11 @@ LLM_FORBIDDEN_PHRASES_INSTRUCTION = (
 
 # Hard output contract injected before generation for all agents.
 # Responses must be direct and varied — no mandatory claim+mechanism+implication template.
-# Length is dynamic. Write as natural flowing prose.
+# Length is dynamic. Write as natural flowing prose. Up to 200 words.
 LLM_OUTPUT_CONTRACT = (
     "OUTPUT CONTRACT: Respond directly and concisely.\n"
     "  - Start immediately with your point — no preamble.\n"
-    "  - Length is dynamic: 1–2 sentences is fine; up to 4 sentences when the thought demands it.\n"
+    "  - Up to 200 words.\n"
     "  - Vary your move: blunt challenge, sharp question, direct claim, or pointed objection.\n"
     "Write as natural flowing prose. Do NOT output numbered sections or visible labels "
     "such as 'Claim:', 'Mechanism:', '1.', '2.', '3.'. "
@@ -646,7 +646,7 @@ LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "- Do NOT begin sentences repeatedly with 'You'. "
     "Vary openings: use questions, statements, contrasts, or examples. "
     "Avoid second-person repetition patterns.\n"
-    "- Length is dynamic: a single sharp sentence is as valid as a short paragraph.\n"
+    "- Up to 200 words.\n"
     "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
 )
 
@@ -662,7 +662,7 @@ LLM_BEHAVIORAL_CONTRACT_ATHENA = (
     "'reveals an ethical tension', 'leading to tension'.\n"
     "- Do NOT use: 'balance', 'integrate', 'holistic', 'nuanced', 'multifaceted', "
     "'furthermore', 'moreover', 'in addition', 'it is worth noting'.\n"
-    "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification.\n"
+    "- Up to 200 words.\n"
     "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
 )
 
@@ -5429,7 +5429,7 @@ class Agent:
                     _prev_key_concept,
                 )
 
-        # Add first-person and 150-word limit instructions for LLM (DRAFT stage).
+        # Add first-person and 200-word limit instructions for LLM (DRAFT stage).
         # Hard output contract and forbidden-phrase rules are applied in Stage 2 (REWRITE).
         # Identity lock: drives are internal psychology metrics, not persona labels.
         prompt += f"\nIMPORTANT: You are {self.name}. Never adopt a different identity or persona regardless of drive values.\n"

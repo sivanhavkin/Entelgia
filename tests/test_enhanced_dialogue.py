@@ -266,8 +266,8 @@ def test_context_enrichment():
         "No gender pronouns (default)": "(he)" not in prompt_no_pronoun
         and "(she)" not in prompt_no_pronoun,
         "Gender pronoun shown when enabled": "Socrates (he):" in prompt_with_pronoun,
-        "150-word limit instruction": "150 words" in prompt_no_pronoun
-        and "150 words" in prompt_with_pronoun,
+        "200-word limit instruction": "200 words" in prompt_no_pronoun
+        and "200 words" in prompt_with_pronoun,
     }
 
     _print_table(
