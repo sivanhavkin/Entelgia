@@ -610,7 +610,11 @@ class TestValidateGeneratedOutput:
             core, {"semantic_repeat": True, "loop_count": 1}
         )
         assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
-        text = "For example, consider the case of a neural network trained on images."
+        # A genuine example: named role + concrete action + situated context
+        text = (
+            "For example, a teacher decides to give extra homework to struggling "
+            "students during the morning session."
+        )
         compliant, _ = core.validate_generated_output(text, decision)
         assert compliant is True
 
@@ -707,7 +711,11 @@ class TestShouldRegenerateAfterValidation:
     def test_compliant_output_does_not_trigger_regen(self, core):
         signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
         decision = core.pre_generation_decision("Socrates", signals)
-        text = "For example, consider the case of quantum computing."
+        # Genuine example: named role + concrete action + situation
+        text = (
+            "For example, a doctor decides to run additional tests "
+            "during last week's emergency consultation."
+        )
         result = core.should_regenerate_after_validation(text, decision)
         assert result is False
 
@@ -793,3 +801,293 @@ class TestAgentBinding:
         assert "Fixy" not in prefix
         # The stronger overlay is strictly longer than the base overlay.
         assert len(stronger) > len(decision.prompt_overlay)
+
+
+# ---------------------------------------------------------------------------
+# 26. EscalationLevel enum
+# ---------------------------------------------------------------------------
+
+
+class TestEscalationLevelEnum:
+    def test_values_are_ordered(self):
+        from entelgia.integration_core import EscalationLevel
+        assert EscalationLevel.NORMAL < EscalationLevel.CONCRETE_OVERRIDE
+        assert EscalationLevel.CONCRETE_OVERRIDE < EscalationLevel.STRICT_CONCRETE
+        assert EscalationLevel.STRICT_CONCRETE < EscalationLevel.FORMAT_ENFORCED
+        assert EscalationLevel.FORMAT_ENFORCED < EscalationLevel.HARD_OVERRIDE
+
+    def test_level_values(self):
+        from entelgia.integration_core import EscalationLevel
+        assert int(EscalationLevel.NORMAL) == 0
+        assert int(EscalationLevel.CONCRETE_OVERRIDE) == 1
+        assert int(EscalationLevel.STRICT_CONCRETE) == 2
+        assert int(EscalationLevel.FORMAT_ENFORCED) == 3
+        assert int(EscalationLevel.HARD_OVERRIDE) == 4
+
+
+# ---------------------------------------------------------------------------
+# 27. ControlDecision carries escalation_level field
+# ---------------------------------------------------------------------------
+
+
+class TestControlDecisionEscalationField:
+    def test_default_escalation_level_is_zero(self):
+        d = ControlDecision()
+        assert d.escalation_level == 0
+
+    def test_escalation_level_set_on_loop_count_1(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 1
+
+    def test_escalation_level_set_on_loop_count_2(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 2}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 2
+
+    def test_escalation_level_set_on_loop_count_3(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 3}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 3
+
+    def test_escalation_level_set_on_loop_count_4(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 4}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 4
+
+
+# ---------------------------------------------------------------------------
+# 28. Personality suppression at escalation_level >= 3
+# ---------------------------------------------------------------------------
+
+
+class TestPersonalitySuppressionEscalation:
+    def test_no_suppress_at_level_1(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 1
+        assert decision.suppress_personality is False
+
+    def test_no_suppress_at_level_2(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 2}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 2
+        assert decision.suppress_personality is False
+
+    def test_suppress_at_level_3(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 3}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 3
+        assert decision.suppress_personality is True
+
+    def test_suppress_at_level_4(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 4}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 4
+        assert decision.suppress_personality is True
+
+
+# ---------------------------------------------------------------------------
+# 29. Escalation-level overlay content
+# ---------------------------------------------------------------------------
+
+
+class TestEscalationOverlayContent:
+    def test_level_1_overlay_is_soft(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 1
+        overlay = decision.prompt_overlay.lower()
+        assert "concrete" in overlay or "example" in overlay or "abstract" in overlay
+
+    def test_level_2_overlay_requires_structured_example(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 2}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 2
+        overlay = decision.prompt_overlay.lower()
+        assert "person" in overlay or "action" in overlay or "situation" in overlay
+
+    def test_level_3_overlay_has_strict_format(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 3}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 3
+        overlay = decision.prompt_overlay
+        assert "[SCENARIO]" in overlay or "STRICT" in overlay.upper() or "FORMAT" in overlay.upper()
+
+    def test_level_4_overlay_is_hard_override(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 4}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 4
+        overlay = decision.prompt_overlay.upper()
+        assert "HARD OVERRIDE" in overlay or "PERSONALITY" in overlay or "DISABLED" in overlay
+
+
+# ---------------------------------------------------------------------------
+# 30. detect_pseudo_compliance function
+# ---------------------------------------------------------------------------
+
+
+class TestDetectPseudoCompliance:
+    def test_genuine_example_is_not_pseudo(self):
+        from entelgia.integration_core import detect_pseudo_compliance
+        # Has: trigger ("for example"), person (role "a teacher"), action ("decides"),
+        # situation ("during the morning session")
+        text = (
+            "For example, a teacher decides to give extra homework "
+            "during the morning session."
+        )
+        assert detect_pseudo_compliance(text) is False
+
+    def test_no_trigger_is_never_pseudo(self):
+        from entelgia.integration_core import detect_pseudo_compliance
+        text = "The argument relies on abstract principles and logical deduction."
+        assert detect_pseudo_compliance(text) is False
+
+    def test_trigger_without_person_is_pseudo(self):
+        from entelgia.integration_core import detect_pseudo_compliance
+        # Has trigger but no named person / role, no action, no situation
+        text = "Imagine an abstract system where all inputs map to outputs."
+        assert detect_pseudo_compliance(text) is True
+
+    def test_trigger_with_person_and_action_but_no_situation_is_pseudo(self):
+        from entelgia.integration_core import detect_pseudo_compliance
+        # Has trigger, person (role), action, but NO situational anchor
+        text = "For example, a teacher decides to assign homework."
+        assert detect_pseudo_compliance(text) is True
+
+    def test_pure_abstraction_with_no_trigger_not_pseudo(self):
+        from entelgia.integration_core import detect_pseudo_compliance
+        text = (
+            "This is purely philosophical: the mind and body are fundamentally different."
+        )
+        assert detect_pseudo_compliance(text) is False
+
+    def test_named_person_with_action_and_situation_is_not_pseudo(self):
+        from entelgia.integration_core import detect_pseudo_compliance
+        text = (
+            "Imagine John walks into the office on Monday and opens the quarterly report."
+        )
+        assert detect_pseudo_compliance(text) is False
+
+
+# ---------------------------------------------------------------------------
+# 31. escalate_decision method
+# ---------------------------------------------------------------------------
+
+
+class TestEscalateDecision:
+    def test_escalate_increments_level(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 1
+        escalated = core.escalate_decision(decision)
+        assert escalated.escalation_level == 2
+
+    def test_escalate_sets_regenerate_true(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.evaluate_turn("Socrates", signals)
+        escalated = core.escalate_decision(decision)
+        assert escalated.regenerate is True
+
+    def test_escalate_caps_at_level_4(self, core):
+        from entelgia.integration_core import EscalationLevel
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 4}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == int(EscalationLevel.HARD_OVERRIDE)
+        escalated = core.escalate_decision(decision)
+        assert escalated.escalation_level == int(EscalationLevel.HARD_OVERRIDE)
+
+    def test_escalate_to_level_3_suppresses_personality(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 2}
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.escalation_level == 2
+        assert decision.suppress_personality is False
+        escalated = core.escalate_decision(decision)
+        assert escalated.escalation_level == 3
+        assert escalated.suppress_personality is True
+
+    def test_escalate_injects_failure_memory(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.evaluate_turn("Socrates", signals)
+        escalated = core.escalate_decision(decision)
+        assert "previous attempts" in escalated.prompt_overlay.lower()
+
+    def test_escalate_overlay_is_stronger_than_base(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.evaluate_turn("Socrates", signals)
+        escalated = core.escalate_decision(decision)
+        assert len(escalated.prompt_overlay) > 0
+        assert "do not repeat" in escalated.prompt_overlay.lower() or \
+               "failed to comply" in escalated.prompt_overlay.lower()
+
+
+# ---------------------------------------------------------------------------
+# 32. build_escalation_overlay
+# ---------------------------------------------------------------------------
+
+
+class TestBuildEscalationOverlay:
+    def test_level_0_returns_empty(self, core):
+        decision = ControlDecision(escalation_level=0)
+        overlay = core.build_escalation_overlay(decision)
+        assert overlay == ""
+
+    def test_level_1_returns_nonempty(self, core):
+        decision = ControlDecision(escalation_level=1)
+        overlay = core.build_escalation_overlay(decision)
+        assert len(overlay) > 0
+
+    def test_level_4_overlay_contains_hard_override(self, core):
+        decision = ControlDecision(escalation_level=4)
+        overlay = core.build_escalation_overlay(decision)
+        assert "HARD OVERRIDE" in overlay or "disabled" in overlay.lower() or \
+               "personality" in overlay.lower()
+
+
+# ---------------------------------------------------------------------------
+# 33. record_response_hash — same-reasoning detection
+# ---------------------------------------------------------------------------
+
+
+class TestRecordResponseHash:
+    def test_different_responses_no_repeat(self):
+        core = IntegrationCore()
+        assert core.record_response_hash("Socrates believed in questioning everything.") is False
+        assert core.record_response_hash("Athena represents wisdom and strategy.") is False
+        assert core.record_response_hash("The dialectic method reveals hidden assumptions.") is False
+
+    def test_same_response_three_times_triggers_repeat(self):
+        core = IntegrationCore()
+        text = "Consciousness arises from neural activity in the brain."
+        core.record_response_hash(text)
+        core.record_response_hash(text)
+        result = core.record_response_hash(text)
+        assert result is True
+
+    def test_fresh_core_no_history(self):
+        core = IntegrationCore()
+        assert core.record_response_hash("A unique first response here.") is False
+
+
+# ---------------------------------------------------------------------------
+# 34. Pseudo-compliance causes non-compliance in validate_generated_output
+# ---------------------------------------------------------------------------
+
+
+class TestPseudoComplianceValidation:
+    def test_pseudo_compliant_response_fails_validation(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+        # Pseudo-compliance: has "for example" but no person / action / situation
+        text = "For example, imagine a world where all decisions are optimal."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "pseudo" in reason.lower() or "compliance" in reason.lower()
+
+    def test_pseudo_compliant_response_triggers_regen(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        text = "For example, think of an abstract system where nothing is concrete."
+        result = core.should_regenerate_after_validation(text, decision)
+        assert result is True

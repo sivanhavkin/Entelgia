@@ -94,6 +94,8 @@ from .integration_core import (
     IntegrationMode,
     IntegrationState,
     ControlDecision,
+    EscalationLevel,
+    detect_pseudo_compliance,
     make_integration_state,
 )
 
@@ -169,6 +171,8 @@ __all__ = [
     "IntegrationMode",
     "IntegrationState",
     "ControlDecision",
+    "EscalationLevel",
+    "detect_pseudo_compliance",
     "make_integration_state",
 ]
 
