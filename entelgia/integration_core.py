@@ -633,8 +633,10 @@ class IntegrationCore:
         Returns
         -------
         str
-            Short imperative directive block, or empty string when mode is
-            NORMAL.
+            Short imperative directive block, or empty string when no overlay
+            is active. Callers must not assume that NORMAL mode implies an
+            empty overlay; advisory overlays may be present even when
+            ``decision.active_mode`` is NORMAL.
         """
         overlay = decision.prompt_overlay
         if overlay:
