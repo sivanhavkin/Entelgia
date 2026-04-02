@@ -2690,6 +2690,9 @@ _FILLER_PATTERNS: List[re.Pattern] = [
 _MIN_WORDS_FOR_REVISION: int = 3
 # Word-overlap ratio at or above which two sentences are considered near-duplicates
 _DUPLICATE_THRESHOLD: float = 0.70
+# Minimum loop-detection confidence required to override the semantic validator's
+# "compliant" verdict (prevents false positives masking repeated content).
+_STRONG_LOOP_CONFIDENCE_THRESHOLD: float = 0.80
 # Hard cap on sentences per revised response (2–4 range as per spec)
 _MAX_REVISED_SENTENCES: int = 4
 
@@ -8236,6 +8239,14 @@ class MainScript:
                             f"[FIXY-LOOP] speaker={speaker.name}"
                             f" is_loop={_loop_result.is_loop}"
                         )
+                    # Override validator on strong loop: a high-confidence
+                    # loop signal overrides a "compliant" verdict to prevent
+                    # false positives masking repeated content.
+                    if (
+                        _loop_result.is_loop
+                        and _loop_result.confidence >= _STRONG_LOOP_CONFIDENCE_THRESHOLD
+                    ):
+                        _validation_result.compliant = False
                     _progress_score = speaker._last_pe_score
                     _ignored_count = (
                         self.interactive_fixy.ignored_guidance_count
