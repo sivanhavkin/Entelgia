@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Any, Optional
 
 # LLM Response Length Instruction
-LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 
 logger = logging.getLogger(__name__)
