@@ -448,7 +448,9 @@ class FixySemanticController:
             result.partial = True
             original_reason = result.reason
             if original_reason:
-                result.reason = f"{original_reason}; low_confidence_treated_as_non_compliant"
+                result.reason = (
+                    f"{original_reason}; low_confidence_treated_as_non_compliant"
+                )
             else:
                 result.reason = "low_confidence_treated_as_non_compliant"
 

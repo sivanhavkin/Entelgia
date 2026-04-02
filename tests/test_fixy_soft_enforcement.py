@@ -47,7 +47,6 @@ from entelgia.fixy_interactive import (
 )
 from entelgia.dialogue_engine import SeedGenerator, DialogueEngine
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -85,10 +84,17 @@ class _FakeSpeaker:
 
 class TestMoveTypes:
     def test_required_move_types_present(self):
-        required = {"NEW_CLAIM", "DIRECT_ATTACK", "EXAMPLE", "TEST", "CONCESSION", "NEW_FRAME"}
-        assert required.issubset(set(MOVE_TYPES)), (
-            f"Missing required move types: {required - set(MOVE_TYPES)}"
-        )
+        required = {
+            "NEW_CLAIM",
+            "DIRECT_ATTACK",
+            "EXAMPLE",
+            "TEST",
+            "CONCESSION",
+            "NEW_FRAME",
+        }
+        assert required.issubset(
+            set(MOVE_TYPES)
+        ), f"Missing required move types: {required - set(MOVE_TYPES)}"
 
     def test_move_types_are_strings(self):
         for mt in MOVE_TYPES:
@@ -146,9 +152,9 @@ class TestBuildGuidance:
         for reason in _REASON_GUIDANCE_MAP:
             g = fixy._build_guidance(reason)
             assert g is not None, f"No guidance for reason {reason!r}"
-            assert g.preferred_move in MOVE_TYPES, (
-                f"preferred_move {g.preferred_move!r} not in MOVE_TYPES"
-            )
+            assert (
+                g.preferred_move in MOVE_TYPES
+            ), f"preferred_move {g.preferred_move!r} not in MOVE_TYPES"
 
     def test_confidence_boosted_on_goal_recurrence(self):
         fixy = _make_fixy()
@@ -191,8 +197,10 @@ class TestRecordAgentMove:
     def test_matching_move_resets_counter(self):
         fixy = _make_fixy()
         fixy.fixy_guidance = FixyGuidance(
-            goal="define_test", preferred_move="TEST", confidence=0.7,
-            reason="premature_synthesis"
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=0.7,
+            reason="premature_synthesis",
         )
         fixy.ignored_guidance_count = 3
         fixy.record_agent_move("TEST")
@@ -201,8 +209,10 @@ class TestRecordAgentMove:
     def test_non_matching_move_increments_counter(self):
         fixy = _make_fixy()
         fixy.fixy_guidance = FixyGuidance(
-            goal="define_test", preferred_move="TEST", confidence=0.7,
-            reason="premature_synthesis"
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=0.7,
+            reason="premature_synthesis",
         )
         fixy.record_agent_move("NEW_CLAIM")
         assert fixy.ignored_guidance_count == 1
@@ -210,18 +220,22 @@ class TestRecordAgentMove:
     def test_two_ignored_turns_boosts_confidence(self):
         fixy = _make_fixy()
         fixy.fixy_guidance = FixyGuidance(
-            goal="define_test", preferred_move="TEST", confidence=0.7,
-            reason="premature_synthesis"
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=0.7,
+            reason="premature_synthesis",
         )
-        fixy.record_agent_move("NEW_CLAIM")   # count = 1
-        fixy.record_agent_move("NEW_CLAIM")   # count = 2 → boost
+        fixy.record_agent_move("NEW_CLAIM")  # count = 1
+        fixy.record_agent_move("NEW_CLAIM")  # count = 2 → boost
         assert fixy.fixy_guidance.confidence > 0.7
 
     def test_confidence_capped_at_one(self):
         fixy = _make_fixy()
         fixy.fixy_guidance = FixyGuidance(
-            goal="define_test", preferred_move="TEST", confidence=0.99,
-            reason="premature_synthesis"
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=0.99,
+            reason="premature_synthesis",
         )
         fixy.ignored_guidance_count = 2
         fixy.record_agent_move("NEW_CLAIM")  # ignored_count = 3, boost
@@ -289,13 +303,15 @@ class TestSeedGeneratorGuidance:
         explore_implication / question_assumption and away from agree_and_expand."""
         sg = SeedGenerator()
         guidance = FixyGuidance(
-            goal="define_test", preferred_move="TEST", confidence=1.0,
-            reason="premature_synthesis"
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=1.0,
+            reason="premature_synthesis",
         )
         speaker = _FakeSpeaker()
         recent = _make_turns(
             ["The claim here is that freedom presupposes responsibility."],
-            roles=["Socrates"]
+            roles=["Socrates"],
         )
 
         # Run many iterations and collect chosen strategies
@@ -349,14 +365,13 @@ class TestSeedGeneratorGuidance:
         """Even with guidance, multiple strategies should still appear."""
         sg = SeedGenerator()
         guidance = FixyGuidance(
-            goal="define_test", preferred_move="TEST", confidence=1.0,
-            reason="premature_synthesis"
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=1.0,
+            reason="premature_synthesis",
         )
         speaker = _FakeSpeaker()
-        recent = _make_turns(
-            ["Some claim about freedom."],
-            roles=["Socrates"]
-        )
+        recent = _make_turns(["Some claim about freedom."], roles=["Socrates"])
         strategies_seen = set()
         random.seed(0)
         for _ in range(100):
@@ -377,9 +392,9 @@ class TestSeedGeneratorGuidance:
                 strategies_seen.add(selected[0])
 
         # Must see at least 2 distinct strategies (not locked to one)
-        assert len(strategies_seen) >= 2, (
-            f"Strategy selection is too deterministic: {strategies_seen}"
-        )
+        assert (
+            len(strategies_seen) >= 2
+        ), f"Strategy selection is too deterministic: {strategies_seen}"
 
 
 # ---------------------------------------------------------------------------
@@ -391,8 +406,10 @@ class TestDialogueEngineGuidancePassthrough:
     def test_guidance_forwarded_no_error(self):
         engine = DialogueEngine()
         guidance = FixyGuidance(
-            goal="break_repetition", preferred_move="NEW_FRAME", confidence=0.6,
-            reason="loop_repetition"
+            goal="break_repetition",
+            preferred_move="NEW_FRAME",
+            confidence=0.6,
+            reason="loop_repetition",
         )
         speaker = _FakeSpeaker()
         dialog = _make_turns(["hello there"], roles=["Socrates"])
@@ -436,25 +453,35 @@ class TestBuildGuidancePromptHint:
         assert any(kw in hint.lower() for kw in ("falsifiable", "observable", "prove"))
 
     def test_concession_hint(self):
-        g = FixyGuidance(goal="g", preferred_move="CONCESSION", confidence=0.8, reason="r")
+        g = FixyGuidance(
+            goal="g", preferred_move="CONCESSION", confidence=0.8, reason="r"
+        )
         hint = build_guidance_prompt_hint(g)
         assert hint != ""
-        assert any(kw in hint.lower() for kw in ("weakness", "blind spot", "acknowledge"))
+        assert any(
+            kw in hint.lower() for kw in ("weakness", "blind spot", "acknowledge")
+        )
 
     def test_new_frame_hint(self):
-        g = FixyGuidance(goal="g", preferred_move="NEW_FRAME", confidence=0.8, reason="r")
+        g = FixyGuidance(
+            goal="g", preferred_move="NEW_FRAME", confidence=0.8, reason="r"
+        )
         hint = build_guidance_prompt_hint(g)
         assert hint != ""
         assert any(kw in hint.lower() for kw in ("frame", "domain", "shift"))
 
     def test_direct_attack_hint(self):
-        g = FixyGuidance(goal="g", preferred_move="DIRECT_ATTACK", confidence=0.8, reason="r")
+        g = FixyGuidance(
+            goal="g", preferred_move="DIRECT_ATTACK", confidence=0.8, reason="r"
+        )
         hint = build_guidance_prompt_hint(g)
         assert hint != ""
         assert any(kw in hint.lower() for kw in ("challenge", "assumption", "directly"))
 
     def test_new_claim_hint(self):
-        g = FixyGuidance(goal="g", preferred_move="NEW_CLAIM", confidence=0.8, reason="r")
+        g = FixyGuidance(
+            goal="g", preferred_move="NEW_CLAIM", confidence=0.8, reason="r"
+        )
         hint = build_guidance_prompt_hint(g)
         assert hint != ""
         assert any(kw in hint.lower() for kw in ("new", "distinction", "variable"))
@@ -467,7 +494,9 @@ class TestBuildGuidancePromptHint:
             assert hint != "", f"No hint defined for move type {move!r}"
 
     def test_unknown_move_returns_empty(self):
-        g = FixyGuidance(goal="g", preferred_move="UNKNOWN_MOVE_XYZ", confidence=0.5, reason="r")
+        g = FixyGuidance(
+            goal="g", preferred_move="UNKNOWN_MOVE_XYZ", confidence=0.5, reason="r"
+        )
         hint = build_guidance_prompt_hint(g)
         assert hint == ""
 
@@ -481,27 +510,30 @@ class TestSeedGeneratorGuidanceHint:
     def test_hint_present_in_seed_when_guidance_given(self):
         sg = SeedGenerator()
         guidance = FixyGuidance(
-            goal="define_test", preferred_move="TEST", confidence=0.9,
-            reason="premature_synthesis"
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=0.9,
+            reason="premature_synthesis",
         )
         speaker = _FakeSpeaker()
         recent = _make_turns(["consciousness is fundamental"], roles=["Socrates"])
-        seed = sg.generate_seed("free will", recent, speaker, turn_count=2,
-                                fixy_guidance=guidance)
+        seed = sg.generate_seed(
+            "free will", recent, speaker, turn_count=2, fixy_guidance=guidance
+        )
         # The seed should contain the guidance hint text
         expected_hint = build_guidance_prompt_hint(guidance)
-        assert expected_hint in seed, (
-            f"Expected hint {expected_hint!r} to appear in seed {seed!r}"
-        )
+        assert (
+            expected_hint in seed
+        ), f"Expected hint {expected_hint!r} to appear in seed {seed!r}"
 
     def test_no_hint_in_seed_when_no_guidance(self):
         sg = SeedGenerator()
         speaker = _FakeSpeaker()
         recent = _make_turns(["consciousness is fundamental"], roles=["Socrates"])
         seed = sg.generate_seed("free will", recent, speaker, turn_count=2)
-        assert "[GUIDANCE HINT]" not in seed, (
-            "No guidance hint should appear when fixy_guidance is None"
-        )
+        assert (
+            "[GUIDANCE HINT]" not in seed
+        ), "No guidance hint should appear when fixy_guidance is None"
 
     def test_hint_not_added_for_unknown_move(self):
         """If build_guidance_prompt_hint returns empty, no hint tag should appear."""
@@ -511,8 +543,9 @@ class TestSeedGeneratorGuidanceHint:
         )
         speaker = _FakeSpeaker()
         recent = _make_turns(["some text"], roles=["Socrates"])
-        seed = sg.generate_seed("free will", recent, speaker, turn_count=2,
-                                fixy_guidance=guidance)
+        seed = sg.generate_seed(
+            "free will", recent, speaker, turn_count=2, fixy_guidance=guidance
+        )
         assert "[GUIDANCE HINT]" not in seed
 
 
@@ -526,20 +559,29 @@ class TestScoreProgressGuidanceAdjustments:
 
     def _make_mem(self):
         from entelgia.progress_enforcer import ClaimsMemory
+
         return ClaimsMemory()
 
     def test_no_penalty_with_zero_ignored(self):
         """Baseline: no penalty when ignored_guidance_count=0."""
         from entelgia.progress_enforcer import score_progress
+
         mem = self._make_mem()
-        guidance = FixyGuidance(goal="g", preferred_move="NEW_FRAME", confidence=0.5, reason="r")
+        guidance = FixyGuidance(
+            goal="g", preferred_move="NEW_FRAME", confidence=0.5, reason="r"
+        )
         score_no_penalty = score_progress(
             "The brain computes representations independently of experience.",
-            [], mem, ignored_guidance_count=0,
+            [],
+            mem,
+            ignored_guidance_count=0,
         )
         score_with_guidance = score_progress(
             "The brain computes representations independently of experience.",
-            [], self._make_mem(), fixy_guidance=guidance, ignored_guidance_count=0,
+            [],
+            self._make_mem(),
+            fixy_guidance=guidance,
+            ignored_guidance_count=0,
         )
         # Both should be valid floats in [0, 1]
         assert 0.0 <= score_no_penalty <= 1.0
@@ -548,9 +590,14 @@ class TestScoreProgressGuidanceAdjustments:
     def test_penalty_applied_at_count_2(self):
         """Score must be lower when ignored_guidance_count >= 2."""
         from entelgia.progress_enforcer import score_progress
+
         text = "The brain computes representations independently of experience."
-        score_base = score_progress(text, [], self._make_mem(), ignored_guidance_count=0)
-        score_penalised = score_progress(text, [], self._make_mem(), ignored_guidance_count=2)
+        score_base = score_progress(
+            text, [], self._make_mem(), ignored_guidance_count=0
+        )
+        score_penalised = score_progress(
+            text, [], self._make_mem(), ignored_guidance_count=2
+        )
         # The penalty multiplier is 0.85 — score should decrease
         assert score_penalised <= score_base, (
             f"Expected penalty at count=2: base={score_base:.3f}, "
@@ -560,6 +607,7 @@ class TestScoreProgressGuidanceAdjustments:
     def test_stronger_penalty_at_count_3(self):
         """Score at count=3 must be <= score at count=2."""
         from entelgia.progress_enforcer import score_progress
+
         text = "The brain computes representations independently of experience."
         score_2 = score_progress(text, [], self._make_mem(), ignored_guidance_count=2)
         score_3 = score_progress(text, [], self._make_mem(), ignored_guidance_count=3)
@@ -571,6 +619,7 @@ class TestScoreProgressGuidanceAdjustments:
     def test_score_capped_at_count_3(self):
         """Score must not exceed 0.55 when ignored_guidance_count >= 3."""
         from entelgia.progress_enforcer import score_progress
+
         # Use a highly positive text to get a high base score
         text = (
             "I reject the claim entirely. Consciousness cannot be physical "
@@ -578,14 +627,17 @@ class TestScoreProgressGuidanceAdjustments:
             "qualia are irreducible. This is a falsifiable claim: if you can "
             "produce a physical account of phenomenal redness, I retract."
         )
-        score_capped = score_progress(text, [], self._make_mem(), ignored_guidance_count=3)
-        assert score_capped <= 0.55, (
-            f"Expected score capped at 0.55 with ignored_count=3, got {score_capped:.3f}"
+        score_capped = score_progress(
+            text, [], self._make_mem(), ignored_guidance_count=3
         )
+        assert (
+            score_capped <= 0.55
+        ), f"Expected score capped at 0.55 with ignored_count=3, got {score_capped:.3f}"
 
     def test_score_never_zeroed(self):
         """Penalty must not zero out the score (system must remain non-blocking)."""
         from entelgia.progress_enforcer import score_progress
+
         text = "The brain computes representations independently of experience."
         score = score_progress(text, [], self._make_mem(), ignored_guidance_count=10)
         assert score > 0.0, "Penalty must not zero the progress score"
@@ -593,6 +645,7 @@ class TestScoreProgressGuidanceAdjustments:
     def test_mismatch_penalty_applied(self):
         """Score is reduced when actual move differs from preferred_move."""
         from entelgia.progress_enforcer import score_progress, classify_move
+
         # Use a text that very reliably classifies as PARAPHRASE / BALANCED_RESTATEMENT
         # (low-value move) and prefer TEST (a different move type).
         text = "Both perspectives have merit and should be weighed carefully."
@@ -603,7 +656,9 @@ class TestScoreProgressGuidanceAdjustments:
         guidance = FixyGuidance(
             goal="g", preferred_move=preferred, confidence=1.0, reason="r"
         )
-        score_with_guidance = score_progress(text, [], self._make_mem(), fixy_guidance=guidance)
+        score_with_guidance = score_progress(
+            text, [], self._make_mem(), fixy_guidance=guidance
+        )
         score_no_guidance = score_progress(text, [], self._make_mem())
         assert score_with_guidance <= score_no_guidance, (
             f"Mismatch penalty not applied: no_guidance={score_no_guidance:.3f}, "
@@ -614,6 +669,7 @@ class TestScoreProgressGuidanceAdjustments:
     def test_compliance_reward_applied(self):
         """Score increases slightly when actual move matches preferred_move."""
         from entelgia.progress_enforcer import score_progress, classify_move
+
         text = "Consciousness is irreducibly subjective and cannot be explained physically."
         mem = self._make_mem()
         actual_move = classify_move(text, [])
@@ -630,16 +686,19 @@ class TestScoreProgressGuidanceAdjustments:
     def test_backward_compat_no_guidance_no_ignored(self):
         """Calling score_progress without new params behaves as before."""
         from entelgia.progress_enforcer import score_progress
+
         mem = self._make_mem()
         score = score_progress(
             "The brain computes representations independently of experience.",
-            [], mem,
+            [],
+            mem,
         )
         assert 0.0 <= score <= 1.0
 
     def test_score_always_in_range(self):
         """score_progress must always return a value in [0.0, 1.0]."""
         from entelgia.progress_enforcer import score_progress
+
         texts = [
             "yes",
             "I completely reject this. Freedom is an illusion.",
@@ -647,8 +706,9 @@ class TestScoreProgressGuidanceAdjustments:
         ]
         for text in texts:
             for count in (0, 2, 3, 5):
-                score = score_progress(text, [], self._make_mem(),
-                                       ignored_guidance_count=count)
-                assert 0.0 <= score <= 1.0, (
-                    f"score={score} out of range for text={text!r}, count={count}"
+                score = score_progress(
+                    text, [], self._make_mem(), ignored_guidance_count=count
                 )
+                assert (
+                    0.0 <= score <= 1.0
+                ), f"score={score} out of range for text={text!r}, count={count}"

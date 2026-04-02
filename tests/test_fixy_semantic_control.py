@@ -1434,7 +1434,9 @@ def test_confidence_threshold_high_remains_compliant():
         }
     )
     ctrl = FixySemanticController(llm=llm, model="stub")
-    result = ctrl.validate_guidance_compliance("Socrates", "Some valid example text.", "EXAMPLE")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates", "Some valid example text.", "EXAMPLE"
+    )
     assert result.compliant is True
     assert "low_confidence_treated_as_non_compliant" not in result.reason
 
@@ -1456,7 +1458,9 @@ def test_confidence_threshold_low_demotes_compliant():
         }
     )
     ctrl = FixySemanticController(llm=llm, model="stub")
-    result = ctrl.validate_guidance_compliance("Athena", "Some abstract text.", "EXAMPLE")
+    result = ctrl.validate_guidance_compliance(
+        "Athena", "Some abstract text.", "EXAMPLE"
+    )
     assert result.compliant is False
     assert result.partial is True
     # Original reason must be preserved and demotion suffix must be appended
@@ -1477,7 +1481,9 @@ def test_confidence_threshold_non_compliant_unchanged():
         }
     )
     ctrl = FixySemanticController(llm=llm, model="stub")
-    result = ctrl.validate_guidance_compliance("Socrates", "Pure abstraction.", "EXAMPLE")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates", "Pure abstraction.", "EXAMPLE"
+    )
     assert result.compliant is False
     assert result.partial is False
     assert result.reason == "no_example_found"
@@ -1509,7 +1515,14 @@ _STRICT_REJECTION_PHRASES = [
 
 def test_example_prompt_contains_strict_rejection_bias():
     """The EXAMPLE validator prompt must contain the strict-rejection bias instructions."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_example"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_example",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Socrates", "Some reply.", "EXAMPLE")
     for phrase in _STRICT_REJECTION_PHRASES:
@@ -1518,16 +1531,27 @@ def test_example_prompt_contains_strict_rejection_bias():
 
 def test_example_prompt_contains_disallowed_patterns():
     """The EXAMPLE prompt must list abstract, metaphor, and hypothetical as non-compliant patterns."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_example"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_example",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Athena", "Some reply.", "EXAMPLE")
     for phrase in ("abstract", "metaphor", "hypothetical"):
-        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in EXAMPLE prompt non-compliant list"
+        assert (
+            phrase in llm.last_prompt.lower()
+        ), f"Expected {phrase!r} in EXAMPLE prompt non-compliant list"
 
 
 def test_test_prompt_contains_strict_rejection_bias():
     """The TEST validator prompt must contain the strict-rejection bias instructions."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"})
+    llm = _CaptureLLM(
+        {"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"}
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Socrates", "Some reply.", "TEST")
     for phrase in _STRICT_REJECTION_PHRASES:
@@ -1536,16 +1560,27 @@ def test_test_prompt_contains_strict_rejection_bias():
 
 def test_test_prompt_contains_disallowed_patterns():
     """The TEST prompt must list rhetorical doubt, skepticism, and vague demands as non-compliant."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"})
+    llm = _CaptureLLM(
+        {"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"}
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Athena", "Some reply.", "TEST")
     for phrase in ("rhetorical", "skepticism", "vague"):
-        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in TEST prompt non-compliant list"
+        assert (
+            phrase in llm.last_prompt.lower()
+        ), f"Expected {phrase!r} in TEST prompt non-compliant list"
 
 
 def test_concession_prompt_contains_strict_rejection_bias():
     """The CONCESSION validator prompt must contain the strict-rejection bias instructions."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_concession"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_concession",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Socrates", "Some reply.", "CONCESSION")
     for phrase in _STRICT_REJECTION_PHRASES:
@@ -1554,11 +1589,20 @@ def test_concession_prompt_contains_strict_rejection_bias():
 
 def test_concession_prompt_contains_disallowed_patterns():
     """The CONCESSION prompt must list fake concession, trivial, and attacks as non-compliant."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_concession"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_concession",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Athena", "Some reply.", "CONCESSION")
     for phrase in ("fake", "trivial", "attacks"):
-        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in CONCESSION prompt non-compliant list"
+        assert (
+            phrase in llm.last_prompt.lower()
+        ), f"Expected {phrase!r} in CONCESSION prompt non-compliant list"
 
 
 # ---------------------------------------------------------------------------
@@ -1593,7 +1637,9 @@ def test_strong_loop_overrides_compliant_validation_applies_extra_penalty():
 
     base = 0.9
     # Step 1: validation reward (+0.05 × confidence)
-    score = apply_validation_to_progress(base, validation_result, ignored_guidance_count=0)
+    score = apply_validation_to_progress(
+        base, validation_result, ignored_guidance_count=0
+    )
     # Step 2: loop penalty (×0.70, cap 0.50 at high confidence)
     score = apply_loop_to_progress(score, loop_result)
     # Step 3: explicit strong-loop-overrides-compliant penalty (×0.85)

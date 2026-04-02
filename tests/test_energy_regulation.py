@@ -648,13 +648,22 @@ class TestEntelgiaAgentDreamResolve:
     def test_select_top_unresolved_orders_by_salience(self):
         """_select_top_unresolved should rank by intensity + conflict + log(repetition+1)."""
         agent = EntelgiaAgent("Socrates")
-        agent.unresolved_topics.append(self._make_topic("low",  intensity=1.0, conflict=1.0, repetition=1))
-        agent.unresolved_topics.append(self._make_topic("high", intensity=5.0, conflict=4.0, repetition=3))
-        agent.unresolved_topics.append(self._make_topic("mid",  intensity=3.0, conflict=2.0, repetition=2))
+        agent.unresolved_topics.append(
+            self._make_topic("low", intensity=1.0, conflict=1.0, repetition=1)
+        )
+        agent.unresolved_topics.append(
+            self._make_topic("high", intensity=5.0, conflict=4.0, repetition=3)
+        )
+        agent.unresolved_topics.append(
+            self._make_topic("mid", intensity=3.0, conflict=2.0, repetition=2)
+        )
         selected = agent._select_top_unresolved()
         _print_table(
             ["rank", "topic", "intensity", "conflict", "repetition"],
-            [[i + 1, t["topic"], t["intensity"], t["conflict"], t["repetition"]] for i, t in enumerate(selected)],
+            [
+                [i + 1, t["topic"], t["intensity"], t["conflict"], t["repetition"]]
+                for i, t in enumerate(selected)
+            ],
             title="_select_top_unresolved Salience Order",
         )
         assert selected[0]["topic"] == "high"
@@ -746,7 +755,12 @@ class TestEntelgiaAgentDreamResolve:
         agent._run_dream_cycle()
         _print_table(
             ["dream_resolutions_count", "type"],
-            [[len(agent.dream_resolutions), agent.dream_resolutions[0].get("type", "?")]],
+            [
+                [
+                    len(agent.dream_resolutions),
+                    agent.dream_resolutions[0].get("type", "?"),
+                ]
+            ],
             title="Dream Stores Resolution Record",
         )
         assert len(agent.dream_resolutions) == 1

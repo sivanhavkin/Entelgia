@@ -646,6 +646,9 @@ LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "'one might argue', 'this raises questions about', 'in the context of', "
     "'one implicit assumption', 'the mechanism at play', 'this notion overlooks'.\n"
     "- Do NOT begin with 'Blunt challenge:' or any fixed signature prefix.\n"
+    "- Do NOT begin sentences repeatedly with 'You'. "
+    "Vary openings: use questions, statements, contrasts, or examples. "
+    "Avoid second-person repetition patterns.\n"
     "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
 )
 
@@ -4434,7 +4437,9 @@ class Agent:
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
-        self.unresolved_topics: List[Dict[str, Any]] = []  # structured unresolved topic store
+        self.unresolved_topics: List[Dict[str, Any]] = (
+            []
+        )  # structured unresolved topic store
         self._topic_history: List[frozenset] = []  # last N keyword sets for stagnation
         self._same_topic_turns: int = 0  # consecutive turns with same signature
         self._last_stagnation: float = 0.0
@@ -8224,7 +8229,9 @@ class MainScript:
                     t.get("text", "")
                     for t in self.dialog
                     if t.get("role") == speaker.name and t.get("text", "").strip()
-                ][-4:-1]  # up to 3 prior turns from this speaker; [-1] is the current turn
+                ][
+                    -4:-1
+                ]  # up to 3 prior turns from this speaker; [-1] is the current turn
                 try:
                     _validation_result, _loop_result = (
                         self.semantic_controller.evaluate_reply(
@@ -8385,9 +8392,7 @@ class MainScript:
             # Log fatigue vs structural cause separation every turn.
             # structural_repeat reflects detected loop modes; fatigue_level and
             # fatigue_bias are purely from energy — they do NOT define loops.
-            _loop_diag_fatigue_bias = max(
-                0.0, (speaker._last_fatigue - 0.2) * 0.6
-            )
+            _loop_diag_fatigue_bias = max(0.0, (speaker._last_fatigue - 0.2) * 0.6)
             logger.info(
                 "[LOOP-DIAG] agent=%s structural_repeat=%s fatigue_level=%.2f fatigue_bias=%.2f",
                 speaker.name,

@@ -409,7 +409,9 @@ class ContextManager:
         # Add debate style with combo and dissent
         style = debate_profile.get("style", "integrative")
         _profile_combo = safe_combo or debate_profile.get("drive_combo", "")
-        _profile_dissent = dissent if dissent else debate_profile.get("dissent_level", 0.0)
+        _profile_dissent = (
+            dissent if dissent else debate_profile.get("dissent_level", 0.0)
+        )
         prompt += f"[Style: {style} | combo={_profile_combo} | dissent={_profile_dissent:.2f}]\n\n"
 
         prompt += f"SEED: {user_seed}\n\n"
