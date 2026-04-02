@@ -8509,7 +8509,7 @@ class MainScript:
                         if "_loop_result" in dir()
                         else False
                     ),
-                    "abstraction_detected": bool(_active_loop_modes),
+                    "abstraction_detected": False,
                     "energy": float(speaker.energy_level),
                     "status": str(speaker._last_fatigue_state or "active"),
                 }
