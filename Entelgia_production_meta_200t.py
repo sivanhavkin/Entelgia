@@ -649,7 +649,8 @@ LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "- Do NOT begin sentences repeatedly with 'You'. "
     "Vary openings: use questions, statements, contrasts, or examples. "
     "Avoid second-person repetition patterns.\n"
-    "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
+    "- Length is dynamic: a single sharp sentence is as valid as a short paragraph.\n"
+    "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
 )
 
 LLM_BEHAVIORAL_CONTRACT_ATHENA = (
@@ -664,7 +665,8 @@ LLM_BEHAVIORAL_CONTRACT_ATHENA = (
     "'reveals an ethical tension', 'leading to tension'.\n"
     "- Do NOT use: 'balance', 'integrate', 'holistic', 'nuanced', 'multifaceted', "
     "'furthermore', 'moreover', 'in addition', 'it is worth noting'.\n"
-    "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification."
+    "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification.\n"
+    "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
 )
 
 LLM_BEHAVIORAL_CONTRACT_FIXY = (
