@@ -8325,7 +8325,7 @@ class MainScript:
                         _stronger_overlay = self._integration_core.build_stronger_overlay(
                             _pre_gen_decision
                         )
-                        _regen_seed = _stronger_overlay + "\n\n" + seed
+                        _regen_seed = _stronger_overlay + "\n\n" + base_seed
                         logger.warning(
                             "[POST-GEN-REGEN] mode=%s ignored by agent=%s — "
                             "regenerating via same agent",
