@@ -854,9 +854,9 @@ class TestDetectConceptualLoop:
             ]
         )
         modes = detector.detect(turns, turn_count=4)
-        assert CONCEPTUAL_LOOP in modes, (
-            f"CONCEPTUAL_LOOP should survive novelty suppressor; got {modes}"
-        )
+        assert (
+            CONCEPTUAL_LOOP in modes
+        ), f"CONCEPTUAL_LOOP should survive novelty suppressor; got {modes}"
 
     def test_conceptual_loop_policy_in_agent_policy(self):
         """_LOOP_AGENT_POLICY should map conceptual_loop to MECHANIZE."""
@@ -1018,9 +1018,9 @@ class TestAxisStagnation:
         detector = DialogueLoopDetector()
         turns = self._make_oscillating()
         modes = detector.detect(turns, turn_count=6)
-        assert AXIS_STAGNATION in modes, (
-            f"AXIS_STAGNATION must appear in detect() modes; got {modes}"
-        )
+        assert (
+            AXIS_STAGNATION in modes
+        ), f"AXIS_STAGNATION must appear in detect() modes; got {modes}"
 
     def test_does_not_fire_when_concrete_case_introduced(self):
         """AXIS_STAGNATION must NOT fire when a concrete case is introduced."""
@@ -1037,9 +1037,9 @@ class TestAxisStagnation:
             ]
         )
         result = detector._check_axis_stagnation(turns)
-        assert result is False, (
-            "_check_axis_stagnation must return False when a concrete case is present"
-        )
+        assert (
+            result is False
+        ), "_check_axis_stagnation must return False when a concrete case is present"
 
     def test_does_not_fire_when_resolution_occurs(self):
         """AXIS_STAGNATION must NOT fire when synthesis/resolution phrases appear."""
@@ -1052,9 +1052,9 @@ class TestAxisStagnation:
             ]
         )
         result = detector._check_axis_stagnation(turns)
-        assert result is False, (
-            "_check_axis_stagnation must return False when synthesis/resolution is present"
-        )
+        assert (
+            result is False
+        ), "_check_axis_stagnation must return False when synthesis/resolution is present"
 
     def test_does_not_fire_when_axis_is_diverse(self):
         """AXIS_STAGNATION must NOT fire when turns cover diverse topics."""
@@ -1070,9 +1070,9 @@ class TestAxisStagnation:
             ]
         )
         result = detector._check_axis_stagnation(turns)
-        assert result is False, (
-            "_check_axis_stagnation must return False when turns are topically diverse"
-        )
+        assert (
+            result is False
+        ), "_check_axis_stagnation must return False when turns are topically diverse"
 
     def test_does_not_fire_below_minimum_turns(self):
         """AXIS_STAGNATION must NOT fire when fewer than 6 turns are available."""
@@ -1080,9 +1080,9 @@ class TestAxisStagnation:
         # Only 4 turns — below _MIN_TURNS_AXIS_STAGNATION
         turns = _make_turns(self._OSCILLATING_TURNS[:4])
         result = detector._check_axis_stagnation(turns)
-        assert result is False, (
-            "_check_axis_stagnation must not fire with fewer than 6 turns"
-        )
+        assert (
+            result is False
+        ), "_check_axis_stagnation must not fire with fewer than 6 turns"
 
     def test_does_not_fire_when_measurable_condition_present(self):
         """AXIS_STAGNATION must NOT fire when a measurable condition is introduced."""
@@ -1097,9 +1097,9 @@ class TestAxisStagnation:
             ]
         )
         result = detector._check_axis_stagnation(turns)
-        assert result is False, (
-            "_check_axis_stagnation must return False when a measurable condition appears"
-        )
+        assert (
+            result is False
+        ), "_check_axis_stagnation must return False when a measurable condition appears"
 
     def test_does_not_fire_when_test_scenario_present(self):
         """AXIS_STAGNATION must NOT fire when a test scenario is introduced."""
@@ -1113,9 +1113,9 @@ class TestAxisStagnation:
             ]
         )
         result = detector._check_axis_stagnation(turns)
-        assert result is False, (
-            "_check_axis_stagnation must return False when a test scenario appears"
-        )
+        assert (
+            result is False
+        ), "_check_axis_stagnation must return False when a test scenario appears"
 
     def test_axis_stagnation_not_suppressed_by_novelty_suppressor(self):
         """AXIS_STAGNATION must survive the novelty suppressor in detect().
@@ -1128,49 +1128,49 @@ class TestAxisStagnation:
         turns = self._make_oscillating()
         # Confirm no novelty in last 2 turns (suppressor inactive for these turns)
         modes = detector.detect(turns, turn_count=6)
-        assert AXIS_STAGNATION in modes, (
-            f"AXIS_STAGNATION must survive the novelty suppressor; got {modes}"
-        )
+        assert (
+            AXIS_STAGNATION in modes
+        ), f"AXIS_STAGNATION must survive the novelty suppressor; got {modes}"
 
     def test_axis_stagnation_policy_in_fixy_policy(self):
         """_LOOP_MODE_POLICY must map axis_stagnation to a non-MEDIATE mode."""
         from entelgia.fixy_interactive import _LOOP_MODE_POLICY, FixyMode
 
-        assert "axis_stagnation" in _LOOP_MODE_POLICY, (
-            "_LOOP_MODE_POLICY must have an entry for 'axis_stagnation'"
-        )
-        assert _LOOP_MODE_POLICY["axis_stagnation"] != FixyMode.MEDIATE, (
-            "axis_stagnation must not fall back to the generic MEDIATE mode"
-        )
+        assert (
+            "axis_stagnation" in _LOOP_MODE_POLICY
+        ), "_LOOP_MODE_POLICY must have an entry for 'axis_stagnation'"
+        assert (
+            _LOOP_MODE_POLICY["axis_stagnation"] != FixyMode.MEDIATE
+        ), "axis_stagnation must not fall back to the generic MEDIATE mode"
 
     def test_axis_stagnation_policy_in_agent_policy(self):
         """_LOOP_AGENT_POLICY must map axis_stagnation to AgentMode.CONCRETIZE."""
         from entelgia.dialogue_engine import _LOOP_AGENT_POLICY, AgentMode
 
-        assert "axis_stagnation" in _LOOP_AGENT_POLICY, (
-            "_LOOP_AGENT_POLICY must have an entry for 'axis_stagnation'"
-        )
+        assert (
+            "axis_stagnation" in _LOOP_AGENT_POLICY
+        ), "_LOOP_AGENT_POLICY must have an entry for 'axis_stagnation'"
         assert _LOOP_AGENT_POLICY["axis_stagnation"] == AgentMode.CONCRETIZE
 
     def test_axis_stagnation_rewrite_mode_in_policy(self):
         """_LOOP_REWRITE_MODE_POLICY must map axis_stagnation to force_case."""
         from entelgia.fixy_interactive import _LOOP_REWRITE_MODE_POLICY, FixyMode
 
-        assert "axis_stagnation" in _LOOP_REWRITE_MODE_POLICY, (
-            "_LOOP_REWRITE_MODE_POLICY must have an entry for 'axis_stagnation'"
-        )
+        assert (
+            "axis_stagnation" in _LOOP_REWRITE_MODE_POLICY
+        ), "_LOOP_REWRITE_MODE_POLICY must have an entry for 'axis_stagnation'"
         assert _LOOP_REWRITE_MODE_POLICY["axis_stagnation"] == FixyMode.FORCE_CASE
 
     def test_axis_stagnation_novelty_rule_in_dialogue_rewriter(self):
         """DialogueRewriter._NOVELTY_RULES must contain an entry for axis_stagnation."""
         rewriter = DialogueRewriter()
-        assert AXIS_STAGNATION in rewriter._NOVELTY_RULES, (
-            "DialogueRewriter._NOVELTY_RULES must contain an entry for AXIS_STAGNATION"
-        )
+        assert (
+            AXIS_STAGNATION in rewriter._NOVELTY_RULES
+        ), "DialogueRewriter._NOVELTY_RULES must contain an entry for AXIS_STAGNATION"
         rule = rewriter._NOVELTY_RULES[AXIS_STAGNATION]
-        assert isinstance(rule, str) and len(rule) > 10, (
-            "AXIS_STAGNATION novelty rule must be a non-trivial instruction string"
-        )
+        assert (
+            isinstance(rule, str) and len(rule) > 10
+        ), "AXIS_STAGNATION novelty rule must be a non-trivial instruction string"
 
     def test_axis_stagnation_constant_value(self):
         """AXIS_STAGNATION constant must equal 'axis_stagnation'."""

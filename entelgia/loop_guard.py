@@ -242,15 +242,77 @@ _NOVELTY_SUPPRESS_THRESHOLD: int = 1
 # Stop-words excluded when normalising concept phrases
 _CONCEPT_STOPWORDS: frozenset = frozenset(
     {
-        "the", "a", "an", "and", "or", "of", "to", "in", "is", "are",
-        "was", "were", "it", "this", "that", "which", "who", "what",
-        "how", "why", "when", "be", "been", "being", "have", "has",
-        "had", "do", "does", "did", "all", "any", "some", "no", "not",
-        "so", "but", "if", "as", "at", "by", "for", "with", "from",
-        "on", "its", "our", "can", "will", "would", "could", "should",
-        "may", "might", "must", "than", "then", "only", "also", "just",
-        "very", "even", "both", "each", "into", "onto", "upon", "about",
-        "such", "more", "most",
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "of",
+        "to",
+        "in",
+        "is",
+        "are",
+        "was",
+        "were",
+        "it",
+        "this",
+        "that",
+        "which",
+        "who",
+        "what",
+        "how",
+        "why",
+        "when",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "all",
+        "any",
+        "some",
+        "no",
+        "not",
+        "so",
+        "but",
+        "if",
+        "as",
+        "at",
+        "by",
+        "for",
+        "with",
+        "from",
+        "on",
+        "its",
+        "our",
+        "can",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "than",
+        "then",
+        "only",
+        "also",
+        "just",
+        "very",
+        "even",
+        "both",
+        "each",
+        "into",
+        "onto",
+        "upon",
+        "about",
+        "such",
+        "more",
+        "most",
     }
 )
 
@@ -1135,9 +1197,7 @@ class DialogueLoopDetector:
         all_text = " ".join(t.get("text", "").lower() for t in turns)
         for cluster_name, keywords in _AXIS_STRUCTURAL_NOVELTY_CLUSTERS.items():
             hits = sum(
-                1
-                for kw in keywords
-                if re.search(r"\b" + re.escape(kw), all_text)
+                1 for kw in keywords if re.search(r"\b" + re.escape(kw), all_text)
             )
             if hits >= _NOVELTY_CLUSTER_HIT_THRESHOLD:
                 logger.debug(
@@ -1236,7 +1296,8 @@ class DialogueLoopDetector:
                     return same_axis
                 except Exception as exc:
                     logger.warning(
-                        "[AXIS-EMBED] embedding failed: %s — falling back to Jaccard", exc
+                        "[AXIS-EMBED] embedding failed: %s — falling back to Jaccard",
+                        exc,
                     )
 
         # Jaccard fallback: mean pairwise keyword overlap across the window

@@ -122,6 +122,7 @@ from entelgia.fixy_semantic_control import (
     VALIDATED_MOVE_TYPES,
     LOOP_BREAKING_MOVES,
     COMPLIANCE_CONFIDENCE_THRESHOLD,
+    STRONG_LOOP_CONFIDENCE_THRESHOLD,
     quick_example_hint,
     quick_test_hint,
     apply_validation_to_progress,
@@ -1433,7 +1434,9 @@ def test_confidence_threshold_high_remains_compliant():
         }
     )
     ctrl = FixySemanticController(llm=llm, model="stub")
-    result = ctrl.validate_guidance_compliance("Socrates", "Some valid example text.", "EXAMPLE")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates", "Some valid example text.", "EXAMPLE"
+    )
     assert result.compliant is True
     assert "low_confidence_treated_as_non_compliant" not in result.reason
 
@@ -1455,7 +1458,9 @@ def test_confidence_threshold_low_demotes_compliant():
         }
     )
     ctrl = FixySemanticController(llm=llm, model="stub")
-    result = ctrl.validate_guidance_compliance("Athena", "Some abstract text.", "EXAMPLE")
+    result = ctrl.validate_guidance_compliance(
+        "Athena", "Some abstract text.", "EXAMPLE"
+    )
     assert result.compliant is False
     assert result.partial is True
     # Original reason must be preserved and demotion suffix must be appended
@@ -1476,7 +1481,9 @@ def test_confidence_threshold_non_compliant_unchanged():
         }
     )
     ctrl = FixySemanticController(llm=llm, model="stub")
-    result = ctrl.validate_guidance_compliance("Socrates", "Pure abstraction.", "EXAMPLE")
+    result = ctrl.validate_guidance_compliance(
+        "Socrates", "Pure abstraction.", "EXAMPLE"
+    )
     assert result.compliant is False
     assert result.partial is False
     assert result.reason == "no_example_found"
@@ -1508,7 +1515,14 @@ _STRICT_REJECTION_PHRASES = [
 
 def test_example_prompt_contains_strict_rejection_bias():
     """The EXAMPLE validator prompt must contain the strict-rejection bias instructions."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_example"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_example",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Socrates", "Some reply.", "EXAMPLE")
     for phrase in _STRICT_REJECTION_PHRASES:
@@ -1517,16 +1531,27 @@ def test_example_prompt_contains_strict_rejection_bias():
 
 def test_example_prompt_contains_disallowed_patterns():
     """The EXAMPLE prompt must list abstract, metaphor, and hypothetical as non-compliant patterns."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_example"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_example",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Athena", "Some reply.", "EXAMPLE")
     for phrase in ("abstract", "metaphor", "hypothetical"):
-        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in EXAMPLE prompt non-compliant list"
+        assert (
+            phrase in llm.last_prompt.lower()
+        ), f"Expected {phrase!r} in EXAMPLE prompt non-compliant list"
 
 
 def test_test_prompt_contains_strict_rejection_bias():
     """The TEST validator prompt must contain the strict-rejection bias instructions."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"})
+    llm = _CaptureLLM(
+        {"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"}
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Socrates", "Some reply.", "TEST")
     for phrase in _STRICT_REJECTION_PHRASES:
@@ -1535,16 +1560,27 @@ def test_test_prompt_contains_strict_rejection_bias():
 
 def test_test_prompt_contains_disallowed_patterns():
     """The TEST prompt must list rhetorical doubt, skepticism, and vague demands as non-compliant."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"})
+    llm = _CaptureLLM(
+        {"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_test"}
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Athena", "Some reply.", "TEST")
     for phrase in ("rhetorical", "skepticism", "vague"):
-        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in TEST prompt non-compliant list"
+        assert (
+            phrase in llm.last_prompt.lower()
+        ), f"Expected {phrase!r} in TEST prompt non-compliant list"
 
 
 def test_concession_prompt_contains_strict_rejection_bias():
     """The CONCESSION validator prompt must contain the strict-rejection bias instructions."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_concession"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_concession",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Socrates", "Some reply.", "CONCESSION")
     for phrase in _STRICT_REJECTION_PHRASES:
@@ -1553,8 +1589,127 @@ def test_concession_prompt_contains_strict_rejection_bias():
 
 def test_concession_prompt_contains_disallowed_patterns():
     """The CONCESSION prompt must list fake concession, trivial, and attacks as non-compliant."""
-    llm = _CaptureLLM({"compliant": False, "partial": False, "confidence": 0.85, "reason": "no_concession"})
+    llm = _CaptureLLM(
+        {
+            "compliant": False,
+            "partial": False,
+            "confidence": 0.85,
+            "reason": "no_concession",
+        }
+    )
     ctrl = FixySemanticController(llm=llm, model="stub")
     ctrl.validate_guidance_compliance("Athena", "Some reply.", "CONCESSION")
     for phrase in ("fake", "trivial", "attacks"):
-        assert phrase in llm.last_prompt.lower(), f"Expected {phrase!r} in CONCESSION prompt non-compliant list"
+        assert (
+            phrase in llm.last_prompt.lower()
+        ), f"Expected {phrase!r} in CONCESSION prompt non-compliant list"
+
+
+# ---------------------------------------------------------------------------
+# Strong-loop validator override
+# ---------------------------------------------------------------------------
+
+
+def test_strong_loop_overrides_compliant_validation_applies_extra_penalty():
+    """High-confidence loop + compliant validation → both penalties stack.
+
+    The caller must apply an explicit ×0.85 factor when
+    ``loop_result.is_loop and loop_result.confidence >= STRONG_LOOP_CONFIDENCE_THRESHOLD
+    and validation_result.compliant``.
+    The shared *validation_result* must NOT be mutated so that
+    ``record_guidance_compliance`` does not falsely increment
+    ``ignored_guidance_count``.
+    """
+    validation_result = ValidationResult(
+        speaker="Socrates",
+        expected_move="EXAMPLE",
+        compliant=True,
+        partial=False,
+        confidence=0.9,
+        reason="concrete_example",
+    )
+    loop_result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=True,
+        confidence=STRONG_LOOP_CONFIDENCE_THRESHOLD + 0.05,  # above threshold
+        reason="definite_loop",
+    )
+
+    base = 0.9
+    # Step 1: validation reward (+0.05 × confidence)
+    score = apply_validation_to_progress(
+        base, validation_result, ignored_guidance_count=0
+    )
+    # Step 2: loop penalty (×0.70, cap 0.50 at high confidence)
+    score = apply_loop_to_progress(score, loop_result)
+    # Step 3: explicit strong-loop-overrides-compliant penalty (×0.85)
+    loop_overrides_compliant = (
+        loop_result.is_loop
+        and loop_result.confidence >= STRONG_LOOP_CONFIDENCE_THRESHOLD
+        and validation_result.compliant
+    )
+    assert loop_overrides_compliant, "Precondition: override should trigger"
+    if loop_overrides_compliant:
+        score = float(max(0.0, min(1.0, score * 0.85)))
+
+    # Score must be capped at 0.50 from the strong-loop penalty
+    assert score <= 0.50
+
+    # Critical: validation_result must NOT be mutated — compliant stays True
+    assert validation_result.compliant is True
+
+
+def test_strong_loop_override_does_not_affect_ignored_guidance_count():
+    """ignored_guidance_count must NOT increase when override is applied.
+
+    Because the agent satisfied the guidance request (compliant=True), Fixy
+    should not penalise the ignored-guidance streak.  The override is a
+    progress-score-only adjustment.
+    """
+    fixy = _make_fixy()
+    fixy.fixy_guidance = _make_guidance("EXAMPLE", 0.8)
+    fixy.ignored_guidance_count = 0
+
+    validation_result = ValidationResult(
+        speaker="Socrates",
+        expected_move="EXAMPLE",
+        compliant=True,
+        partial=False,
+        confidence=0.9,
+        reason="concrete_example",
+    )
+    # Pass the unmutated validation_result to record_guidance_compliance
+    fixy.record_guidance_compliance(validation_result)
+
+    # Count must still be 0 (reset on compliance)
+    assert fixy.ignored_guidance_count == 0
+
+
+def test_strong_loop_override_not_triggered_below_threshold():
+    """No extra penalty should apply when loop confidence is below STRONG_LOOP_CONFIDENCE_THRESHOLD."""
+    validation_result = ValidationResult(
+        speaker="Socrates",
+        expected_move="EXAMPLE",
+        compliant=True,
+        partial=False,
+        confidence=0.9,
+        reason="concrete_example",
+    )
+    loop_result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=True,
+        confidence=STRONG_LOOP_CONFIDENCE_THRESHOLD - 0.05,  # below threshold
+        reason="possible_loop",
+    )
+
+    loop_overrides_compliant = (
+        loop_result.is_loop
+        and loop_result.confidence >= STRONG_LOOP_CONFIDENCE_THRESHOLD
+        and validation_result.compliant
+    )
+    assert not loop_overrides_compliant, "Override must NOT trigger below threshold"
+
+
+def test_strong_loop_confidence_threshold_value():
+    """STRONG_LOOP_CONFIDENCE_THRESHOLD must equal 0.80 (canonical spec value)."""
+    assert STRONG_LOOP_CONFIDENCE_THRESHOLD == pytest.approx(0.80)

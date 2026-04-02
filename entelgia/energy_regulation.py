@@ -138,9 +138,7 @@ class EntelgiaAgent:
         """Return the top *k* unresolved topics sorted by salience score."""
         if k is None:
             k = self.DREAM_RESOLVE_TOP_K
-        pending = [
-            t for t in self.unresolved_topics if t.get("status") == "unresolved"
-        ]
+        pending = [t for t in self.unresolved_topics if t.get("status") == "unresolved"]
         pending.sort(key=self._score_unresolved, reverse=True)
         return pending[:k]
 

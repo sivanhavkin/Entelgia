@@ -64,6 +64,9 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
         "'one might argue', 'this raises questions about', 'in the context of', "
         "'one implicit assumption', 'the mechanism at play', 'this notion overlooks'.\n"
         "- Do NOT begin with 'Blunt challenge:' or any fixed signature prefix.\n"
+        "- Do NOT begin sentences repeatedly with 'You'. "
+        "Vary openings: use questions, statements, contrasts, or examples. "
+        "Avoid second-person repetition patterns.\n"
         "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
     ),
     "Athena": (
@@ -406,7 +409,9 @@ class ContextManager:
         # Add debate style with combo and dissent
         style = debate_profile.get("style", "integrative")
         _profile_combo = safe_combo or debate_profile.get("drive_combo", "")
-        _profile_dissent = dissent if dissent else debate_profile.get("dissent_level", 0.0)
+        _profile_dissent = (
+            dissent if dissent else debate_profile.get("dissent_level", 0.0)
+        )
         prompt += f"[Style: {style} | combo={_profile_combo} | dissent={_profile_dissent:.2f}]\n\n"
 
         prompt += f"SEED: {user_seed}\n\n"

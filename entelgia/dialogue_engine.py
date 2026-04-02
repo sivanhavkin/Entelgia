@@ -207,6 +207,7 @@ class SeedGenerator:
         guidance_hint = ""
         if fixy_guidance is not None:
             from entelgia.fixy_interactive import build_guidance_prompt_hint
+
             raw_hint = build_guidance_prompt_hint(fixy_guidance)
             if raw_hint:
                 guidance_hint = "\n[GUIDANCE HINT] " + raw_hint
@@ -224,7 +225,10 @@ class SeedGenerator:
         return seed_text
 
     def _select_strategy(
-        self, turn_count: int, conflict_level: float, last_emotion: str,
+        self,
+        turn_count: int,
+        conflict_level: float,
+        last_emotion: str,
         fixy_guidance: "Optional[FixyGuidance]" = None,
     ) -> str:
         """
@@ -278,19 +282,19 @@ class SeedGenerator:
 
             # Map preferred_move → strategies to boost / suppress
             _BOOST: Dict[str, List[str]] = {
-                "TEST":          ["explore_implication", "question_assumption"],
-                "EXAMPLE":       ["introduce_analogy"],
-                "CONCESSION":    ["agree_and_expand", "synthesize"],
-                "NEW_FRAME":     ["meta_reflect", "explore_implication"],
-                "NEW_CLAIM":     ["constructive_disagree", "question_assumption"],
+                "TEST": ["explore_implication", "question_assumption"],
+                "EXAMPLE": ["introduce_analogy"],
+                "CONCESSION": ["agree_and_expand", "synthesize"],
+                "NEW_FRAME": ["meta_reflect", "explore_implication"],
+                "NEW_CLAIM": ["constructive_disagree", "question_assumption"],
                 "DIRECT_ATTACK": ["constructive_disagree"],
             }
             _SUPPRESS: Dict[str, List[str]] = {
-                "TEST":          ["agree_and_expand"],
-                "EXAMPLE":       ["agree_and_expand"],
-                "CONCESSION":    ["constructive_disagree"],
-                "NEW_FRAME":     ["agree_and_expand"],
-                "NEW_CLAIM":     ["agree_and_expand", "synthesize"],
+                "TEST": ["agree_and_expand"],
+                "EXAMPLE": ["agree_and_expand"],
+                "CONCESSION": ["constructive_disagree"],
+                "NEW_FRAME": ["agree_and_expand"],
+                "NEW_CLAIM": ["agree_and_expand", "synthesize"],
                 "DIRECT_ATTACK": ["agree_and_expand", "synthesize"],
             }
 
@@ -466,8 +470,12 @@ class DialogueEngine:
             dialog_history[-5:] if len(dialog_history) >= 5 else dialog_history
         )
         return self.seed_generator.generate_seed(
-            topic, recent_turns, speaker, turn_count,
-            agent_mode=agent_mode, fixy_guidance=fixy_guidance,
+            topic,
+            recent_turns,
+            speaker,
+            turn_count,
+            agent_mode=agent_mode,
+            fixy_guidance=fixy_guidance,
         )
 
     def should_allow_fixy(

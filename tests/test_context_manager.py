@@ -488,7 +488,11 @@ class TestAgentStateInPrompt:
             dialog_tail=[],
             stm=[],
             ltm=[],
-            debate_profile={"style": "analytical", "drive_combo": "high_id", "dissent_level": 0.35},
+            debate_profile={
+                "style": "analytical",
+                "drive_combo": "high_id",
+                "dissent_level": 0.35,
+            },
             energy=72.5,
             pressure=3.40,
             emotion="curious",
@@ -596,8 +600,16 @@ class TestAgentStateInPrompt:
             debate_profile={"style": "integrative"},
         )
         prompt = self.cm.build_enriched_context(**defaults)
-        for key in ("energy=", "pressure=", "conflict=", "unresolved=",
-                    "stagnation=", "emotion=", "kind=", "temp="):
+        for key in (
+            "energy=",
+            "pressure=",
+            "conflict=",
+            "unresolved=",
+            "stagnation=",
+            "emotion=",
+            "kind=",
+            "temp=",
+        ):
             assert key in prompt, f"Expected '{key}' in prompt"
 
 

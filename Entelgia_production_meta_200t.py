@@ -137,6 +137,7 @@ try:
         FixySemanticController,
         apply_validation_to_progress as _apply_validation_to_progress,
         apply_loop_to_progress as _apply_loop_to_progress,
+        STRONG_LOOP_CONFIDENCE_THRESHOLD as _STRONG_LOOP_CONFIDENCE_THRESHOLD,
     )
 
     # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
@@ -645,6 +646,9 @@ LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "'one might argue', 'this raises questions about', 'in the context of', "
     "'one implicit assumption', 'the mechanism at play', 'this notion overlooks'.\n"
     "- Do NOT begin with 'Blunt challenge:' or any fixed signature prefix.\n"
+    "- Do NOT begin sentences repeatedly with 'You'. "
+    "Vary openings: use questions, statements, contrasts, or examples. "
+    "Avoid second-person repetition patterns.\n"
     "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
 )
 
@@ -4433,7 +4437,9 @@ class Agent:
         # Drive Pressure state
         self.drive_pressure: float = 2.0
         self.open_questions: int = 0  # unresolved question counter (0..5)
-        self.unresolved_topics: List[Dict[str, Any]] = []  # structured unresolved topic store
+        self.unresolved_topics: List[Dict[str, Any]] = (
+            []
+        )  # structured unresolved topic store
         self._topic_history: List[frozenset] = []  # last N keyword sets for stagnation
         self._same_topic_turns: int = 0  # consecutive turns with same signature
         self._last_stagnation: float = 0.0
@@ -8223,7 +8229,9 @@ class MainScript:
                     t.get("text", "")
                     for t in self.dialog
                     if t.get("role") == speaker.name and t.get("text", "").strip()
-                ][-4:-1]  # up to 3 prior turns from this speaker; [-1] is the current turn
+                ][
+                    -4:-1
+                ]  # up to 3 prior turns from this speaker; [-1] is the current turn
                 try:
                     _validation_result, _loop_result = (
                         self.semantic_controller.evaluate_reply(
@@ -8262,6 +8270,22 @@ class MainScript:
                     _progress_score = _apply_loop_to_progress(
                         _progress_score, _loop_result
                     )
+                    # When a strong loop overrides an otherwise-compliant
+                    # validation verdict, apply an explicit non-compliance
+                    # multiplier rather than mutating the shared
+                    # _validation_result object (which is later passed to
+                    # record_guidance_compliance and must reflect the real
+                    # validator outcome to avoid side-effects on
+                    # ignored_guidance_count).
+                    _loop_overrides_compliant = (
+                        _loop_result.is_loop
+                        and _loop_result.confidence >= _STRONG_LOOP_CONFIDENCE_THRESHOLD
+                        and _validation_result.compliant
+                    )
+                    if _loop_overrides_compliant:
+                        _progress_score = float(
+                            max(0.0, min(1.0, _progress_score * 0.85))
+                        )
                     # Mirror loop result into dialogue semantic_repeat signal
                     # and recompute alignment so [SEMANTIC-REPEAT-SYNC] stays coherent.
                     speaker._last_dialogue_signals["semantic_repeat"] = (
@@ -8289,10 +8313,12 @@ class MainScript:
                     _pe_replace_last_score(speaker.name, _progress_score)
                     logger.info(
                         "[FIXY-COUPLING] speaker=%s compliant=%s is_loop=%s"
-                        " progress_after=%.2f semantic_repeat=%s",
+                        " loop_overrides_compliant=%s progress_after=%.2f"
+                        " semantic_repeat=%s",
                         speaker.name,
                         _validation_result.compliant,
                         _loop_result.is_loop,
+                        _loop_overrides_compliant,
                         _progress_score,
                         speaker._last_dialogue_signals["semantic_repeat"],
                     )
@@ -8366,9 +8392,7 @@ class MainScript:
             # Log fatigue vs structural cause separation every turn.
             # structural_repeat reflects detected loop modes; fatigue_level and
             # fatigue_bias are purely from energy — they do NOT define loops.
-            _loop_diag_fatigue_bias = max(
-                0.0, (speaker._last_fatigue - 0.2) * 0.6
-            )
+            _loop_diag_fatigue_bias = max(0.0, (speaker._last_fatigue - 0.2) * 0.6)
             logger.info(
                 "[LOOP-DIAG] agent=%s structural_repeat=%s fatigue_level=%.2f fatigue_bias=%.2f",
                 speaker.name,

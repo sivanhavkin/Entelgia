@@ -30,7 +30,6 @@ from Entelgia_production_meta import (
     _ENERGY_DREAM_THRESHOLD,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -55,7 +54,9 @@ class TestFatigueAboveThreshold:
     def test_no_fatigue_above_threshold(self, energy):
         fatigue, state = _compute_fatigue(energy)
         _print_row("above threshold", energy, fatigue, state)
-        assert fatigue == 0.0, f"Expected 0.0 fatigue for energy={energy}, got {fatigue}"
+        assert (
+            fatigue == 0.0
+        ), f"Expected 0.0 fatigue for energy={energy}, got {fatigue}"
         assert state == "none", f"Expected 'none' for energy={energy}, got {state!r}"
 
     def test_exactly_at_threshold(self):
@@ -78,17 +79,17 @@ class TestFatigueGradualRange:
         "energy, expected_state",
         [
             # State boundary: none (fatigue ≤ 0.2) — energy ≥ 55 (60 - 0.2*25 = 55)
-            (60.0, "none"),   # threshold
-            (55.0, "none"),   # fatigue = 0.20 exactly → still "none"
+            (60.0, "none"),  # threshold
+            (55.0, "none"),  # fatigue = 0.20 exactly → still "none"
             # State boundary: mild (0.2 < fatigue ≤ 0.5) — energy 47.5–55
-            (54.9, "mild"),   # just above 55 → fatigue just above 0.2 → mild
-            (47.5, "mild"),   # fatigue = 0.50 exactly → still "mild"
+            (54.9, "mild"),  # just above 55 → fatigue just above 0.2 → mild
+            (47.5, "mild"),  # fatigue = 0.50 exactly → still "mild"
             # State boundary: medium (0.5 < fatigue ≤ 0.8) — energy 40–47.5
-            (47.4, "medium"), # just above 47.5 → fatigue just above 0.5 → medium
-            (40.0, "medium"), # fatigue = 0.80 exactly → still "medium"
+            (47.4, "medium"),  # just above 47.5 → fatigue just above 0.5 → medium
+            (40.0, "medium"),  # fatigue = 0.80 exactly → still "medium"
             # State boundary: severe (fatigue > 0.8) — energy < 40
-            (39.9, "severe"), # just below 40 → fatigue just above 0.8 → severe
-            (35.0, "severe"), # lower boundary of meaningful range
+            (39.9, "severe"),  # just below 40 → fatigue just above 0.8 → severe
+            (35.0, "severe"),  # lower boundary of meaningful range
         ],
     )
     def test_state_label_mapping(self, energy, expected_state):
@@ -125,9 +126,9 @@ class TestFatigueGradualRange:
             expected_raw = (_FATIGUE_ENERGY_THRESHOLD - energy) / _FATIGUE_ENERGY_SPAN
             expected_clamped = max(0.0, min(1.0, expected_raw))
             fatigue, _ = _compute_fatigue(energy)
-            assert abs(fatigue - expected_clamped) < 1e-9, (
-                f"energy={energy}: expected {expected_clamped:.6f}, got {fatigue:.6f}"
-            )
+            assert (
+                abs(fatigue - expected_clamped) < 1e-9
+            ), f"energy={energy}: expected {expected_clamped:.6f}, got {fatigue:.6f}"
 
 
 # ============================================================================
@@ -142,7 +143,9 @@ class TestFatigueBelowDreamThreshold:
     def test_severe_below_dream_threshold(self, energy):
         fatigue, state = _compute_fatigue(energy)
         _print_row("below dream threshold", energy, fatigue, state)
-        assert fatigue == 1.0, f"Expected clamped fatigue=1.0 for energy={energy}, got {fatigue}"
+        assert (
+            fatigue == 1.0
+        ), f"Expected clamped fatigue=1.0 for energy={energy}, got {fatigue}"
         assert state == "severe"
 
 
@@ -160,9 +163,9 @@ class TestFatigueClampInvariant:
     )
     def test_score_in_unit_interval(self, energy):
         fatigue, _ = _compute_fatigue(energy)
-        assert 0.0 <= fatigue <= 1.0, (
-            f"Fatigue out of [0, 1] for energy={energy}: got {fatigue}"
-        )
+        assert (
+            0.0 <= fatigue <= 1.0
+        ), f"Fatigue out of [0, 1] for energy={energy}: got {fatigue}"
 
 
 # ============================================================================
@@ -233,11 +236,11 @@ class TestFatigueDoesNotControlLoopFlags:
     @pytest.mark.parametrize(
         "energy, should_be_no_fatigue",
         [
-            (100.0, True),   # > 60: no fatigue
-            (70.0, True),    # > 60: no fatigue
-            (55.0, False),   # mild fatigue
-            (40.0, False),   # medium fatigue
-            (35.0, False),   # severe fatigue
+            (100.0, True),  # > 60: no fatigue
+            (70.0, True),  # > 60: no fatigue
+            (55.0, False),  # mild fatigue
+            (40.0, False),  # medium fatigue
+            (35.0, False),  # severe fatigue
         ],
     )
     def test_fatigue_does_not_set_semantic_repeat(self, energy, should_be_no_fatigue):
@@ -258,11 +261,13 @@ class TestFatigueDoesNotControlLoopFlags:
         for e_int in range(-5, 111):
             energy = float(e_int)
             _, state = _compute_fatigue(energy)
-            assert state in valid_states, f"Unexpected state {state!r} for energy={energy}"
+            assert (
+                state in valid_states
+            ), f"Unexpected state {state!r} for energy={energy}"
             observed.add(state)
-        assert observed == valid_states, (
-            f"Not all states reachable — observed: {observed}, expected: {valid_states}"
-        )
+        assert (
+            observed == valid_states
+        ), f"Not all states reachable — observed: {observed}, expected: {valid_states}"
 
 
 # ============================================================================
@@ -296,9 +301,9 @@ class TestComputeEnergyStatus:
     def test_energy_status_label(self, energy, expected_status):
         status = _compute_energy_status(energy)
         print(f"\n  energy={energy:6.1f}  status={status!r}")
-        assert status == expected_status, (
-            f"energy={energy}: expected status={expected_status!r}, got {status!r}"
-        )
+        assert (
+            status == expected_status
+        ), f"energy={energy}: expected status={expected_status!r}, got {status!r}"
 
     def test_all_three_statuses_reachable(self):
         """All three energy status labels must be reachable."""
@@ -306,13 +311,13 @@ class TestComputeEnergyStatus:
         observed = set()
         for e_int in range(-5, 111):
             status = _compute_energy_status(float(e_int))
-            assert status in valid_statuses, (
-                f"Unexpected status {status!r} for energy={float(e_int)}"
-            )
+            assert (
+                status in valid_statuses
+            ), f"Unexpected status {status!r} for energy={float(e_int)}"
             observed.add(status)
-        assert observed == valid_statuses, (
-            f"Not all statuses reachable — observed: {observed}, expected: {valid_statuses}"
-        )
+        assert (
+            observed == valid_statuses
+        ), f"Not all statuses reachable — observed: {observed}, expected: {valid_statuses}"
 
     def test_constants_define_boundaries(self):
         """_FATIGUE_ENERGY_THRESHOLD and _ENERGY_DREAM_THRESHOLD must be the regime boundaries."""
@@ -331,9 +336,9 @@ class TestComputeEnergyStatus:
         """_compute_energy_status must always return a str."""
         for energy in [-100.0, 0.0, 35.0, 47.5, 60.0, 75.0]:
             result = _compute_energy_status(energy)
-            assert isinstance(result, str), (
-                f"Expected str, got {type(result)} for energy={energy}"
-            )
+            assert isinstance(
+                result, str
+            ), f"Expected str, got {type(result)} for energy={energy}"
 
 
 # ============================================================================
@@ -514,7 +519,10 @@ class TestFatiguePostDrainConsistency:
         """_last_energy_status must not be 'normal' when energy_level is in 35–60."""
         import Entelgia_production_meta as _meta
         from unittest.mock import patch
-        from Entelgia_production_meta import _FATIGUE_ENERGY_THRESHOLD, _ENERGY_DREAM_THRESHOLD
+        from Entelgia_production_meta import (
+            _FATIGUE_ENERGY_THRESHOLD,
+            _ENERGY_DREAM_THRESHOLD,
+        )
 
         agent, cfg = self._make_agent(start_energy=63.0)
         dialog = [{"role": "Athena", "text": "What is identity?"}]

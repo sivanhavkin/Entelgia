@@ -60,6 +60,11 @@ LOOP_BREAKING_MOVES: List[str] = [
 #: (partial=True) to prevent false positives from uncertain LLM judgements.
 COMPLIANCE_CONFIDENCE_THRESHOLD: float = 0.70
 
+#: Minimum loop-detection confidence required to treat a semantic loop as a
+#: "strong loop".  At this level, :func:`apply_loop_to_progress` caps the
+#: score at 0.50, and callers may apply an additional non-compliance penalty.
+STRONG_LOOP_CONFIDENCE_THRESHOLD: float = 0.80
+
 # ---------------------------------------------------------------------------
 # Result dataclasses
 # ---------------------------------------------------------------------------
@@ -443,7 +448,9 @@ class FixySemanticController:
             result.partial = True
             original_reason = result.reason
             if original_reason:
-                result.reason = f"{original_reason}; low_confidence_treated_as_non_compliant"
+                result.reason = (
+                    f"{original_reason}; low_confidence_treated_as_non_compliant"
+                )
             else:
                 result.reason = "low_confidence_treated_as_non_compliant"
 
@@ -696,7 +703,7 @@ def apply_loop_to_progress(
     """
     if loop_result.is_loop:
         progress_score *= 0.70
-        if loop_result.confidence >= 0.80:
+        if loop_result.confidence >= STRONG_LOOP_CONFIDENCE_THRESHOLD:
             progress_score = min(progress_score, 0.50)
 
     return float(max(0.0, min(1.0, progress_score)))
