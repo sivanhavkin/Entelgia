@@ -4473,7 +4473,8 @@ class Agent:
         self._last_fatigue_state: str = "none"
         # Energy status (measurement only) — set by speak() every turn; reflects energy regime.
         self._last_energy_status: str = "normal"
-        # Progress score and move type (set by speak(); adjusted by semantic validation in MainScript).
+        # Progress score (set by speak(); may be adjusted by semantic validation in MainScript).
+        # Move type is set by speak() and is not modified by semantic validation.
         self._last_pe_score: float = 0.0
         self._last_pe_move: str = ""
         # ── Anti-repetition form tracking ─────────────────────────────────────
@@ -6459,6 +6460,12 @@ class Agent:
         _pe_claims_mem = _pe_get_claims_memory(self.name)
         _pe_move = _pe_classify_move(out, _history_texts)
         _pe_score = _pe_score_progress(out, _history_texts, _pe_claims_mem)
+        logger.info(
+            "[PROGRESS] agent=%s score=%.2f move_type=%s",
+            self.name,
+            _pe_score,
+            _pe_move,
+        )
         # Update claims memory and log any new/changed claims
         _pe_new_claims = _pe_update_claims(self.name, out, _pe_move)
         if _pe_new_claims:
