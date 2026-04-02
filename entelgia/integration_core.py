@@ -440,7 +440,9 @@ class IntegrationCore:
         """
         valid_fields = IntegrationState.__dataclass_fields__  # type: ignore[attr-defined]
         filtered = {
-            k: v for k, v in state_dict.items() if k in valid_fields
+            k: v
+            for k, v in state_dict.items()
+            if k in valid_fields and k != "agent_name"
         }
         return IntegrationState(agent_name=agent_name, **filtered)
 
