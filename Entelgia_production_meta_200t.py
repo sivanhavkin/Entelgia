@@ -137,6 +137,7 @@ try:
         FixySemanticController,
         apply_validation_to_progress as _apply_validation_to_progress,
         apply_loop_to_progress as _apply_loop_to_progress,
+        STRONG_LOOP_CONFIDENCE_THRESHOLD as _STRONG_LOOP_CONFIDENCE_THRESHOLD,
     )
 
     # Loop-guard: loop detector, phrase ban, rewriter, topic clusters
@@ -8262,6 +8263,22 @@ class MainScript:
                     _progress_score = _apply_loop_to_progress(
                         _progress_score, _loop_result
                     )
+                    # When a strong loop overrides an otherwise-compliant
+                    # validation verdict, apply an explicit non-compliance
+                    # multiplier rather than mutating the shared
+                    # _validation_result object (which is later passed to
+                    # record_guidance_compliance and must reflect the real
+                    # validator outcome to avoid side-effects on
+                    # ignored_guidance_count).
+                    _loop_overrides_compliant = (
+                        _loop_result.is_loop
+                        and _loop_result.confidence >= _STRONG_LOOP_CONFIDENCE_THRESHOLD
+                        and _validation_result.compliant
+                    )
+                    if _loop_overrides_compliant:
+                        _progress_score = float(
+                            max(0.0, min(1.0, _progress_score * 0.85))
+                        )
                     # Mirror loop result into dialogue semantic_repeat signal
                     # and recompute alignment so [SEMANTIC-REPEAT-SYNC] stays coherent.
                     speaker._last_dialogue_signals["semantic_repeat"] = (
@@ -8289,10 +8306,12 @@ class MainScript:
                     _pe_replace_last_score(speaker.name, _progress_score)
                     logger.info(
                         "[FIXY-COUPLING] speaker=%s compliant=%s is_loop=%s"
-                        " progress_after=%.2f semantic_repeat=%s",
+                        " loop_overrides_compliant=%s progress_after=%.2f"
+                        " semantic_repeat=%s",
                         speaker.name,
                         _validation_result.compliant,
                         _loop_result.is_loop,
+                        _loop_overrides_compliant,
                         _progress_score,
                         speaker._last_dialogue_signals["semantic_repeat"],
                     )
