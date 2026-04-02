@@ -18,6 +18,7 @@ from typing import Dict, List, Tuple, Any, Optional
 
 # LLM Response Length Instruction
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 
 logger = logging.getLogger(__name__)
 
@@ -485,7 +486,7 @@ _MODE_PROMPTS: Dict[str, str] = {
         "'What remains unclear is whether...' / "
         "'Both of you may be using this concept in different senses...'\n"
         "Do NOT use 'Deadlock:', 'Loop:', 'Next move:', or any prescriptive label.\n"
-        "Max 2–3 short sentences. Do NOT summarize or recycle dialogue content."
+        "Up to 200 words. Do NOT summarize or recycle dialogue content."
     ),
     FixyMode.GENTLE_NUDGE: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
@@ -495,7 +496,7 @@ _MODE_PROMPTS: Dict[str, str] = {
         "'There may be a variable that changes everything here...'\n"
         "Do NOT use 'Deadlock:', 'Loop:', 'Next move:', or rigid police-style labels.\n"
         "Preserve productive tension. Do NOT push for premature closure.\n"
-        "Max 2–3 short sentences. Do NOT moralize."
+        "Up to 200 words. Do NOT moralize."
     ),
     FixyMode.STRUCTURED_MEDIATION: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
@@ -504,7 +505,7 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Then identify what is missing: 'A missing distinction here may be...'\n"
         "Do NOT use 'Deadlock:', 'Loop:', 'Next move:'. Do NOT force a verdict. "
         "Do NOT guide the next step explicitly.\n"
-        "Max 3 sentences. Sound like a theorist, not a policy engine."
+        "Up to 200 words. Sound like a theorist, not a policy engine."
     ),
     FixyMode.HARD_CONSTRAINT: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
@@ -512,7 +513,7 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Begin with 'It seems the tension here is fundamentally between...' "
         "or 'What remains unresolved beneath the surface is...'\n"
         "Do NOT instruct, prescribe, or propose next steps. Illuminate the structure of the disagreement.\n"
-        "Max 3 short sentences. Sound like a thinker inside the dialogue, not an arbiter above it."
+        "Up to 200 words. Sound like a thinker inside the dialogue, not an arbiter above it."
     ),
     # ── Legacy / default mode ──────────────────────────────────────────────
     FixyMode.MEDIATE: (
@@ -521,126 +522,126 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Begin with 'It seems the disagreement is really about...' "
         "or 'A missing distinction here may be...'\n"
         "Do NOT use rigid labels like 'Deadlock:', 'Loop:', 'Next move:'.\n"
-        "Max 3 short sentences. Do NOT summarize or recycle dialogue content. Do NOT moralize."
+        "Up to 200 words. Do NOT summarize or recycle dialogue content. Do NOT moralize."
     ),
     FixyMode.CONTRADICT: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "A genuine contradiction is being softened into apparent agreement.\n"
         "Begin with 'It seems the disagreement is really about...' "
         "or 'Both of you may be using this concept in different senses...'\n"
-        "Do NOT use 'Deadlock:' or 'Next move:'. Max 3 short sentences. Do NOT bridge or reconcile."
+        "Do NOT use 'Deadlock:' or 'Next move:'. Up to 200 words. Do NOT bridge or reconcile."
     ),
     FixyMode.CONCRETIZE: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The exchange has remained abstract without concrete grounding.\n"
         "Begin with 'A missing distinction here may be...' or "
         "'What neither side has yet examined is a specific instance...'\n"
-        "Max 3 short sentences. Do NOT summarize the dialogue."
+        "Up to 200 words. Do NOT summarize the dialogue."
     ),
     FixyMode.INVERT: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "One view has been repeated without genuine challenge.\n"
         "Begin with 'What remains unclear is what the strongest objection to this position would be...' "
         "or 'A missing distinction may emerge if the dominant view is tested against...'\n"
-        "Max 3 short sentences. Do NOT recycle dialogue content."
+        "Up to 200 words. Do NOT recycle dialogue content."
     ),
     FixyMode.PIVOT: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The conversation appears locked within one conceptual domain.\n"
         "Begin with 'What remains unaddressed is...' "
         "or 'The conversation seems anchored to a single frame...'\n"
-        "Max 3 short sentences. Do NOT philosophize or prescribe a direction."
+        "Up to 200 words. Do NOT philosophize or prescribe a direction."
     ),
     FixyMode.EXPOSE_SYNTHESIS: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "A synthesis has been claimed without resolving the underlying contradiction.\n"
         "Begin with 'A missing distinction here may be...' "
         "or 'The synthesis claimed here may paper over...'\n"
-        "Max 3 short sentences. Do NOT accept the synthesis. Do NOT recycle dialogue content."
+        "Up to 200 words. Do NOT accept the synthesis. Do NOT recycle dialogue content."
     ),
     FixyMode.FORCE_MECHANISM: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "Claims are being made without a stated causal mechanism.\n"
         "Begin with 'A missing variable here is the causal chain from...' "
         "or 'What remains unclear is how one leads to the other...'\n"
-        "Max 3 short sentences. Do NOT prescribe a mechanism or direct next steps."
+        "Up to 200 words. Do NOT prescribe a mechanism or direct next steps."
     ),
     FixyMode.FORCE_CONCRETE_EXAMPLE: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The exchange has remained abstract without any real-world grounding.\n"
         "Begin with 'What neither side has yet examined is a specific real-world instance...' "
         "or 'A missing distinction may become visible in a concrete situation where...'\n"
-        "Max 3 short sentences. Do NOT summarize or moralize."
+        "Up to 200 words. Do NOT summarize or moralize."
     ),
     FixyMode.FORCE_COUNTEREXAMPLE: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "A central assertion has not been subjected to a disconfirming case.\n"
         "Begin with 'A missing variable here is a case where this claim does not hold...' "
         "or 'What remains unclear is whether this position survives a situation where...'\n"
-        "Max 3 short sentences. Do NOT resolve or prescribe an answer."
+        "Up to 200 words. Do NOT resolve or prescribe an answer."
     ),
     FixyMode.FORCE_DIRECT_DISAGREEMENT: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The exchange has converged toward agreement without naming the underlying tension.\n"
         "Begin with 'It seems the disagreement is really about...' "
         "or 'Both of you may be using this concept in different senses...'\n"
-        "Max 3 short sentences. Do NOT reconcile or bridge the positions."
+        "Up to 200 words. Do NOT reconcile or bridge the positions."
     ),
     FixyMode.FORCE_TOPIC_RETURN: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The conversation has drifted from its original question.\n"
         "Begin with 'What remains unaddressed is the original question of...' "
         "or 'A tension emerges when the current frame is held against what was first asked...'\n"
-        "Max 3 short sentences. Do NOT moralize or prescribe a direction."
+        "Up to 200 words. Do NOT moralize or prescribe a direction."
     ),
     FixyMode.FORCE_SHORT_ANSWER: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "A central question has gone unanswered in the exchange.\n"
         "Begin with 'What remains unclear is whether...' "
         "followed by a precise articulation of the unresolved question.\n"
-        "Max 2 short sentences. Do NOT prescribe an answer."
+        "Up to 200 words. Do NOT prescribe an answer."
     ),
     FixyMode.FORCE_NEW_DOMAIN: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The conversation appears anchored to a single conceptual cluster.\n"
         "Begin with 'The conversation seems anchored to a single frame...' "
         "or 'A tension emerges when this argument is held against a different domain...'\n"
-        "Max 3 short sentences. Do NOT moralize or prescribe a next step."
+        "Up to 200 words. Do NOT moralize or prescribe a next step."
     ),
     FixyMode.FORCE_METRIC: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "No measurable criterion or benchmark has appeared in the exchange.\n"
         "Begin with 'A missing variable here is a measurable criterion for...' "
         "or 'What remains unclear is how either position could be evaluated against...'\n"
-        "Max 3 short sentences. Do NOT prescribe what to measure."
+        "Up to 200 words. Do NOT prescribe what to measure."
     ),
     FixyMode.FORCE_CHOICE: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "Both positions are held simultaneously without genuine conflict.\n"
         "Begin with 'It seems the disagreement is really about...' "
         "or 'A tension emerges when both views are held at once — specifically...'\n"
-        "Max 3 short sentences. Do NOT resolve the tension or prescribe a commitment."
+        "Up to 200 words. Do NOT resolve the tension or prescribe a commitment."
     ),
     FixyMode.FORCE_TEST: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The exchange contains claims that have not yet been grounded empirically.\n"
         "Begin with 'A missing variable here is a testable prediction for...' "
         "or 'What remains unclear is what observable difference would follow from...'\n"
-        "Max 3 short sentences. Do NOT demand proof or prescribe a test."
+        "Up to 200 words. Do NOT demand proof or prescribe a test."
     ),
     FixyMode.FORCE_CASE: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "The reasoning has remained at an abstract level with no grounded instance.\n"
         "Begin with 'A missing distinction may be visible in a specific historical or situational case where...' "
         "or 'Both of you may be assuming something that a particular case would complicate...'\n"
-        "Max 3 short sentences. Do NOT prescribe which case to examine."
+        "Up to 200 words. Do NOT prescribe which case to examine."
     ),
     FixyMode.FORCE_DEFINITION: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
         "A central term is being used by both sides without a shared definition.\n"
         "Begin with 'Both of you may be using this term in different senses...' "
         "or 'What remains unclear is whether the same word is carrying different meanings...'\n"
-        "Max 3 short sentences. Do NOT define the term or prescribe a resolution."
+        "Up to 200 words. Do NOT define the term or prescribe a resolution."
     ),
 }
 
@@ -1553,7 +1554,7 @@ class InteractiveFixy:
                     "Begin with 'What neither side has yet examined is...' "
                     "or 'A missing distinction here may be...'\n"
                     "Do NOT use 'Loop:', 'Next move:', or rigid labels.\n"
-                    "Max 3 short sentences. Do NOT summarize dialogue content."
+                    "Up to 200 words. Do NOT summarize dialogue content."
                 ),
                 "synthesis_opportunity": _MODE_PROMPTS[FixyMode.EXPOSE_SYNTHESIS],
                 "meta_reflection_needed": (
@@ -1562,7 +1563,7 @@ class InteractiveFixy:
                     "Begin with 'What remains unaddressed is...' "
                     "or 'The conversation seems anchored to a single frame...'\n"
                     "Do NOT use 'Drift:', 'Next move:', or rigid labels.\n"
-                    "Max 3 short sentences. Do NOT moralize or prescribe policy."
+                    "Up to 200 words. Do NOT moralize or prescribe policy."
                 ),
             }
             prompt_template = legacy_prompts.get(
@@ -1606,9 +1607,9 @@ class InteractiveFixy:
             f"{dedup_instruction}"
             f"RECENT DIALOGUE:\n{context}\n\n"
             f"Output rule: {output_instruction}\n"
-            f"Max 3 short sentences. Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
+            f"Up to 200 words. Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
-            f"{LLM_RESPONSE_LIMIT}\n"
+            f"{LLM_FIXY_RESPONSE_LIMIT}\n"
         )
 
         intervention = self.llm.generate(

@@ -531,6 +531,7 @@ ANTHROPIC_MODELS: list[str] = [
 
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 MAX_RESPONSE_WORDS = 150
 MAX_CONSECUTIVE_SUPEREGO_REWRITES = 2
 
@@ -649,7 +650,8 @@ LLM_BEHAVIORAL_CONTRACT_SOCRATES = (
     "- Do NOT begin sentences repeatedly with 'You'. "
     "Vary openings: use questions, statements, contrasts, or examples. "
     "Avoid second-person repetition patterns.\n"
-    "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
+    "- Length is dynamic: a single sharp sentence is as valid as a short paragraph.\n"
+    "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
 )
 
 LLM_BEHAVIORAL_CONTRACT_ATHENA = (
@@ -664,7 +666,8 @@ LLM_BEHAVIORAL_CONTRACT_ATHENA = (
     "'reveals an ethical tension', 'leading to tension'.\n"
     "- Do NOT use: 'balance', 'integrate', 'holistic', 'nuanced', 'multifaceted', "
     "'furthermore', 'moreover', 'in addition', 'it is worth noting'.\n"
-    "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification."
+    "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification.\n"
+    "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
 )
 
 LLM_BEHAVIORAL_CONTRACT_FIXY = (
@@ -678,7 +681,7 @@ LLM_BEHAVIORAL_CONTRACT_FIXY = (
     "- Do NOT end with policy prescriptions.\n"
     "- Do NOT use: 'it is important', 'we must consider', 'one might argue', "
     "'let us examine', 'in the context of', 'Shift focus to'.\n"
-    "- Maximum 3 short sentences total. No sermonizing."
+    "- Up to 200 words. No sermonizing."
 )
 
 # Map agent name → behavioral contract string
@@ -5443,7 +5446,8 @@ class Agent:
         # DRAFT stage: soft guidance only — focus on meaningful thought, not perfect wording.
         # Form constraints and phrase bans are applied in Stage 2 (REWRITE).
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
-        prompt += f"{LLM_RESPONSE_LIMIT}\n"
+        _resp_limit = LLM_FIXY_RESPONSE_LIMIT if self.name == "Fixy" else LLM_RESPONSE_LIMIT
+        prompt += f"{_resp_limit}\n"
         prompt += "\nFocus on producing a coherent, meaningful thought. Slight roughness is fine.\n"
         prompt += "\nRespond now:\n"
         return prompt

@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional
 
 # LLM Response Length Instruction
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 
 # LLM First-Person Instruction - agents must speak as themselves using "I"
 LLM_FIRST_PERSON_INSTRUCTION = "IMPORTANT: Always speak in first person. Use 'I', 'me', 'my'. Never refer to yourself in third person or by your own name."
@@ -67,7 +68,8 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
         "- Do NOT begin sentences repeatedly with 'You'. "
         "Vary openings: use questions, statements, contrasts, or examples. "
         "Avoid second-person repetition patterns.\n"
-        "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
+        "- Length is dynamic: a single sharp sentence is as valid as a short paragraph.\n"
+        "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
     ),
     "Athena": (
         "ATHENA ROLE GOAL: Clarify structure, make a distinction, or articulate a mechanism.\n"
@@ -81,7 +83,8 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
         "'reveals an ethical tension', 'leading to tension'.\n"
         "- Do NOT use: 'balance', 'integrate', 'holistic', 'nuanced', 'multifaceted', "
         "'furthermore', 'moreover', 'in addition', 'it is worth noting'.\n"
-        "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification."
+        "- Length is dynamic: a sharp two-sentence observation is as valid as a longer clarification.\n"
+        "- FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory."
     ),
     "Fixy": (
         "FIXY ROLE GOAL: Diagnose the conversation failure mode.\n"
@@ -94,7 +97,7 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
         "- Do NOT end with policy prescriptions.\n"
         "- Do NOT use: 'it is important', 'we must consider', 'one might argue', "
         "'let us examine', 'in the context of', 'Shift focus to'.\n"
-        "- Maximum 3 short sentences total. No sermonizing."
+        "- Up to 200 words. No sermonizing."
     ),
 }
 
@@ -478,7 +481,8 @@ class ContextManager:
         if _agent_contract:
             prompt += f"\n{_agent_contract}\n"
         prompt += f"{LLM_FIRST_PERSON_INSTRUCTION}\n"
-        prompt += f"{LLM_RESPONSE_LIMIT}\n"
+        _resp_limit = LLM_FIXY_RESPONSE_LIMIT if agent_name == "Fixy" else LLM_RESPONSE_LIMIT
+        prompt += f"{_resp_limit}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
         prompt += "\nRespond now:\n"
 
