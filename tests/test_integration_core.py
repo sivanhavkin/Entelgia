@@ -675,6 +675,22 @@ class TestValidateGeneratedOutput:
         assert compliant is False
         assert "long" in reason.lower() or "words" in reason.lower()
 
+    # FIXY_AUTHORITY_OVERRIDE ─────────────────────────────────────────────────
+
+    def test_fixy_authority_override_always_passes_for_any_text(self, core):
+        """FIXY_AUTHORITY_OVERRIDE has no detectable textual obligation —
+        always compliant so the cortex relies on Fixy-driven enforcement
+        rather than heuristic pattern matching."""
+        signals = {**_nominal_signals(), "is_loop": True, "compliance": False}
+        decision = self._decision_for(core, {"is_loop": True, "compliance": False})
+        assert decision.active_mode == IntegrationMode.FIXY_AUTHORITY_OVERRIDE
+        # Pure abstraction — no concrete signals
+        compliant, reason = core.validate_generated_output(
+            "An abstract philosophical argument with no examples.", decision
+        )
+        assert compliant is True
+        assert "FIXY_AUTHORITY_OVERRIDE" in reason
+
 
 # ---------------------------------------------------------------------------
 # 23. should_regenerate_after_validation — returns False for NORMAL mode,

@@ -685,7 +685,6 @@ class IntegrationCore:
         if mode in (
             IntegrationMode.CONCRETE_OVERRIDE,
             IntegrationMode.PERSONALITY_SUPPRESSION,
-            IntegrationMode.FIXY_AUTHORITY_OVERRIDE,
         ):
             if any(s in t for s in _VALIDATE_CONCRETE_SIGNALS):
                 return True, f"Active mode {mode.value}: concrete example detected."

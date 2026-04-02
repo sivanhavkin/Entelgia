@@ -8167,6 +8167,11 @@ class MainScript:
                 seed,
             )
 
+            # Capture the seed before any PRE-GEN overlay is prepended so
+            # that POST-GEN regeneration can build from the clean base seed
+            # (avoiding duplicated directives in the regen prompt).
+            _pre_gen_base_seed = seed
+
             # ── PRE-GENERATION: IntegrationCore two-stage control ─────────────────
             # Build IntegrationState from signals known at the END of the
             # previous turn and call IntegrationCore BEFORE the LLM call.
@@ -8212,6 +8217,26 @@ class MainScript:
                     "energy": float(speaker.energy_level),
                     "status": str(speaker._last_fatigue_state or "active"),
                 }
+                # ── Carry forward indicators from the previous turn's cortex
+                # decision so the pre-gen rule engine fires with at least the
+                # same severity that was detected at end-of-last-turn.
+                if _prev_cortex_decision is not None:
+                    from entelgia.integration_core import IntegrationMode as _IM_PREV
+                    if _prev_cortex_decision.active_mode != _IM_PREV.NORMAL:
+                        if _prev_cortex_decision.regenerate:
+                            # A hard regen was required last turn: treat this
+                            # turn as looping until the agent breaks the pattern.
+                            _pre_gen_signals["is_loop"] = True
+                            _pre_gen_signals["loop_count"] = max(
+                                _pre_gen_signals["loop_count"] + 1, 1
+                            )
+                        if _prev_cortex_decision.suppress_personality:
+                            # Stagnation was detected: carry forward stagnation
+                            # above the suppression threshold so the same rule
+                            # continues to fire.
+                            _pre_gen_signals["stagnation"] = max(
+                                _pre_gen_signals["stagnation"], 0.26
+                            )
                 try:
                     _pre_gen_decision = self._integration_core.pre_generation_decision(
                         speaker.name, _pre_gen_signals
@@ -8325,7 +8350,22 @@ class MainScript:
                         _stronger_overlay = self._integration_core.build_stronger_overlay(
                             _pre_gen_decision
                         )
-                        _regen_seed = _stronger_overlay + "\n\n" + base_seed
+                        # Build regen seed from _pre_gen_base_seed (the seed
+                        # before any overlay was injected) so the stronger
+                        # overlay replaces rather than repeats the original.
+                        # If FORCE_CHOICE was active this turn, compose the
+                        # FORCE_CHOICE constraint into the regen seed so the
+                        # agent satisfies both obligations simultaneously.
+                        _fc_prefix = ""
+                        if _current_turn_rewrite_mode == FixyMode.FORCE_CHOICE:
+                            _fc_prefix = (
+                                "FORCE-CHOICE REGENERATION: You MUST pick ONE side.\n"
+                                "Use one of: 'I choose X because...' / "
+                                "'X is wrong because...' / "
+                                "'The answer is X, not Y, because...'\n"
+                                "Do NOT hedge. Do NOT blend.\n\n"
+                            )
+                        _regen_seed = _fc_prefix + _stronger_overlay + "\n\n" + _pre_gen_base_seed
                         logger.warning(
                             "[POST-GEN-REGEN] mode=%s ignored by agent=%s — "
                             "regenerating via same agent",
@@ -8348,6 +8388,21 @@ class MainScript:
                             "[POST-GEN-REGEN] regeneration complete for agent=%s",
                             _pre_gen_agent.name,
                         )
+                        # Re-validate FORCE_CHOICE on the new output so the
+                        # constraint is not silently dropped by the cortex regen.
+                        if _current_turn_rewrite_mode == FixyMode.FORCE_CHOICE:
+                            if not validate_force_choice(out):
+                                logger.warning(
+                                    "[FORCE-CHOICE] post-cortex-regen validation failed"
+                                    " for agent=%s; accepting best-effort response",
+                                    _pre_gen_agent.name,
+                                )
+                            else:
+                                logger.info(
+                                    "[FORCE-CHOICE] post-cortex-regen validation passed"
+                                    " for agent=%s",
+                                    _pre_gen_agent.name,
+                                )
                 except Exception:
                     logger.warning(
                         "[POST-GEN-VALIDATION] validation raised exception for agent=%s",
