@@ -503,3 +503,277 @@ class TestFixyAuthorityEnforcesFlag:
         signals["compliance"] = False
         decision = core.evaluate_turn("Socrates", signals)
         assert decision.enforce_fixy is True
+
+
+# ---------------------------------------------------------------------------
+# 19. prepare_generation_state builds IntegrationState identically to
+#     _build_state (public alias).
+# ---------------------------------------------------------------------------
+
+
+class TestPrepareGenerationState:
+    def test_returns_integration_state(self, core):
+        state = core.prepare_generation_state("Socrates", _nominal_signals())
+        assert isinstance(state, IntegrationState)
+
+    def test_agent_name_is_preserved(self, core):
+        state = core.prepare_generation_state("Athena", _nominal_signals())
+        assert state.agent_name == "Athena"
+
+    def test_unknown_keys_are_dropped(self, core):
+        signals = {**_nominal_signals(), "ghost_key": 99}
+        state = core.prepare_generation_state("Socrates", signals)
+        assert not hasattr(state, "ghost_key")
+
+    def test_missing_keys_use_defaults(self, core):
+        state = core.prepare_generation_state("Socrates", {"agent_name": "Socrates"})
+        assert state.semantic_repeat is False
+        assert state.loop_count == 0
+
+
+# ---------------------------------------------------------------------------
+# 20. pre_generation_decision produces the same ControlDecision as
+#     evaluate_turn for identical inputs (same rule engine, different log
+#     tags).
+# ---------------------------------------------------------------------------
+
+
+class TestPreGenerationDecision:
+    def test_normal_signals_give_normal_mode(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        assert decision.active_mode == IntegrationMode.NORMAL
+
+    def test_loop_signals_give_concrete_override(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+
+    def test_fixy_authority_triggered_on_loop_plus_noncompliance(self, core):
+        signals = {**_nominal_signals(), "is_loop": True, "compliance": False}
+        decision = core.pre_generation_decision("Socrates", signals)
+        assert decision.active_mode == IntegrationMode.FIXY_AUTHORITY_OVERRIDE
+
+    def test_same_result_as_evaluate_turn(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 2}
+        d_pre = core.pre_generation_decision("Socrates", signals)
+        d_post = core.evaluate_turn("Socrates", signals)
+        assert d_pre.active_mode == d_post.active_mode
+        assert d_pre.priority_level == d_post.priority_level
+
+    def test_accepts_integration_state_directly(self, core):
+        state = IntegrationState(
+            agent_name="Athena",
+            semantic_repeat=True,
+            loop_count=1,
+        )
+        decision = core.pre_generation_decision("Athena", state)
+        assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+
+
+# ---------------------------------------------------------------------------
+# 21. build_generation_overlay returns the decision's overlay text.
+# ---------------------------------------------------------------------------
+
+
+class TestBuildGenerationOverlay:
+    def test_returns_overlay_from_decision(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        overlay = core.build_generation_overlay(decision)
+        assert overlay == decision.prompt_overlay
+
+    def test_returns_empty_string_for_normal_mode(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        overlay = core.build_generation_overlay(decision)
+        assert overlay == ""
+
+
+# ---------------------------------------------------------------------------
+# 22. validate_generated_output — per-mode compliance checks.
+# ---------------------------------------------------------------------------
+
+
+class TestValidateGeneratedOutput:
+    def _decision_for(self, core, overrides):
+        signals = {**_nominal_signals(), **overrides}
+        return core.pre_generation_decision("Socrates", signals)
+
+    def test_normal_mode_is_always_compliant(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        compliant, _ = core.validate_generated_output("Any text at all.", decision)
+        assert compliant is True
+
+    # CONCRETE_OVERRIDE ───────────────────────────────────────────────────────
+
+    def test_concrete_override_passes_with_concrete_signal(self, core):
+        decision = self._decision_for(
+            core, {"semantic_repeat": True, "loop_count": 1}
+        )
+        assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+        text = "For example, consider the case of a neural network trained on images."
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    def test_concrete_override_fails_with_pure_abstraction(self, core):
+        decision = self._decision_for(
+            core, {"semantic_repeat": True, "loop_count": 1}
+        )
+        text = "This is an abstract philosophical argument without any grounding."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "concrete" in reason.lower()
+
+    # RESOLUTION_OVERRIDE ─────────────────────────────────────────────────────
+
+    def test_resolution_override_passes_with_resolution_signal(self, core):
+        decision = self._decision_for(
+            core, {"unresolved": 3, "progress_after": 0.2}
+        )
+        assert decision.active_mode == IntegrationMode.RESOLUTION_OVERRIDE
+        text = "Therefore we can conclude that the argument is settled."
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    def test_resolution_override_fails_without_resolution_language(self, core):
+        decision = self._decision_for(
+            core, {"unresolved": 3, "progress_after": 0.2}
+        )
+        text = "I still think there are many open questions here."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "resolution" in reason.lower()
+
+    # ATTACK_OVERRIDE ─────────────────────────────────────────────────────────
+
+    def test_attack_override_passes_with_challenge_signal(self, core):
+        decision = self._decision_for(core, {"stagnation": 0.5})
+        assert decision.active_mode == IntegrationMode.ATTACK_OVERRIDE
+        text = "That reasoning is flawed because it ignores the empirical evidence."
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    def test_attack_override_fails_without_challenge(self, core):
+        decision = self._decision_for(core, {"stagnation": 0.5})
+        text = "I largely agree with what you have said and find it reasonable."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "challenge" in reason.lower()
+
+    # LOW_COMPLEXITY ──────────────────────────────────────────────────────────
+
+    def test_low_complexity_passes_for_short_response(self, core):
+        decision = self._decision_for(core, {"fatigue": 0.9})
+        assert decision.active_mode == IntegrationMode.LOW_COMPLEXITY
+        text = " ".join(["word"] * 50)
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    def test_low_complexity_fails_for_overlong_response(self, core):
+        decision = self._decision_for(core, {"fatigue": 0.9})
+        text = " ".join(["word"] * 200)
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "long" in reason.lower() or "words" in reason.lower()
+
+
+# ---------------------------------------------------------------------------
+# 23. should_regenerate_after_validation — returns False for NORMAL mode,
+#     True when the output violated the active mode.
+# ---------------------------------------------------------------------------
+
+
+class TestShouldRegenerateAfterValidation:
+    def test_normal_mode_never_triggers_regen(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        result = core.should_regenerate_after_validation("Any text.", decision)
+        assert result is False
+
+    def test_compliant_output_does_not_trigger_regen(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        text = "For example, consider the case of quantum computing."
+        result = core.should_regenerate_after_validation(text, decision)
+        assert result is False
+
+    def test_non_compliant_output_triggers_regen(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        text = "The essence of this concept is purely abstract and philosophical."
+        result = core.should_regenerate_after_validation(text, decision)
+        assert result is True
+
+
+# ---------------------------------------------------------------------------
+# 24. build_stronger_overlay — prefix is prepended to the original overlay.
+# ---------------------------------------------------------------------------
+
+
+class TestBuildStrongerOverlay:
+    def test_contains_original_overlay(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        stronger = core.build_stronger_overlay(decision)
+        assert decision.prompt_overlay in stronger
+
+    def test_stronger_than_original(self, core):
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision = core.pre_generation_decision("Socrates", signals)
+        stronger = core.build_stronger_overlay(decision)
+        assert len(stronger) > len(decision.prompt_overlay)
+
+    def test_prefix_signals_regeneration_requirement(self, core):
+        signals = {**_nominal_signals(), "stagnation": 0.5}
+        decision = core.pre_generation_decision("Socrates", signals)
+        stronger = core.build_stronger_overlay(decision)
+        # Must communicate that a prior attempt failed
+        assert any(
+            phrase in stronger.upper()
+            for phrase in ("REGENERATION", "STRICT", "MANDATORY", "PREVIOUS")
+        )
+
+
+# ---------------------------------------------------------------------------
+# 25. Agent-binding: pre_generation_decision uses agent_name from input
+#     and the cortex decision is specific to that agent (not Fixy).
+# ---------------------------------------------------------------------------
+
+
+class TestAgentBinding:
+    def test_decision_carries_correct_agent_in_state(self, core):
+        """pre_generation_decision must not silently re-bind to a different agent."""
+        socrates_signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        decision_soc = core.pre_generation_decision("Socrates", socrates_signals)
+
+        athena_signals = {**_nominal_signals()}
+        decision_ath = core.pre_generation_decision("Athena", athena_signals)
+
+        # Both decisions are valid; the mode depends on signals, not on name alone
+        assert decision_soc.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+        assert decision_ath.active_mode == IntegrationMode.NORMAL
+
+    def test_fixy_name_does_not_bypass_rule_engine(self, core):
+        """IntegrationCore must produce the same rule result regardless of name."""
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
+        # Even if called with Fixy's name (gate is upstream in the main loop),
+        # the rule engine should fire normally.
+        decision = core.pre_generation_decision("Fixy", signals)
+        assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+
+    def test_stronger_overlay_is_agent_agnostic(self, core):
+        """build_stronger_overlay prefix must not hardcode a speaker name."""
+        signals = {**_nominal_signals(), "is_loop": True, "compliance": False}
+        decision = core.pre_generation_decision("Socrates", signals)
+        stronger = core.build_stronger_overlay(decision)
+        # Verify behaviour: the added prefix must signal a failed prior attempt.
+        # Extract the prefix by removing the original overlay from the end.
+        prefix = stronger[: stronger.index(decision.prompt_overlay)]
+        assert any(
+            phrase in prefix.upper()
+            for phrase in ("REGENERATION", "STRICT", "MANDATORY", "PREVIOUS")
+        ), f"Prefix does not signal a required retry: {prefix!r}"
+        # The prefix must not route regeneration to a specific agent.
+        assert "Socrates" not in prefix
+        assert "Athena" not in prefix
+        assert "Fixy" not in prefix
+        # The stronger overlay is strictly longer than the base overlay.
+        assert len(stronger) > len(decision.prompt_overlay)

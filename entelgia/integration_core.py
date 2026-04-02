@@ -51,11 +51,15 @@ symbolic rule engine runs.  The hook is a no-op stub right now:
 
 Logging tags
 ------------
-[INTEGRATION-STATE]   — normalised input signals
-[INTEGRATION-DECISION] — final ControlDecision
-[INTEGRATION-MODE]    — active IntegrationMode
-[INTEGRATION-OVERLAY] — generated prompt overlay text
-[INTEGRATION-REGEN]   — regeneration policy triggered
+[INTEGRATION-STATE]    — normalised input signals (post-generation)
+[INTEGRATION-DECISION] — final ControlDecision (post-generation)
+[INTEGRATION-MODE]     — active IntegrationMode
+[INTEGRATION-OVERLAY]  — generated prompt overlay text (post-generation)
+[INTEGRATION-REGEN]    — regeneration policy triggered
+[PRE-GEN-STATE]        — normalised input signals before LLM call
+[PRE-GEN-DECISION]     — ControlDecision produced before LLM call
+[PRE-GEN-OVERLAY]      — overlay text injected into current prompt
+[POST-GEN-VALIDATION]  — compliance check on generated output
 """
 
 from __future__ import annotations
@@ -63,7 +67,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -261,6 +265,90 @@ _OVERLAY_ATTACK: str = (
     "Tone adjustment alone is not sufficient — override the reasoning structure."
 )
 
+# ---------------------------------------------------------------------------
+# Second-pass overlay prefix (used when the first pass was ignored)
+# ---------------------------------------------------------------------------
+
+_STRONGER_OVERLAY_PREFIX: str = (
+    "STRICT REGENERATION REQUIRED. "
+    "The previous response ignored an active directive. "
+    "This is a mandatory second attempt. You must comply with the following:\n"
+)
+
+# ---------------------------------------------------------------------------
+# Post-generation validation signal lists
+# ---------------------------------------------------------------------------
+
+# Phrases that indicate a concrete, real-world grounding
+_VALIDATE_CONCRETE_SIGNALS: tuple = (
+    "for example",
+    "for instance",
+    "such as",
+    "in practice",
+    "real-world",
+    "real world",
+    "consider the case",
+    "take the case",
+    "in the case of",
+    "specifically",
+    "a study",
+    "research shows",
+    "evidence shows",
+    "data shows",
+    "according to",
+    "demonstrated by",
+    "illustrated by",
+    "imagine a",
+    "picture a",
+    "think of",
+)
+
+# Phrases that indicate resolution or conclusion
+_VALIDATE_RESOLUTION_SIGNALS: tuple = (
+    "therefore",
+    "thus we can",
+    "i conclude",
+    "we can conclude",
+    "the answer is",
+    "this resolves",
+    "this settles",
+    "the tension is resolved",
+    "we can agree",
+    "i agree that",
+    "it follows that",
+    "this means",
+    "this implies that",
+    "in conclusion",
+    "to summarise",
+    "to summarize",
+)
+
+# Phrases that indicate a structural challenge or attack
+_VALIDATE_ATTACK_SIGNALS: tuple = (
+    "wrong",
+    "incorrect",
+    "this is false",
+    "that is false",
+    "flawed",
+    "fails to",
+    "overlooks",
+    "mistaken",
+    "does not account",
+    "ignores",
+    "contradicts",
+    "undermines",
+    "refutes",
+    "i challenge",
+    "i dispute",
+    "i reject",
+    "not the case",
+    "the opposite",
+    "rather than",
+)
+
+# Word-count ceiling enforced for LOW_COMPLEXITY mode responses
+_LOW_COMPLEXITY_MAX_WORDS: int = 150
+
 
 # ---------------------------------------------------------------------------
 # IntegrationCore
@@ -438,6 +526,254 @@ class IntegrationCore:
                 decision.decision_reason,
             )
         return decision.regenerate
+
+    def prepare_generation_state(
+        self,
+        agent_name: str,
+        signals: "Dict[str, Any]",
+    ) -> IntegrationState:
+        """Build an :class:`IntegrationState` from pre-generation signals.
+
+        Identical in mechanics to the internal :meth:`_build_state` helper but
+        exposed as a named public entry-point to make the two-stage control
+        flow explicit in calling code.
+
+        Parameters
+        ----------
+        agent_name:
+            Name of the agent about to generate a response.
+        signals:
+            Dict of signal values mirroring :class:`IntegrationState` fields.
+            Unknown keys are silently ignored; missing keys fall back to
+            :class:`IntegrationState` defaults.
+
+        Returns
+        -------
+        IntegrationState
+        """
+        return self._build_state(agent_name, signals)
+
+    def pre_generation_decision(
+        self,
+        agent_name: str,
+        state_input: "Union[IntegrationState, Dict[str, Any]]",
+    ) -> ControlDecision:
+        """Evaluate pre-generation state and return a :class:`ControlDecision`.
+
+        Must be called **before** the LLM call so that the active mode
+        constrains the *current* response rather than only the next one.
+        Accepts the same input formats as :meth:`evaluate_turn` and applies
+        the same rule engine; the difference is the ``[PRE-GEN-*]`` log tags
+        used here, which distinguish pre-generation decisions from the
+        post-generation :meth:`evaluate_turn` call.
+
+        Parameters
+        ----------
+        agent_name:
+            Name of the agent about to speak.
+        state_input:
+            :class:`IntegrationState` or signal dict built from the signals
+            known at the *end of the previous turn*.
+
+        Returns
+        -------
+        ControlDecision
+        """
+        if isinstance(state_input, IntegrationState):
+            state = state_input
+        else:
+            state = self._build_state(agent_name, state_input)
+
+        logger.info(
+            "[PRE-GEN-STATE] agent=%s semantic_repeat=%s structural_repeat=%s "
+            "loop_count=%d progress_after=%.2f unresolved=%d pressure=%.2f "
+            "fatigue=%.2f stagnation=%.2f is_loop=%s compliance=%s "
+            "energy=%.1f status=%s",
+            state.agent_name,
+            state.semantic_repeat,
+            state.structural_repeat,
+            state.loop_count,
+            state.progress_after,
+            state.unresolved,
+            state.pressure,
+            state.fatigue,
+            state.stagnation,
+            state.is_loop,
+            state.compliance,
+            state.energy,
+            state.status,
+        )
+
+        decision = self._apply_rules(state)
+
+        logger.info(
+            "[PRE-GEN-DECISION] agent=%s mode=%s priority=%d reason=%r "
+            "suppress_personality=%s enforce_fixy=%s",
+            state.agent_name,
+            decision.active_mode.value,
+            decision.priority_level,
+            decision.decision_reason,
+            decision.suppress_personality,
+            decision.enforce_fixy,
+        )
+        return decision
+
+    def build_generation_overlay(self, decision: ControlDecision) -> str:
+        """Return the overlay text to inject into the **current** LLM prompt.
+
+        Logs the overlay under ``[PRE-GEN-OVERLAY]`` so it is distinguishable
+        from the post-generation :meth:`build_prompt_overlay` call.
+
+        Parameters
+        ----------
+        decision:
+            A :class:`ControlDecision` previously returned by
+            :meth:`pre_generation_decision`.
+
+        Returns
+        -------
+        str
+            Short imperative directive block, or empty string when mode is
+            NORMAL.
+        """
+        overlay = decision.prompt_overlay
+        if overlay:
+            logger.info("[PRE-GEN-OVERLAY] %r", overlay)
+        return overlay
+
+    def validate_generated_output(
+        self,
+        text: str,
+        decision: ControlDecision,
+    ) -> "Tuple[bool, str]":
+        """Check whether *text* respects the active mode in *decision*.
+
+        Uses lightweight heuristic pattern matching — no semantic parsing.
+        Only modes that impose a detectable textual obligation are validated:
+
+        * ``CONCRETE_OVERRIDE`` / ``PERSONALITY_SUPPRESSION`` /
+          ``FIXY_AUTHORITY_OVERRIDE`` — response must contain at least one
+          concrete signal phrase.
+        * ``RESOLUTION_OVERRIDE`` — response must contain resolution language.
+        * ``ATTACK_OVERRIDE`` — response must contain a structural challenge.
+        * ``LOW_COMPLEXITY`` — response word count must not exceed
+          :data:`_LOW_COMPLEXITY_MAX_WORDS`.
+        * ``NORMAL`` — always passes (no textual obligation).
+
+        Parameters
+        ----------
+        text:
+            The generated response text to validate.
+        decision:
+            The :class:`ControlDecision` produced by
+            :meth:`pre_generation_decision` for this generation step.
+
+        Returns
+        -------
+        (compliant, reason)
+            *compliant* is ``True`` when the response satisfies the active
+            mode constraint.  *reason* is a short human-readable explanation.
+        """
+        mode = decision.active_mode
+        if mode == IntegrationMode.NORMAL:
+            return True, "No active mode constraint."
+
+        t = text.lower()
+
+        if mode in (
+            IntegrationMode.CONCRETE_OVERRIDE,
+            IntegrationMode.PERSONALITY_SUPPRESSION,
+            IntegrationMode.FIXY_AUTHORITY_OVERRIDE,
+        ):
+            if any(s in t for s in _VALIDATE_CONCRETE_SIGNALS):
+                return True, f"Active mode {mode.value}: concrete example detected."
+            return (
+                False,
+                f"Active mode {mode.value}: no concrete example detected in response.",
+            )
+
+        if mode == IntegrationMode.RESOLUTION_OVERRIDE:
+            if any(s in t for s in _VALIDATE_RESOLUTION_SIGNALS):
+                return True, f"Active mode {mode.value}: resolution language detected."
+            return (
+                False,
+                f"Active mode {mode.value}: no resolution language detected.",
+            )
+
+        if mode == IntegrationMode.ATTACK_OVERRIDE:
+            if any(s in t for s in _VALIDATE_ATTACK_SIGNALS):
+                return True, f"Active mode {mode.value}: structural challenge detected."
+            return (
+                False,
+                f"Active mode {mode.value}: no structural challenge detected.",
+            )
+
+        if mode == IntegrationMode.LOW_COMPLEXITY:
+            word_count = len(text.split())
+            if word_count <= _LOW_COMPLEXITY_MAX_WORDS:
+                return True, f"Active mode {mode.value}: response length {word_count} words is acceptable."
+            return (
+                False,
+                f"Active mode {mode.value}: response too long ({word_count} words > {_LOW_COMPLEXITY_MAX_WORDS}).",
+            )
+
+        # Any other mode — no textual constraint defined, treat as compliant.
+        return True, f"Active mode {mode.value}: no textual constraint defined."
+
+    def should_regenerate_after_validation(
+        self,
+        text: str,
+        decision: ControlDecision,
+    ) -> bool:
+        """Return True when the generated output ignored the active mode.
+
+        Calls :meth:`validate_generated_output` and logs the result under
+        ``[POST-GEN-VALIDATION]``.  Returns ``False`` immediately when the
+        active mode is ``NORMAL`` (no constraint to validate).
+
+        Parameters
+        ----------
+        text:
+            The generated response text to validate.
+        decision:
+            The :class:`ControlDecision` produced by
+            :meth:`pre_generation_decision` for this generation step.
+
+        Returns
+        -------
+        bool
+            ``True`` when the response must be regenerated.
+        """
+        if decision.active_mode == IntegrationMode.NORMAL:
+            return False
+
+        compliant, reason = self.validate_generated_output(text, decision)
+        logger.info(
+            "[POST-GEN-VALIDATION] mode=%s compliant=%s reason=%r",
+            decision.active_mode.value,
+            compliant,
+            reason,
+        )
+        return not compliant
+
+    def build_stronger_overlay(self, decision: ControlDecision) -> str:
+        """Return a stronger overlay directive for second-pass regeneration.
+
+        Prepends :data:`_STRONGER_OVERLAY_PREFIX` to the original overlay so
+        the model receives an escalated constraint that explicitly states a
+        prior attempt was insufficient.
+
+        Parameters
+        ----------
+        decision:
+            The :class:`ControlDecision` whose overlay should be strengthened.
+
+        Returns
+        -------
+        str
+            Stronger imperative directive block.
+        """
+        return _STRONGER_OVERLAY_PREFIX + decision.prompt_overlay
 
     # ------------------------------------------------------------------
     # Internal helpers

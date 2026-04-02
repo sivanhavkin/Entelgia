@@ -7937,6 +7937,10 @@ class MainScript:
         _last_high_conflict_turn: int = 0
         # True when a force_choice rewrite was injected but not yet validated.
         _force_choice_pending: bool = False
+        # ControlDecision produced by IntegrationCore at the end of the
+        # previous turn; carried forward so PRE-GENERATION control can apply
+        # the cortex's decision to the *current* LLM call, not only the next.
+        _prev_cortex_decision = None
 
         print(
             Fore.GREEN
@@ -7957,6 +7961,14 @@ class MainScript:
             # premature_synthesis, topic_stagnation) using recent dialogue.
             _active_loop_modes: List[str] = []
             _agent_mode: Optional[str] = None
+            # ControlDecision from pre-generation IntegrationCore call;
+            # reset each turn so the post-gen validation block is always
+            # working against the decision that governed THIS turn's prompt.
+            # _pre_gen_agent is stored alongside to bind the decision explicitly
+            # to the agent that will speak — ensuring regeneration is never
+            # routed to Fixy.
+            _pre_gen_decision = None
+            _pre_gen_agent = None
             if self._loop_detector is not None:
                 _active_loop_modes = self._loop_detector.detect(
                     self.dialog,
@@ -8154,6 +8166,92 @@ class MainScript:
                 speaker.name,
                 seed,
             )
+
+            # ── PRE-GENERATION: IntegrationCore two-stage control ─────────────────
+            # Build IntegrationState from signals known at the END of the
+            # previous turn and call IntegrationCore BEFORE the LLM call.
+            # This ensures the active mode (CONCRETE_OVERRIDE, RESOLUTION_OVERRIDE,
+            # etc.) constrains the CURRENT response, not only the next one.
+            if (
+                self._integration_core is not None
+                and speaker.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                _pre_gen_signals = {
+                    "semantic_repeat": speaker._last_dialogue_signals.get(
+                        "semantic_repeat", False
+                    ),
+                    "structural_repeat": bool(_active_loop_modes),
+                    "loop_count": (
+                        self.interactive_fixy.semantic_loop_count
+                        if self.interactive_fixy is not None
+                        else 0
+                    ),
+                    "progress_after": float(speaker._last_pe_score),
+                    "unresolved": int(speaker.open_questions),
+                    "pressure": float(speaker.drive_pressure),
+                    "fatigue": float(speaker._last_fatigue),
+                    "stagnation": float(speaker._last_stagnation),
+                    "linguistic_score": float(speaker._last_eval_score),
+                    "dialogue_score": float(speaker._last_dialogue_score),
+                    "alignment": str(speaker._last_pressure_sync),
+                    "move_type": str(speaker._last_pe_move),
+                    # compliance: False when agent has been ignoring Fixy guidance
+                    "compliance": not (
+                        self.interactive_fixy.ignored_guidance_count >= 1
+                        if self.interactive_fixy is not None
+                        else False
+                    ),
+                    # is_loop: mirror Fixy's semantic_repeat flag from last turn
+                    "is_loop": bool(
+                        self.interactive_fixy.semantic_repeat
+                        if self.interactive_fixy is not None
+                        else False
+                    ),
+                    "abstraction_detected": False,
+                    "energy": float(speaker.energy_level),
+                    "status": str(speaker._last_fatigue_state or "active"),
+                }
+                try:
+                    _pre_gen_decision = self._integration_core.pre_generation_decision(
+                        speaker.name, _pre_gen_signals
+                    )
+                    # Bind the decision to this specific agent so that any
+                    # subsequent regeneration is issued by the same speaker,
+                    # never by Fixy or a different agent.
+                    _pre_gen_agent = speaker
+                    from entelgia.integration_core import IntegrationMode as _IM_PRE
+
+                    if _pre_gen_decision.active_mode != _IM_PRE.NORMAL:
+                        _pre_gen_overlay = (
+                            self._integration_core.build_generation_overlay(
+                                _pre_gen_decision
+                            )
+                        )
+                        if _pre_gen_overlay:
+                            seed = _pre_gen_overlay + "\n\n" + seed
+                            logger.info(
+                                "[PRE-GEN-OVERLAY] injected for agent=%s mode=%s",
+                                speaker.name,
+                                _pre_gen_decision.active_mode.value,
+                            )
+                            if self.cfg.show_meta:
+                                print(
+                                    Fore.WHITE
+                                    + Style.DIM
+                                    + f"[PRE-GEN-DECISION] agent={speaker.name}"
+                                    f" mode={_pre_gen_decision.active_mode.value}"
+                                    + Style.RESET_ALL
+                                    + "\n"
+                                )
+                except Exception:
+                    logger.warning(
+                        "[PRE-GEN-DECISION] pre_generation_decision failed for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────
+
             out = speaker.speak(seed, self.dialog)
 
             # ── force_choice post-generation validation ───────────────────────
@@ -8202,6 +8300,61 @@ class MainScript:
                 else:
                     logger.info("[FORCE-CHOICE] accepted for agent=%s", speaker.name)
                 _force_choice_pending = False
+
+            # ── POST-GENERATION: validate against active pre-gen mode ─────────────
+            # After the response is generated (and after force_choice validation),
+            # check whether the output actually respects the active pre-gen mode.
+            # Regeneration is performed exclusively by the SAME dialogue agent
+            # (speaker) that produced the first draft — never by Fixy.
+            # _pre_gen_agent is stored explicitly at the point _pre_gen_decision
+            # was created to make the agent–decision binding unambiguous.
+            if (
+                _pre_gen_decision is not None
+                and _pre_gen_agent is not None
+                and _pre_gen_agent.name == speaker.name  # safety: binding must still match
+                and _pre_gen_agent.name != "Fixy"  # hard guard: never regenerate via Fixy
+                and ENTELGIA_ENHANCED
+            ):
+                try:
+                    _post_gen_should_regen = (
+                        self._integration_core.should_regenerate_after_validation(
+                            out, _pre_gen_decision
+                        )
+                    )
+                    if _post_gen_should_regen:
+                        _stronger_overlay = self._integration_core.build_stronger_overlay(
+                            _pre_gen_decision
+                        )
+                        _regen_seed = _stronger_overlay + "\n\n" + seed
+                        logger.warning(
+                            "[POST-GEN-REGEN] mode=%s ignored by agent=%s — "
+                            "regenerating via same agent",
+                            _pre_gen_decision.active_mode.value,
+                            _pre_gen_agent.name,
+                        )
+                        if self.cfg.show_meta:
+                            print(
+                                Fore.WHITE
+                                + Style.DIM
+                                + f"[POST-GEN-REGEN] agent={_pre_gen_agent.name}"
+                                f" mode={_pre_gen_decision.active_mode.value}"
+                                " — regenerating with stronger overlay"
+                                + Style.RESET_ALL
+                                + "\n"
+                            )
+                        # Regenerate using the same agent (speaker), not Fixy
+                        out = _pre_gen_agent.speak(_regen_seed, self.dialog)
+                        logger.info(
+                            "[POST-GEN-REGEN] regeneration complete for agent=%s",
+                            _pre_gen_agent.name,
+                        )
+                except Exception:
+                    logger.warning(
+                        "[POST-GEN-VALIDATION] validation raised exception for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────
 
             self.dialog.append({"role": speaker.name, "text": out})
 
@@ -8515,6 +8668,9 @@ class MainScript:
                         speaker.name,
                         exc_info=True,
                     )
+                # Persist this decision so the PRE-GENERATION block of the
+                # NEXT turn can reference it when building its overlay.
+                _prev_cortex_decision = _cortex_decision
             # ─────────────────────────────────────────────────────────────────────────
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             # Skipped entirely when enable_observer is False or
