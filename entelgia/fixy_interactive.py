@@ -18,6 +18,7 @@ from typing import Dict, List, Tuple, Any, Optional
 
 # LLM Response Length Instruction
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 
 logger = logging.getLogger(__name__)
 
@@ -504,7 +505,7 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Then identify what is missing: 'A missing distinction here may be...'\n"
         "Do NOT use 'Deadlock:', 'Loop:', 'Next move:'. Do NOT force a verdict. "
         "Do NOT guide the next step explicitly.\n"
-        "Max 3 sentences. Sound like a theorist, not a policy engine."
+        "Up to 200 words. Sound like a theorist, not a policy engine."
     ),
     FixyMode.HARD_CONSTRAINT: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
@@ -1608,7 +1609,7 @@ class InteractiveFixy:
             f"Output rule: {output_instruction}\n"
             f"Up to 200 words. Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
-            f"{LLM_RESPONSE_LIMIT}\n"
+            f"{LLM_FIXY_RESPONSE_LIMIT}\n"
         )
 
         intervention = self.llm.generate(

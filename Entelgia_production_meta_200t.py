@@ -531,6 +531,7 @@ ANTHROPIC_MODELS: list[str] = [
 
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 150 words."
+LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 MAX_RESPONSE_WORDS = 150
 MAX_CONSECUTIVE_SUPEREGO_REWRITES = 2
 
@@ -5445,7 +5446,8 @@ class Agent:
         # DRAFT stage: soft guidance only — focus on meaningful thought, not perfect wording.
         # Form constraints and phrase bans are applied in Stage 2 (REWRITE).
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
-        prompt += f"{LLM_RESPONSE_LIMIT}\n"
+        _resp_limit = LLM_FIXY_RESPONSE_LIMIT if self.name == "Fixy" else LLM_RESPONSE_LIMIT
+        prompt += f"{_resp_limit}\n"
         prompt += "\nFocus on producing a coherent, meaningful thought. Slight roughness is fine.\n"
         prompt += "\nRespond now:\n"
         return prompt
