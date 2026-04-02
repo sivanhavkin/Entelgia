@@ -18,6 +18,8 @@ Public API
 IntegrationCore.evaluate_turn(agent_name, state_dict) -> ControlDecision
 IntegrationCore.build_prompt_overlay(decision)        -> str
 IntegrationCore.should_regenerate(decision)           -> bool
+IntegrationCore.escalate_decision(decision)           -> ControlDecision
+detect_pseudo_compliance(text)                        -> bool
 
 Data classes
 ------------
@@ -33,6 +35,14 @@ ATTACK_OVERRIDE
 LOW_COMPLEXITY
 PERSONALITY_SUPPRESSION
 FIXY_AUTHORITY_OVERRIDE
+
+Escalation levels
+-----------------
+0 → NORMAL
+1 → CONCRETE_OVERRIDE (soft)
+2 → STRICT_CONCRETE
+3 → FORMAT_ENFORCED
+4 → HARD_OVERRIDE (personality suppressed)
 
 Priority order (highest → lowest)
 ----------------------------------
@@ -51,23 +61,28 @@ symbolic rule engine runs.  The hook is a no-op stub right now:
 
 Logging tags
 ------------
-[INTEGRATION-STATE]    — normalised input signals (post-generation)
-[INTEGRATION-DECISION] — final ControlDecision (post-generation)
-[INTEGRATION-MODE]     — active IntegrationMode
-[INTEGRATION-OVERLAY]  — generated prompt overlay text (post-generation)
-[INTEGRATION-REGEN]    — regeneration policy triggered
-[PRE-GEN-STATE]        — normalised input signals before LLM call
-[PRE-GEN-DECISION]     — ControlDecision produced before LLM call
-[PRE-GEN-OVERLAY]      — overlay text injected into current prompt
-[POST-GEN-VALIDATION]  — compliance check on generated output
+[INTEGRATION-STATE]         — normalised input signals (post-generation)
+[INTEGRATION-DECISION]      — final ControlDecision (post-generation)
+[INTEGRATION-MODE]          — active IntegrationMode
+[INTEGRATION-OVERLAY]       — generated prompt overlay text (post-generation)
+[INTEGRATION-REGEN]         — regeneration policy triggered
+[INTEGRATION-ESCALATION]    — escalation level assigned
+[INTEGRATION-PSEUDO-COMPLIANCE] — pseudo-compliance detection result
+[INTEGRATION-FORCE-REGEN]   — forced regeneration with reason
+[PRE-GEN-STATE]             — normalised input signals before LLM call
+[PRE-GEN-DECISION]          — ControlDecision produced before LLM call
+[PRE-GEN-OVERLAY]           — overlay text injected into current prompt
+[POST-GEN-VALIDATION]       — compliance check on generated output
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, Optional, Tuple, Union
+import re
+from dataclasses import dataclass, field
+from enum import Enum, IntEnum
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +102,21 @@ _PRIORITY_FATIGUE: int = 4
 _PRIORITY_PRESSURE: int = 2
 _PRIORITY_DEFAULT: int = 0
 
+# Escalation engine constants
+_ESCALATION_LOOP_COUNT_LEVEL1: int = 1
+_ESCALATION_LOOP_COUNT_LEVEL2: int = 2
+_ESCALATION_LOOP_COUNT_LEVEL3: int = 3
+_ESCALATION_LOOP_COUNT_LEVEL4: int = 4
+_ESCALATION_PERSONALITY_SUPPRESS_LEVEL: int = 3
+_MAX_REGENERATION_ATTEMPTS: int = 3
+
+# Pseudo-compliance detection: similarity threshold for reasoning hash comparison
+_REASONING_HASH_SIMILARITY_THRESHOLD: int = 2  # max allowed same hashes in history
+# Number of content words used when building the reasoning skeleton hash
+_REASONING_HASH_MAX_TOKENS: int = 40
+# History window size: threshold + 1 unique entries + 1 buffer for the incoming hash
+_REASONING_HASH_HISTORY_SIZE: int = _REASONING_HASH_SIMILARITY_THRESHOLD + 2
+
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -103,6 +133,23 @@ class IntegrationMode(str, Enum):
     LOW_COMPLEXITY = "LOW_COMPLEXITY"
     PERSONALITY_SUPPRESSION = "PERSONALITY_SUPPRESSION"
     FIXY_AUTHORITY_OVERRIDE = "FIXY_AUTHORITY_OVERRIDE"
+
+
+class EscalationLevel(IntEnum):
+    """Escalation levels used by the hard-control engine.
+
+    Level 0 → NORMAL         — no escalation
+    Level 1 → CONCRETE_OVERRIDE (soft) — request a concrete real-world example
+    Level 2 → STRICT_CONCRETE — structured concrete example required
+    Level 3 → FORMAT_ENFORCED — mandatory output format; personality suppressed
+    Level 4 → HARD_OVERRIDE   — personality fully disabled; hard output cap
+    """
+
+    NORMAL = 0
+    CONCRETE_OVERRIDE = 1
+    STRICT_CONCRETE = 2
+    FORMAT_ENFORCED = 3
+    HARD_OVERRIDE = 4
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +277,7 @@ class ControlDecision:
     decision_reason: str = "No override required."
     priority_level: int = _PRIORITY_DEFAULT
     active_mode: IntegrationMode = IntegrationMode.NORMAL
+    escalation_level: int = EscalationLevel.NORMAL
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +314,52 @@ _OVERLAY_ATTACK: str = (
 )
 
 # ---------------------------------------------------------------------------
+# Escalation-level overlay templates
+# ---------------------------------------------------------------------------
+
+_OVERLAY_ESCALATION_1: str = (
+    "Provide one concrete real-world example. Avoid abstract repetition."
+)
+
+_OVERLAY_ESCALATION_2: str = (
+    "You must provide a specific real-world example:\n"
+    "- include a person\n"
+    "- include a concrete action\n"
+    "- include a situation\n"
+    "Abstract reasoning is not sufficient."
+)
+
+_OVERLAY_ESCALATION_3: str = (
+    "STRICT FORMAT REQUIRED:\n\n"
+    "[SCENARIO]\n"
+    "A specific person in a real situation\n\n"
+    "[ACTION]\n"
+    "What they actually do\n\n"
+    "[OUTCOME]\n"
+    "What happens next\n\n"
+    "Do not include abstract reasoning.\n"
+    "Failure to follow format is invalid."
+)
+
+_OVERLAY_ESCALATION_4: str = (
+    "HARD OVERRIDE:\n\n"
+    "- Personality style is disabled\n"
+    "- No philosophical questions allowed\n"
+    "- Output must be 1–2 sentences maximum\n"
+    "- Must describe a concrete real-world action\n\n"
+    "Invalid output will be rejected."
+)
+
+# Map escalation level → overlay text
+_ESCALATION_OVERLAYS: Dict[int, str] = {
+    EscalationLevel.NORMAL: "",
+    EscalationLevel.CONCRETE_OVERRIDE: _OVERLAY_ESCALATION_1,
+    EscalationLevel.STRICT_CONCRETE: _OVERLAY_ESCALATION_2,
+    EscalationLevel.FORMAT_ENFORCED: _OVERLAY_ESCALATION_3,
+    EscalationLevel.HARD_OVERRIDE: _OVERLAY_ESCALATION_4,
+}
+
+# ---------------------------------------------------------------------------
 # Second-pass overlay prefix (used when the first pass was ignored)
 # ---------------------------------------------------------------------------
 
@@ -273,6 +367,15 @@ _STRONGER_OVERLAY_PREFIX: str = (
     "STRICT REGENERATION REQUIRED. "
     "The previous response ignored an active directive. "
     "This is a mandatory second attempt. You must comply with the following:\n"
+)
+
+# ---------------------------------------------------------------------------
+# Failure memory injection (injected into re-generation prompts)
+# ---------------------------------------------------------------------------
+
+_FAILURE_MEMORY_PREFIX: str = (
+    "Previous attempts failed to comply with constraints. "
+    "Do not repeat previous reasoning.\n"
 )
 
 # ---------------------------------------------------------------------------
@@ -349,6 +452,131 @@ _VALIDATE_ATTACK_SIGNALS: tuple = (
 # Word-count ceiling enforced for LOW_COMPLEXITY mode responses
 _LOW_COMPLEXITY_MAX_WORDS: int = 150
 
+# ---------------------------------------------------------------------------
+# Pseudo-compliance detection helpers
+# ---------------------------------------------------------------------------
+
+# Phrases that typically introduce a hypothetical or abstract placeholder
+# rather than a genuine concrete example.
+_PSEUDO_COMPLIANCE_TRIGGERS: tuple = (
+    "for example",
+    "for instance",
+    "imagine",
+    "picture a",
+    "think of",
+    "suppose",
+    "let's say",
+    "let us say",
+    "consider",
+)
+
+# Patterns indicating the presence of a named person or a named role
+_CONCRETE_PERSON_PATTERN: re.Pattern = re.compile(
+    r"""
+    \b(
+        [A-Z][a-z]* \s [A-Z][a-z]*   # Proper full name: "John Smith", "Li Wu"
+        | [A-Z][a-z]{1,}              # Capitalised first name: "Alice", "Al"
+        | a \s teacher                # role article + role noun
+        | a \s doctor
+        | a \s student
+        | a \s nurse
+        | a \s manager
+        | a \s soldier
+        | a \s pilot
+        | a \s engineer
+        | a \s scientist
+        | a \s worker
+        | a \s parent
+        | the \s teacher
+        | the \s doctor
+        | the \s student
+        | the \s nurse
+        | the \s manager
+        | the \s soldier
+        | the \s pilot
+        | the \s engineer
+        | the \s scientist
+        | the \s worker
+        | the \s parent
+    )\b
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
+
+# Pattern indicating a concrete action: verb clearly tied to a scenario
+_CONCRETE_ACTION_PATTERN: re.Pattern = re.compile(
+    r"\b(decides?|chooses?|takes?|runs?|walks?|opens?|closes?|builds?|writes?|calls?|"
+    r"applies?|submits?|fires?|hires?|signs?|pays?|buys?|sells?|sends?|reads?|"
+    r"leaves?|arrives?|creates?|starts?|stops?|drives?|flies?|enters?|exits?)\b",
+    re.IGNORECASE,
+)
+
+# Pattern indicating a specific situation (location / time / event anchor)
+_CONCRETE_SITUATION_PATTERN: re.Pattern = re.compile(
+    r"\b(in \w+ (hospital|school|factory|office|courtroom|city|town|company)|"
+    r"during (the|a) \w+|at (the|a) \w+ (meeting|trial|game|event|session|interview)|"
+    r"on (monday|tuesday|wednesday|thursday|friday|saturday|sunday)|"
+    r"in \d{4}|last (week|month|year)|yesterday|this (morning|afternoon|evening))\b",
+    re.IGNORECASE,
+)
+
+
+def detect_pseudo_compliance(text: str) -> bool:
+    """Return ``True`` when *text* appears to comply but lacks genuine concreteness.
+
+    Pseudo-compliance is detected when the text contains one of the typical
+    hypothetical-introduction phrases (e.g. "for example", "imagine") **but**
+    does **not** include all three of:
+
+    1. A named person or a concrete role (e.g. "a teacher", "John")
+    2. A concrete action verb tied to a real scenario
+    3. A specific situational anchor (location, time, event)
+
+    Parameters
+    ----------
+    text:
+        The generated response text to inspect.
+
+    Returns
+    -------
+    bool
+        ``True`` when pseudo-compliance is detected.
+    """
+    t_lower = text.lower()
+    has_trigger = any(phrase in t_lower for phrase in _PSEUDO_COMPLIANCE_TRIGGERS)
+    if not has_trigger:
+        return False
+
+    has_person = bool(_CONCRETE_PERSON_PATTERN.search(text))
+    has_action = bool(_CONCRETE_ACTION_PATTERN.search(text))
+    has_situation = bool(_CONCRETE_SITUATION_PATTERN.search(text))
+
+    # If trigger present but missing any concreteness indicator → pseudo-compliance
+    return not (has_person and has_action and has_situation)
+
+
+def _reasoning_hash(text: str) -> str:
+    """Return a short hash of the normalised reasoning skeleton of *text*.
+
+    Strips common filler words and punctuation to surface structural
+    similarity across responses that use different surface wording.
+    """
+    # Normalise: lowercase, strip punctuation, collapse whitespace
+    normalised = re.sub(r"[^\w\s]", "", text.lower())
+    normalised = re.sub(r"\s+", " ", normalised).strip()
+    # Remove extremely common stop words to surface structural similarity
+    stop_words = {
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "may", "might", "shall", "can", "i", "we", "you", "they",
+        "he", "she", "it", "this", "that", "these", "those", "and", "or",
+        "but", "if", "in", "on", "at", "to", "for", "of", "with", "by",
+        "from", "as", "so", "yet", "not",
+    }
+    tokens = [w for w in normalised.split() if w not in stop_words]
+    skeleton = " ".join(sorted(tokens[:_REASONING_HASH_MAX_TOKENS]))
+    return hashlib.md5(skeleton.encode("utf-8")).hexdigest()[:12]
+
 
 # ---------------------------------------------------------------------------
 # IntegrationCore
@@ -409,6 +637,8 @@ class IntegrationCore:
     def __init__(self) -> None:
         # TODO: wire SupervisorNet instance here when available
         self._supervisor: Optional[Any] = None
+        # Rolling history of reasoning hashes for same-reasoning detection
+        self._reasoning_hash_history: List[str] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -654,13 +884,20 @@ class IntegrationCore:
         Only modes that impose a detectable textual obligation are validated:
 
         * ``CONCRETE_OVERRIDE`` / ``PERSONALITY_SUPPRESSION`` —
-          response must contain at least one concrete signal phrase.
+          response must contain at least one concrete signal phrase and must
+          not be pseudo-compliant.
         * ``RESOLUTION_OVERRIDE`` — response must contain resolution language.
         * ``ATTACK_OVERRIDE`` — response must contain a structural challenge.
         * ``LOW_COMPLEXITY`` — response word count must not exceed
           :data:`_LOW_COMPLEXITY_MAX_WORDS`.
         * ``FIXY_AUTHORITY_OVERRIDE`` / ``NORMAL`` — always pass (no
           additional detectable textual obligation).
+
+        Pseudo-compliance is checked for CONCRETE_OVERRIDE and
+        PERSONALITY_SUPPRESSION modes: a response that contains a
+        hypothetical trigger phrase but lacks a concrete person, action, and
+        situation is treated as non-compliant even if it contains a concrete
+        signal phrase.
 
         Parameters
         ----------
@@ -686,8 +923,20 @@ class IntegrationCore:
             IntegrationMode.CONCRETE_OVERRIDE,
             IntegrationMode.PERSONALITY_SUPPRESSION,
         ):
-            if any(s in t for s in _VALIDATE_CONCRETE_SIGNALS):
+            has_signal = any(s in t for s in _VALIDATE_CONCRETE_SIGNALS)
+            pseudo = detect_pseudo_compliance(text)
+            logger.info(
+                "[INTEGRATION-PSEUDO-COMPLIANCE] detected=%s",
+                pseudo,
+            )
+            if has_signal and not pseudo:
                 return True, f"Active mode {mode.value}: concrete example detected."
+            if pseudo:
+                return (
+                    False,
+                    f"Active mode {mode.value}: pseudo-compliance detected — "
+                    "response contains hypothetical language but lacks genuine concreteness.",
+                )
             return (
                 False,
                 f"Active mode {mode.value}: no concrete example detected in response.",
@@ -732,6 +981,10 @@ class IntegrationCore:
         ``[POST-GEN-VALIDATION]``.  Returns ``False`` immediately when the
         active mode is ``NORMAL`` (no constraint to validate).
 
+        Also checks for pseudo-compliance in CONCRETE_OVERRIDE and
+        PERSONALITY_SUPPRESSION modes, and forces regeneration with an
+        incremented escalation level when found.
+
         Parameters
         ----------
         text:
@@ -755,6 +1008,14 @@ class IntegrationCore:
             compliant,
             reason,
         )
+
+        if not compliant:
+            logger.warning(
+                "[INTEGRATION-FORCE-REGEN] reason=%r escalation_level=%d",
+                reason,
+                decision.escalation_level,
+            )
+
         return not compliant
 
     def build_stronger_overlay(self, decision: ControlDecision) -> str:
@@ -775,6 +1036,130 @@ class IntegrationCore:
             Stronger imperative directive block.
         """
         return _STRONGER_OVERLAY_PREFIX + decision.prompt_overlay
+
+    def escalate_decision(self, decision: ControlDecision) -> ControlDecision:
+        """Return a new :class:`ControlDecision` with escalation incremented by 1.
+
+        Used during the regeneration loop when the previous response failed
+        validation.  The new decision carries:
+
+        * ``escalation_level`` incremented by 1 (capped at
+          :data:`EscalationLevel.HARD_OVERRIDE`)
+        * A stronger ``prompt_overlay`` drawn from the escalation overlay table,
+          prefixed with :data:`_FAILURE_MEMORY_PREFIX`
+        * ``suppress_personality=True`` when the new level is ≥
+          :data:`_ESCALATION_PERSONALITY_SUPPRESS_LEVEL`
+        * ``regenerate=True`` so the caller knows it must retry
+
+        Parameters
+        ----------
+        decision:
+            The previous :class:`ControlDecision` that was non-compliant.
+
+        Returns
+        -------
+        ControlDecision
+            New escalated decision ready to drive the next generation attempt.
+        """
+        new_level = min(
+            decision.escalation_level + 1,
+            int(EscalationLevel.HARD_OVERRIDE),
+        )
+        suppress = new_level >= _ESCALATION_PERSONALITY_SUPPRESS_LEVEL
+
+        overlay = _FAILURE_MEMORY_PREFIX + _ESCALATION_OVERLAYS.get(
+            new_level,
+            _OVERLAY_ESCALATION_4,
+        )
+
+        logger.info(
+            "[INTEGRATION-ESCALATION] level=%d suppress_personality=%s",
+            new_level,
+            suppress,
+        )
+
+        return ControlDecision(
+            allow_response=decision.allow_response,
+            regenerate=True,
+            suppress_personality=suppress,
+            enforce_fixy=decision.enforce_fixy,
+            force_concrete_mode=True,
+            force_resolution_mode=decision.force_resolution_mode,
+            force_attack_mode=decision.force_attack_mode,
+            low_complexity_mode=decision.low_complexity_mode,
+            prompt_overlay=overlay,
+            decision_reason=(
+                f"Escalation triggered: previous response was non-compliant. "
+                f"escalation_level={new_level}."
+            ),
+            priority_level=decision.priority_level,
+            active_mode=decision.active_mode,
+            escalation_level=new_level,
+        )
+
+    def build_escalation_overlay(self, decision: ControlDecision) -> str:
+        """Return the escalation overlay text for *decision*.
+
+        Uses :attr:`ControlDecision.escalation_level` to select the
+        appropriate overlay template from :data:`_ESCALATION_OVERLAYS`.
+        When the level is 0 the method returns an empty string.
+
+        Parameters
+        ----------
+        decision:
+            A :class:`ControlDecision` with an ``escalation_level`` field.
+
+        Returns
+        -------
+        str
+            Escalation overlay text, or empty string for level 0.
+        """
+        overlay = _ESCALATION_OVERLAYS.get(decision.escalation_level, "")
+        if overlay:
+            logger.info(
+                "[INTEGRATION-ESCALATION] level=%d overlay=%r",
+                decision.escalation_level,
+                overlay,
+            )
+        return overlay
+
+    def record_response_hash(self, text: str) -> bool:
+        """Record the reasoning hash of *text* and return True when a repeated
+        reasoning structure is detected.
+
+        Keeps a sliding window of recent hashes (up to
+        :data:`_REASONING_HASH_SIMILARITY_THRESHOLD` + 1 entries).  If the
+        same hash appears more than :data:`_REASONING_HASH_SIMILARITY_THRESHOLD`
+        times in the window, repetition is flagged and the caller should force
+        escalation immediately.
+
+        Parameters
+        ----------
+        text:
+            The generated response text.
+
+        Returns
+        -------
+        bool
+            ``True`` when repeated reasoning structure is detected.
+        """
+        h = _reasoning_hash(text)
+        self._reasoning_hash_history.append(h)
+        # Keep a bounded window — threshold + 2 so we can count up to threshold + 1
+        # occurrences of the incoming hash before evicting old entries.
+        if len(self._reasoning_hash_history) > _REASONING_HASH_HISTORY_SIZE:
+            self._reasoning_hash_history = self._reasoning_hash_history[-_REASONING_HASH_HISTORY_SIZE:]
+
+        repeat_count = self._reasoning_hash_history.count(h)
+        repeated = repeat_count > _REASONING_HASH_SIMILARITY_THRESHOLD
+        if repeated:
+            logger.warning(
+                "[INTEGRATION-FORCE-REGEN] reason='same_reasoning_hash' "
+                "hash=%s count=%d",
+                h,
+                repeat_count,
+            )
+        return repeated
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -906,17 +1291,40 @@ class IntegrationCore:
 
     @staticmethod
     def _decide_loop_concrete(state: IntegrationState) -> ControlDecision:
+        # Determine escalation level based on loop_count
+        lc = state.loop_count
+        if lc >= _ESCALATION_LOOP_COUNT_LEVEL4:
+            esc_level = int(EscalationLevel.HARD_OVERRIDE)
+        elif lc >= _ESCALATION_LOOP_COUNT_LEVEL3:
+            esc_level = int(EscalationLevel.FORMAT_ENFORCED)
+        elif lc >= _ESCALATION_LOOP_COUNT_LEVEL2:
+            esc_level = int(EscalationLevel.STRICT_CONCRETE)
+        else:
+            esc_level = int(EscalationLevel.CONCRETE_OVERRIDE)
+
+        suppress = esc_level >= _ESCALATION_PERSONALITY_SUPPRESS_LEVEL
+        escalation_overlay = _ESCALATION_OVERLAYS.get(esc_level, _OVERLAY_ESCALATION_1)
+
         reason = (
             f"Semantic repeat detected for '{state.agent_name}' "
             f"with loop_count={state.loop_count}. "
-            "Concrete override activated to break abstract repetition."
+            f"Escalation level {esc_level} activated to break abstract repetition."
         )
+
+        logger.info(
+            "[INTEGRATION-ESCALATION] level=%d suppress_personality=%s",
+            esc_level,
+            suppress,
+        )
+
         return ControlDecision(
             force_concrete_mode=True,
-            prompt_overlay=_OVERLAY_LOOP + " " + _OVERLAY_CONCRETE,
+            suppress_personality=suppress,
+            prompt_overlay=_OVERLAY_LOOP + " " + escalation_overlay,
             decision_reason=reason,
             priority_level=_PRIORITY_LOOP,
             active_mode=IntegrationMode.CONCRETE_OVERRIDE,
+            escalation_level=esc_level,
         )
 
     @staticmethod
