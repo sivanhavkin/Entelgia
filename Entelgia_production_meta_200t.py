@@ -5446,7 +5446,9 @@ class Agent:
         # DRAFT stage: soft guidance only — focus on meaningful thought, not perfect wording.
         # Form constraints and phrase bans are applied in Stage 2 (REWRITE).
         prompt += f"\n{LLM_FIRST_PERSON_INSTRUCTION}\n"
-        _resp_limit = LLM_FIXY_RESPONSE_LIMIT if self.name == "Fixy" else LLM_RESPONSE_LIMIT
+        _resp_limit = (
+            LLM_FIXY_RESPONSE_LIMIT if self.name == "Fixy" else LLM_RESPONSE_LIMIT
+        )
         prompt += f"{_resp_limit}\n"
         prompt += "\nFocus on producing a coherent, meaningful thought. Slight roughness is fine.\n"
         prompt += "\nRespond now:\n"

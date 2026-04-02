@@ -51,9 +51,7 @@ SOCRATES_PERSONA = {
         "5. NEVER use: 'let us consider', 'we must examine', 'it is important', "
         "'one might argue', 'this raises questions about', 'in the context of', "
         "'one implicit assumption', 'the mechanism at play', 'this notion overlooks'.\n"
-        "6. Up to 200 words.\n"
-        "7. If Fixy issues a directive: Override your personality style if needed. "
-        "Breaking your usual style is REQUIRED."
+        "6. Up to 200 words."
     ),
     "drives_influence": {
         "high_id": "More provocative and adversarial — pushes harder on contradictions",
@@ -103,9 +101,7 @@ ATHENA_PERSONA = {
         "'nuanced', 'multifaceted'.\n"
         "5. No filler transitions: no 'furthermore', 'moreover', 'in addition', "
         "'it is worth noting'.\n"
-        "6. Up to 200 words.\n"
-        "7. If Fixy issues a directive: Override your personality style if needed. "
-        "Breaking your usual style is REQUIRED."
+        "6. Up to 200 words."
     ),
     "drives_influence": {
         "high_id": "More experimental frameworks, novel model-building approaches",

@@ -481,7 +481,9 @@ class ContextManager:
         if _agent_contract:
             prompt += f"\n{_agent_contract}\n"
         prompt += f"{LLM_FIRST_PERSON_INSTRUCTION}\n"
-        _resp_limit = LLM_FIXY_RESPONSE_LIMIT if agent_name == "Fixy" else LLM_RESPONSE_LIMIT
+        _resp_limit = (
+            LLM_FIXY_RESPONSE_LIMIT if agent_name == "Fixy" else LLM_RESPONSE_LIMIT
+        )
         prompt += f"{_resp_limit}\n"
         prompt += f"{LLM_FORBIDDEN_PHRASES_INSTRUCTION}\n"
         prompt += "\nRespond now:\n"
