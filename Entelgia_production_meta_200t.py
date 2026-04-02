@@ -4477,8 +4477,9 @@ class Agent:
         self._last_fatigue_state: str = "none"
         # Energy status (measurement only) — set by speak() every turn; reflects energy regime.
         self._last_energy_status: str = "normal"
-        # Progress score (set by speak(); adjusted by semantic validation in MainScript).
+        # Progress score and move type (set by speak(); adjusted by semantic validation in MainScript).
         self._last_pe_score: float = 0.0
+        self._last_pe_move: str = ""
         # ── Anti-repetition form tracking ─────────────────────────────────────
         # Tracks the last 3 rhetorical forms used by this agent.  The same
         # form must not be used more than 2 consecutive turns.
@@ -5730,12 +5731,6 @@ class Agent:
         # ── Energy status: regime label derived from energy level ─────────────
         _energy_status = _compute_energy_status(self.energy_level)
         self._last_energy_status = _energy_status
-        logger.info(
-            "[ENERGY-STATUS] agent=%s status=%s energy=%.1f",
-            self.name,
-            _energy_status,
-            self.energy_level,
-        )
 
         # Inject a soft fatigue modifier into the prompt when energy is in the
         # 35–60 range.  Effects scale continuously with fatigue and are phrasing-
@@ -6470,12 +6465,6 @@ class Agent:
         _pe_claims_mem = _pe_get_claims_memory(self.name)
         _pe_move = _pe_classify_move(out, _history_texts)
         _pe_score = _pe_score_progress(out, _history_texts, _pe_claims_mem)
-        logger.info(
-            "[PROGRESS] agent=%s score=%.2f move_type=%s",
-            self.name,
-            _pe_score,
-            _pe_move,
-        )
         # Update claims memory and log any new/changed claims
         _pe_new_claims = _pe_update_claims(self.name, out, _pe_move)
         if _pe_new_claims:
@@ -6562,8 +6551,9 @@ class Agent:
                     _pe_score,
                     _pe_regen_score,
                 )
-        # Store the final progress score for access by MainScript after speak() returns.
+        # Store the final progress score and move type for access by MainScript after speak() returns.
         self._last_pe_score = _pe_score
+        self._last_pe_move = _pe_move
         # ─────────────────────────────────────────────────────────────────────────
 
         # ── Emotion inference (on final text, after all post-processing) ──────────
@@ -8221,6 +8211,9 @@ class MainScript:
             # Call evaluate_reply after each non-Fixy agent turn to check guidance
             # compliance and detect semantic loops.  Results are logged and fed back
             # into the progress score to penalise non-compliance and looping.
+            _deferred_fixy_validation_str: Optional[str] = None
+            _deferred_fixy_loop_str: Optional[str] = None
+            _deferred_fixy_coupling_args: Optional[tuple] = None
             if (
                 self.semantic_controller is not None
                 and speaker.name != "Fixy"
@@ -8256,11 +8249,11 @@ class MainScript:
                         )
                     )
                     if self.cfg.show_meta:
-                        print(
+                        _deferred_fixy_validation_str = (
                             f"[FIXY-VALIDATION] speaker={speaker.name}"
                             f" compliant={_validation_result.compliant}"
                         )
-                        print(
+                        _deferred_fixy_loop_str = (
                             f"[FIXY-LOOP] speaker={speaker.name}"
                             f" is_loop={_loop_result.is_loop}"
                         )
@@ -8317,10 +8310,7 @@ class MainScript:
                     # Propagate the adjusted score back into the progress-enforcer
                     # history so that semantic penalties affect stagnation tracking.
                     _pe_replace_last_score(speaker.name, _progress_score)
-                    logger.info(
-                        "[FIXY-COUPLING] speaker=%s compliant=%s is_loop=%s"
-                        " loop_overrides_compliant=%s progress_after=%.2f"
-                        " semantic_repeat=%s",
+                    _deferred_fixy_coupling_args = (
                         speaker.name,
                         _validation_result.compliant,
                         _loop_result.is_loop,
@@ -8399,6 +8389,29 @@ class MainScript:
             # structural_repeat reflects detected loop modes; fatigue_level and
             # fatigue_bias are purely from energy — they do NOT define loops.
             _loop_diag_fatigue_bias = max(0.0, (speaker._last_fatigue - 0.2) * 0.6)
+
+            self.print_agent(speaker, out)
+
+            # ── Post-output Fixy diagnostics and progress ──────────────────────────
+            # Emitted after print_agent so they appear in the log after the agent's
+            # visible response rather than before it.
+            if _deferred_fixy_validation_str is not None:
+                print(_deferred_fixy_validation_str)
+            if _deferred_fixy_loop_str is not None:
+                print(_deferred_fixy_loop_str)
+            if _deferred_fixy_coupling_args is not None:
+                logger.info(
+                    "[FIXY-COUPLING] speaker=%s compliant=%s is_loop=%s"
+                    " loop_overrides_compliant=%s progress_after=%.2f"
+                    " semantic_repeat=%s",
+                    *_deferred_fixy_coupling_args,
+                )
+            logger.info(
+                "[PROGRESS] agent=%s score=%.2f move_type=%s",
+                speaker.name,
+                speaker._last_pe_score,
+                speaker._last_pe_move,
+            )
             logger.info(
                 "[LOOP-DIAG] agent=%s structural_repeat=%s fatigue_level=%.2f fatigue_bias=%.2f",
                 speaker.name,
@@ -8406,8 +8419,6 @@ class MainScript:
                 speaker._last_fatigue,
                 _loop_diag_fatigue_bias,
             )
-
-            self.print_agent(speaker, out)
 
             # Collect meta-actions performed this turn
             _meta_actions: List[str] = []
