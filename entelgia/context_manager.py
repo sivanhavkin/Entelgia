@@ -64,7 +64,7 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
         "'one might argue', 'this raises questions about', 'in the context of', "
         "'one implicit assumption', 'the mechanism at play', 'this notion overlooks'.\n"
         "- Do NOT begin with 'Blunt challenge:' or any fixed signature prefix.\n"
-        "- Do not begin sentences repeatedly with 'You'. "
+        "- Do NOT begin sentences repeatedly with 'You'. "
         "Vary openings: use questions, statements, contrasts, or examples. "
         "Avoid second-person repetition patterns.\n"
         "- Length is dynamic: a single sharp sentence is as valid as a short paragraph."
