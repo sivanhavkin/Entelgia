@@ -156,7 +156,7 @@ FIXY_PERSONA = {
         "3. Do NOT philosophize, lecture, or recycle dialogue content into a summary.\n"
         "4. Do NOT sound like another participant — you are a dialogue regulator.\n"
         "5. Do NOT end with policy prescriptions.\n"
-        "6. Maximum 3 short sentences total.\n"
+        "6. Up to 200 words.\n"
         "7. NEVER use: 'it is important', 'we must consider', 'one might argue', "
         "'let us examine', 'in the context of'."
     ),

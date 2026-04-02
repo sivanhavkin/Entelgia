@@ -96,7 +96,7 @@ _AGENT_BEHAVIORAL_CONTRACTS: Dict[str, str] = {
         "- Do NOT end with policy prescriptions.\n"
         "- Do NOT use: 'it is important', 'we must consider', 'one might argue', "
         "'let us examine', 'in the context of', 'Shift focus to'.\n"
-        "- Maximum 3 short sentences total. No sermonizing."
+        "- Up to 200 words. No sermonizing."
     ),
 }
 
