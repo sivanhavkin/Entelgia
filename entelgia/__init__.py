@@ -89,6 +89,13 @@ from .fixy_semantic_control import (
     apply_validation_to_progress,
     apply_loop_to_progress,
 )
+from .integration_core import (
+    IntegrationCore,
+    IntegrationMode,
+    IntegrationState,
+    ControlDecision,
+    make_integration_state,
+)
 
 __all__ = [
     "DialogueEngine",
@@ -158,6 +165,11 @@ __all__ = [
     "quick_test_hint",
     "apply_validation_to_progress",
     "apply_loop_to_progress",
+    "IntegrationCore",
+    "IntegrationMode",
+    "IntegrationState",
+    "ControlDecision",
+    "make_integration_state",
 ]
 
 __version__ = "5.0.0"
