@@ -651,14 +651,14 @@ class IntegrationCore:
         Uses lightweight heuristic pattern matching — no semantic parsing.
         Only modes that impose a detectable textual obligation are validated:
 
-        * ``CONCRETE_OVERRIDE`` / ``PERSONALITY_SUPPRESSION`` /
-          ``FIXY_AUTHORITY_OVERRIDE`` — response must contain at least one
-          concrete signal phrase.
+        * ``CONCRETE_OVERRIDE`` / ``PERSONALITY_SUPPRESSION`` —
+          response must contain at least one concrete signal phrase.
         * ``RESOLUTION_OVERRIDE`` — response must contain resolution language.
         * ``ATTACK_OVERRIDE`` — response must contain a structural challenge.
         * ``LOW_COMPLEXITY`` — response word count must not exceed
           :data:`_LOW_COMPLEXITY_MAX_WORDS`.
-        * ``NORMAL`` — always passes (no textual obligation).
+        * ``FIXY_AUTHORITY_OVERRIDE`` / ``NORMAL`` — always pass (no
+          additional detectable textual obligation).
 
         Parameters
         ----------
