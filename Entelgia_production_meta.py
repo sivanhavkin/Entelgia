@@ -197,6 +197,7 @@ try:
         compute_resolution_alignment as _compute_resolution_alignment,
         compute_semantic_repeat_alignment as _compute_semantic_repeat_alignment,
     )
+    from entelgia.integration_core import IntegrationCore as _IntegrationCore
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -7527,6 +7528,11 @@ class MainScript:
                 if cfg.enable_observer
                 else None
             )
+            # Executive Cortex: integrates all turn signals and decides how
+            # Fixy should regulate the next generation step.
+            self._integration_core = (
+                _IntegrationCore() if cfg.enable_observer else None
+            )
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
@@ -7535,6 +7541,7 @@ class MainScript:
             self._phrase_ban = None
             self._dialogue_rewriter = None
             self.semantic_controller = None
+            self._integration_core = None
 
         if not cfg.enable_observer:
             logger.info("Observer (Fixy) disabled via enable_observer=False")
@@ -8449,6 +8456,58 @@ class MainScript:
                 speaker.open_questions,
                 speaker._last_semantic_repeat_alignment,
             )
+            # ── Executive Cortex: collect all turn signals and decide ──────────────
+            # IntegrationCore sits above the dialogue agents and above Fixy.
+            # It reads every signal produced this turn, integrates them through
+            # a priority-ordered rule engine, and returns a ControlDecision that
+            # the Fixy block below uses to override mode, force intervention, and
+            # inject a directive overlay into Fixy's prompt.
+            _cortex_decision = None
+            if (
+                self._integration_core is not None
+                and speaker.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                _cortex_signals = {
+                    "semantic_repeat": speaker._last_dialogue_signals.get(
+                        "semantic_repeat", False
+                    ),
+                    "structural_repeat": bool(_active_loop_modes),
+                    "loop_count": len(_active_loop_modes),
+                    "progress_after": float(speaker._last_pe_score),
+                    "unresolved": int(speaker.open_questions),
+                    "pressure": float(speaker.drive_pressure),
+                    "fatigue": float(speaker._last_fatigue),
+                    "stagnation": float(speaker._last_stagnation),
+                    "linguistic_score": float(speaker._last_eval_score),
+                    "dialogue_score": float(speaker._last_dialogue_score),
+                    "alignment": str(speaker._last_pressure_sync),
+                    "move_type": str(speaker._last_pe_move),
+                    "compliance": bool(
+                        _validation_result.compliant
+                        if "_validation_result" in dir()
+                        else True
+                    ),
+                    "is_loop": bool(
+                        _loop_result.is_loop
+                        if "_loop_result" in dir()
+                        else False
+                    ),
+                    "abstraction_detected": bool(_active_loop_modes),
+                    "energy": float(speaker.energy_level),
+                    "status": str(speaker._last_fatigue_state or "active"),
+                }
+                try:
+                    _cortex_decision = self._integration_core.evaluate_turn(
+                        speaker.name, _cortex_signals
+                    )
+                except Exception:
+                    logger.warning(
+                        "[INTEGRATION-CORE] evaluate_turn failed for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────────
             # Interactive Fixy (need-based) or legacy scheduled Fixy
             # Skipped entirely when enable_observer is False or
             # fixy_interventions_enabled is False
@@ -8462,9 +8521,54 @@ class MainScript:
                 should_intervene, reason = self.interactive_fixy.should_intervene(
                     self.dialog, self.turn_index, current_topic=topic_label
                 )
+                # ── Executive Cortex: override Fixy should_intervene / mode ──────────
+                # When IntegrationCore sets enforce_fixy=True it means a loop or
+                # stagnation pattern was detected that Fixy's own heuristics may have
+                # missed (e.g. superficial compliance, pressure misalignment).  Force
+                # the intervention and remap the Fixy mode to the cortex directive.
+                _cortex_overlay: str = ""
+                if _cortex_decision is not None:
+                    _cortex_overlay = self._integration_core.build_prompt_overlay(
+                        _cortex_decision
+                    )
+                    if _cortex_decision.enforce_fixy and not should_intervene:
+                        should_intervene = True
+                        reason = "executive_cortex_override"
+                        logger.info(
+                            "[INTEGRATION-CORE] Fixy forced by cortex for agent=%s"
+                            " mode=%s reason=%r",
+                            speaker.name,
+                            _cortex_decision.active_mode.value,
+                            _cortex_decision.decision_reason,
+                        )
+                # ─────────────────────────────────────────────────────────────────────
                 if should_intervene:
                     # v2.9.0: Fixy selects disruption mode based on detected loop type
                     fixy_mode = self.interactive_fixy.get_fixy_mode(reason)
+                    # ── Cortex mode override ──────────────────────────────────────────
+                    # The cortex decision takes priority over Fixy's own mode selection
+                    # when a hard control mode is active.
+                    if _cortex_decision is not None:
+                        from entelgia.integration_core import IntegrationMode as _IM
+                        _mode_map = {
+                            _IM.FIXY_AUTHORITY_OVERRIDE: FixyMode.CONTRADICT,
+                            _IM.CONCRETE_OVERRIDE: FixyMode.CONCRETIZE,
+                            _IM.PERSONALITY_SUPPRESSION: FixyMode.CONCRETIZE,
+                            _IM.ATTACK_OVERRIDE: FixyMode.CONTRADICT,
+                            _IM.RESOLUTION_OVERRIDE: FixyMode.EXPOSE_SYNTHESIS,
+                            _IM.LOW_COMPLEXITY: FixyMode.GENTLE_NUDGE,
+                        }
+                        _mapped = _mode_map.get(_cortex_decision.active_mode)
+                        if _mapped is not None:
+                            logger.info(
+                                "[INTEGRATION-CORE] Fixy mode overridden:"
+                                " %s → %s (cortex=%s)",
+                                fixy_mode,
+                                _mapped,
+                                _cortex_decision.active_mode.value,
+                            )
+                            fixy_mode = _mapped
+                    # ─────────────────────────────────────────────────────────────────
                     # When topics are disabled, FORCE_TOPIC_RETURN is meaningless;
                     # substitute FORCE_CHOICE so Fixy still advances the dialogue.
                     if (
@@ -8477,7 +8581,11 @@ class MainScript:
                         )
                         fixy_mode = FixyMode.FORCE_CHOICE
                     intervention = self.interactive_fixy.generate_intervention(
-                        self.dialog, reason, mode=fixy_mode, current_topic=topic_label
+                        self.dialog,
+                        reason,
+                        mode=fixy_mode,
+                        current_topic=topic_label,
+                        cortex_overlay=_cortex_overlay or None,
                     )
                     # Apply graded topic compliance to Fixy interventions
                     _fixy_prev_topic = getattr(self.fixy_agent, "_last_topic", "")
