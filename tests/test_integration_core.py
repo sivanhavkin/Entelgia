@@ -413,7 +413,7 @@ class TestMakeIntegrationState:
 
 
 # ---------------------------------------------------------------------------
-# 16. evaluate_turn integration path (state_dict directly)
+# 16. evaluate_turn integration path (state_dict directly and IntegrationState)
 # ---------------------------------------------------------------------------
 
 
@@ -425,6 +425,38 @@ class TestEvaluateTurnIntegrationPath:
     def test_decision_reason_populated(self, core):
         decision = core.evaluate_turn("Socrates", _nominal_signals())
         assert decision.decision_reason  # non-empty string
+
+    def test_accepts_integration_state_directly(self, core):
+        """evaluate_turn must accept an IntegrationState (not only a dict)."""
+        state = IntegrationState(
+            agent_name="Socrates",
+            semantic_repeat=True,
+            loop_count=2,
+            stagnation=0.3,
+        )
+        decision = core.evaluate_turn("Socrates", state)
+        assert isinstance(decision, ControlDecision)
+        # semantic_repeat=True + loop_count=2 should fire CONCRETE_OVERRIDE
+        assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+
+    def test_integration_state_agent_name_used_directly(self, core):
+        """When an IntegrationState is passed the agent_name arg is ignored."""
+        state = IntegrationState(agent_name="Athena", fatigue=0.8)
+        decision = core.evaluate_turn("ignored_name", state)
+        assert decision.active_mode == IntegrationMode.LOW_COMPLEXITY
+
+    def test_dict_and_state_produce_same_result(self, core):
+        """Dict path and IntegrationState path must yield identical decisions."""
+        signals = _nominal_signals()
+        signals["is_loop"] = True
+        signals["compliance"] = False
+        decision_from_dict = core.evaluate_turn("Socrates", signals)
+
+        state = make_integration_state("Socrates", **signals)
+        decision_from_state = core.evaluate_turn("Socrates", state)
+
+        assert decision_from_dict.active_mode == decision_from_state.active_mode
+        assert decision_from_dict.regenerate == decision_from_state.regenerate
 
 
 # ---------------------------------------------------------------------------

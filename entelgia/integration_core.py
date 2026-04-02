@@ -63,7 +63,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +281,8 @@ class IntegrationCore:
     ::
 
         core = IntegrationCore()
+
+        # Preferred: pass an IntegrationState directly
         state = IntegrationState(
             agent_name="Socrates",
             semantic_repeat=True,
@@ -288,6 +290,10 @@ class IntegrationCore:
             stagnation=0.3,
         )
         decision = core.evaluate_turn("Socrates", state)
+
+        # Alternatively: pass a plain signal dict (used by the main loop)
+        decision = core.evaluate_turn("Socrates", {"semantic_repeat": True, "loop_count": 2})
+
         if core.should_regenerate(decision):
             # discard draft, regenerate
             ...
@@ -323,17 +329,22 @@ class IntegrationCore:
     def evaluate_turn(
         self,
         agent_name: str,
-        state_dict: Dict[str, Any],
+        state_input: "Union[IntegrationState, Dict[str, Any]]",
     ) -> ControlDecision:
         """Evaluate one completed turn and return a :class:`ControlDecision`.
 
         Parameters
         ----------
         agent_name:
-            Name of the agent that just spoke.
-        state_dict:
-            Dictionary of signal values.  Unknown keys are silently ignored;
-            missing keys fall back to the defaults defined in
+            Name of the agent that just spoke.  Ignored when *state_input*
+            is already an :class:`IntegrationState` (the name is read from
+            the struct directly).
+        state_input:
+            Either an :class:`IntegrationState` instance (preferred, used
+            when the caller has already built the struct) or a plain
+            ``Dict[str, Any]`` of signal values (used by the main loop for
+            convenience).  When a dict is supplied, unknown keys are silently
+            ignored and missing keys fall back to the defaults defined in
             :class:`IntegrationState`.
 
         Returns
@@ -341,7 +352,10 @@ class IntegrationCore:
         ControlDecision
             The regulation decision for the *next* turn.
         """
-        state = self._build_state(agent_name, state_dict)
+        if isinstance(state_input, IntegrationState):
+            state = state_input
+        else:
+            state = self._build_state(agent_name, state_input)
         logger.info(
             "[INTEGRATION-STATE] agent=%s semantic_repeat=%s structural_repeat=%s "
             "loop_count=%d progress_after=%.2f unresolved=%d pressure=%.2f "

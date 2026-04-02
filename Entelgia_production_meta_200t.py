@@ -8489,7 +8489,15 @@ class MainScript:
                         "semantic_repeat", False
                     ),
                     "structural_repeat": bool(_active_loop_modes),
-                    "loop_count": len(_active_loop_modes),
+                    "loop_count": (
+                        self.interactive_fixy.semantic_loop_count
+                        if self.interactive_fixy is not None
+                        else int(
+                            _loop_result.is_loop
+                            if "_loop_result" in dir()
+                            else False
+                        )
+                    ),
                     "progress_after": float(speaker._last_pe_score),
                     "unresolved": int(speaker.open_questions),
                     "pressure": float(speaker.drive_pressure),

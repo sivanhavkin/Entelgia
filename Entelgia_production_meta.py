@@ -8473,7 +8473,15 @@ class MainScript:
                         "semantic_repeat", False
                     ),
                     "structural_repeat": bool(_active_loop_modes),
-                    "loop_count": len(_active_loop_modes),
+                    "loop_count": (
+                        self.interactive_fixy.semantic_loop_count
+                        if self.interactive_fixy is not None
+                        else int(
+                            _loop_result.is_loop
+                            if "_loop_result" in dir()
+                            else False
+                        )
+                    ),
                     "progress_after": float(speaker._last_pe_score),
                     "unresolved": int(speaker.open_questions),
                     "pressure": float(speaker.drive_pressure),
@@ -8522,10 +8530,10 @@ class MainScript:
                     self.dialog, self.turn_index, current_topic=topic_label
                 )
                 # ── Executive Cortex: override Fixy should_intervene / mode ──────────
-                # When IntegrationCore sets enforce_fixy=True it means a loop or
-                # stagnation pattern was detected that Fixy's own heuristics may have
-                # missed (e.g. superficial compliance, pressure misalignment).  Force
-                # the intervention and remap the Fixy mode to the cortex directive.
+                # When IntegrationCore sets enforce_fixy=True it currently signals a
+                # FIXY_AUTHORITY_OVERRIDE directive (loop detected + superficial
+                # compliance).  Force the intervention and remap the Fixy mode to
+                # the cortex directive.
                 _cortex_overlay: str = ""
                 if _cortex_decision is not None:
                     _cortex_overlay = self._integration_core.build_prompt_overlay(
