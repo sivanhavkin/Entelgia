@@ -1500,6 +1500,7 @@ class InteractiveFixy:
         reason: str,
         mode: Optional[str] = None,
         current_topic: Optional[str] = None,
+        cortex_overlay: Optional[str] = None,
     ) -> str:
         """
         Generate contextual intervention using the appropriate Fixy mode.
@@ -1523,6 +1524,9 @@ class InteractiveFixy:
             reason: Reason for intervention
             mode: Override FixyMode (optional; auto-selected from reason if omitted)
             current_topic: Active topic label (optional; included in prompt when provided)
+            cortex_overlay: Imperative directive from IntegrationCore (executive cortex).
+                When provided it is prepended to the prompt so Fixy acts on the
+                cortex decision rather than only on its own heuristics.
 
         Returns:
             Intervention text
@@ -1611,6 +1615,11 @@ class InteractiveFixy:
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
             f"{LLM_FIXY_RESPONSE_LIMIT}\n"
         )
+        if cortex_overlay:
+            full_prompt = (
+                f"[EXECUTIVE CORTEX DIRECTIVE — highest priority]\n"
+                f"{cortex_overlay}\n\n"
+            ) + full_prompt
 
         intervention = self.llm.generate(
             self.model, full_prompt, temperature=0.4, use_cache=False
