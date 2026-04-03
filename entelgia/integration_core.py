@@ -200,25 +200,54 @@ _REASONING_HASH_MAX_TOKENS: int = 40
 # History window size: threshold + 1 unique entries + 1 buffer for the incoming hash
 _REASONING_HASH_HISTORY_SIZE: int = _REASONING_HASH_SIMILARITY_THRESHOLD + 2
 
-
 # ---------------------------------------------------------------------------
-# Pipeline gate
+# Quality gate: banned rhetorical scaffolding patterns
 # ---------------------------------------------------------------------------
+# A response matching >= _QUALITY_GATE_THRESHOLD of these patterns is treated
+# as generic academic scaffolding and must be regenerated.  This mirrors the
+# original Fixy check-and-regenerate logic, now routed through the
+# IntegrationCore post-generation validation machinery.
 
+_QUALITY_GATE_PATTERNS: tuple = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bwe must consider\b",
+        r"\bit is important to recognize\b",
+        r"\bit is important to note\b",
+        r"\bthis raises questions about\b",
+        r"\blet us (?:examine|consider|explore|reflect)\b",
+        r"\bin the context of\b",
+        r"\bhowever[,\s]+it is crucial\b",
+        r"\bone assumption that often goes unexamined\b",
+        r"\bone might argue\b",
+        r"\bit can be argued\b",
+        r"\bit is worth (?:noting|considering|reflecting)\b",
+        r"\bin (?:conclusion|summary|other words)\b",
+        r"\bto summarize\b",
+        r"\ban alternative perspective\b",
+        r"\bunderlying assumptions\b",
+        r"\bprevailing notion\b",
+        r"\bit is (?:crucial|essential|imperative) to\b",
+        r"\bit should be noted\b",
+        r"\bneedless to say\b",
+    )
+)
 
-def integration_pipeline_enabled(cfg) -> bool:
-    """Return True only when the IntegrationCore enforce pipeline must be active.
+# Number of pattern hits at or above which a response is considered generic
+_QUALITY_GATE_THRESHOLD: int = 2
 
-    This is the single authoritative gate for the cortex enforce subsystem.
-    Every IntegrationCore entry point (pre-generation decision,
-    post-generation evaluate_turn, overlay injection, regeneration, and
-    cortex-forced Fixy intervention) must be gated through this function.
+# Minimum word count to apply the quality gate (short responses are passed through)
+_QUALITY_GATE_MIN_WORDS: int = 10
 
-    When this returns False the cortex enforce pipeline is a hard no-op: no
-    force-mode overlays are applied, no regeneration is triggered by the
-    cortex, and IntegrationCore returns NORMAL decisions only.
-    """
-    return bool(getattr(cfg, "integration_enforce_enabled", False))
+# Overlay injected when regenerating a quality-gate failure in NORMAL mode
+_OVERLAY_QUALITY_GATE: str = (
+    "STRICT REGENERATION REQUIRED. "
+    "Your previous response contained generic academic scaffolding phrases that are forbidden. "
+    "Do NOT use: 'we must consider', 'it is important to recognize', 'one might argue', "
+    "'let us examine', 'in conclusion', 'to summarize', 'it is worth noting', "
+    "'underlying assumptions', 'an alternative perspective', or similar filler phrases. "
+    "Respond directly and concisely with your point — no preamble, no scaffolding."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1172,6 +1201,22 @@ class IntegrationCore:
             return True, "STRUCTURE_LOCK satisfied: all sections present with concrete content."
 
         if mode == IntegrationMode.NORMAL:
+            # Even in NORMAL mode, check for banned rhetorical scaffolding.
+            # This restores the original Fixy check-and-regenerate behaviour,
+            # now routed through the IntegrationCore post-generation machinery.
+            if len(text.split()) >= _QUALITY_GATE_MIN_WORDS:
+                hits = sum(1 for pat in _QUALITY_GATE_PATTERNS if pat.search(t))
+                if hits >= _QUALITY_GATE_THRESHOLD:
+                    logger.info(
+                        "[QUALITY-GATE] NORMAL mode: %d banned pattern hit(s) — "
+                        "flagging for regeneration",
+                        hits,
+                    )
+                    return (
+                        False,
+                        f"QUALITY_GATE: response contains {hits} banned rhetorical "
+                        "scaffolding pattern(s) and must be regenerated.",
+                    )
             return True, "No active mode constraint."
 
         if mode in (
@@ -1230,11 +1275,14 @@ class IntegrationCore:
         text: str,
         decision: ControlDecision,
     ) -> bool:
-        """Return True when the generated output ignored the active mode.
+        """Return True when the generated output ignored the active mode or failed the quality gate.
 
         Calls :meth:`validate_generated_output` and logs the result under
-        ``[POST-GEN-VALIDATION]``.  Returns ``False`` immediately when the
-        active mode is ``NORMAL`` (no constraint to validate).
+        ``[POST-GEN-VALIDATION]``.  For non-NORMAL modes with no escalation
+        (and text short enough to skip the quality gate), returns ``False``
+        immediately.  For NORMAL mode, the quality gate is still applied so
+        that banned rhetorical scaffolding triggers regeneration — restoring
+        the original Fixy check-and-regenerate behaviour.
 
         Also checks for pseudo-compliance in CONCRETE_OVERRIDE and
         PERSONALITY_SUPPRESSION modes, and forces regeneration with an
@@ -1256,7 +1304,9 @@ class IntegrationCore:
         if (
             decision.active_mode == IntegrationMode.NORMAL
             and decision.escalation_level < _STRUCTURE_LOCK_LEVEL
+            and len(text.split()) < _QUALITY_GATE_MIN_WORDS
         ):
+            # Too short to apply quality gate and no active mode constraint.
             return False
 
         compliant, reason = self.validate_generated_output(text, decision)
@@ -1293,7 +1343,12 @@ class IntegrationCore:
         str
             Stronger imperative directive block.
         """
-        return _STRONGER_OVERLAY_PREFIX + decision.prompt_overlay
+        base_overlay = decision.prompt_overlay
+        if not base_overlay:
+            # NORMAL mode quality-gate failure: use the quality-gate overlay
+            # so the regeneration prompt gives the agent clear instructions.
+            base_overlay = _OVERLAY_QUALITY_GATE
+        return _STRONGER_OVERLAY_PREFIX + base_overlay
 
     def escalate_decision(self, decision: ControlDecision) -> ControlDecision:
         """Return a new :class:`ControlDecision` with escalation incremented by 1.
