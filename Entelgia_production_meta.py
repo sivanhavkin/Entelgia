@@ -14,7 +14,7 @@ Advanced Multi-Agent Dialogue System with:
 - Session persistence
 - REST API (FastAPI)
 - Better monitoring
-- 10-MINUTE AUTO-TIMEOUT
+- TURN-BASED SESSION (5 / 15 / 25 / 50 / 75 / 100 turns selectable at startup, default 15)
 - MEMORY SECURITY with HMAC-SHA256 signatures
 
 Version Note: Latest release: 5.0.0.
@@ -49,7 +49,7 @@ pytest-mock>=3.12.0       # Mocking for tests
 # ============================================
 python-dateutil>=2.8.2    # Date utilities
 
-Run CLI (30 min auto-timeout):
+Run CLI (turn-count selector at startup):
   python entelgia_production_meta.py
 
 Run API:
@@ -2233,8 +2233,8 @@ class Config:
                     "anthropic_api_key must be set when llm_backend is 'anthropic' "
                     "(set ANTHROPIC_API_KEY in your .env or environment)"
                 )
-        if self.timeout_minutes < 1:
-            raise ValueError("timeout_minutes must be >= 1")
+        if self.timeout_minutes < 0:
+            raise ValueError("timeout_minutes must be >= 0 (0 = no time limit)")
         logging.getLogger().setLevel(logging.DEBUG if self.debug else logging.INFO)
         logger.info(
             f"Config validated: max_turns={self.max_turns}, timeout={self.timeout_minutes}min"
@@ -7936,7 +7936,11 @@ class MainScript:
 
         self.dialog.append({"role": "seed", "text": self.cfg.seed_topic})
 
-        timeout_seconds = self.cfg.timeout_minutes * 60
+        timeout_seconds = (
+            self.cfg.timeout_minutes * 60
+            if self.cfg.timeout_minutes > 0
+            else float("inf")
+        )
         # Fixy rewrite hint: set by Fixy's intervention and consumed on the
         # next agent's turn.  Cleared after use so it does not persist.
         _fixy_rewrite_hint: Optional[str] = None
@@ -7956,14 +7960,20 @@ class MainScript:
         # the cortex's decision to the *current* LLM call, not only the next.
         _prev_cortex_decision = None
 
+        _timeout_label = (
+            f"{self.cfg.timeout_minutes}-minute"
+            if self.cfg.timeout_minutes > 0
+            else "no-timeout"
+        )
         print(
             Fore.GREEN
-            + f"\n[Session {self.session_id}] Starting {self.cfg.timeout_minutes}-minute dialogue..."
+            + f"\n[Session {self.session_id}] Starting {_timeout_label} dialogue..."
             + Style.RESET_ALL
         )
-        logger.info(
-            f"Starting session {self.session_id} with {timeout_seconds}s timeout"
+        _log_timeout = (
+            f"{timeout_seconds}s" if self.cfg.timeout_minutes > 0 else "unlimited"
         )
+        logger.info(f"Starting session {self.session_id} with {_log_timeout} timeout")
 
         while time.time() - self.start_time < timeout_seconds:
             if _shutdown_event.is_set():
@@ -9229,6 +9239,70 @@ def _pick_from_list(prompt_header: str, options: list[str]) -> str | None:
         )
 
 
+_SESSION_TURN_OPTIONS: tuple[int, ...] = (5, 15, 25, 50, 75, 100)
+_SESSION_TURN_DEFAULT: int = 15
+
+
+def _pick_numbered_option(
+    title: str,
+    options: list[int],
+    default: int,
+    item_label: str,
+) -> int:
+    """Prompt the user to select one value from a numbered list.
+
+    Pressing Enter selects *default*. Invalid input is rejected and the
+    prompt is repeated until a valid selection is made.
+    """
+    print()
+    print(Fore.CYAN + title + Style.RESET_ALL)
+    for i, value in enumerate(options, 1):
+        marker = " (default)" if value == default else ""
+        print(f"  [{i}] {value} {item_label}{marker}")
+
+    while True:
+        sys.stdout.flush()
+        raw = input(
+            f"Enter choice [1-{len(options)}] (or press Enter for {default}): "
+        ).strip()
+        if raw == "":
+            print(
+                Fore.GREEN
+                + f"  Using default: {default} {item_label}"
+                + Style.RESET_ALL
+            )
+            return default
+        try:
+            choice = int(raw)
+            if 1 <= choice <= len(options):
+                selected = options[choice - 1]
+                print(Fore.GREEN + f"  Selected: {selected} {item_label}" + Style.RESET_ALL)
+                return selected
+        except ValueError:
+            pass
+        print(
+            Fore.YELLOW
+            + f"  [WARN] '{raw}' is not a valid choice. Enter a number between 1 and {len(options)}, or press Enter for the default."
+            + Style.RESET_ALL
+        )
+
+
+def select_session_turns() -> int:
+    """Interactive startup selector for number of dialogue turns.
+
+    Presents a numbered list of turn-count options.  Pressing Enter without
+    a choice selects the default (15 turns).  Invalid input is rejected and
+    the prompt is repeated until a valid selection is made.  Returns the
+    chosen turn count.
+    """
+    return _pick_numbered_option(
+        "Select number of turns for this session:",
+        list(_SESSION_TURN_OPTIONS),
+        _SESSION_TURN_DEFAULT,
+        "turns",
+    )
+
+
 def select_llm_backend_and_models(cfg: "Config") -> None:
     """Interactive startup selector for LLM backend and per-agent models.
 
@@ -9348,15 +9422,8 @@ def _print_llm_config_summary(cfg: "Config") -> None:
 
 
 def run_cli():
-    """Run command line interface - configurable timeout dialogue."""
+    """Run command line interface - turn-based dialogue (no time limit)."""
     global CFG
-    CFG = Config(
-        max_turns=200,
-        timeout_minutes=30,
-        show_meta=True,
-        topics_enabled=False,
-        topic_manager_enabled=False,
-    )
 
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
     print(
@@ -9365,6 +9432,15 @@ def run_cli():
         + Style.RESET_ALL
     )
     print(Fore.GREEN + "=" * 80 + Style.RESET_ALL)
+
+    selected_turns = select_session_turns()
+    CFG = Config(
+        max_turns=selected_turns,
+        timeout_minutes=0,
+        show_meta=True,
+        topics_enabled=False,
+        topic_manager_enabled=False,
+    )
 
     select_llm_backend_and_models(CFG)
 
@@ -9500,7 +9576,7 @@ def main():
             print()
             print("Usage:")
             print(
-                f"  python {os.path.basename(__file__)}              Run 30-minute CLI dialogue (default)"
+                f"  python {os.path.basename(__file__)}              Run CLI dialogue with turn-count selector (default)"
             )
             print(f"  python {os.path.basename(__file__)} test         Run unit tests")
             print(
@@ -9523,7 +9599,7 @@ def main():
             )
             print()
             print("Features:")
-            print("  • 30-minute auto-timeout dialogue")
+            print("  • Turn-based dialogue (5 / 15 / 25 / 50 / 75 / 100 turns, default 15)")
             print("  • Multi-agent with Socrates & Athena")
             print("  • Persistent memory (STM + LTM)")
             print("  • Emotion tracking & importance scoring")
@@ -9546,7 +9622,7 @@ def main():
             )
             sys.exit(1)
     else:
-        # Default: Run CLI (30 minutes)
+        # Default: Run CLI (turn-based, no time limit)
         run_cli()
 
 
