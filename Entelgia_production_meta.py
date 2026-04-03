@@ -8526,13 +8526,15 @@ class MainScript:
                         _pa_rejected_texts.append(out)
 
                         _loop_regen_count += 1
-                        # Ensure the final allowed regen uses the fail-safe
-                        # overlay tier (attempt >= 2) instead of the standard
-                        # overlay, since the previous attempt already failed.
+                        # _loop_regen_count was just incremented and can now
+                        # equal _IC_MAX_LOOP_BREAK on the final iteration of
+                        # the while loop (while condition checks the PRE-increment
+                        # value, so count reaches the ceiling here after ++).
+                        # On the final attempt use the fail-safe overlay (tier 2)
+                        # so the model gets the strictest possible instruction.
+                        _is_final_attempt = _loop_regen_count >= _IC_MAX_LOOP_BREAK
                         _loop_overlay_attempt = (
-                            _IC_MAX_LOOP_BREAK
-                            if _loop_regen_count >= _IC_MAX_LOOP_BREAK
-                            else _loop_regen_count - 1
+                            _IC_MAX_LOOP_BREAK if _is_final_attempt else _loop_regen_count - 1
                         )
                         _loop_break_overlay = (
                             self._integration_core.build_loop_break_overlay(
