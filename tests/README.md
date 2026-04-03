@@ -342,7 +342,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 1956 total tests across 40 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator, fixy soft enforcement, fixy semantic control, fatigue tagging, integration core, integration memory store, session turn selector, text humanizer integration) |
+| **Unit Tests** | `pytest` | Runs 1956 total tests across 40 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator, fixy soft enforcement, fixy semantic control, fatigue tagging, integration core, integration memory store, session turn selector) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -931,7 +931,7 @@ Tests verify the integrated Fixy semantic validation and loop-detection layer (`
 
 ---
 
-### 🧠 Fatigue Tagging Tests (20 tests)
+### 🧠 Fatigue Tagging Tests (60 tests)
 
 ```bash
 pytest tests/test_fatigue_tagging.py -v
