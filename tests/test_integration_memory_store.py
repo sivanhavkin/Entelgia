@@ -3,7 +3,8 @@
 
 """
 Unit tests for entelgia/integration_memory_store.py and
-the memory integration hooks added to IntegrationCore.
+the memory integration hooks added to IntegrationCore and
+FixySemanticController.
 
 Covers:
   1.  IntegrationMemoryStore initialises with empty entries when file absent
@@ -23,6 +24,16 @@ Covers:
   15. IntegrationCore.record_decision persists entry when store is attached
   16. load handles corrupt JSON gracefully (empty store, no exception)
   17. auto_save=False does not write on store_entry
+  -- FixySemanticController memory wiring --
+  18. FixySemanticController.attach_memory_store wires the store
+  19. validate_guidance_compliance persists ValidationResult to memory store
+  20. validate_guidance_compliance is no-op to memory without store
+  21. detect_semantic_loop persists LoopCheckResult to memory store
+  22. detect_semantic_loop is no-op to memory without store
+  23. memory entry tags for loop_detected when is_loop=True
+  24. memory entry tags for weak_reasoning when reasoning_delta is "none"
+  25. retrieve_relevant with tag "fixy_validation" returns only validation entries
+  26. retrieve_relevant with tag "semantic_loop" returns only loop entries
 """
 
 from __future__ import annotations
@@ -36,6 +47,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
+from entelgia.fixy_semantic_control import (
+    FixySemanticController,
+    LoopCheckResult,
+    ValidationResult,
+)
 from entelgia.integration_core import (
     ControlDecision,
     IntegrationCore,
@@ -409,5 +425,221 @@ def test_auto_save_false_does_not_write():
         assert mtime_before == mtime_after, (
             "File should NOT have been written when auto_save=False"
         )
+    finally:
+        os.unlink(path)
+
+
+# ===========================================================================
+# FixySemanticController memory wiring tests
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+class _FakeLLM:
+    """Minimal LLM stub that returns a fixed JSON string."""
+
+    def __init__(self, raw: str) -> None:
+        self._raw = raw
+
+    def generate(self, model: str, prompt: str, **kwargs) -> str:
+        return self._raw
+
+
+def _validation_llm(compliant: bool = True) -> _FakeLLM:
+    payload = json.dumps({
+        "compliant": compliant,
+        "partial": False,
+        "confidence": 0.9,
+        "reason": "test_reason",
+    })
+    return _FakeLLM(payload)
+
+
+def _loop_llm(is_loop: bool = False) -> _FakeLLM:
+    payload = json.dumps({
+        "is_loop": is_loop,
+        "confidence": 0.85,
+        "reasoning_delta": "none" if is_loop else "moderate",
+        "new_move_type": "none" if is_loop else "new_distinction",
+        "reason": "test_loop_reason",
+    })
+    return _FakeLLM(payload)
+
+
+# ---------------------------------------------------------------------------
+# 18. FixySemanticController.attach_memory_store wires the store
+# ---------------------------------------------------------------------------
+
+
+def test_fixy_controller_attach_memory_store():
+    ctrl = FixySemanticController(llm=_validation_llm(), model="test-model")
+    assert ctrl._memory_store is None
+
+    store, path = _temp_store(auto_save=False)
+    try:
+        ctrl.attach_memory_store(store)
+        assert ctrl._memory_store is store
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# 19. validate_guidance_compliance persists ValidationResult to store
+# ---------------------------------------------------------------------------
+
+
+def test_validate_guidance_compliance_records_to_memory():
+    ctrl = FixySemanticController(llm=_validation_llm(compliant=True), model="m")
+    store, path = _temp_store(auto_save=False)
+    try:
+        ctrl.attach_memory_store(store)
+        result = ctrl.validate_guidance_compliance("Socrates", "example text", "EXAMPLE")
+
+        assert result.compliant is True
+        assert len(store._entries) == 1
+        entry = store._entries[0]
+        assert entry["agent"] == "Socrates"
+        assert entry["entry_type"] == "fixy_validation"
+        assert entry["expected_move"] == "EXAMPLE"
+        assert entry["compliant"] is True
+        assert "fixy_validation" in entry["tags"]
+        assert "example" in entry["tags"]
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# 20. validate_guidance_compliance is no-op to memory without store
+# ---------------------------------------------------------------------------
+
+
+def test_validate_guidance_compliance_no_store_no_error():
+    ctrl = FixySemanticController(llm=_validation_llm(), model="m")
+    # No store attached — should not raise, no entries stored anywhere
+    result = ctrl.validate_guidance_compliance("Athena", "some text", "EXAMPLE")
+    assert result.speaker == "Athena"
+
+
+# ---------------------------------------------------------------------------
+# 21. detect_semantic_loop persists LoopCheckResult to store
+# ---------------------------------------------------------------------------
+
+
+def test_detect_semantic_loop_records_to_memory():
+    ctrl = FixySemanticController(llm=_loop_llm(is_loop=False), model="m")
+    store, path = _temp_store(auto_save=False)
+    try:
+        ctrl.attach_memory_store(store)
+        result = ctrl.detect_semantic_loop(
+            "Socrates", "current text", ["older text", "recent text"]
+        )
+
+        assert len(store._entries) == 1
+        entry = store._entries[0]
+        assert entry["agent"] == "Socrates"
+        assert entry["entry_type"] == "loop_check"
+        assert entry["is_loop"] is False
+        assert "semantic_loop" in entry["tags"]
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# 22. detect_semantic_loop is no-op to memory without store
+# ---------------------------------------------------------------------------
+
+
+def test_detect_semantic_loop_no_store_no_error():
+    ctrl = FixySemanticController(llm=_loop_llm(), model="m")
+    result = ctrl.detect_semantic_loop("Athena", "text", ["prev"])
+    assert result.speaker == "Athena"
+
+
+# ---------------------------------------------------------------------------
+# 23. memory entry tags include "loop_detected" when is_loop=True
+# ---------------------------------------------------------------------------
+
+
+def test_loop_result_tags_loop_detected():
+    ctrl = FixySemanticController(llm=_loop_llm(is_loop=True), model="m")
+    store, path = _temp_store(auto_save=False)
+    try:
+        ctrl.attach_memory_store(store)
+        ctrl.detect_semantic_loop("Socrates", "repeating text", ["same text"])
+
+        entry = store._entries[0]
+        assert "loop_detected" in entry["tags"]
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# 24. memory entry tags include "weak_reasoning" when reasoning_delta is "none"
+# ---------------------------------------------------------------------------
+
+
+def test_loop_result_tags_weak_reasoning():
+    # _loop_llm(is_loop=True) sets reasoning_delta="none"
+    ctrl = FixySemanticController(llm=_loop_llm(is_loop=True), model="m")
+    store, path = _temp_store(auto_save=False)
+    try:
+        ctrl.attach_memory_store(store)
+        ctrl.detect_semantic_loop("Socrates", "same argument again", ["same argument"])
+
+        entry = store._entries[0]
+        assert "weak_reasoning" in entry["tags"]
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# 25. retrieve_relevant with tag "fixy_validation" returns only validation entries
+# ---------------------------------------------------------------------------
+
+
+def test_retrieve_relevant_fixy_validation_tag():
+    ctrl = FixySemanticController(llm=_validation_llm(), model="m")
+    store, path = _temp_store(auto_save=False)
+    try:
+        ctrl.attach_memory_store(store)
+        # Store a validation entry and a loop entry for the same agent
+        ctrl.validate_guidance_compliance("Socrates", "example", "EXAMPLE")
+
+        loop_ctrl = FixySemanticController(llm=_loop_llm(), model="m")
+        loop_ctrl.attach_memory_store(store)
+        loop_ctrl.detect_semantic_loop("Socrates", "text", ["prev"])
+
+        assert len(store._entries) == 2
+        results = store.retrieve_relevant("Socrates", tags=["fixy_validation"])
+        assert len(results) == 1
+        assert results[0]["entry_type"] == "fixy_validation"
+    finally:
+        os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# 26. retrieve_relevant with tag "semantic_loop" returns only loop entries
+# ---------------------------------------------------------------------------
+
+
+def test_retrieve_relevant_semantic_loop_tag():
+    store, path = _temp_store(auto_save=False)
+    try:
+        # Store a validation entry
+        val_ctrl = FixySemanticController(llm=_validation_llm(), model="m")
+        val_ctrl.attach_memory_store(store)
+        val_ctrl.validate_guidance_compliance("Athena", "text", "CONCESSION")
+
+        # Store a loop entry
+        loop_ctrl = FixySemanticController(llm=_loop_llm(is_loop=True), model="m")
+        loop_ctrl.attach_memory_store(store)
+        loop_ctrl.detect_semantic_loop("Athena", "looping text", ["prev"])
+
+        results = store.retrieve_relevant("Athena", tags=["semantic_loop"])
+        assert len(results) == 1
+        assert results[0]["entry_type"] == "loop_check"
     finally:
         os.unlink(path)
