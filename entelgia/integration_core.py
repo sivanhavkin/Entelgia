@@ -158,7 +158,9 @@ _STRUCTURE_LOCK_ACTION_VERBS: tuple = (
     "gave", "took", "put", "placed", "ate", "drank", "read", "taught",
     "edited", "deleted", "copied", "typed", "pressed", "clicked",
     "started", "stopped", "closed", "chose", "selected", "decided",
-    # Present-tense forms (for responses narrated in present tense)
+    # Present-tense forms (for responses narrated in present tense).
+    # Suffix pattern in matching covers -s/-es/-ing/-ed/-d inflections so each
+    # base stem here also matches third-person singular and progressive forms.
     "decide", "choose", "take", "run", "drive", "walk", "produce",
     "create", "publish", "fire", "hire", "operate", "deploy", "launch",
     "install", "remove", "close", "complete", "deliver", "sell", "buy",
@@ -166,6 +168,8 @@ _STRUCTURE_LOCK_ACTION_VERBS: tuple = (
     "apply", "announce", "report", "approve", "give", "treat", "diagnose",
     "repair", "fix", "test", "measure", "record", "visit", "arrive",
     "enter", "exit", "return",
+    # Medical base stems not covered by past-tense entries above
+    "administer", "prescribe",
 )
 
 # Phrases in [OUTCOME] that signal abstract reflection rather than an
@@ -184,7 +188,8 @@ _STRUCTURE_LOCK_OUTCOME_ABSTRACT: tuple = (
     "serves as a reminder",
     "calls into question",
     "forces us to reconsider",
-    "opens up new",
+    "opens up new questions",
+    "opens up new ways of thinking",
     "this is a reminder",
 )
 
@@ -653,17 +658,21 @@ def _extract_section_body(text_lower: str, section_header: str) -> str:
     str
         Stripped body text, or an empty string when the header is not found.
     """
-    # Build alternation from known section names (strip surrounding brackets)
+    # Build alternation from known section names (strip surrounding brackets).
+    # Anchor to line start so that a section name inside a body paragraph does
+    # not trigger a false split.
     section_names = "|".join(
         re.escape(s.strip("[]")) for s in _STRUCTURE_LOCK_SECTIONS
     )
     pattern = (
-        re.escape(section_header)
-        + r"\s*(.*?)(?=\[(?:"
+        r"(?m)^"
+        + re.escape(section_header)
+        + r"\s*\n(.*?)(?=^"
+        + r"\[(?:"
         + section_names
-        + r")\]|$)"
+        + r")\]|\Z)"
     )
-    match = re.search(pattern, text_lower, re.DOTALL)
+    match = re.search(pattern, text_lower, re.DOTALL | re.MULTILINE)
     if match:
         return match.group(1).strip()
     return ""
@@ -702,10 +711,12 @@ def _validate_structure_lock_content(text: str) -> "Tuple[bool, str]":
                     f"contains generic placeholder — content must be specific and concrete.",
                 )
 
-    # 2. [ACTION] must contain at least one concrete observable action verb
+    # 2. [ACTION] must contain at least one concrete observable action verb.
+    # Matches base form, 3rd-person singular (-s/-es), past tense (-d/-ed),
+    # and progressive (-ing) to avoid false failures for common inflections.
     action_body = _extract_section_body(t, "[action]")
     if not any(
-        re.search(r"\b" + re.escape(verb) + r"\b", action_body)
+        re.search(r"\b" + re.escape(verb) + r"(?:s|es|ing|ed|d)?\b", action_body)
         for verb in _STRUCTURE_LOCK_ACTION_VERBS
     ):
         return (
@@ -1095,16 +1106,15 @@ class IntegrationCore:
             mode constraint.  *reason* is a short human-readable explanation.
         """
         mode = decision.active_mode
-        if mode == IntegrationMode.NORMAL:
-            return True, "No active mode constraint."
 
         t = text.lower()
 
         # -----------------------------------------------------------------
         # STRUCTURE_LOCK — section-header + content enforcement (level >= 3)
-        # Checked before mode-specific validation so that responses that use
-        # abstract prose instead of the required format are caught here even
-        # when they happen to contain a concrete-signal phrase.
+        # Evaluated first, before the NORMAL early-return, so that any future
+        # decision combining NORMAL mode with a high escalation level is still
+        # caught here.  Uses line-anchored regex so that a section name
+        # mentioned inside a body paragraph does not satisfy the header check.
         # -----------------------------------------------------------------
         if decision.escalation_level >= _STRUCTURE_LOCK_LEVEL:
             logger.info(
@@ -1112,7 +1122,10 @@ class IntegrationCore:
                 decision.escalation_level,
                 _STRUCTURE_LOCK_SECTIONS,
             )
-            missing = [s for s in _STRUCTURE_LOCK_SECTIONS if s not in t]
+            missing = [
+                s for s in _STRUCTURE_LOCK_SECTIONS
+                if not re.search(r"(?m)^" + re.escape(s), t)
+            ]
             if missing:
                 return (
                     False,
@@ -1137,6 +1150,9 @@ class IntegrationCore:
                 decision.escalation_level,
             )
             return True, "STRUCTURE_LOCK satisfied: all sections present with concrete content."
+
+        if mode == IntegrationMode.NORMAL:
+            return True, "No active mode constraint."
 
         if mode in (
             IntegrationMode.CONCRETE_OVERRIDE,
@@ -1217,7 +1233,10 @@ class IntegrationCore:
         bool
             ``True`` when the response must be regenerated.
         """
-        if decision.active_mode == IntegrationMode.NORMAL:
+        if (
+            decision.active_mode == IntegrationMode.NORMAL
+            and decision.escalation_level < _STRUCTURE_LOCK_LEVEL
+        ):
             return False
 
         compliant, reason = self.validate_generated_output(text, decision)

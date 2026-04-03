@@ -1222,10 +1222,13 @@ class TestStructureLock:
         result = core.should_regenerate_after_validation(text, decision)
         assert result is True
 
-    def test_level_3_overlay_uses_person_header(self, core):
-        """Verify the Level-3 overlay now advertises the [PERSON] section."""
+    def test_level_3_overlay_uses_structured_headers(self, core):
+        """Verify the Level-3 overlay advertises the current structured sections."""
         decision = self._decision_at_level(core, 3)
         assert "[PERSON]" in decision.prompt_overlay
+        assert "[ACTION]" in decision.prompt_overlay
+        assert "[OUTCOME]" in decision.prompt_overlay
+        assert "[SCENARIO]" not in decision.prompt_overlay
 
     # ----------------------------------------------------------------
     # Section-content quality validation
@@ -1354,3 +1357,37 @@ class TestStructureLock:
         )
         result = core.should_regenerate_after_validation(text, decision)
         assert result is True
+
+    def test_section_name_in_body_does_not_satisfy_header_check(self, core):
+        """A section name mentioned inside a body paragraph must not count as a header."""
+        decision = self._decision_at_level(core, 3)
+        # [person] appears mid-sentence, not at a line start — must not satisfy check
+        text = (
+            "We can refer to [person] and [action] and [outcome] in our analysis\n"
+            "but without actual section headers the format is invalid."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STRUCTURE_LOCK" in reason
+
+    def test_action_verb_third_person_singular_passes(self, core):
+        """[ACTION] with a 3rd-person singular verb form (-s) must be accepted."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nDr Lee, a surgeon\n\n"
+            "[ACTION]\nShe administers the anaesthetic before the operation\n\n"
+            "[OUTCOME]\nThe patient loses consciousness within 60 seconds"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
+
+    def test_action_verb_progressive_form_passes(self, core):
+        """[ACTION] with a progressive verb form (-ing) must be accepted."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nDr Lee, a surgeon\n\n"
+            "[ACTION]\nShe is administering the anaesthetic to the patient\n\n"
+            "[OUTCOME]\nThe patient becomes sedated within 60 seconds"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
