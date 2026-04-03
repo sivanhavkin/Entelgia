@@ -65,6 +65,22 @@ COMPLIANCE_CONFIDENCE_THRESHOLD: float = 0.70
 #: score at 0.50, and callers may apply an additional non-compliance penalty.
 STRONG_LOOP_CONFIDENCE_THRESHOLD: float = 0.80
 
+#: Valid values for :attr:`LoopCheckResult.reasoning_delta`.
+_VALID_REASONING_DELTAS: frozenset = frozenset({"none", "weak", "moderate", "strong"})
+
+#: Valid values for :attr:`LoopCheckResult.new_move_type`.
+_VALID_NEW_MOVE_TYPES: frozenset = frozenset(
+    {
+        "none",
+        "example_only",
+        "new_distinction",
+        "new_variable",
+        "reframe",
+        "resolution_attempt",
+        "counterexample",
+    }
+)
+
 # ---------------------------------------------------------------------------
 # Result dataclasses
 # ---------------------------------------------------------------------------
@@ -383,16 +399,6 @@ def _safe_parse_loop(raw: str, speaker: str) -> LoopCheckResult:
     conservatively leaves ``is_loop=False`` so uncertain LLM output never
     triggers a false-positive loop intervention.
     """
-    _VALID_REASONING_DELTAS = {"none", "weak", "moderate", "strong"}
-    _VALID_NEW_MOVE_TYPES = {
-        "none",
-        "example_only",
-        "new_distinction",
-        "new_variable",
-        "reframe",
-        "resolution_attempt",
-        "counterexample",
-    }
     try:
         cleaned = re.sub(r"^```[a-z]*\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
         data = json.loads(cleaned)
@@ -774,7 +780,7 @@ def apply_loop_to_progress(
         progress_score *= 0.70
         if loop_result.confidence >= STRONG_LOOP_CONFIDENCE_THRESHOLD:
             progress_score = min(progress_score, 0.50)
-        if getattr(loop_result, "reasoning_delta", "none") in ("none", "weak"):
+        if getattr(loop_result, "reasoning_delta", None) in ("none", "weak"):
             progress_score = min(progress_score, 0.40)
 
     return float(max(0.0, min(1.0, progress_score)))
