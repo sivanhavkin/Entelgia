@@ -8713,6 +8713,16 @@ class MainScript:
                     "abstraction_detected": False,
                     "energy": float(speaker.energy_level),
                     "status": str(speaker._last_fatigue_state or "active"),
+                    "reasoning_delta": (
+                        _loop_result.reasoning_delta
+                        if "_loop_result" in dir()
+                        else None
+                    ),
+                    "new_move_type": (
+                        _loop_result.new_move_type
+                        if "_loop_result" in dir()
+                        else None
+                    ),
                 }
                 try:
                     _cortex_decision = self._integration_core.evaluate_turn(

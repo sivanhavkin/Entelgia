@@ -1868,7 +1868,7 @@ def test_loop_no_recent_texts_delta_is_none():
     assert result.new_move_type is None
 
 
-def test_loop_invalid_reasoning_delta_normalised_to_none():
+def test_loop_invalid_reasoning_delta_normalised_to_string_none():
     """Unrecognised reasoning_delta value from LLM is normalised to 'none'."""
     llm = _ReturnLLM(
         {

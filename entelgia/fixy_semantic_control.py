@@ -402,15 +402,27 @@ def _safe_parse_loop(raw: str, speaker: str) -> LoopCheckResult:
     try:
         cleaned = re.sub(r"^```[a-z]*\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
         data = json.loads(cleaned)
-        raw_delta = str(data.get("reasoning_delta", "none")).lower()
-        raw_move = str(data.get("new_move_type", "none")).lower()
+        delta_value = data.get("reasoning_delta")
+        if delta_value is None:
+            reasoning_delta = None
+        else:
+            raw_delta = str(delta_value).lower()
+            reasoning_delta = raw_delta if raw_delta in _VALID_REASONING_DELTAS else "none"
+
+        move_value = data.get("new_move_type")
+        if move_value is None:
+            new_move_type = None
+        else:
+            raw_move = str(move_value).lower()
+            new_move_type = raw_move if raw_move in _VALID_NEW_MOVE_TYPES else "none"
+
         return LoopCheckResult(
             speaker=speaker,
             is_loop=bool(data.get("is_loop", False)),
             confidence=float(data.get("confidence", 0.5)),
             reason=str(data.get("reason", "unknown")),
-            reasoning_delta=raw_delta if raw_delta in _VALID_REASONING_DELTAS else "none",
-            new_move_type=raw_move if raw_move in _VALID_NEW_MOVE_TYPES else "none",
+            reasoning_delta=reasoning_delta,
+            new_move_type=new_move_type,
         )
     except Exception:
         logger.debug(
