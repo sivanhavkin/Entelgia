@@ -598,9 +598,28 @@ class TestValidateGeneratedOutput:
         signals = {**_nominal_signals(), **overrides}
         return core.pre_generation_decision("Socrates", signals)
 
-    def test_normal_mode_is_always_compliant(self, core):
+    def test_normal_mode_is_compliant_for_clean_text(self, core):
         decision = core.pre_generation_decision("Socrates", _nominal_signals())
         compliant, _ = core.validate_generated_output("Any text at all.", decision)
+        assert compliant is True
+
+    def test_normal_mode_fails_quality_gate_on_banned_patterns(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        # Two or more banned rhetorical scaffolding patterns → non-compliant
+        text = (
+            "We must consider the implications carefully. "
+            "One might argue that underlying assumptions are at play here. "
+            "It is worth noting that further analysis is needed."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "QUALITY_GATE" in reason
+
+    def test_normal_mode_single_banned_pattern_still_compliant(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        # Only one banned pattern → threshold not reached, still compliant
+        text = "One might argue that this is a philosophical question."
+        compliant, _ = core.validate_generated_output(text, decision)
         assert compliant is True
 
     # CONCRETE_OVERRIDE ───────────────────────────────────────────────────────
@@ -703,9 +722,26 @@ class TestValidateGeneratedOutput:
 
 
 class TestShouldRegenerateAfterValidation:
-    def test_normal_mode_never_triggers_regen(self, core):
+    def test_normal_mode_clean_text_never_triggers_regen(self, core):
         decision = core.pre_generation_decision("Socrates", _nominal_signals())
         result = core.should_regenerate_after_validation("Any text.", decision)
+        assert result is False
+
+    def test_normal_mode_triggers_regen_on_banned_patterns(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        # Two or more banned rhetorical scaffolding patterns → regen
+        text = (
+            "We must consider the implications carefully. "
+            "One might argue that underlying assumptions are at play here. "
+            "It is worth noting that further analysis is needed."
+        )
+        result = core.should_regenerate_after_validation(text, decision)
+        assert result is True
+
+    def test_normal_mode_short_text_never_triggers_regen(self, core):
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        # Below _QUALITY_GATE_MIN_WORDS → bypass quality gate
+        result = core.should_regenerate_after_validation("Too short.", decision)
         assert result is False
 
     def test_compliant_output_does_not_trigger_regen(self, core):
@@ -754,6 +790,23 @@ class TestBuildStrongerOverlay:
             phrase in stronger.upper()
             for phrase in ("REGENERATION", "STRICT", "MANDATORY", "PREVIOUS")
         )
+
+    def test_normal_mode_with_advisory_overlay_includes_quality_gate(self, core):
+        """NORMAL mode with a non-empty advisory overlay must also include quality-gate instructions."""
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        # Patch in an advisory overlay (simulates pressure-misalignment guidance)
+        from dataclasses import replace
+        decision_with_advisory = replace(decision, prompt_overlay="Advisory: stay on topic.")
+        stronger = core.build_stronger_overlay(decision_with_advisory)
+        assert "Advisory: stay on topic." in stronger
+        assert "FORBIDDEN" in stronger or "banned" in stronger.lower() or "scaffolding" in stronger.lower()
+
+    def test_normal_mode_empty_overlay_uses_quality_gate(self, core):
+        """NORMAL mode with no overlay falls back entirely to quality-gate overlay."""
+        decision = core.pre_generation_decision("Socrates", _nominal_signals())
+        assert decision.prompt_overlay == ""
+        stronger = core.build_stronger_overlay(decision)
+        assert "scaffolding" in stronger.lower() or "banned" in stronger.lower()
 
 
 # ---------------------------------------------------------------------------

@@ -1278,10 +1278,13 @@ class IntegrationCore:
         """Return True when the generated output ignored the active mode or failed the quality gate.
 
         Calls :meth:`validate_generated_output` and logs the result under
-        ``[POST-GEN-VALIDATION]``.  For non-NORMAL modes with no escalation
-        (and text short enough to skip the quality gate), returns ``False``
-        immediately.  For NORMAL mode, the quality gate is still applied so
-        that banned rhetorical scaffolding triggers regeneration — restoring
+        ``[POST-GEN-VALIDATION]``.  Returns ``False`` immediately only when
+        the active mode is ``NORMAL``, the escalation level is below
+        ``_STRUCTURE_LOCK_LEVEL``, and the generated text is too short to
+        reach the quality gate.  Other modes continue through validation so
+        that their active-mode constraints can still be enforced, while
+        NORMAL mode still uses the quality gate for long enough outputs so
+        banned rhetorical scaffolding can trigger regeneration — restoring
         the original Fixy check-and-regenerate behaviour.
 
         Also checks for pseudo-compliance in CONCRETE_OVERRIDE and
@@ -1343,10 +1346,21 @@ class IntegrationCore:
         str
             Stronger imperative directive block.
         """
-        base_overlay = decision.prompt_overlay
-        if not base_overlay:
-            # NORMAL mode quality-gate failure: use the quality-gate overlay
-            # so the regeneration prompt gives the agent clear instructions.
+        base_overlay = decision.prompt_overlay or ""
+
+        # NORMAL-mode regeneration can arrive with a non-empty advisory
+        # overlay (for example, pressure-misalignment guidance) that is
+        # unrelated to the quality gate. In that case we must still include
+        # the explicit quality-gate instructions so the second-pass prompt
+        # forbids banned scaffolding patterns.
+        if decision.active_mode == IntegrationMode.NORMAL:
+            if _OVERLAY_QUALITY_GATE not in base_overlay:
+                base_overlay = (
+                    f"{base_overlay}\n\n{_OVERLAY_QUALITY_GATE}"
+                    if base_overlay
+                    else _OVERLAY_QUALITY_GATE
+                )
+        elif not base_overlay:
             base_overlay = _OVERLAY_QUALITY_GATE
         return _STRONGER_OVERLAY_PREFIX + base_overlay
 

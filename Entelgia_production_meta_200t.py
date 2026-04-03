@@ -5852,7 +5852,7 @@ class Agent:
             ]
             logger.info(
                 "[QUALITY-GATE] agent=%s draft has generic patterns (hits=%r) — "
-                "IntegrationCore post-gen validation will trigger regeneration",
+                "IntegrationCore post-gen validation may trigger regeneration when enhanced",
                 self.name,
                 _gate_hits[:3],
             )
