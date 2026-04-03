@@ -1,0 +1,6 @@
+{
+  "version": "1.0",
+  "description": "Integration memory store for IntegrationCore. Persists past control decisions and agent state snapshots so that IntegrationCore can surface relevant historical context when building prompt overlays.",
+  "max_entries": 500,
+  "entries": []
+}

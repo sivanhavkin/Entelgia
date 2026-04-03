@@ -59,6 +59,16 @@ A later ``SupervisorNet`` can score :class:`IntegrationState` before the
 symbolic rule engine runs.  The hook is a no-op stub right now:
 ``IntegrationCore._supervisor_score(state) -> Optional[float]``
 
+Memory integration
+------------------
+An optional :class:`~entelgia.integration_memory_store.IntegrationMemoryStore`
+can be attached via :meth:`IntegrationCore.attach_memory_store`.  Once wired:
+
+* :meth:`get_memory_context` retrieves a formatted text block of recent
+  decisions for the given agent that can be appended to any prompt overlay.
+* :meth:`record_decision` persists the current turn's decision and state
+  to the JSON-backed store so that future turns can read them back.
+
 Logging tags
 ------------
 [INTEGRATION-STATE]         — normalised input signals (post-generation)
@@ -73,6 +83,8 @@ Logging tags
 [PRE-GEN-DECISION]          — ControlDecision produced before LLM call
 [PRE-GEN-OVERLAY]           — overlay text injected into current prompt
 [POST-GEN-VALIDATION]       — compliance check on generated output
+[INTEGRATION-MEMORY-CONTEXT] — memory context retrieved for agent
+[INTEGRATION-MEMORY-RECORD]  — decision recorded to memory store
 """
 
 from __future__ import annotations
@@ -82,7 +94,10 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+
+if TYPE_CHECKING:  # pragma: no cover
+    from entelgia.integration_memory_store import IntegrationMemoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -882,6 +897,8 @@ class IntegrationCore:
         self._supervisor: Optional[Any] = None
         # Rolling history of reasoning hashes for same-reasoning detection
         self._reasoning_hash_history: List[str] = []
+        # Optional JSON-backed memory store (wired via attach_memory_store)
+        self._memory_store: Optional[IntegrationMemoryStore] = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -1498,6 +1515,105 @@ class IntegrationCore:
                 repeat_count,
             )
         return repeated
+
+    def attach_memory_store(self, store: "IntegrationMemoryStore") -> None:
+        """Wire a :class:`~entelgia.integration_memory_store.IntegrationMemoryStore`
+        to this core so that :meth:`get_memory_context` and
+        :meth:`record_decision` become operational.
+
+        Parameters
+        ----------
+        store:
+            An initialised ``IntegrationMemoryStore`` instance.  Pass ``None``
+            to detach an existing store.
+        """
+        self._memory_store = store
+        logger.info(
+            "[INTEGRATION-MEMORY] memory store %s",
+            "attached" if store is not None else "detached",
+        )
+
+    def get_memory_context(
+        self,
+        agent_name: str,
+        tags: Optional[List[str]] = None,
+        limit: int = 3,
+    ) -> str:
+        """Return a formatted text block of recent memory entries for *agent_name*.
+
+        Retrieves up to *limit* entries from the attached memory store and
+        formats them as a compact context block suitable for appending to a
+        prompt overlay.  Returns an empty string when no store is attached or
+        no matching entries exist.
+
+        Parameters
+        ----------
+        agent_name:
+            Name of the agent whose history to retrieve.
+        tags:
+            Optional list of tag strings used to narrow the query to
+            semantically relevant entries (e.g. ``["loop", "stagnation"]``).
+            When ``None`` the most-recent entries regardless of tag are used.
+        limit:
+            Maximum number of entries to include in the context block.
+
+        Returns
+        -------
+        str
+            Multi-line context block prefixed with ``[MEMORY]`` lines, or an
+            empty string when no context is available.
+        """
+        if self._memory_store is None:
+            return ""
+        entries = self._memory_store.retrieve_relevant(
+            agent=agent_name, tags=tags, limit=limit
+        )
+        context = self._memory_store.format_context(entries)
+        logger.info(
+            "[INTEGRATION-MEMORY-CONTEXT] agent=%s entries=%d",
+            agent_name,
+            len(entries),
+        )
+        return context
+
+    def record_decision(
+        self,
+        agent_name: str,
+        decision: ControlDecision,
+        state: IntegrationState,
+        tags: Optional[List[str]] = None,
+    ) -> None:
+        """Persist the current turn's *decision* and *state* to the memory store.
+
+        A no-op when no memory store has been attached via
+        :meth:`attach_memory_store`.
+
+        Parameters
+        ----------
+        agent_name:
+            Name of the agent that just spoke.
+        decision:
+            The :class:`ControlDecision` produced for this turn.
+        state:
+            The :class:`IntegrationState` that produced the decision.
+        tags:
+            Optional list of tag strings to label this entry for later
+            retrieval (e.g. ``["loop"]``, ``["stagnation"]``).
+        """
+        if self._memory_store is None:
+            return
+        entry = self._memory_store.make_entry(
+            agent=agent_name,
+            decision=decision,
+            state=state,
+            tags=tags,
+        )
+        self._memory_store.store_entry(entry)
+        logger.info(
+            "[INTEGRATION-MEMORY-RECORD] agent=%s mode=%s",
+            agent_name,
+            getattr(decision, "active_mode", "NORMAL"),
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
