@@ -436,6 +436,8 @@ class ControlDecision:
     priority_level: int = _PRIORITY_DEFAULT
     active_mode: IntegrationMode = IntegrationMode.NORMAL
     escalation_level: int = EscalationLevel.NORMAL
+    is_loop: bool = False
+    reasoning_delta: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +538,45 @@ _STRONGER_OVERLAY_PREFIX: str = (
 _FAILURE_MEMORY_PREFIX: str = (
     "Previous attempts failed to comply with constraints. "
     "Do not repeat previous reasoning.\n"
+)
+
+# ---------------------------------------------------------------------------
+# Semantic loop rejection: immediate regen overlays
+# ---------------------------------------------------------------------------
+
+# Maximum number of within-turn loop-rejection regeneration attempts before
+# the fail-safe is triggered and the best-effort response is accepted.
+# Exposed as a public constant so callers can reference it without importing
+# a module-private name.
+MAX_LOOP_BREAK_ATTEMPTS: int = 2
+_MAX_LOOP_BREAK_ATTEMPTS: int = MAX_LOOP_BREAK_ATTEMPTS  # internal alias
+
+_OVERLAY_LOOP_BREAK: str = (
+    "SEMANTIC LOOP REJECTED. Your previous response repeated the same reasoning "
+    "without introducing genuinely new content. You MUST: "
+    "(1) choose a different conceptual angle, "
+    "(2) introduce a concrete real-world case or counterexample that was not mentioned before, "
+    "(3) make one definitive claim you have not made in this dialogue. "
+    "Do NOT rephrase or restate your previous point."
+)
+
+_OVERLAY_LOOP_BREAK_HARD: str = (
+    "CRITICAL: SEMANTIC LOOP DETECTED A SECOND TIME. "
+    "Both of your previous responses failed to introduce new reasoning. "
+    "MANDATORY: Start from a completely different premise. "
+    "State ONE concrete fact, name ONE specific real-world example with a person, "
+    "place, and date. Make ONE claim you have not made in this dialogue. "
+    "Do NOT reference your previous responses."
+)
+
+_OVERLAY_LOOP_FAILSAFE: str = (
+    "ESCALATION: REPEATED SEMANTIC LOOP DETECTED AFTER MULTIPLE REJECTIONS. "
+    "All previous attempts have failed to break the reasoning loop. "
+    "STRICT FORMAT ACTIVATED.\n\n"
+    "[PERSON] — name a specific person.\n"
+    "[ACTION] — one concrete action they took.\n"
+    "[OUTCOME] — the direct observable result.\n\n"
+    "No abstract reasoning. No philosophy. One concrete case only."
 )
 
 # ---------------------------------------------------------------------------
@@ -1478,6 +1519,82 @@ class IntegrationCore:
             )
         return overlay
 
+    def check_loop_rejection(
+        self,
+        is_loop: bool,
+        reasoning_delta: Optional[str],
+        move_type: Optional[str] = None,
+    ) -> "Tuple[bool, str]":
+        """Return ``(should_reject, reason)`` when a semantic loop invalidates a response.
+
+        A response must be rejected when **both** of the following are true:
+
+        * ``is_loop`` is ``True`` — the response is semantically too similar to
+          recent dialogue history.
+        * ``reasoning_delta`` is ``"none"`` or ``"weak"`` — no genuinely new
+          reasoning was introduced.  A ``"moderate"`` or ``"strong"`` delta
+          indicates that, despite surface similarity, the response contributes
+          new content and should be accepted.
+
+        This check is independent of mode-based validation and represents the
+        third mandatory gate: a response is valid only when structure is valid,
+        content is valid, **and** it is not a semantic loop.
+
+        Parameters
+        ----------
+        is_loop:
+            Whether the response was identified as a semantic loop by the
+            semantic controller.
+        reasoning_delta:
+            Degree of new reasoning introduced: ``"none"``, ``"weak"``,
+            ``"moderate"``, or ``"strong"``.  ``None`` is treated as unknown
+            (no rejection triggered).
+        move_type:
+            Optional move-type label for logging context (e.g. ``"example_only"``).
+
+        Returns
+        -------
+        (should_reject, reason)
+            *should_reject* is ``True`` when the response must be discarded
+            and regenerated.  *reason* is a short human-readable explanation.
+        """
+        if is_loop and reasoning_delta in ("none", "weak"):
+            logger.warning(
+                "[INTEGRATION-LOOP-REJECT] reason='semantic loop detected'"
+                " delta=%s move_type=%s",
+                reasoning_delta,
+                move_type,
+            )
+            return True, "SEMANTIC LOOP: no new reasoning"
+        return False, ""
+
+    def build_loop_break_overlay(self, regen_attempt: int = 0) -> str:
+        """Return a loop-breaking overlay for immediate loop-rejection regeneration.
+
+        Selects an increasingly strict overlay directive based on how many
+        loop-rejection regeneration attempts have already been made within the
+        current turn.  On the first attempt a firm but targeted directive is
+        used; on the second attempt a critical escalation; on subsequent
+        attempts the fail-safe structured format (equivalent to
+        :data:`_OVERLAY_LOOP_FAILSAFE`) is returned.
+
+        Parameters
+        ----------
+        regen_attempt:
+            Zero-based index of the current regen attempt (0 = first regen,
+            1 = second regen, 2+ = fail-safe).
+
+        Returns
+        -------
+        str
+            Imperative overlay text to inject into the regeneration prompt.
+        """
+        if regen_attempt >= _MAX_LOOP_BREAK_ATTEMPTS:
+            return _OVERLAY_LOOP_FAILSAFE
+        if regen_attempt == 1:
+            return _OVERLAY_LOOP_BREAK_HARD
+        return _OVERLAY_LOOP_BREAK
+
     def record_response_hash(self, text: str) -> bool:
         """Record the reasoning hash of *text* and return True when a repeated
         reasoning structure is detected.
@@ -1788,6 +1905,8 @@ class IntegrationCore:
             priority_level=_PRIORITY_LOOP,
             active_mode=IntegrationMode.CONCRETE_OVERRIDE,
             escalation_level=esc_level,
+            is_loop=state.is_loop,
+            reasoning_delta=state.reasoning_delta,
         )
 
     @staticmethod
