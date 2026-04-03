@@ -110,6 +110,14 @@ _ESCALATION_LOOP_COUNT_LEVEL4: int = 4
 _ESCALATION_PERSONALITY_SUPPRESS_LEVEL: int = 3
 _MAX_REGENERATION_ATTEMPTS: int = 3
 
+# Structure lock: activates when escalation_level >= this threshold.
+# At this point text-based instructions alone are insufficient; the response
+# format is enforced structurally by validating that all required section
+# headers are present in the output.
+_STRUCTURE_LOCK_LEVEL: int = 3
+# Required section headers (lowercased for case-insensitive matching)
+_STRUCTURE_LOCK_SECTIONS: tuple = ("[person]", "[action]", "[outcome]")
+
 # Pseudo-compliance detection: similarity threshold for reasoning hash comparison
 _REASONING_HASH_SIMILARITY_THRESHOLD: int = 2  # max allowed same hashes in history
 # Number of content words used when building the reasoning skeleton hash
@@ -331,8 +339,8 @@ _OVERLAY_ESCALATION_2: str = (
 
 _OVERLAY_ESCALATION_3: str = (
     "STRICT FORMAT REQUIRED:\n\n"
-    "[SCENARIO]\n"
-    "A specific person in a real situation\n\n"
+    "[PERSON]\n"
+    "A specific real person in a concrete situation\n\n"
     "[ACTION]\n"
     "What they actually do\n\n"
     "[OUTCOME]\n"
@@ -893,6 +901,13 @@ class IntegrationCore:
         * ``FIXY_AUTHORITY_OVERRIDE`` / ``NORMAL`` — always pass (no
           additional detectable textual obligation).
 
+        **STRUCTURE_LOCK** (escalation_level >= :data:`_STRUCTURE_LOCK_LEVEL`):
+          Applied regardless of active mode.  When engaged, every required
+          section header listed in :data:`_STRUCTURE_LOCK_SECTIONS` must be
+          present in the output.  This structural check is evaluated *before*
+          the mode-based check so that pseudo-compliant prose that ignores the
+          section format is rejected at the structural layer.
+
         Pseudo-compliance is checked for CONCRETE_OVERRIDE and
         PERSONALITY_SUPPRESSION modes: a response that contains a
         hypothetical trigger phrase but lacks a concrete person, action, and
@@ -918,6 +933,31 @@ class IntegrationCore:
             return True, "No active mode constraint."
 
         t = text.lower()
+
+        # -----------------------------------------------------------------
+        # STRUCTURE_LOCK — section-header enforcement (level >= 3)
+        # Checked before mode-specific validation so that responses that use
+        # abstract prose instead of the required format are caught here even
+        # when they happen to contain a concrete-signal phrase.
+        # -----------------------------------------------------------------
+        if decision.escalation_level >= _STRUCTURE_LOCK_LEVEL:
+            logger.info(
+                "[STRUCTURE-LOCK] active escalation_level=%d required_sections=%s",
+                decision.escalation_level,
+                _STRUCTURE_LOCK_SECTIONS,
+            )
+            missing = [s for s in _STRUCTURE_LOCK_SECTIONS if s not in t]
+            if missing:
+                return (
+                    False,
+                    f"STRUCTURE_LOCK violation: required section(s) missing: "
+                    f"{', '.join(s.upper() for s in missing)}. "
+                    "Response must use the exact section headers.",
+                )
+            # All required sections are present — the structured format itself
+            # constitutes compliance.  Skip mode-based checks which apply
+            # text-based heuristics that are superseded by structural enforcement.
+            return True, "STRUCTURE_LOCK satisfied: all required section headers present."
 
         if mode in (
             IntegrationMode.CONCRETE_OVERRIDE,
