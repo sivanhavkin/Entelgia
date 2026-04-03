@@ -1226,3 +1226,131 @@ class TestStructureLock:
         """Verify the Level-3 overlay now advertises the [PERSON] section."""
         decision = self._decision_at_level(core, 3)
         assert "[PERSON]" in decision.prompt_overlay
+
+    # ----------------------------------------------------------------
+    # Section-content quality validation
+    # ----------------------------------------------------------------
+
+    def test_person_section_with_generic_placeholder_fails(self, core):
+        """[PERSON] body containing 'a person' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\na person in a situation\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "content violation" in reason.lower() or "placeholder" in reason.lower()
+
+    def test_person_section_with_someone_placeholder_fails(self, core):
+        """[PERSON] body containing 'someone' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nSomeone from the hospital\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_person_section_with_an_individual_placeholder_fails(self, core):
+        """[PERSON] body containing 'an individual' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nAn individual working in healthcare\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_action_section_with_something_placeholder_fails(self, core):
+        """[ACTION] body containing 'something' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse at City Hospital\n\n"
+            "[ACTION]\nShe did something with the patients\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_action_section_with_some_action_placeholder_fails(self, core):
+        """[ACTION] body containing 'some action' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe performed some action\n\n"
+            "[OUTCOME]\nThe result followed"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_action_section_without_concrete_verb_fails(self, core):
+        """[ACTION] with no observable action verb is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nThe situation continued in the ward\n\n"
+            "[OUTCOME]\nThe ward fell silent"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "action verb" in reason.lower() or "ACTION" in reason
+
+    def test_outcome_section_with_abstract_reflection_fails(self, core):
+        """[OUTCOME] consisting of abstract reflection is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nThis reminds us of the importance of healthcare workers"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "abstract" in reason.lower() or "reflection" in reason.lower()
+
+    def test_outcome_section_with_raises_question_fails(self, core):
+        """[OUTCOME] with 'raises the question' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nThis raises the question of whether vaccines are always safe"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_outcome_section_with_challenges_us_fails(self, core):
+        """[OUTCOME] with 'challenges us to' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nThis challenges us to rethink public health policy"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_all_sections_concrete_content_passes(self, core):
+        """Explicit positive: all sections have concrete, specific content."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nDr Sarah Chen, a paediatrician at St Mary's Hospital\n\n"
+            "[ACTION]\nShe prescribed a two-week course of antibiotics to a child with pneumonia\n\n"
+            "[OUTCOME]\nThe child's fever broke within 48 hours and she was discharged"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
+
+    def test_content_validation_triggers_regen_on_generic_placeholder(self, core):
+        """should_regenerate_after_validation returns True for generic-placeholder content."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nSomeone\n\n"
+            "[ACTION]\nDid something\n\n"
+            "[OUTCOME]\nSomething happened"
+        )
+        result = core.should_regenerate_after_validation(text, decision)
+        assert result is True
