@@ -9247,7 +9247,9 @@ def select_session_turns() -> int:
     """Interactive startup selector for number of dialogue turns.
 
     Presents a numbered list of turn-count options.  Pressing Enter without
-    a choice selects the default (15 turns).  Returns the chosen turn count.
+    a choice selects the default (15 turns).  Invalid input is rejected and
+    the prompt is repeated until a valid selection is made.  Returns the
+    chosen turn count.
     """
     print()
     print(Fore.CYAN + "Select number of turns for this session:" + Style.RESET_ALL)
