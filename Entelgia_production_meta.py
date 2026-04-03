@@ -9243,6 +9243,50 @@ _SESSION_TURN_OPTIONS: tuple[int, ...] = (5, 15, 25, 50, 75, 100)
 _SESSION_TURN_DEFAULT: int = 15
 
 
+def _pick_numbered_option(
+    title: str,
+    options: list[int],
+    default: int,
+    item_label: str,
+) -> int:
+    """Prompt the user to select one value from a numbered list.
+
+    Pressing Enter selects *default*. Invalid input is rejected and the
+    prompt is repeated until a valid selection is made.
+    """
+    print()
+    print(Fore.CYAN + title + Style.RESET_ALL)
+    for i, value in enumerate(options, 1):
+        marker = " (default)" if value == default else ""
+        print(f"  [{i}] {value} {item_label}{marker}")
+
+    while True:
+        sys.stdout.flush()
+        raw = input(
+            f"Enter choice [1-{len(options)}] (or press Enter for {default}): "
+        ).strip()
+        if raw == "":
+            print(
+                Fore.GREEN
+                + f"  Using default: {default} {item_label}"
+                + Style.RESET_ALL
+            )
+            return default
+        try:
+            choice = int(raw)
+            if 1 <= choice <= len(options):
+                selected = options[choice - 1]
+                print(Fore.GREEN + f"  Selected: {selected} {item_label}" + Style.RESET_ALL)
+                return selected
+        except ValueError:
+            pass
+        print(
+            Fore.YELLOW
+            + f"  [WARN] '{raw}' is not a valid choice. Enter a number between 1 and {len(options)}, or press Enter for the default."
+            + Style.RESET_ALL
+        )
+
+
 def select_session_turns() -> int:
     """Interactive startup selector for number of dialogue turns.
 
@@ -9251,37 +9295,12 @@ def select_session_turns() -> int:
     the prompt is repeated until a valid selection is made.  Returns the
     chosen turn count.
     """
-    print()
-    print(Fore.CYAN + "Select number of turns for this session:" + Style.RESET_ALL)
-    for i, n in enumerate(_SESSION_TURN_OPTIONS, 1):
-        marker = " (default)" if n == _SESSION_TURN_DEFAULT else ""
-        print(f"  [{i}] {n} turns{marker}")
-
-    while True:
-        sys.stdout.flush()
-        raw = input(
-            f"Enter choice [1-{len(_SESSION_TURN_OPTIONS)}] (or press Enter for {_SESSION_TURN_DEFAULT}): "
-        ).strip()
-        if raw == "":
-            print(
-                Fore.GREEN
-                + f"  Using default: {_SESSION_TURN_DEFAULT} turns"
-                + Style.RESET_ALL
-            )
-            return _SESSION_TURN_DEFAULT
-        try:
-            choice = int(raw)
-            if 1 <= choice <= len(_SESSION_TURN_OPTIONS):
-                selected = _SESSION_TURN_OPTIONS[choice - 1]
-                print(Fore.GREEN + f"  Selected: {selected} turns" + Style.RESET_ALL)
-                return selected
-        except ValueError:
-            pass
-        print(
-            Fore.YELLOW
-            + f"  [WARN] '{raw}' is not a valid choice. Enter a number between 1 and {len(_SESSION_TURN_OPTIONS)}, or press Enter for the default."
-            + Style.RESET_ALL
-        )
+    return _pick_numbered_option(
+        "Select number of turns for this session:",
+        list(_SESSION_TURN_OPTIONS),
+        _SESSION_TURN_DEFAULT,
+        "turns",
+    )
 
 
 def select_llm_backend_and_models(cfg: "Config") -> None:
