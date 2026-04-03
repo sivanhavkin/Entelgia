@@ -7993,11 +7993,12 @@ class MainScript:
             # routed to Fixy.
             _pre_gen_decision = None
             _pre_gen_agent = None
-            # Within-turn loop-rejection regen counter and cached loop result.
+            # Within-turn loop-rejection regen counter.
             # _loop_regen_count tracks how many times a response has been
-            # discarded due to semantic loop detection in the PRE-ACCEPT block;
-            # _pre_accept_loop_result carries the loop check output so the
-            # later semantic validation block can reuse it.
+            # discarded due to semantic loop detection in the PRE-ACCEPT block.
+            # _pre_accept_loop_result caches the final loop-check result from
+            # PRE-ACCEPT so the post-dialog.append semantic validation block
+            # can reuse it without making a duplicate LLM call.
             _loop_regen_count: int = 0
             _pre_accept_loop_result = None
             if self._loop_detector is not None:
@@ -8478,6 +8479,10 @@ class MainScript:
                         for t in self.dialog
                         if t.get("role") == speaker.name and t.get("text", "").strip()
                     ][-3:]  # last 3 prior turns from this speaker; out not yet in dialog
+                    # Accumulate rejected attempts so the re-evaluation
+                    # loop can compare each regen against ALL prior
+                    # attempts within this turn, not just the dialog history.
+                    _pa_rejected_texts: list = []
 
                     _, _pa_loop = self.semantic_controller.evaluate_reply(
                         speaker=speaker.name,
@@ -8500,9 +8505,10 @@ class MainScript:
                     _pre_accept_loop_result = _pa_loop
 
                     # Regen loop: up to _IC_MAX_LOOP_BREAK attempts (0-based counter).
-                    # Each iteration: check → reject → increment → regen → re-check.
+                    # Each iteration: check -> reject -> increment -> regen -> re-check.
                     # The loop exits early on non-rejection; the fail-safe fires when
-                    # _loop_regen_count reaches _IC_MAX_LOOP_BREAK after the last regen.
+                    # _loop_regen_count reaches _IC_MAX_LOOP_BREAK after the last regen
+                    # AND the final output is still a loop.
                     while _loop_regen_count < _IC_MAX_LOOP_BREAK:
                         _pa_reject, _pa_reason = (
                             self._integration_core.check_loop_rejection(
@@ -8514,15 +8520,27 @@ class MainScript:
                         if not _pa_reject:
                             break
 
-                        # Loop rejection: escalate and regenerate.
+                        # Loop rejection: record the rejected response so
+                        # subsequent re-evaluations can detect if the model
+                        # repeats it verbatim or near-verbatim.
+                        _pa_rejected_texts.append(out)
+
                         _loop_regen_count += 1
+                        # Ensure the final allowed regen uses the fail-safe
+                        # overlay tier (attempt >= 2) instead of the standard
+                        # overlay, since the previous attempt already failed.
+                        _loop_overlay_attempt = (
+                            _IC_MAX_LOOP_BREAK
+                            if _loop_regen_count >= _IC_MAX_LOOP_BREAK
+                            else _loop_regen_count - 1
+                        )
                         _loop_break_overlay = (
                             self._integration_core.build_loop_break_overlay(
-                                _loop_regen_count - 1
+                                _loop_overlay_attempt
                             )
                         )
                         # On the final allowed attempt, truncate the dialogue
-                        # context to the last 4 turns (≈ 2 exchanges) to break
+                        # context to the last 4 turns (~2 exchanges) to break
                         # the attractor without discarding all recent context.
                         _pa_dialog = (
                             self.dialog[-4:]
@@ -8553,7 +8571,9 @@ class MainScript:
                             )
                         out = _pre_gen_agent.speak(_loop_regen_seed, _pa_dialog)
 
-                        # Re-evaluate the regenerated response.
+                        # Re-evaluate the regenerated response, extending
+                        # recent_texts with rejected attempts so the model
+                        # cannot evade detection by repeating a prior draft.
                         _, _pa_loop = self.semantic_controller.evaluate_reply(
                             speaker=speaker.name,
                             text=out,
@@ -8562,7 +8582,7 @@ class MainScript:
                                 if self.interactive_fixy is not None
                                 else None
                             ),
-                            recent_texts=_pa_recent_texts,
+                            recent_texts=_pa_recent_texts + _pa_rejected_texts,
                             stagnation=speaker._last_stagnation,
                             repeated_moves=bool(_active_loop_modes),
                             ignored_recently=(
@@ -8574,14 +8594,32 @@ class MainScript:
                         )
                         _pre_accept_loop_result = _pa_loop
 
+                    # Only emit the fail-safe warning when the budget is
+                    # exhausted AND the final regenerated output is still a
+                    # loop -- if the last regen actually broke the loop the
+                    # response is accepted silently.
                     if _loop_regen_count >= _IC_MAX_LOOP_BREAK:
-                        # All loop-break attempts exhausted — accept best-effort.
-                        logger.warning(
-                            "[INTEGRATION-LOOP-FAILSAFE] repeated loop after %d"
-                            " regen(s) for agent=%s — accepting best-effort response",
-                            _loop_regen_count,
-                            speaker.name,
+                        _final_reject, _ = (
+                            self._integration_core.check_loop_rejection(
+                                _pa_loop.is_loop,
+                                getattr(_pa_loop, "reasoning_delta", None),
+                                getattr(_pa_loop, "new_move_type", None),
+                            )
                         )
+                        if _final_reject:
+                            logger.warning(
+                                "[INTEGRATION-LOOP-FAILSAFE] repeated loop after %d"
+                                " regen(s) for agent=%s -- accepting best-effort response",
+                                _loop_regen_count,
+                                speaker.name,
+                            )
+                        else:
+                            logger.info(
+                                "[INTEGRATION-LOOP-BREAK] loop resolved by final"
+                                " regen for agent=%s after %d attempt(s)",
+                                speaker.name,
+                                _loop_regen_count,
+                            )
                 except Exception:
                     logger.warning(
                         "[PRE-ACCEPT-LOOP] loop rejection check raised exception"
@@ -8618,12 +8656,23 @@ class MainScript:
                     -4:-1
                 ]  # up to 3 prior turns from this speaker; [-1] is the current turn
                 try:
+                    # When the PRE-ACCEPT block already computed a loop result
+                    # for the final accepted *out*, pass recent_texts=[] so the
+                    # loop-check LLM call inside evaluate_reply is skipped (the
+                    # loop gate is already satisfied).  The returned _loop_result
+                    # is then replaced with the PRE-ACCEPT result which evaluated
+                    # the same response (and any rejected attempts) more carefully.
+                    _post_gen_recent_texts = (
+                        []
+                        if _pre_accept_loop_result is not None
+                        else _recent_same_speaker_texts
+                    )
                     _validation_result, _loop_result = (
                         self.semantic_controller.evaluate_reply(
                             speaker=speaker.name,
                             text=out,
                             fixy_guidance=_current_fixy_guidance,
-                            recent_texts=_recent_same_speaker_texts,
+                            recent_texts=_post_gen_recent_texts,
                             stagnation=speaker._last_stagnation,
                             repeated_moves=bool(_active_loop_modes),
                             ignored_recently=(
@@ -8634,6 +8683,11 @@ class MainScript:
                             unresolved_rising=(speaker.open_questions >= 2),
                         )
                     )
+                    # Override the loop result with the PRE-ACCEPT result when
+                    # available: it reflects the final accepted response and
+                    # includes any rejected attempts in its comparison window.
+                    if _pre_accept_loop_result is not None:
+                        _loop_result = _pre_accept_loop_result
                     if self.cfg.show_meta:
                         _deferred_fixy_validation_str = (
                             f"[FIXY-VALIDATION] speaker={speaker.name}"
