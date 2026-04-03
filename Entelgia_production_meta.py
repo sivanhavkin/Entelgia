@@ -8472,7 +8472,7 @@ class MainScript:
                 and ENTELGIA_ENHANCED
             ):
                 try:
-                    from entelgia.integration_core import _MAX_LOOP_BREAK_ATTEMPTS as _IC_MAX_LOOP_BREAK
+                    from entelgia.integration_core import MAX_LOOP_BREAK_ATTEMPTS as _IC_MAX_LOOP_BREAK
                     _pa_recent_texts = [
                         t.get("text", "")
                         for t in self.dialog
@@ -8499,6 +8499,10 @@ class MainScript:
                     )
                     _pre_accept_loop_result = _pa_loop
 
+                    # Regen loop: up to _IC_MAX_LOOP_BREAK attempts (0-based counter).
+                    # Each iteration: check → reject → increment → regen → re-check.
+                    # The loop exits early on non-rejection; the fail-safe fires when
+                    # _loop_regen_count reaches _IC_MAX_LOOP_BREAK after the last regen.
                     while _loop_regen_count < _IC_MAX_LOOP_BREAK:
                         _pa_reject, _pa_reason = (
                             self._integration_core.check_loop_rejection(
@@ -8517,8 +8521,9 @@ class MainScript:
                                 _loop_regen_count - 1
                             )
                         )
-                        # Fail-safe after max attempts: truncate context to
-                        # break the attractor without a complete restart.
+                        # On the final allowed attempt, truncate the dialogue
+                        # context to the last 4 turns (≈ 2 exchanges) to break
+                        # the attractor without discarding all recent context.
                         _pa_dialog = (
                             self.dialog[-4:]
                             if _loop_regen_count >= _IC_MAX_LOOP_BREAK

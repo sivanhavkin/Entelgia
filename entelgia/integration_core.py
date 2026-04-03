@@ -546,7 +546,10 @@ _FAILURE_MEMORY_PREFIX: str = (
 
 # Maximum number of within-turn loop-rejection regeneration attempts before
 # the fail-safe is triggered and the best-effort response is accepted.
-_MAX_LOOP_BREAK_ATTEMPTS: int = 2
+# Exposed as a public constant so callers can reference it without importing
+# a module-private name.
+MAX_LOOP_BREAK_ATTEMPTS: int = 2
+_MAX_LOOP_BREAK_ATTEMPTS: int = MAX_LOOP_BREAK_ATTEMPTS  # internal alias
 
 _OVERLAY_LOOP_BREAK: str = (
     "SEMANTIC LOOP REJECTED. Your previous response repeated the same reasoning "

@@ -1499,7 +1499,7 @@ class TestCheckLoopRejection:
         reject, reason = core.check_loop_rejection(is_loop=False, reasoning_delta="weak")
         assert reject is False
 
-    def test_loop_with_none_delta_none_is_accepted(self, core):
+    def test_loop_with_null_delta_is_accepted(self, core):
         """reasoning_delta=None (unknown) → should_reject=False regardless of is_loop."""
         reject, reason = core.check_loop_rejection(is_loop=True, reasoning_delta=None)
         assert reject is False
