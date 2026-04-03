@@ -413,16 +413,16 @@ def test_load_corrupt_json_graceful():
 def test_auto_save_false_does_not_write():
     store, path = _temp_store(auto_save=False)
     try:
-        # Record the file mtime before storing
-        mtime_before = os.path.getmtime(path)
-
-        import time
-        time.sleep(0.05)  # ensure detectable mtime change
+        # Record the file contents before storing
+        with open(path, "rb") as fh:
+            contents_before = fh.read()
 
         store.store_entry(_sample_entry())
-        mtime_after = os.path.getmtime(path)
 
-        assert mtime_before == mtime_after, (
+        with open(path, "rb") as fh:
+            contents_after = fh.read()
+
+        assert contents_before == contents_after, (
             "File should NOT have been written when auto_save=False"
         )
     finally:

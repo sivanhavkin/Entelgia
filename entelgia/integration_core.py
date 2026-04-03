@@ -1516,7 +1516,7 @@ class IntegrationCore:
             )
         return repeated
 
-    def attach_memory_store(self, store: "IntegrationMemoryStore") -> None:
+    def attach_memory_store(self, store: "Optional[IntegrationMemoryStore]") -> None:
         """Wire a :class:`~entelgia.integration_memory_store.IntegrationMemoryStore`
         to this core so that :meth:`get_memory_context` and
         :meth:`record_decision` become operational.

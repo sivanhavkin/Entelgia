@@ -7543,9 +7543,16 @@ class MainScript:
             )
             # JSON-backed memory store: persists IntegrationCore decisions so
             # that future turns can retrieve historical context per agent.
+            # Use cfg.data_dir so the file lands in the same writable runtime
+            # directory as all other Entelgia data files.
             if self._integration_core is not None:
-                _mem_store = _IntegrationMemoryStore()
+                _mem_path = str(Path(cfg.data_dir) / "integration_memory.json")
+                _mem_store = _IntegrationMemoryStore(_mem_path)
                 self._integration_core.attach_memory_store(_mem_store)
+                # Also wire FixySemanticController so validation/loop results
+                # are persisted to the same store.
+                if self.semantic_controller is not None:
+                    self.semantic_controller.attach_memory_store(_mem_store)
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
@@ -8752,7 +8759,7 @@ class MainScript:
                         self._integration_core.record_decision(
                             speaker.name,
                             _cortex_decision,
-                            self._integration_core._build_state(
+                            self._integration_core.prepare_generation_state(
                                 speaker.name, _cortex_signals
                             ),
                         )

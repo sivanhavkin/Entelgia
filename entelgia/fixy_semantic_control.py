@@ -486,7 +486,7 @@ class FixySemanticController:
     # Memory store integration
     # ------------------------------------------------------------------
 
-    def attach_memory_store(self, store: "IntegrationMemoryStore") -> None:
+    def attach_memory_store(self, store: "Optional[IntegrationMemoryStore]") -> None:
         """Wire an :class:`~entelgia.integration_memory_store.IntegrationMemoryStore`
         so that validation and loop results are automatically persisted.
 

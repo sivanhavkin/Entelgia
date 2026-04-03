@@ -57,6 +57,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,26 @@ logger = logging.getLogger(__name__)
 # Defaults
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PATH: str = os.path.join(os.path.dirname(__file__), "integration_memory.json")
+
+def _default_memory_path() -> str:
+    """Return a writable path for the integration memory JSON file.
+
+    Resolution order (first match wins):
+    1. ``ENTELGIA_RUNTIME_DIR`` environment variable
+    2. ``XDG_STATE_HOME`` (Linux standard)
+    3. ``LOCALAPPDATA`` (Windows)
+    4. ``~/.entelgia`` (universal fallback)
+    """
+    candidates = [
+        os.getenv("ENTELGIA_RUNTIME_DIR"),
+        os.getenv("XDG_STATE_HOME") and str(Path(os.getenv("XDG_STATE_HOME")) / "entelgia"),
+        os.getenv("LOCALAPPDATA") and str(Path(os.getenv("LOCALAPPDATA")) / "entelgia"),
+        str(Path.home() / ".entelgia"),
+    ]
+    base = next(p for p in candidates if p)
+    return str(Path(base) / "integration_memory.json")
+
+
 _DEFAULT_MAX_ENTRIES: int = 500
 _CONTEXT_PREFIX: str = "[MEMORY]"
 
@@ -80,9 +100,11 @@ class IntegrationMemoryStore:
     Parameters
     ----------
     path:
-        Absolute or relative path to the JSON memory file.  Defaults to
-        ``entelgia/integration_memory.json`` (the seed file shipped with the
-        package).
+        Absolute or relative path to the JSON memory file.  Defaults to a
+        user-writable location resolved from the ``ENTELGIA_RUNTIME_DIR``,
+        ``XDG_STATE_HOME``, or ``LOCALAPPDATA`` environment variables, falling
+        back to ``~/.entelgia/integration_memory.json``.  The parent directory
+        is created automatically if it does not exist.
     auto_save:
         When ``True`` (default) the store writes back to disk after every
         :meth:`store_entry` call.  Set to ``False`` to batch-save manually
@@ -96,10 +118,10 @@ class IntegrationMemoryStore:
 
     def __init__(
         self,
-        path: str = _DEFAULT_PATH,
+        path: Optional[str] = None,
         auto_save: bool = True,
     ) -> None:
-        self._path = path
+        self._path = path if path is not None else _default_memory_path()
         self._auto_save = auto_save
         self._entries: List[Dict[str, Any]] = []
         self._max_entries: int = _DEFAULT_MAX_ENTRIES
@@ -158,6 +180,9 @@ class IntegrationMemoryStore:
             "entries": self._entries,
         }
         try:
+            parent_dir = os.path.dirname(self._path)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
             with open(self._path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
         except OSError as exc:
@@ -167,7 +192,7 @@ class IntegrationMemoryStore:
                 exc,
             )
             return
-        logger.info(
+        logger.debug(
             "[INTEGRATION-MEMORY-SAVE] saved %d entries to %s",
             len(self._entries),
             self._path,
@@ -198,7 +223,7 @@ class IntegrationMemoryStore:
             entry["timestamp"] = datetime.now(timezone.utc).isoformat()
 
         self._entries.append(entry)
-        logger.info(
+        logger.debug(
             "[INTEGRATION-MEMORY-STORE] id=%s agent=%s mode=%s",
             entry.get("id"),
             entry.get("agent"),
@@ -332,6 +357,9 @@ class IntegrationMemoryStore:
             agent = e.get("agent", "?")
             mode = e.get("active_mode", "NORMAL")
             reason = str(e.get("decision_reason", "")).strip()
+            # Normalize internal whitespace (newlines/tabs → single space) so
+            # the injected overlay always fits on a single line.
+            reason = " ".join(reason.split())
             # Truncate long reasons to keep the overlay compact
             if len(reason) > 120:
                 reason = reason[:117] + "..."
