@@ -110,6 +110,89 @@ _ESCALATION_LOOP_COUNT_LEVEL4: int = 4
 _ESCALATION_PERSONALITY_SUPPRESS_LEVEL: int = 3
 _MAX_REGENERATION_ATTEMPTS: int = 3
 
+# Structure lock: activates when escalation_level >= this threshold.
+# At this point text-based instructions alone are insufficient; the response
+# format is enforced structurally by validating that all required section
+# headers are present in the output AND that each section contains meaningful
+# concrete content.
+_STRUCTURE_LOCK_LEVEL: int = 3
+# Required section headers (lowercased for case-insensitive matching)
+_STRUCTURE_LOCK_SECTIONS: tuple = ("[person]", "[action]", "[outcome]")
+
+# Generic placeholder phrases that make any section body invalid.
+# Each entry is a regex fragment matched with word boundaries.
+_STRUCTURE_LOCK_GENERIC_PLACEHOLDERS: tuple = (
+    r"someone",
+    r"a\s+person",
+    r"an\s+individual",
+    r"something",
+    r"some\s+action",
+)
+
+# Concrete observable action verbs required in the [ACTION] body.
+# At least one must be present (past or present tense).
+# Past-tense forms (examples are typically narrated in past tense)
+_STRUCTURE_LOCK_ACTION_VERBS: tuple = (
+    # Medical / clinical
+    "administered", "prescribed", "diagnosed", "treated", "operated",
+    # Professional / administrative
+    "signed", "filed", "submitted", "registered", "issued", "approved",
+    "denied", "refused", "rejected", "accepted", "announced", "declared",
+    "promoted", "fired", "hired", "resigned", "dismissed", "convicted",
+    "arrested", "charged", "voted", "introduced", "passed", "acquired",
+    "banned", "reported", "requested",
+    # Communication
+    "called", "wrote", "published", "recorded",
+    # Construction / technical
+    "built", "installed", "removed", "replaced", "repaired", "fixed",
+    "assembled", "loaded", "printed", "scanned", "tested", "measured",
+    "deployed", "launched", "activated", "released", "executed", "implemented",
+    # Transport / movement
+    "drove", "walked", "ran", "arrived", "departed", "entered", "exited",
+    "returned", "visited", "moved", "transferred",
+    # Commerce / logistics
+    "sold", "bought", "sent", "received", "delivered", "completed",
+    # Manufacturing / production
+    "produced", "created", "conducted", "performed", "applied",
+    # Everyday / general observable
+    "gave", "took", "put", "placed", "ate", "drank", "read", "taught",
+    "edited", "deleted", "copied", "typed", "pressed", "clicked",
+    "started", "stopped", "closed", "chose", "selected", "decided",
+    # Present-tense forms (for responses narrated in present tense).
+    # Suffix pattern in matching covers -s/-es/-ing/-ed/-d inflections so each
+    # base stem here also matches third-person singular and progressive forms.
+    "decide", "choose", "take", "run", "drive", "walk", "produce",
+    "create", "publish", "fire", "hire", "operate", "deploy", "launch",
+    "install", "remove", "close", "complete", "deliver", "sell", "buy",
+    "transfer", "send", "receive", "conduct", "perform", "execute",
+    "apply", "announce", "report", "approve", "give", "treat", "diagnose",
+    "repair", "fix", "test", "measure", "record", "visit", "arrive",
+    "enter", "exit", "return",
+    # Medical base stems not covered by past-tense entries above
+    "administer", "prescribe",
+)
+
+# Phrases in [OUTCOME] that signal abstract reflection rather than an
+# observable consequence.  Any match causes content validation to fail.
+_STRUCTURE_LOCK_OUTCOME_ABSTRACT: tuple = (
+    "invites reflection",
+    "raises the question",
+    "challenges us to",
+    "makes us think",
+    "reminds us",
+    "highlights the importance",
+    "shows us that",
+    "demonstrates that",
+    "suggests that",
+    "implies that",
+    "serves as a reminder",
+    "calls into question",
+    "forces us to reconsider",
+    "opens up new questions",
+    "opens up new ways of thinking",
+    "this is a reminder",
+)
+
 # Pseudo-compliance detection: similarity threshold for reasoning hash comparison
 _REASONING_HASH_SIMILARITY_THRESHOLD: int = 2  # max allowed same hashes in history
 # Number of content words used when building the reasoning skeleton hash
@@ -331,14 +414,16 @@ _OVERLAY_ESCALATION_2: str = (
 
 _OVERLAY_ESCALATION_3: str = (
     "STRICT FORMAT REQUIRED:\n\n"
-    "[SCENARIO]\n"
-    "A specific person in a real situation\n\n"
+    "[PERSON]\n"
+    "A specific real person — use a name or a concrete role (e.g. 'Dr Smith' or 'a nurse').\n"
+    "Do NOT write 'a person', 'someone', or 'an individual'.\n\n"
     "[ACTION]\n"
-    "What they actually do\n\n"
+    "One specific observable action they performed — use a concrete action verb.\n"
+    "Do NOT write 'does something' or 'performs some action'.\n\n"
     "[OUTCOME]\n"
-    "What happens next\n\n"
-    "Do not include abstract reasoning.\n"
-    "Failure to follow format is invalid."
+    "A concrete observable consequence — what actually happened next.\n"
+    "Do NOT write abstract reflection or philosophical commentary.\n\n"
+    "Failure to follow format exactly is invalid."
 )
 
 _OVERLAY_ESCALATION_4: str = (
@@ -553,6 +638,104 @@ def detect_pseudo_compliance(text: str) -> bool:
 
     # If trigger present but missing any concreteness indicator → pseudo-compliance
     return not (has_person and has_action and has_situation)
+
+
+def _extract_section_body(text_lower: str, section_header: str) -> str:
+    """Return the body text after *section_header* until the next section or end.
+
+    The set of known section names is derived from :data:`_STRUCTURE_LOCK_SECTIONS`
+    so the regex stays in sync if sections are ever renamed.
+
+    Parameters
+    ----------
+    text_lower:
+        The full response text already lowercased.
+    section_header:
+        Lowercased section tag, e.g. ``"[action]"``.
+
+    Returns
+    -------
+    str
+        Stripped body text, or an empty string when the header is not found.
+    """
+    # Build alternation from known section names (strip surrounding brackets).
+    # Anchor to line start so that a section name inside a body paragraph does
+    # not trigger a false split.
+    section_names = "|".join(
+        re.escape(s.strip("[]")) for s in _STRUCTURE_LOCK_SECTIONS
+    )
+    pattern = (
+        r"(?m)^"
+        + re.escape(section_header)
+        + r"\s*\n(.*?)(?=^"
+        + r"\[(?:"
+        + section_names
+        + r")\]|\Z)"
+    )
+    match = re.search(pattern, text_lower, re.DOTALL | re.MULTILINE)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
+def _validate_structure_lock_content(text: str) -> "Tuple[bool, str]":
+    """Validate that each STRUCTURE_LOCK section has meaningful concrete content.
+
+    Called **after** all required headers have been confirmed present.  Checks
+    that section bodies are not filled with generic placeholders, that
+    ``[ACTION]`` contains at least one concrete observable action verb, and that
+    ``[OUTCOME]`` does not consist solely of abstract philosophical reflection.
+
+    Parameters
+    ----------
+    text:
+        The full response text (any casing).
+
+    Returns
+    -------
+    (compliant, reason)
+        *compliant* is ``True`` when every section passes all content rules.
+        *reason* is a short human-readable explanation of the first failure
+        encountered.
+    """
+    t = text.lower()
+
+    # 1. Generic placeholder check — applies to all sections
+    for section_header in _STRUCTURE_LOCK_SECTIONS:
+        body = _extract_section_body(t, section_header)
+        for placeholder_re in _STRUCTURE_LOCK_GENERIC_PLACEHOLDERS:
+            if re.search(r"\b" + placeholder_re + r"\b", body):
+                return (
+                    False,
+                    f"STRUCTURE_LOCK content violation: {section_header.upper()} "
+                    f"contains generic placeholder — content must be specific and concrete.",
+                )
+
+    # 2. [ACTION] must contain at least one concrete observable action verb.
+    # Matches base form, 3rd-person singular (-s/-es), past tense (-d/-ed),
+    # and progressive (-ing) to avoid false failures for common inflections.
+    action_body = _extract_section_body(t, "[action]")
+    if not any(
+        re.search(r"\b" + re.escape(verb) + r"(?:s|es|ing|ed|d)?\b", action_body)
+        for verb in _STRUCTURE_LOCK_ACTION_VERBS
+    ):
+        return (
+            False,
+            "STRUCTURE_LOCK content violation: [ACTION] must contain at least "
+            "one concrete observable action verb.",
+        )
+
+    # 3. [OUTCOME] must not be pure abstract reflection
+    outcome_body = _extract_section_body(t, "[outcome]")
+    for phrase in _STRUCTURE_LOCK_OUTCOME_ABSTRACT:
+        if phrase in outcome_body:
+            return (
+                False,
+                f"STRUCTURE_LOCK content violation: [OUTCOME] contains abstract "
+                f"reflection ('{phrase}') instead of an observable consequence.",
+            )
+
+    return True, "STRUCTURE_LOCK content validated: all sections contain concrete content."
 
 
 def _reasoning_hash(text: str) -> str:
@@ -893,6 +1076,15 @@ class IntegrationCore:
         * ``FIXY_AUTHORITY_OVERRIDE`` / ``NORMAL`` — always pass (no
           additional detectable textual obligation).
 
+        **STRUCTURE_LOCK** (escalation_level >= :data:`_STRUCTURE_LOCK_LEVEL`):
+          Applied regardless of active mode.  When engaged, (1) every required
+          section header listed in :data:`_STRUCTURE_LOCK_SECTIONS` must be
+          present, and (2) each section body must contain meaningful concrete
+          content — no generic placeholders, ``[ACTION]`` must include at
+          least one observable action verb, and ``[OUTCOME]`` must not consist
+          of abstract reflection.  Only after both checks pass are mode-based
+          heuristics skipped.
+
         Pseudo-compliance is checked for CONCRETE_OVERRIDE and
         PERSONALITY_SUPPRESSION modes: a response that contains a
         hypothetical trigger phrase but lacks a concrete person, action, and
@@ -914,10 +1106,53 @@ class IntegrationCore:
             mode constraint.  *reason* is a short human-readable explanation.
         """
         mode = decision.active_mode
-        if mode == IntegrationMode.NORMAL:
-            return True, "No active mode constraint."
 
         t = text.lower()
+
+        # -----------------------------------------------------------------
+        # STRUCTURE_LOCK — section-header + content enforcement (level >= 3)
+        # Evaluated first, before the NORMAL early-return, so that any future
+        # decision combining NORMAL mode with a high escalation level is still
+        # caught here.  Uses line-anchored regex so that a section name
+        # mentioned inside a body paragraph does not satisfy the header check.
+        # -----------------------------------------------------------------
+        if decision.escalation_level >= _STRUCTURE_LOCK_LEVEL:
+            logger.info(
+                "[STRUCTURE-LOCK] active escalation_level=%d required_sections=%s",
+                decision.escalation_level,
+                _STRUCTURE_LOCK_SECTIONS,
+            )
+            missing = [
+                s for s in _STRUCTURE_LOCK_SECTIONS
+                if not re.search(r"(?m)^" + re.escape(s), t)
+            ]
+            if missing:
+                return (
+                    False,
+                    f"STRUCTURE_LOCK violation: required section(s) missing: "
+                    f"{', '.join(s.upper() for s in missing)}. "
+                    "Response must use the exact section headers.",
+                )
+            # All headers present — now validate section content quality.
+            content_ok, content_reason = _validate_structure_lock_content(text)
+            if not content_ok:
+                logger.warning(
+                    "[STRUCTURE-LOCK] content validation failed: %s",
+                    content_reason,
+                )
+                return False, content_reason
+            # Headers present and content concrete — skip mode-based text
+            # heuristics which are superseded by structural enforcement.
+            logger.info(
+                "[STRUCTURE-LOCK] satisfied — skipping mode-based checks "
+                "(mode=%s escalation_level=%d)",
+                mode.value,
+                decision.escalation_level,
+            )
+            return True, "STRUCTURE_LOCK satisfied: all sections present with concrete content."
+
+        if mode == IntegrationMode.NORMAL:
+            return True, "No active mode constraint."
 
         if mode in (
             IntegrationMode.CONCRETE_OVERRIDE,
@@ -998,7 +1233,10 @@ class IntegrationCore:
         bool
             ``True`` when the response must be regenerated.
         """
-        if decision.active_mode == IntegrationMode.NORMAL:
+        if (
+            decision.active_mode == IntegrationMode.NORMAL
+            and decision.escalation_level < _STRUCTURE_LOCK_LEVEL
+        ):
             return False
 
         compliant, reason = self.validate_generated_output(text, decision)

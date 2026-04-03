@@ -1091,3 +1091,303 @@ class TestPseudoComplianceValidation:
         text = "For example, think of an abstract system where nothing is concrete."
         result = core.should_regenerate_after_validation(text, decision)
         assert result is True
+
+
+# ---------------------------------------------------------------------------
+# 35. STRUCTURE_LOCK — structural section-header enforcement (level >= 3)
+# ---------------------------------------------------------------------------
+
+
+class TestStructureLock:
+    """Validate STRUCTURE_LOCK behaviour in validate_generated_output.
+
+    STRUCTURE_LOCK activates at escalation_level >= 3 and requires the
+    response to contain every header listed in _STRUCTURE_LOCK_SECTIONS
+    ([PERSON], [ACTION], [OUTCOME]) regardless of the active mode.
+    """
+
+    def _decision_at_level(self, core, loop_count: int):
+        """Return a ControlDecision whose escalation_level equals loop_count."""
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": loop_count}
+        return core.evaluate_turn("Socrates", signals)
+
+    # Level < 3 — no STRUCTURE_LOCK
+
+    def test_level_2_does_not_enforce_section_headers(self, core):
+        decision = self._decision_at_level(core, 2)
+        assert decision.escalation_level == 2
+        # Response with no section headers but a genuine concrete signal must still pass
+        text = (
+            "For example, a teacher decides to give extra homework to struggling "
+            "students during the morning session."
+        )
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    # Level 3 — STRUCTURE_LOCK active
+
+    def test_level_3_structure_lock_activates(self, core):
+        decision = self._decision_at_level(core, 3)
+        assert decision.escalation_level == 3
+
+    def test_level_3_passes_when_all_sections_present(self, core):
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse at City Hospital\n\n"
+            "[ACTION]\nShe administered the vaccine to 30 patients in one morning\n\n"
+            "[OUTCOME]\nAll patients recovered without complications"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
+
+    def test_level_3_fails_when_person_section_missing(self, core):
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "[PERSON]" in reason.upper()
+
+    def test_level_3_fails_when_action_section_missing(self, core):
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "[ACTION]" in reason.upper()
+
+    def test_level_3_fails_when_outcome_section_missing(self, core):
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe administered the vaccine"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "[OUTCOME]" in reason.upper()
+
+    def test_level_3_fails_for_abstract_prose_without_headers(self, core):
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "For example, consider a medical professional in a real hospital "
+            "who specifically administers vaccines according to a protocol."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STRUCTURE_LOCK" in reason
+
+    def test_level_3_section_headers_case_insensitive(self, core):
+        """Section headers should be matched case-insensitively."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[person]\nJane, a nurse\n\n"
+            "[action]\nShe administered the vaccine\n\n"
+            "[outcome]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
+
+    # Level 4 — STRUCTURE_LOCK still active
+
+    def test_level_4_also_enforces_section_headers(self, core):
+        decision = self._decision_at_level(core, 4)
+        assert decision.escalation_level == 4
+        text = "Concrete action: a doctor prescribed medication."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STRUCTURE_LOCK" in reason
+
+    def test_level_4_passes_when_all_sections_present(self, core):
+        decision = self._decision_at_level(core, 4)
+        text = (
+            "[PERSON]\nDr Smith, a cardiologist\n\n"
+            "[ACTION]\nHe prescribed beta-blockers to a patient\n\n"
+            "[OUTCOME]\nThe patient's blood pressure stabilised within a week"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
+
+    # should_regenerate_after_validation integration
+
+    def test_structure_lock_triggers_regen_on_missing_headers(self, core):
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "For example, a teacher decides to give extra homework to struggling "
+            "students during the morning session."
+        )
+        result = core.should_regenerate_after_validation(text, decision)
+        assert result is True
+
+    def test_level_3_overlay_uses_structured_headers(self, core):
+        """Verify the Level-3 overlay advertises the current structured sections."""
+        decision = self._decision_at_level(core, 3)
+        assert "[PERSON]" in decision.prompt_overlay
+        assert "[ACTION]" in decision.prompt_overlay
+        assert "[OUTCOME]" in decision.prompt_overlay
+        assert "[SCENARIO]" not in decision.prompt_overlay
+
+    # ----------------------------------------------------------------
+    # Section-content quality validation
+    # ----------------------------------------------------------------
+
+    def test_person_section_with_generic_placeholder_fails(self, core):
+        """[PERSON] body containing 'a person' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\na person in a situation\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "content violation" in reason.lower() or "placeholder" in reason.lower()
+
+    def test_person_section_with_someone_placeholder_fails(self, core):
+        """[PERSON] body containing 'someone' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nSomeone from the hospital\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_person_section_with_an_individual_placeholder_fails(self, core):
+        """[PERSON] body containing 'an individual' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nAn individual working in healthcare\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_action_section_with_something_placeholder_fails(self, core):
+        """[ACTION] body containing 'something' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse at City Hospital\n\n"
+            "[ACTION]\nShe did something with the patients\n\n"
+            "[OUTCOME]\nAll patients recovered"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_action_section_with_some_action_placeholder_fails(self, core):
+        """[ACTION] body containing 'some action' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe performed some action\n\n"
+            "[OUTCOME]\nThe result followed"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_action_section_without_concrete_verb_fails(self, core):
+        """[ACTION] with no observable action verb is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nThe situation continued in the ward\n\n"
+            "[OUTCOME]\nThe ward fell silent"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "action verb" in reason.lower() or "ACTION" in reason
+
+    def test_outcome_section_with_abstract_reflection_fails(self, core):
+        """[OUTCOME] consisting of abstract reflection is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nThis reminds us of the importance of healthcare workers"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "abstract" in reason.lower() or "reflection" in reason.lower()
+
+    def test_outcome_section_with_raises_question_fails(self, core):
+        """[OUTCOME] with 'raises the question' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nThis raises the question of whether vaccines are always safe"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_outcome_section_with_challenges_us_fails(self, core):
+        """[OUTCOME] with 'challenges us to' is rejected."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nJane, a nurse\n\n"
+            "[ACTION]\nShe administered the vaccine\n\n"
+            "[OUTCOME]\nThis challenges us to rethink public health policy"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+
+    def test_all_sections_concrete_content_passes(self, core):
+        """Explicit positive: all sections have concrete, specific content."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nDr Sarah Chen, a paediatrician at St Mary's Hospital\n\n"
+            "[ACTION]\nShe prescribed a two-week course of antibiotics to a child with pneumonia\n\n"
+            "[OUTCOME]\nThe child's fever broke within 48 hours and she was discharged"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
+
+    def test_content_validation_triggers_regen_on_generic_placeholder(self, core):
+        """should_regenerate_after_validation returns True for generic-placeholder content."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nSomeone\n\n"
+            "[ACTION]\nDid something\n\n"
+            "[OUTCOME]\nSomething happened"
+        )
+        result = core.should_regenerate_after_validation(text, decision)
+        assert result is True
+
+    def test_section_name_in_body_does_not_satisfy_header_check(self, core):
+        """A section name mentioned inside a body paragraph must not count as a header."""
+        decision = self._decision_at_level(core, 3)
+        # [person] appears mid-sentence, not at a line start — must not satisfy check
+        text = (
+            "We can refer to [person] and [action] and [outcome] in our analysis\n"
+            "but without actual section headers the format is invalid."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STRUCTURE_LOCK" in reason
+
+    def test_action_verb_third_person_singular_passes(self, core):
+        """[ACTION] with a 3rd-person singular verb form (-s) must be accepted."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nDr Lee, a surgeon\n\n"
+            "[ACTION]\nShe administers the anaesthetic before the operation\n\n"
+            "[OUTCOME]\nThe patient loses consciousness within 60 seconds"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
+
+    def test_action_verb_progressive_form_passes(self, core):
+        """[ACTION] with a progressive verb form (-ing) must be accepted."""
+        decision = self._decision_at_level(core, 3)
+        text = (
+            "[PERSON]\nDr Lee, a surgeon\n\n"
+            "[ACTION]\nShe is administering the anaesthetic to the patient\n\n"
+            "[OUTCOME]\nThe patient becomes sedated within 60 seconds"
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True, reason
