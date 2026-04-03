@@ -65,6 +65,22 @@ COMPLIANCE_CONFIDENCE_THRESHOLD: float = 0.70
 #: score at 0.50, and callers may apply an additional non-compliance penalty.
 STRONG_LOOP_CONFIDENCE_THRESHOLD: float = 0.80
 
+#: Valid values for :attr:`LoopCheckResult.reasoning_delta`.
+_VALID_REASONING_DELTAS: frozenset = frozenset({"none", "weak", "moderate", "strong"})
+
+#: Valid values for :attr:`LoopCheckResult.new_move_type`.
+_VALID_NEW_MOVE_TYPES: frozenset = frozenset(
+    {
+        "none",
+        "example_only",
+        "new_distinction",
+        "new_variable",
+        "reframe",
+        "resolution_attempt",
+        "counterexample",
+    }
+)
+
 # ---------------------------------------------------------------------------
 # Result dataclasses
 # ---------------------------------------------------------------------------
@@ -114,12 +130,33 @@ class LoopCheckResult:
         Detector's confidence in its own judgement in [0.0, 1.0].
     reason:
         Short human-readable explanation of the judgement.
+    reasoning_delta:
+        Degree of new reasoning introduced, as returned by the LLM judge:
+        ``"none"`` — no new reasoning at all;
+        ``"weak"`` — cosmetic change only (e.g. a single illustrative example);
+        ``"moderate"`` — partial new reasoning but same core structure;
+        ``"strong"`` — genuine new reasoning move.
+        ``None`` means the field was not evaluated (e.g. no recent texts, parse
+        failure, or check not triggered) and callers must not treat it as a
+        loop signal.
+    new_move_type:
+        Classification of the new move (if any), as returned by the LLM judge:
+        ``"none"`` — nothing new;
+        ``"example_only"`` — concrete example that only illustrates the prior claim;
+        ``"new_distinction"`` — introduces a new conceptual distinction;
+        ``"new_variable"`` — introduces a new causal variable;
+        ``"reframe"`` — reframes the problem at a different level;
+        ``"resolution_attempt"`` — attempts to resolve a prior contradiction;
+        ``"counterexample"`` — tests the prior claim with a counterexample.
+        ``None`` means not evaluated.
     """
 
     speaker: str
     is_loop: bool
     confidence: float
     reason: str
+    reasoning_delta: Optional[str] = None
+    new_move_type: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +305,7 @@ _COMPLIANCE_PROMPTS = {
 }
 
 _LOOP_PROMPT_TEMPLATE = """\
-Determine whether the current reply repeats the same core argument as the recent replies from the same speaker, even if wording differs.
+You are a strict reasoning judge. Evaluate whether the current reply introduces a genuinely new reasoning move, or merely restates and decorates the previous argument.
 
 Speaker: {speaker}
 
@@ -278,16 +315,39 @@ Recent replies:
 Current reply:
 {text}
 
-Rules:
-- Mark is_loop=true if the current reply is mainly a rephrasing of the same underlying argument.
-- Small wording changes, new metaphors, or slightly sharper phrasing do NOT count as a new argument.
-- Mark is_loop=false only if the current reply adds a genuinely new distinction, example, test, concession, or framework.
+Step 1 — Semantic check:
+- Does the current reply restate the same core claim as the recent replies?
+- Does it preserve the same causal structure, even with different wording?
+
+Step 2 — Reasoning delta check:
+- Does the current reply introduce a new causal variable not present before?
+- Does it reframe the problem (shift level: principle → test case, or test case → principle)?
+- Does it produce a counterexample that challenges the prior claim?
+- Does it attempt to resolve a prior contradiction?
+- Does it introduce a new conceptual distinction?
+- OR: does it only add a concrete example that illustrates the same prior argument?
+
+Classification rules:
+- Classify is_loop=true when: same core claim is restated AND same reasoning structure is preserved AND no new distinction, variable, reframe, counterexample, or resolution is introduced.
+- Classify is_loop=false ONLY when: a new causal variable, a reframe, a counterexample, a contradiction resolution, or a meaningful level shift is present.
+- A concrete example alone is NOT sufficient. If the example only illustrates the previous claim, set is_loop=true, reasoning_delta="weak", new_move_type="example_only".
+- Do NOT reward surface novelty, stylistic variation, or sharper phrasing.
+
+For reasoning_delta, choose one of: "none" | "weak" | "moderate" | "strong"
+  none: nothing new at all
+  weak: cosmetic change or example-only illustration of the same argument
+  moderate: partial new reasoning but the same core structure persists
+  strong: genuine new reasoning move (new variable, reframe, counterexample, resolution, new distinction)
+
+For new_move_type, choose one of: "none" | "example_only" | "new_distinction" | "new_variable" | "reframe" | "resolution_attempt" | "counterexample"
 
 Return valid JSON only:
 {{
   "is_loop": true or false,
   "confidence": 0.0 to 1.0,
-  "reason": "short explanation"
+  "reason": "short explanation",
+  "reasoning_delta": "none" | "weak" | "moderate" | "strong",
+  "new_move_type": "none" | "example_only" | "new_distinction" | "new_variable" | "reframe" | "resolution_attempt" | "counterexample"
 }}"""
 
 
@@ -334,16 +394,35 @@ def _safe_parse_validation(
 def _safe_parse_loop(raw: str, speaker: str) -> LoopCheckResult:
     """Parse *raw* LLM output into a :class:`LoopCheckResult`.
 
-    Falls back to a low-confidence non-loop result on any parse failure.
+    On any parse failure, falls back to a low-confidence non-loop result with
+    ``reasoning_delta=None`` (meaning *not evaluated*).  The fail-safe
+    conservatively leaves ``is_loop=False`` so uncertain LLM output never
+    triggers a false-positive loop intervention.
     """
     try:
         cleaned = re.sub(r"^```[a-z]*\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
         data = json.loads(cleaned)
+        delta_value = data.get("reasoning_delta")
+        if delta_value is None:
+            reasoning_delta = None
+        else:
+            raw_delta = str(delta_value).lower()
+            reasoning_delta = raw_delta if raw_delta in _VALID_REASONING_DELTAS else "none"
+
+        move_value = data.get("new_move_type")
+        if move_value is None:
+            new_move_type = None
+        else:
+            raw_move = str(move_value).lower()
+            new_move_type = raw_move if raw_move in _VALID_NEW_MOVE_TYPES else "none"
+
         return LoopCheckResult(
             speaker=speaker,
             is_loop=bool(data.get("is_loop", False)),
             confidence=float(data.get("confidence", 0.5)),
             reason=str(data.get("reason", "unknown")),
+            reasoning_delta=reasoning_delta,
+            new_move_type=new_move_type,
         )
     except Exception:
         logger.debug(
@@ -355,6 +434,8 @@ def _safe_parse_loop(raw: str, speaker: str) -> LoopCheckResult:
             is_loop=False,
             confidence=0.3,
             reason="loop_parse_failed",
+            reasoning_delta=None,
+            new_move_type=None,
         )
 
 
@@ -530,10 +611,13 @@ class FixySemanticController:
         result = _safe_parse_loop(raw, speaker)
 
         logger.info(
-            "[FIXY-LOOP] speaker=%s is_loop=%s confidence=%.2f reason=%s",
+            "[FIXY-LOOP] speaker=%s is_loop=%s confidence=%.2f"
+            " reasoning_delta=%s new_move_type=%s reason=%s",
             speaker,
             result.is_loop,
             result.confidence,
+            result.reasoning_delta,
+            result.new_move_type,
             result.reason,
         )
         return result
@@ -688,6 +772,9 @@ def apply_loop_to_progress(
 
     * Semantic loop detected → ×0.70
     * Loop with confidence >= 0.80 → also cap at 0.50
+    * Loop with reasoning_delta ``"none"`` or ``"weak"`` → additionally cap at 0.40,
+      because a concrete-example-only or zero-delta response warrants stronger
+      suppression than a borderline loop.
 
     Parameters
     ----------
@@ -705,5 +792,7 @@ def apply_loop_to_progress(
         progress_score *= 0.70
         if loop_result.confidence >= STRONG_LOOP_CONFIDENCE_THRESHOLD:
             progress_score = min(progress_score, 0.50)
+        if getattr(loop_result, "reasoning_delta", None) in ("none", "weak"):
+            progress_score = min(progress_score, 0.40)
 
     return float(max(0.0, min(1.0, progress_score)))

@@ -339,6 +339,15 @@ class IntegrationState:
         Agent energy level (0.0–100.0).
     status:
         Agent status label, e.g. ``"active"``, ``"fatigued"``, ``"dreaming"``.
+    reasoning_delta:
+        Degree of new reasoning introduced by the latest response as classified
+        by the LLM loop checker: ``"none"``, ``"weak"``, ``"moderate"``, or
+        ``"strong"``.  ``None`` when not yet evaluated.
+    new_move_type:
+        Type of new reasoning move (if any): ``"none"``, ``"example_only"``,
+        ``"new_distinction"``, ``"new_variable"``, ``"reframe"``,
+        ``"resolution_attempt"``, or ``"counterexample"``.  ``None`` when not
+        yet evaluated.
     """
 
     agent_name: str
@@ -359,6 +368,8 @@ class IntegrationState:
     abstraction_detected: bool = False
     energy: float = 100.0
     status: str = "active"
+    reasoning_delta: Optional[str] = None
+    new_move_type: Optional[str] = None
 
 
 @dataclass
@@ -1629,19 +1640,28 @@ class IntegrationCore:
         else:
             esc_level = int(EscalationLevel.CONCRETE_OVERRIDE)
 
+        # Escalate harder when reasoning_delta is none or weak — the response
+        # added no new reasoning move, so a stronger intervention is warranted.
+        if state.reasoning_delta in ("none", "weak"):
+            esc_level = min(esc_level + 1, int(EscalationLevel.HARD_OVERRIDE))
+
         suppress = esc_level >= _ESCALATION_PERSONALITY_SUPPRESS_LEVEL
         escalation_overlay = _ESCALATION_OVERLAYS.get(esc_level, _OVERLAY_ESCALATION_1)
 
         reason = (
             f"Semantic repeat detected for '{state.agent_name}' "
-            f"with loop_count={state.loop_count}. "
+            f"with loop_count={state.loop_count} "
+            f"reasoning_delta={state.reasoning_delta!r} new_move_type={state.new_move_type!r}. "
             f"Escalation level {esc_level} activated to break abstract repetition."
         )
 
         logger.info(
-            "[INTEGRATION-ESCALATION] level=%d suppress_personality=%s",
+            "[INTEGRATION-ESCALATION] level=%d suppress_personality=%s"
+            " reasoning_delta=%s new_move_type=%s",
             esc_level,
             suppress,
+            state.reasoning_delta,
+            state.new_move_type,
         )
 
         return ControlDecision(
