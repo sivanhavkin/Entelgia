@@ -105,6 +105,31 @@ Covers:
   71. Compliant result with confidence >= 0.70 → remains compliant
   72. Compliant result with confidence < 0.70 → becomes non-compliant with partial=True
   73. Non-compliant result with low confidence → unchanged (still non-compliant)
+
+  Reasoning delta — LoopCheckResult fields
+  74. Default reasoning_delta and new_move_type are None
+  75. Explicit reasoning_delta and new_move_type are stored correctly
+
+  Reasoning delta — LLM response parsing
+  76. LLM returns reasoning_delta=weak / new_move_type=example_only → parsed correctly
+  77. LLM returns reasoning_delta=strong / new_move_type=new_variable → parsed correctly
+  78. LLM returns reasoning_delta=none / new_move_type=none → parsed correctly
+  79. Malformed JSON → reasoning_delta=None, new_move_type=None (not evaluated)
+  80. LLM exception → reasoning_delta=None, new_move_type=None (not evaluated)
+  81. No recent texts → reasoning_delta=None (not evaluated)
+  82. Invalid reasoning_delta value from LLM → normalised to "none"
+
+  Reasoning delta — apply_loop_to_progress additional cap
+  83. Loop with reasoning_delta=weak → progress capped at 0.40
+  84. Loop with reasoning_delta=none (explicit) → progress capped at 0.40
+  85. Loop with reasoning_delta=moderate → ×0.70 only, no 0.40 cap
+  86. Loop with reasoning_delta=None (not evaluated) → ×0.70 only, no 0.40 cap
+
+  Reasoning delta — record_semantic_loop override
+  87. reasoning_delta=weak + is_loop=False → overridden to loop
+  88. reasoning_delta=none (explicit) + is_loop=False → overridden to loop
+  89. reasoning_delta=None (not evaluated) + is_loop=False → NOT overridden
+  90. reasoning_delta=strong + is_loop=False → NOT overridden
 """
 
 import sys
@@ -1713,3 +1738,282 @@ def test_strong_loop_override_not_triggered_below_threshold():
 def test_strong_loop_confidence_threshold_value():
     """STRONG_LOOP_CONFIDENCE_THRESHOLD must equal 0.80 (canonical spec value)."""
     assert STRONG_LOOP_CONFIDENCE_THRESHOLD == pytest.approx(0.80)
+
+
+# ---------------------------------------------------------------------------
+# Reasoning delta — LoopCheckResult fields
+# ---------------------------------------------------------------------------
+
+
+def test_loop_check_result_default_delta_fields():
+    """LoopCheckResult defaults reasoning_delta and new_move_type to None."""
+    result = LoopCheckResult(
+        speaker="Socrates", is_loop=False, confidence=0.8, reason="new_claim"
+    )
+    assert result.reasoning_delta is None
+    assert result.new_move_type is None
+
+
+def test_loop_check_result_explicit_delta_fields():
+    """LoopCheckResult stores explicit reasoning_delta and new_move_type."""
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=True,
+        confidence=0.9,
+        reason="example_only",
+        reasoning_delta="weak",
+        new_move_type="example_only",
+    )
+    assert result.reasoning_delta == "weak"
+    assert result.new_move_type == "example_only"
+
+
+# ---------------------------------------------------------------------------
+# Reasoning delta — LLM response parsing
+# ---------------------------------------------------------------------------
+
+
+def test_loop_detected_with_reasoning_delta_weak():
+    """LLM returns example_only — is_loop=True, reasoning_delta=weak."""
+    llm = _ReturnLLM(
+        {
+            "is_loop": True,
+            "confidence": 0.88,
+            "reason": "example_only_illustrates_prior_claim",
+            "reasoning_delta": "weak",
+            "new_move_type": "example_only",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.detect_semantic_loop(
+        "Socrates",
+        "For example, consider a stone falling — it still proves gravity is constant.",
+        ["Gravity is a constant physical force.", "All masses are subject to gravity."],
+    )
+    assert result.is_loop is True
+    assert result.reasoning_delta == "weak"
+    assert result.new_move_type == "example_only"
+
+
+def test_loop_not_detected_with_strong_delta():
+    """LLM returns new_variable — is_loop=False, reasoning_delta=strong."""
+    llm = _ReturnLLM(
+        {
+            "is_loop": False,
+            "confidence": 0.91,
+            "reason": "new_causal_variable_introduced",
+            "reasoning_delta": "strong",
+            "new_move_type": "new_variable",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.detect_semantic_loop(
+        "Athena",
+        "But what about observer effects — that introduces a variable absent from the prior claim.",
+        ["Gravity is a constant physical force."],
+    )
+    assert result.is_loop is False
+    assert result.reasoning_delta == "strong"
+    assert result.new_move_type == "new_variable"
+
+
+def test_loop_with_reasoning_delta_none():
+    """LLM returns reasoning_delta=none — is_loop=True with no move."""
+    llm = _ReturnLLM(
+        {
+            "is_loop": True,
+            "confidence": 0.92,
+            "reason": "pure_restatement",
+            "reasoning_delta": "none",
+            "new_move_type": "none",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.detect_semantic_loop(
+        "Socrates",
+        "Every mental event is ultimately just brain activity.",
+        [
+            "The mind is just the brain.",
+            "Consciousness reduces to neural states.",
+        ],
+    )
+    assert result.is_loop is True
+    assert result.reasoning_delta == "none"
+    assert result.new_move_type == "none"
+
+
+def test_loop_malformed_json_delta_is_none():
+    """Malformed LLM output — reasoning_delta and new_move_type must be None (not evaluated)."""
+    ctrl = FixySemanticController(llm=_GarbageLLM(), model="stub")
+    result = ctrl.detect_semantic_loop("Socrates", "Some text.", ["Previous text."])
+    assert result.is_loop is False
+    assert result.reasoning_delta is None
+    assert result.new_move_type is None
+
+
+def test_loop_llm_exception_delta_is_none():
+    """LLM exception — reasoning_delta and new_move_type must be None (not evaluated)."""
+    ctrl = FixySemanticController(llm=_RaiseLLM(), model="stub")
+    result = ctrl.detect_semantic_loop("Socrates", "Some text.", ["Previous."])
+    assert result.is_loop is False
+    assert result.reasoning_delta is None
+    assert result.new_move_type is None
+
+
+def test_loop_no_recent_texts_delta_is_none():
+    """No-recent-texts fallback — reasoning_delta must be None."""
+    ctrl = FixySemanticController(llm=_RaiseLLM(), model="stub")
+    result = ctrl.detect_semantic_loop("Socrates", "Some reply.", [])
+    assert result.reasoning_delta is None
+    assert result.new_move_type is None
+
+
+def test_loop_invalid_reasoning_delta_normalised_to_none():
+    """Unrecognised reasoning_delta value from LLM is normalised to 'none'."""
+    llm = _ReturnLLM(
+        {
+            "is_loop": True,
+            "confidence": 0.85,
+            "reason": "restatement",
+            "reasoning_delta": "TOTALLY_INVALID_VALUE",
+            "new_move_type": "also_invalid",
+        }
+    )
+    ctrl = FixySemanticController(llm=llm, model="stub")
+    result = ctrl.detect_semantic_loop("Socrates", "Text.", ["Prior."])
+    assert result.reasoning_delta == "none"
+    assert result.new_move_type == "none"
+
+
+# ---------------------------------------------------------------------------
+# Reasoning delta — apply_loop_to_progress additional cap
+# ---------------------------------------------------------------------------
+
+
+def test_apply_loop_weak_delta_capped_at_0_40():
+    """Loop with reasoning_delta=weak caps progress at 0.40."""
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=True,
+        confidence=0.5,
+        reason="example_only",
+        reasoning_delta="weak",
+        new_move_type="example_only",
+    )
+    adjusted = apply_loop_to_progress(0.9, result)
+    assert adjusted <= 0.40
+
+
+def test_apply_loop_none_delta_capped_at_0_40():
+    """Loop with reasoning_delta=none (explicit) caps progress at 0.40."""
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=True,
+        confidence=0.5,
+        reason="pure_restatement",
+        reasoning_delta="none",
+        new_move_type="none",
+    )
+    adjusted = apply_loop_to_progress(0.9, result)
+    assert adjusted <= 0.40
+
+
+def test_apply_loop_moderate_delta_not_capped_at_0_40():
+    """Loop with reasoning_delta=moderate: ×0.70 only, NOT capped at 0.40."""
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=True,
+        confidence=0.5,
+        reason="partial_novelty",
+        reasoning_delta="moderate",
+        new_move_type="new_distinction",
+    )
+    base = 0.8
+    adjusted = apply_loop_to_progress(base, result)
+    # ×0.70 = 0.56; confidence < 0.80 so no 0.50 cap; delta=moderate so no 0.40 cap
+    assert adjusted == pytest.approx(base * 0.70, abs=1e-6)
+    assert adjusted > 0.40
+
+
+def test_apply_loop_null_delta_not_capped_at_0_40():
+    """Loop with reasoning_delta=None (not evaluated) does NOT apply 0.40 cap."""
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=True,
+        confidence=0.5,
+        reason="possible_loop",
+        reasoning_delta=None,
+    )
+    base = 0.8
+    adjusted = apply_loop_to_progress(base, result)
+    # ×0.70 = 0.56; no 0.50 cap (confidence < 0.80); no 0.40 cap (delta is None)
+    assert adjusted == pytest.approx(base * 0.70, abs=1e-6)
+    assert adjusted > 0.40
+
+
+# ---------------------------------------------------------------------------
+# Reasoning delta — record_semantic_loop override
+# ---------------------------------------------------------------------------
+
+
+def test_record_semantic_loop_weak_delta_overrides_is_loop_false():
+    """reasoning_delta=weak with is_loop=False must be treated as a loop."""
+    fixy = _make_fixy()
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=False,  # LLM primary verdict
+        confidence=0.65,
+        reason="borderline",
+        reasoning_delta="weak",
+        new_move_type="example_only",
+    )
+    fixy.record_semantic_loop(result)
+    assert fixy.semantic_repeat is True
+    assert fixy.semantic_loop_count == 1
+
+
+def test_record_semantic_loop_none_delta_overrides_is_loop_false():
+    """reasoning_delta='none' (explicit string) with is_loop=False must be treated as a loop."""
+    fixy = _make_fixy()
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=False,
+        confidence=0.65,
+        reason="borderline",
+        reasoning_delta="none",
+        new_move_type="none",
+    )
+    fixy.record_semantic_loop(result)
+    assert fixy.semantic_repeat is True
+    assert fixy.semantic_loop_count == 1
+
+
+def test_record_semantic_loop_null_delta_does_not_override():
+    """reasoning_delta=None (not evaluated) must NOT override is_loop=False."""
+    fixy = _make_fixy()
+    result = LoopCheckResult(
+        speaker="Socrates",
+        is_loop=False,
+        confidence=0.65,
+        reason="no_evaluation",
+        reasoning_delta=None,
+    )
+    fixy.record_semantic_loop(result)
+    assert fixy.semantic_repeat is False
+    assert fixy.semantic_loop_count == 0
+
+
+def test_record_semantic_loop_strong_delta_not_overridden():
+    """reasoning_delta=strong must not flip is_loop=False to True."""
+    fixy = _make_fixy()
+    result = LoopCheckResult(
+        speaker="Athena",
+        is_loop=False,
+        confidence=0.88,
+        reason="new_variable_introduced",
+        reasoning_delta="strong",
+        new_move_type="new_variable",
+    )
+    fixy.record_semantic_loop(result)
+    assert fixy.semantic_repeat is False
+    assert fixy.semantic_loop_count == 0

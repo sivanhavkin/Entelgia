@@ -1081,6 +1081,10 @@ class InteractiveFixy:
         that callers can read the flag without checking the result object
         directly.
 
+        When ``reasoning_delta`` is ``"none"`` or ``"weak"``, the result is
+        treated as a loop regardless of ``is_loop``, because an
+        example-only or zero-delta response provides no genuine progress.
+
         When a semantic loop is detected:
 
         * Increments :attr:`semantic_loop_count`.
@@ -1101,6 +1105,17 @@ class InteractiveFixy:
         is_loop = getattr(result, "is_loop", False)
         confidence = getattr(result, "confidence", 0.5)
         speaker = getattr(result, "speaker", "?")
+        reasoning_delta = getattr(result, "reasoning_delta", None)
+        new_move_type = getattr(result, "new_move_type", None)
+
+        # When the LLM explicitly determined that no genuine new reasoning move
+        # was made (reasoning_delta="none" or "weak"), treat the response as a
+        # loop even if the raw is_loop verdict was False.  This only applies
+        # when reasoning_delta was actually evaluated (not None), so that
+        # legacy results, parse failures, and non-triggered checks are
+        # unaffected.
+        if reasoning_delta in ("none", "weak") and not is_loop:
+            is_loop = True
 
         # Always mirror the latest loop-detection outcome.
         self.semantic_repeat = bool(is_loop)
@@ -1111,9 +1126,11 @@ class InteractiveFixy:
         self.semantic_loop_count += 1
         logger.info(
             "[FIXY-LOOP] semantic loop recorded (speaker=%r confidence=%.2f"
-            " total_loops=%d)",
+            " reasoning_delta=%s new_move_type=%s total_loops=%d)",
             speaker,
             confidence,
+            reasoning_delta,
+            new_move_type,
             self.semantic_loop_count,
         )
 
