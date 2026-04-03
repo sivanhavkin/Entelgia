@@ -202,6 +202,26 @@ _REASONING_HASH_HISTORY_SIZE: int = _REASONING_HASH_SIMILARITY_THRESHOLD + 2
 
 
 # ---------------------------------------------------------------------------
+# Pipeline gate
+# ---------------------------------------------------------------------------
+
+
+def integration_pipeline_enabled(cfg) -> bool:
+    """Return True only when the IntegrationCore enforce pipeline must be active.
+
+    This is the single authoritative gate for the cortex enforce subsystem.
+    Every IntegrationCore entry point (pre-generation decision,
+    post-generation evaluate_turn, overlay injection, regeneration, and
+    cortex-forced Fixy intervention) must be gated through this function.
+
+    When this returns False the cortex enforce pipeline is a hard no-op: no
+    force-mode overlays are applied, no regeneration is triggered by the
+    cortex, and IntegrationCore returns NORMAL decisions only.
+    """
+    return bool(getattr(cfg, "integration_enforce_enabled", False))
+
+
+# ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
 
