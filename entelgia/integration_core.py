@@ -957,6 +957,12 @@ class IntegrationCore:
             # All required sections are present — the structured format itself
             # constitutes compliance.  Skip mode-based checks which apply
             # text-based heuristics that are superseded by structural enforcement.
+            logger.info(
+                "[STRUCTURE-LOCK] satisfied — skipping mode-based checks "
+                "(mode=%s escalation_level=%d)",
+                mode.value,
+                decision.escalation_level,
+            )
             return True, "STRUCTURE_LOCK satisfied: all required section headers present."
 
         if mode in (
