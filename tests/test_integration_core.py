@@ -1444,3 +1444,147 @@ class TestStructureLock:
         )
         compliant, reason = core.validate_generated_output(text, decision)
         assert compliant is True, reason
+
+
+# ---------------------------------------------------------------------------
+# 36. check_loop_rejection — hard loop gate
+# ---------------------------------------------------------------------------
+
+
+class TestCheckLoopRejection:
+    """Tests for IntegrationCore.check_loop_rejection (hard loop gate).
+
+    A response is valid only when:
+      (1) structure valid
+      (2) content valid
+      (3) NOT a semantic loop (is_loop=True AND reasoning_delta in ("none","weak"))
+    All three must pass.
+    """
+
+    @pytest.fixture
+    def core(self) -> IntegrationCore:
+        return IntegrationCore()
+
+    def test_loop_with_none_delta_is_rejected(self, core):
+        """is_loop=True + reasoning_delta='none' → should_reject=True."""
+        reject, reason = core.check_loop_rejection(is_loop=True, reasoning_delta="none")
+        assert reject is True
+        assert "SEMANTIC LOOP" in reason
+
+    def test_loop_with_weak_delta_is_rejected(self, core):
+        """is_loop=True + reasoning_delta='weak' → should_reject=True."""
+        reject, reason = core.check_loop_rejection(is_loop=True, reasoning_delta="weak")
+        assert reject is True
+        assert "SEMANTIC LOOP" in reason
+
+    def test_loop_with_moderate_delta_is_accepted(self, core):
+        """is_loop=True + reasoning_delta='moderate' → should_reject=False."""
+        reject, reason = core.check_loop_rejection(is_loop=True, reasoning_delta="moderate")
+        assert reject is False
+        assert reason == ""
+
+    def test_loop_with_strong_delta_is_accepted(self, core):
+        """is_loop=True + reasoning_delta='strong' → should_reject=False."""
+        reject, reason = core.check_loop_rejection(is_loop=True, reasoning_delta="strong")
+        assert reject is False
+        assert reason == ""
+
+    def test_no_loop_with_none_delta_is_accepted(self, core):
+        """is_loop=False even with delta='none' → should_reject=False (no loop flagged)."""
+        reject, reason = core.check_loop_rejection(is_loop=False, reasoning_delta="none")
+        assert reject is False
+
+    def test_no_loop_with_weak_delta_is_accepted(self, core):
+        """is_loop=False + reasoning_delta='weak' → should_reject=False."""
+        reject, reason = core.check_loop_rejection(is_loop=False, reasoning_delta="weak")
+        assert reject is False
+
+    def test_loop_with_none_delta_none_is_accepted(self, core):
+        """reasoning_delta=None (unknown) → should_reject=False regardless of is_loop."""
+        reject, reason = core.check_loop_rejection(is_loop=True, reasoning_delta=None)
+        assert reject is False
+
+    def test_move_type_is_forwarded_in_log_without_error(self, core):
+        """move_type param should not raise an error."""
+        reject, _ = core.check_loop_rejection(
+            is_loop=True, reasoning_delta="weak", move_type="example_only"
+        )
+        assert reject is True
+
+
+# ---------------------------------------------------------------------------
+# 37. build_loop_break_overlay — escalating loop-break overlays
+# ---------------------------------------------------------------------------
+
+
+class TestBuildLoopBreakOverlay:
+    """Tests for IntegrationCore.build_loop_break_overlay."""
+
+    @pytest.fixture
+    def core(self) -> IntegrationCore:
+        return IntegrationCore()
+
+    def test_attempt_0_returns_first_break_overlay(self, core):
+        overlay = core.build_loop_break_overlay(regen_attempt=0)
+        assert "SEMANTIC LOOP REJECTED" in overlay
+        assert overlay  # non-empty
+
+    def test_attempt_1_returns_hard_break_overlay(self, core):
+        overlay = core.build_loop_break_overlay(regen_attempt=1)
+        assert "CRITICAL" in overlay
+        assert "SECOND TIME" in overlay
+
+    def test_attempt_2_returns_failsafe_overlay(self, core):
+        overlay = core.build_loop_break_overlay(regen_attempt=2)
+        assert "ESCALATION" in overlay or "REPEATED" in overlay
+
+    def test_attempt_beyond_max_returns_failsafe(self, core):
+        overlay = core.build_loop_break_overlay(regen_attempt=99)
+        assert overlay  # non-empty; same as failsafe
+
+
+# ---------------------------------------------------------------------------
+# 38. ControlDecision carries is_loop and reasoning_delta from loop rule
+# ---------------------------------------------------------------------------
+
+
+class TestControlDecisionLoopFields:
+    """is_loop and reasoning_delta are populated by _decide_loop_concrete."""
+
+    @pytest.fixture
+    def core(self) -> IntegrationCore:
+        return IntegrationCore()
+
+    def test_loop_decision_carries_is_loop_true(self, core):
+        state = IntegrationState(
+            agent_name="Socrates",
+            semantic_repeat=True,
+            loop_count=1,
+            is_loop=True,
+            reasoning_delta="weak",
+        )
+        decision = core.evaluate_turn("Socrates", state)
+        assert decision.is_loop is True
+
+    def test_loop_decision_carries_reasoning_delta(self, core):
+        state = IntegrationState(
+            agent_name="Socrates",
+            semantic_repeat=True,
+            loop_count=1,
+            is_loop=True,
+            reasoning_delta="none",
+        )
+        decision = core.evaluate_turn("Socrates", state)
+        assert decision.reasoning_delta == "none"
+
+    def test_non_loop_decision_has_default_is_loop_false(self, core):
+        """A decision produced by a non-loop rule must have is_loop=False by default."""
+        state = IntegrationState(
+            agent_name="Socrates",
+            semantic_repeat=False,
+            loop_count=0,
+            stagnation=0.0,
+        )
+        decision = core.evaluate_turn("Socrates", state)
+        assert decision.is_loop is False
+        assert decision.reasoning_delta is None

@@ -7993,6 +7993,13 @@ class MainScript:
             # routed to Fixy.
             _pre_gen_decision = None
             _pre_gen_agent = None
+            # Within-turn loop-rejection regen counter and cached loop result.
+            # _loop_regen_count tracks how many times a response has been
+            # discarded due to semantic loop detection in the PRE-ACCEPT block;
+            # _pre_accept_loop_result carries the loop check output so the
+            # later semantic validation block can reuse it.
+            _loop_regen_count: int = 0
+            _pre_accept_loop_result = None
             if self._loop_detector is not None:
                 _active_loop_modes = self._loop_detector.detect(
                     self.dialog,
@@ -8446,6 +8453,139 @@ class MainScript:
                     )
             # ─────────────────────────────────────────────────────────────────────
 
+            # ── PRE-ACCEPT: semantic loop hard rejection ───────────────────────
+            # Run semantic loop detection on the final *out* BEFORE appending
+            # it to the dialogue history.  A response is valid only when all
+            # three gates pass: (1) structure valid, (2) content valid (mode
+            # checks above), and (3) NOT a semantic loop.  When a loop is
+            # detected — is_loop=True AND reasoning_delta in ("none", "weak") —
+            # the response is rejected immediately and regenerated.  Up to
+            # _MAX_LOOP_BREAK_ATTEMPTS retries are allowed; if the response is
+            # still a loop after all attempts the fail-safe accepts the
+            # best-effort response with a warning.
+            if (
+                self.semantic_controller is not None
+                and self._integration_core is not None
+                and _pre_gen_agent is not None
+                and _pre_gen_agent.name == speaker.name
+                and _pre_gen_agent.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                try:
+                    from entelgia.integration_core import _MAX_LOOP_BREAK_ATTEMPTS as _IC_MAX_LOOP_BREAK
+                    _pa_recent_texts = [
+                        t.get("text", "")
+                        for t in self.dialog
+                        if t.get("role") == speaker.name and t.get("text", "").strip()
+                    ][-3:]  # last 3 prior turns from this speaker; out not yet in dialog
+
+                    _, _pa_loop = self.semantic_controller.evaluate_reply(
+                        speaker=speaker.name,
+                        text=out,
+                        fixy_guidance=(
+                            self.interactive_fixy.fixy_guidance
+                            if self.interactive_fixy is not None
+                            else None
+                        ),
+                        recent_texts=_pa_recent_texts,
+                        stagnation=speaker._last_stagnation,
+                        repeated_moves=bool(_active_loop_modes),
+                        ignored_recently=(
+                            self.interactive_fixy.ignored_guidance_count >= 1
+                            if self.interactive_fixy is not None
+                            else False
+                        ),
+                        unresolved_rising=(speaker.open_questions >= 2),
+                    )
+                    _pre_accept_loop_result = _pa_loop
+
+                    while _loop_regen_count < _IC_MAX_LOOP_BREAK:
+                        _pa_reject, _pa_reason = (
+                            self._integration_core.check_loop_rejection(
+                                _pa_loop.is_loop,
+                                getattr(_pa_loop, "reasoning_delta", None),
+                                getattr(_pa_loop, "new_move_type", None),
+                            )
+                        )
+                        if not _pa_reject:
+                            break
+
+                        # Loop rejection: escalate and regenerate.
+                        _loop_regen_count += 1
+                        _loop_break_overlay = (
+                            self._integration_core.build_loop_break_overlay(
+                                _loop_regen_count - 1
+                            )
+                        )
+                        # Fail-safe after max attempts: truncate context to
+                        # break the attractor without a complete restart.
+                        _pa_dialog = (
+                            self.dialog[-4:]
+                            if _loop_regen_count >= _IC_MAX_LOOP_BREAK
+                            else self.dialog
+                        )
+                        _loop_regen_seed = (
+                            _loop_break_overlay + "\n\n" + _pre_gen_base_seed
+                        )
+                        logger.warning(
+                            "[INTEGRATION-LOOP-REJECT] reason=%r"
+                            " delta=%s move_type=%s regen_attempt=%d speaker=%s",
+                            _pa_reason,
+                            getattr(_pa_loop, "reasoning_delta", None),
+                            getattr(_pa_loop, "new_move_type", None),
+                            _loop_regen_count,
+                            speaker.name,
+                        )
+                        if self.cfg.show_meta:
+                            print(
+                                Fore.YELLOW
+                                + Style.BRIGHT
+                                + f"[INTEGRATION-LOOP-REJECT] agent={speaker.name}"
+                                f" delta={getattr(_pa_loop, 'reasoning_delta', None)}"
+                                f" attempt={_loop_regen_count}"
+                                + Style.RESET_ALL
+                                + "\n"
+                            )
+                        out = _pre_gen_agent.speak(_loop_regen_seed, _pa_dialog)
+
+                        # Re-evaluate the regenerated response.
+                        _, _pa_loop = self.semantic_controller.evaluate_reply(
+                            speaker=speaker.name,
+                            text=out,
+                            fixy_guidance=(
+                                self.interactive_fixy.fixy_guidance
+                                if self.interactive_fixy is not None
+                                else None
+                            ),
+                            recent_texts=_pa_recent_texts,
+                            stagnation=speaker._last_stagnation,
+                            repeated_moves=bool(_active_loop_modes),
+                            ignored_recently=(
+                                self.interactive_fixy.ignored_guidance_count >= 1
+                                if self.interactive_fixy is not None
+                                else False
+                            ),
+                            unresolved_rising=(speaker.open_questions >= 2),
+                        )
+                        _pre_accept_loop_result = _pa_loop
+
+                    if _loop_regen_count >= _IC_MAX_LOOP_BREAK:
+                        # All loop-break attempts exhausted — accept best-effort.
+                        logger.warning(
+                            "[INTEGRATION-LOOP-FAILSAFE] repeated loop after %d"
+                            " regen(s) for agent=%s — accepting best-effort response",
+                            _loop_regen_count,
+                            speaker.name,
+                        )
+                except Exception:
+                    logger.warning(
+                        "[PRE-ACCEPT-LOOP] loop rejection check raised exception"
+                        " for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────
+
             self.dialog.append({"role": speaker.name, "text": out})
 
             # ── Semantic validation and loop detection (FixySemanticController) ─────
@@ -8510,13 +8650,12 @@ class MainScript:
                     _progress_score = _apply_loop_to_progress(
                         _progress_score, _loop_result
                     )
-                    # When a strong loop overrides an otherwise-compliant
-                    # validation verdict, apply an explicit non-compliance
-                    # multiplier rather than mutating the shared
-                    # _validation_result object (which is later passed to
-                    # record_guidance_compliance and must reflect the real
-                    # validator outcome to avoid side-effects on
-                    # ignored_guidance_count).
+                    # Hard loop rejection is handled in the PRE-ACCEPT block
+                    # above (before dialog.append).  _loop_overrides_compliant
+                    # is retained here as a secondary signal: if a loop still
+                    # reaches this point (e.g. because the pre-accept block was
+                    # unavailable or the fail-safe was triggered), we apply an
+                    # additional progress-score penalty to discourage acceptance.
                     _loop_overrides_compliant = (
                         _loop_result.is_loop
                         and _loop_result.confidence >= _STRONG_LOOP_CONFIDENCE_THRESHOLD
