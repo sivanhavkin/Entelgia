@@ -131,23 +131,34 @@ _STRUCTURE_LOCK_GENERIC_PLACEHOLDERS: tuple = (
 
 # Concrete observable action verbs required in the [ACTION] body.
 # At least one must be present (past or present tense).
+# Past-tense forms (examples are typically narrated in past tense)
 _STRUCTURE_LOCK_ACTION_VERBS: tuple = (
-    "administered", "prescribed", "wrote", "signed", "called", "built",
-    "submitted", "ran", "drove", "walked", "produced", "created", "published",
-    "fired", "hired", "operated", "deployed", "launched", "installed",
-    "removed", "replaced", "closed", "opened", "completed", "delivered",
-    "sold", "bought", "transferred", "moved", "sent", "received", "filed",
-    "registered", "conducted", "performed", "executed", "implemented",
-    "applied", "activated", "released", "issued", "refused", "accepted",
-    "rejected", "announced", "arrested", "charged", "resigned", "promoted",
-    "reported", "requested", "denied", "approved", "introduced", "passed",
-    "voted", "dismissed", "convicted", "acquired", "declared", "banned",
-    "decided", "chose", "selected", "gave", "took", "put", "placed",
-    "ate", "drank", "read", "taught", "treated", "diagnosed",
-    "repaired", "fixed", "assembled", "loaded", "printed", "scanned",
-    "tested", "measured", "recorded", "edited", "deleted", "copied",
-    "typed", "pressed", "clicked", "visited", "arrived", "departed",
-    "entered", "exited", "returned", "started", "stopped", "opened",
+    # Medical / clinical
+    "administered", "prescribed", "diagnosed", "treated", "operated",
+    # Professional / administrative
+    "signed", "filed", "submitted", "registered", "issued", "approved",
+    "denied", "refused", "rejected", "accepted", "announced", "declared",
+    "promoted", "fired", "hired", "resigned", "dismissed", "convicted",
+    "arrested", "charged", "voted", "introduced", "passed", "acquired",
+    "banned", "reported", "requested",
+    # Communication
+    "called", "wrote", "published", "recorded",
+    # Construction / technical
+    "built", "installed", "removed", "replaced", "repaired", "fixed",
+    "assembled", "loaded", "printed", "scanned", "tested", "measured",
+    "deployed", "launched", "activated", "released", "executed", "implemented",
+    # Transport / movement
+    "drove", "walked", "ran", "arrived", "departed", "entered", "exited",
+    "returned", "visited", "moved", "transferred",
+    # Commerce / logistics
+    "sold", "bought", "sent", "received", "delivered", "completed",
+    # Manufacturing / production
+    "produced", "created", "conducted", "performed", "applied",
+    # Everyday / general observable
+    "gave", "took", "put", "placed", "ate", "drank", "read", "taught",
+    "edited", "deleted", "copied", "typed", "pressed", "clicked",
+    "started", "stopped", "closed", "chose", "selected", "decided",
+    # Present-tense forms (for responses narrated in present tense)
     "decide", "choose", "take", "run", "drive", "walk", "produce",
     "create", "publish", "fire", "hire", "operate", "deploy", "launch",
     "install", "remove", "close", "complete", "deliver", "sell", "buy",
@@ -627,6 +638,9 @@ def detect_pseudo_compliance(text: str) -> bool:
 def _extract_section_body(text_lower: str, section_header: str) -> str:
     """Return the body text after *section_header* until the next section or end.
 
+    The set of known section names is derived from :data:`_STRUCTURE_LOCK_SECTIONS`
+    so the regex stays in sync if sections are ever renamed.
+
     Parameters
     ----------
     text_lower:
@@ -639,9 +653,16 @@ def _extract_section_body(text_lower: str, section_header: str) -> str:
     str
         Stripped body text, or an empty string when the header is not found.
     """
-    # Match the header then capture everything until the next '[' that starts a
-    # known section tag, or until end-of-string.
-    pattern = re.escape(section_header) + r"\s*(.*?)(?=\[(?:person|action|outcome)\]|$)"
+    # Build alternation from known section names (strip surrounding brackets)
+    section_names = "|".join(
+        re.escape(s.strip("[]")) for s in _STRUCTURE_LOCK_SECTIONS
+    )
+    pattern = (
+        re.escape(section_header)
+        + r"\s*(.*?)(?=\[(?:"
+        + section_names
+        + r")\]|$)"
+    )
     match = re.search(pattern, text_lower, re.DOTALL)
     if match:
         return match.group(1).strip()
