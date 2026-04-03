@@ -84,6 +84,55 @@ All notable changes to this project will be documented in this file. The format 
   - **Unresolved topic tracking in `Agent.speak()`** (production meta) — when the agent's output contains `?`, the active topic is looked up in `unresolved_topics`. If a matching `"unresolved"` entry already exists, its `repetition` counter is incremented and intensity/conflict are refreshed; otherwise a new entry is created with `drive_pressure` as `intensity`, `conflict_index()` as `conflict`, and `weight = 1.0`.
   - **`dream_cycle()` extended** (production meta `MainScript`) — after STM promotion, the top 3 unresolved items are selected, each generates a deterministic insight, is marked `"integrated"` with weight `× 0.3`, and the insight is stored in LTM as a conscious memory with `provenance="dream_resolution"`.
   - **`[DREAM-RESOLVE]` log line** — emitted at `INFO` level at the end of every dream cycle: `[DREAM-RESOLVE] agent=<name> resolved=<n> integrated=<m> remaining=<k>`. `resolved` is the count processed in this cycle; `integrated` is the cumulative total; `remaining` is still-unresolved.
+- **New module `entelgia/integration_core.py` — IntegrationCore (executive cortex)** — active, priority-ordered control layer that sits above dialogue agents and Fixy; reads all per-turn signals and produces a `ControlDecision` that drives Fixy's intervention: (#394)
+  - `IntegrationState` — typed snapshot of all per-turn signals
+  - `ControlDecision` — structured output: `allow_response`, `regenerate`, `suppress_personality`, `enforce_fixy`, `force_*_mode`, `prompt_overlay`, `priority_level`, `active_mode`, `escalation_level`
+  - `IntegrationMode` enum — `NORMAL | CONCRETE_OVERRIDE | RESOLUTION_OVERRIDE | ATTACK_OVERRIDE | LOW_COMPLEXITY | PERSONALITY_SUPPRESSION | FIXY_AUTHORITY_OVERRIDE`
+  - `IntegrationCore.evaluate_turn(agent_name, state_dict) → ControlDecision` — symbolic rule engine, priority 1–6: (1) `is_loop + not compliance` → `FIXY_AUTHORITY_OVERRIDE`, `regenerate=True`; (2) `semantic_repeat + loop_count ≥ 1` → `CONCRETE_OVERRIDE`; (3) `semantic_repeat + stagnation ≥ 0.25` → `PERSONALITY_SUPPRESSION`; (4) `stagnation ≥ 0.25` → `ATTACK_OVERRIDE`; (5) `unresolved ≥ 3 + progress < 0.5` → `RESOLUTION_OVERRIDE`; (6) `fatigue ≥ 0.6` → `LOW_COMPLEXITY`
+  - `build_prompt_overlay(decision) → str` — short imperative directive for LLM injection; `should_regenerate(decision) → bool`
+  - Structured logs: `[INTEGRATION-STATE]`, `[INTEGRATION-DECISION]`, `[INTEGRATION-MODE]`, `[INTEGRATION-OVERLAY]`, `[INTEGRATION-REGEN]`
+  - Only instantiated when `enable_observer=True`
+- **`IntegrationCore` escalation system** (`entelgia/integration_core.py`) — hard enforcement engine with progressive constraint escalation on detected loops: (#396)
+  - `EscalationLevel` IntEnum (0–4): `NORMAL → CONCRETE_OVERRIDE → STRICT_CONCRETE → FORMAT_ENFORCED → HARD_OVERRIDE`
+  - `escalation_level` field on `ControlDecision` (default 0); `_decide_loop_concrete` maps `loop_count` to level; personality suppressed at L3+
+  - Level overlays — L1: soft; L2: structured named-person example; L3: `[SCENARIO]/[ACTION]/[OUTCOME]` mandatory template; L4: hard override
+  - `detect_pseudo_compliance(text)` — catches responses using hypothetical trigger phrases (`"for example"`, `"imagine"`, `"suppose"`) without all three grounding signals (named person/role, concrete action verb, situational anchor)
+  - `escalate_decision(decision)` — increments level (+1, capped at 4), prepends `_FAILURE_MEMORY_PREFIX`, sets `regenerate=True`
+  - `build_escalation_overlay(decision)` — selects overlay text by current escalation level
+  - `record_response_hash(text)` — rolling hash history of structural reasoning skeletons; returns `True` on repeated structure, forcing immediate escalation
+  - New log tags: `[INTEGRATION-ESCALATION]`, `[INTEGRATION-PSEUDO-COMPLIANCE]`, `[INTEGRATION-FORCE-REGEN]`
+- **Two-stage pre/post-generation cortex control** (`Entelgia_production_meta.py`) — `IntegrationCore` is now evaluated before and after the LLM call to constrain the current generation: (#395)
+  - `prepare_generation_state(agent, signals)` — public pre-gen entry alias
+  - `pre_generation_decision(agent, state)` — runs the rule engine before the LLM call; logs `[PRE-GEN-STATE]` / `[PRE-GEN-DECISION]`
+  - `build_generation_overlay(decision)` — returns overlay injected into the current seed; logs `[PRE-GEN-OVERLAY]`
+  - `validate_generated_output(text, decision)` — heuristic compliance check per active mode
+  - `should_regenerate_after_validation(text, decision)` — `True` when active mode constraint was violated; logs `[POST-GEN-VALIDATION]`
+  - `build_stronger_overlay(decision)` — prepends `STRICT REGENERATION REQUIRED` for second-pass regeneration
+  - `_prev_cortex_decision` carry-forward — when the previous turn's cortex decision had `regenerate=True`, current pre-gen signals get `is_loop=True` and `loop_count` bumped
+  - POST-GEN regeneration guard hard-excludes `"Fixy"` — regeneration is always issued by the same dialogue agent (Socrates/Athena) that produced the first draft
+- **`STRUCTURE_LOCK` content enforcement at escalation ≥ 3** (`entelgia/integration_core.py`) — structural header validation followed by content validation: (#397)
+  - `_STRUCTURE_LOCK_GENERIC_PLACEHOLDERS` — banned placeholder patterns (`someone`, `a person`, `an individual`, `something`, `some action`) matched with word boundaries
+  - `_STRUCTURE_LOCK_ACTION_VERBS` — ~80 concrete observable verbs grouped by category; at least one required in `[ACTION]`
+  - `_STRUCTURE_LOCK_OUTCOME_ABSTRACT` — 15 abstract-reflection phrases that disqualify `[OUTCOME]`
+  - `_extract_section_body(text_lower, section_header)` — parses body between headers via lookahead regex
+  - `_validate_structure_lock_content(text)` — enforces all three rules in order; `_OVERLAY_ESCALATION_3` updated to forbid generic placeholders and abstract reflection
+- **`_QUALITY_GATE_PATTERNS` in `IntegrationCore`** (`entelgia/integration_core.py`) — 19 compiled regexes matching banned rhetorical scaffolding; `_QUALITY_GATE_THRESHOLD = 2`, `_QUALITY_GATE_MIN_WORDS = 10`, `_OVERLAY_QUALITY_GATE` fallback overlay added; `validate_generated_output` now runs the quality gate in NORMAL mode; `build_stronger_overlay` falls back to `_OVERLAY_QUALITY_GATE` when `prompt_overlay` is empty; `should_regenerate_after_validation` no longer short-circuits in NORMAL mode. (#398)
+- **`LoopCheckResult` reasoning-delta fields** (`entelgia/fixy_semantic_control.py`) — `reasoning_delta: Optional[str]` (`"none" | "weak" | "moderate" | "strong"`) and `new_move_type: Optional[str]` (`"none" | "example_only" | "new_distinction" | "new_variable" | "reframe" | "resolution_attempt" | "counterexample"`). `None` is the fail-safe sentinel for parse failures and unchecked turns; the string `"none"` is an explicit LLM verdict of zero new reasoning. (#399)
+- **Two-stage LLM loop evaluation** (`_LOOP_PROMPT_TEMPLATE` rewrite) — semantic check (same claim? same causal structure?) followed by reasoning-delta check; strict framing — surface novelty and stylistic variation do not count; returns all five fields in structured JSON. (#399)
+- **`apply_loop_to_progress()` weak-delta cap** — `reasoning_delta in ("none", "weak")` additionally caps the score at `0.40` on top of the existing `×0.70` and `0.50` cap. (#399)
+- **`record_semantic_loop()` delta-based loop override** — when the LLM explicitly returns `reasoning_delta in ("none", "weak")`, `is_loop` is forced to `True` even if the primary verdict was `False`; parse failures and unchecked turns are unaffected. (#399)
+- **`reasoning_delta` and `new_move_type` on `IntegrationState`** — exposed for downstream use; `_decide_loop_concrete()` bumps escalation one level higher when `reasoning_delta in ("none", "weak")`. (#399)
+- **New module `entelgia/integration_memory_store.py` — JSON-backed IntegrationMemoryStore** — persistent memory layer for `IntegrationCore` decisions and `FixySemanticController` results: (#400)
+  - JSON-backed store with capped entry list (`max_entries=500`, auto-evict oldest) backed by `entelgia/integration_memory.json`
+  - `store_entry(entry)` — appends timestamped entry with auto-assigned ID; evicts oldest when limit exceeded
+  - `retrieve_by_agent(agent_name, limit)` — returns most recent entries for a given agent
+  - `retrieve_relevant(agent_name, tags, limit)` — filters by tag intersection for targeted retrieval
+  - `format_context(entries)` — renders compact `[MEMORY]`-prefixed block for prompt injection
+  - `make_entry(agent, decision, state)` — factory builds entries from live `ControlDecision` / `IntegrationState` objects
+  - `save()` / `load()` — round-trip JSON persistence; corrupted files degrade gracefully to empty store
+- **`IntegrationCore` memory hooks** — `attach_memory_store(store)`, `record_decision(agent_name, decision, state, tags)`, `get_memory_context(agent_name, tags, limit)`. `record_decision()` persists every evaluated turn; `get_memory_context()` prepends recent decision history as overlay text into the seed before the LLM call. (#400)
+- **`FixySemanticController` auto-recording** — once a store is attached, `ValidationResult` and `LoopCheckResult` are automatically persisted after every LLM call with tags `fixy_validation` / `semantic_loop` / `loop_detected` / `weak_reasoning`. (#400)
+- **`select_session_turns()` session start menu** (`Entelgia_production_meta.py`) — interactive numbered menu shown before backend selection; options: `5 / 15 / 25 / 50 / 75 / 100` turns; Enter defaults to 15. `run_cli()` creates `Config(max_turns=<selection>, timeout_minutes=0)` — no wall-clock limit. `Config` validation relaxed: `timeout_minutes >= 0` (0 = no limit); `run()` sets `timeout_seconds = float("inf")` when `timeout_minutes == 0`. (#401)
 
 ### Changed
 
@@ -93,10 +142,22 @@ All notable changes to this project will be documented in this file. The format 
 - **`[FIXY-GATE] skipped` and `[DEDUP] dream_cycle skipped` log lines downgraded to `DEBUG`** — these are expected no-op paths; emitting them at `INFO` level created log noise during normal operation. Updated in `entelgia/loop_guard.py`, `entelgia/fixy_interactive.py`, and both production scripts. (#358)
 - **`compute_resolution_alignment()` simplified** — internal-state threshold logic removed; resolution alignment now derives solely from `dialogue_resolution` (the text-level signal), returning only `"aligned"` or `"neutral"`. Parameters `unresolved_count`, `conflict`, and `stagnation` retained for call-site compatibility but are no longer read. (#363)
 - **`score_progress()` signature extended** (`entelgia/progress_enforcer.py`) — two keyword-only parameters `fixy_guidance` and `ignored_guidance_count` added. All existing call sites pass neither argument and are entirely unaffected; the new parameters activate only when explicitly provided. (#380)
+- **Full fixy-coupling restored in `Entelgia_production_meta_200t.py`** — imports `apply_validation_to_progress` and `apply_loop_to_progress`; mirrors loop result into `_last_dialogue_signals["semantic_repeat"]`; propagates results into `InteractiveFixy` via `record_semantic_loop` / `record_guidance_compliance`; adds `[FIXY-COUPLING]` logger. (#389)
+- **No-timeout support in `Entelgia_production_meta_200t.py`** — `timeout_minutes=0` sets `timeout_seconds = float("inf")`; validation relaxed to `>= 0`; `_timeout_label` / `_log_timeout` helpers produce human-readable "no-timeout" / "unlimited" in logs and banner. (#389)
+- **`STRONG_LOOP_CONFIDENCE_THRESHOLD` exported** from `entelgia/fixy_semantic_control.py`; `apply_loop_to_progress` uses the constant; `×0.85` score penalty in both production scripts applied as explicit multiplication without validator mutation; `[FIXY-COUPLING]` log includes `loop_overrides_compliant` field. (#390)
+- **Fixy mode prompts expanded to 200 words** (`entelgia/fixy_interactive.py`, `entelgia/context_manager.py`, `entelgia/enhanced_personas.py`) — all occurrences of `Max 2 short sentences`, `Max 3 short sentences`, and `Max 2–3 short sentences` replaced with `Up to 200 words`. (#391)
+- **Fixy authority directive added to agent contracts** — `FIXY IS THE CONVERSATION MANAGER. When Fixy intervenes with a directive, follow it immediately and without debate. Fixy's orders are mandatory.` appended to `LLM_BEHAVIORAL_CONTRACT_SOCRATES` and `LLM_BEHAVIORAL_CONTRACT_ATHENA` in `Entelgia_production_meta.py` and `entelgia/context_manager.py`. (#391)
+- **`LLM_RESPONSE_LIMIT` raised from 150 to 200 words** — all sentence-count hints replaced with `Up to 200 words.` across all contract definition sites; `LLM_OUTPUT_CONTRACT` updated. (#392)
+- **Post-speak diagnostic log ordering fixed** (`Entelgia_production_meta.py`) — `[FIXY-VALIDATION]`, `[FIXY-LOOP]`, `[FIXY-COUPLING]`, and `[LOOP-DIAG]` deferred to after `print_agent()` so they appear after the visible agent response; a new `_last_pe_move: str` instance variable captures the final move type for an additional post-output `[PROGRESS]` record. (#393)
+- **`[ENERGY-STATUS]` log line removed** — `logger.info` call dropped; internal `_last_energy_status` assignment retained. (#393)
+- **`generate_intervention` on `InteractiveFixy`** gains `cortex_overlay: Optional[str]` — when set, prepended to Fixy's LLM prompt as `[EXECUTIVE CORTEX DIRECTIVE — highest priority]`. (#394)
+- **`Entelgia_production_meta_200t.py` removed** — the 200t variant is superseded by the interactive turn-count selector in the main production script; `Entelgia_production_meta.py` is now the sole entry point covering all session lengths. (#401)
 
 ### Fixed
 
 - **CI test helpers** — `tests/test_topic_anchors.py` and `tests/test_stabilization_pass.py` now use topic-enabled configs via a shared `_make_cfg()` helper, ensuring all topic anchor assertions (`TOPIC ANCHOR [STRICT]:`, `Active topic:`, `[TOPIC-RECOVERY]`, etc.) fire correctly. Three files reformatted with Black. (#349)
+- **`"Do NOT"` capitalisation** fixed in `entelgia/context_manager.py`. (#390)
+- **Socrates "You…" repetition rule** corrected in agent behavioral contract. (#390)
 
 ### Tests
 
@@ -116,7 +177,11 @@ All notable changes to this project will be documented in this file. The format 
   - `build_guidance_prompt_hint` — correct hint per move type, empty for `None`, empty for unrecognised move, all `MOVE_TYPES` covered
   - `SeedGenerator.generate_seed` hint injection when guidance set, no `[GUIDANCE HINT]` tag without guidance
   - `score_progress` — penalty at count ≥ 2 (`×0.85`), stronger penalty + cap at count ≥ 3 (`×0.75` / `≤ 0.55`), mismatch penalty, compliance reward, backward compat, score always in `[0.0, 1.0]`
-- **Total test count**: **1574 tests** across **36 suites**.
+- **`tests/test_fixy_semantic_control.py`** — **4 new tests** for `STRONG_LOOP_CONFIDENCE_THRESHOLD` strong-loop override behaviour. (#390) **17 new tests** covering `LoopCheckResult` `reasoning_delta` / `new_move_type` field defaults, all LLM response variants, parse/exception/no-context fail-safes, invalid value normalisation, 0.40 cap logic, and `is_loop` override for all delta values. (#399)
+- **`tests/test_integration_core.py`** — new suite with **138 tests** covering `IntegrationCore`, `IntegrationState`, `ControlDecision`, all six priority rules, overlay imperatives, `EscalationLevel`, `detect_pseudo_compliance`, `build_escalation_overlay`, `escalate_decision`, `record_response_hash`, `validate_generated_output` (STRUCTURE_LOCK structural + content validation, quality-gate NORMAL mode), `should_regenerate_after_validation`, `_validate_structure_lock_content`, and `_extract_section_body`. (#394, #395, #396, #397, #398)
+- **`tests/test_integration_memory_store.py`** — new suite with **27 tests** covering `IntegrationMemoryStore` store I/O, entry eviction at `max_entries`, retrieval by agent and tag, round-trip JSON persistence, graceful corrupt-file handling, `IntegrationCore` `attach_memory_store` / `record_decision` / `get_memory_context` hooks, and `FixySemanticController` auto-recording of `ValidationResult` and `LoopCheckResult` (including `loop_detected` and `weak_reasoning` tag logic). (#400)
+- **`tests/test_session_turn_selector.py`** — new suite with **9 tests** covering `_pick_numbered_option` helper (Enter defaults, valid choice, last item, invalid-then-valid, out-of-range, zero rejected) and `select_session_turns` (default mapping, valid selection, invalid-then-default). (#401)
+- **Total test count**: **1956 tests** across **40 suites**.
 
 ---
 

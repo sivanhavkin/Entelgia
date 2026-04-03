@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **1574 tests** (1574 collected) in 36 suites:
+Entelgia ships with comprehensive test coverage across **1956 tests** (1956 collected) in 40 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -342,7 +342,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 1508 total tests across 35 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator, fixy soft enforcement, fixy semantic control) |
+| **Unit Tests** | `pytest` | Runs 1956 total tests across 40 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator, fixy soft enforcement, fixy semantic control, fatigue tagging, integration core, integration memory store, session turn selector, text humanizer integration) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -851,7 +851,7 @@ Tests verify Soft Fixy Enforcement v1 and v2 across `entelgia/fixy_interactive.p
 
 ---
 
-### 🧠 Fixy Semantic Control Tests (52 tests)
+### 🧠 Fixy Semantic Control Tests (100 tests)
 
 ```bash
 pytest tests/test_fixy_semantic_control.py -v
@@ -928,3 +928,125 @@ Tests verify the integrated Fixy semantic validation and loop-detection layer (`
 **Constants**
 - ✅ `VALIDATED_MOVE_TYPES` contains `EXAMPLE`, `TEST`, `CONCESSION` and excludes `NEW_CLAIM`
 - ✅ `LOOP_BREAKING_MOVES` contains `EXAMPLE`, `TEST`, `CONCESSION`, `NEW_FRAME`
+
+---
+
+### 🧠 Fatigue Tagging Tests (20 tests)
+
+```bash
+pytest tests/test_fatigue_tagging.py -v
+```
+
+Tests verify `_compute_fatigue`, `_compute_energy_status`, and related `Agent` state fields:
+
+- ✅ **No fatigue above threshold** — `energy > 60` returns `fatigue = 0.0`
+- ✅ **Boundary at threshold** — exactly at `_FATIGUE_ENERGY_THRESHOLD` returns `0.0`
+- ✅ **State label mapping** — numeric score maps to correct label (`none / mild / medium / severe`)
+- ✅ **Fatigue increases as energy decreases** — monotonicity enforced across the 35–60 range
+- ✅ **Fatigue formula at midpoint and full span** — exact formula verified
+- ✅ **Clamp at dream threshold** — `energy < 35` clamps to `1.0`
+- ✅ **Score in unit interval** — all energy values produce `[0.0, 1.0]`
+- ✅ **Agent init** — `_last_fatigue` initialises to `0.0`, `_last_fatigue_state` to `"none"`
+- ✅ **Side-effect absence** — fatigue does not set `semantic_repeat` loop flag
+- ✅ **`_compute_energy_status`** — all three regime labels (`normal / degrading / dream`), boundary conditions, return-type check
+- ✅ **`Agent._last_energy_status`** — initialises to `"normal"`, is a `str`; no stale normal status when energy is in degrading range
+
+---
+
+### 🧩 IntegrationCore Tests (138 tests)
+
+```bash
+pytest tests/test_integration_core.py -v
+```
+
+Tests verify `IntegrationCore` and all related helpers in `entelgia/integration_core.py`:
+
+**`IntegrationState` and `ControlDecision`**
+- ✅ Construction from nominal dict; unknown keys silently dropped; missing keys fall back to defaults
+- ✅ All flags default to `False`; default mode is `NORMAL`; default priority is `0`
+
+**Priority rules**
+- ✅ **Rule 2 — `CONCRETE_OVERRIDE`**: triggers on `semantic_repeat + loop_count ≥ 1`; no trigger without semantic repeat
+- ✅ **Rule 3 — `PERSONALITY_SUPPRESSION`**: triggers on `semantic_repeat + stagnation ≥ 0.25`
+- ✅ **Rule 4 — `ATTACK_OVERRIDE`**: triggers on `stagnation ≥ 0.25`; not triggered below threshold
+- ✅ **Rule 5 — `RESOLUTION_OVERRIDE`**: triggers on `unresolved ≥ 3 + progress < 0.5`
+- ✅ **Rule 6 — `LOW_COMPLEXITY`**: triggers on `fatigue ≥ 0.6`
+- ✅ **Rule 1 — `FIXY_AUTHORITY_OVERRIDE`**: triggers on `is_loop + not compliance`
+- ✅ **Priority ordering**: highest-priority rule wins; overlay injected on misalignment; no overlay when aligned
+- ✅ **Normal mode, allow-response default, prompt overlay, and regen bool**
+
+**Escalation system**
+- ✅ **Level overlays**: L1 soft, L2 structured example, L3 strict format, L4 hard override
+- ✅ **`detect_pseudo_compliance`**: genuine grounded example not pseudo; no-trigger never pseudo; trigger without person/action/situation is pseudo; pure abstraction not pseudo
+- ✅ **`escalate_decision`**: increments level; sets `regenerate=True`; caps at L4; suppresses personality at L3; injects failure memory prefix; stronger overlay than base
+- ✅ **`build_escalation_overlay`**: L0 empty; L1 non-empty; L4 contains hard override
+- ✅ **`record_response_hash`**: different responses no repeat; same response three times triggers repeat; fresh core no history
+
+**Pseudo-compliance + regen integration**
+- ✅ Pseudo-compliant response fails validation and triggers regen
+
+**STRUCTURE_LOCK (L3/L4) structural validation**
+- ✅ L2 does not enforce section headers; L3 activates structure lock; passes with all three headers; fails on missing `[PERSON]`, `[ACTION]`, or `[OUTCOME]`; fails on abstract prose; headers case-insensitive; L4 also enforces headers
+- ✅ Section name in body does not satisfy header check; structure lock triggers regen on missing headers; L3 overlay uses structured headers
+
+**STRUCTURE_LOCK content validation**
+- ✅ `[PERSON]` with generic placeholder (`a person`, `someone`, `an individual`) fails; `[ACTION]` with `something`/`some action` placeholder fails; `[ACTION]` without concrete verb fails; `[OUTCOME]` with abstract reflection (`reminds us`, `raises the question`, `challenges us to`) fails; all-concrete content passes; content violation triggers regen; action verb inflections (third-person singular, progressive) pass
+
+---
+
+### 🗄️ Integration Memory Store Tests (27 tests)
+
+```bash
+pytest tests/test_integration_memory_store.py -v
+```
+
+Tests verify `IntegrationMemoryStore` in `entelgia/integration_memory_store.py` and its hooks on `IntegrationCore` and `FixySemanticController`:
+
+**Store I/O**
+- ✅ Init with no file creates empty store
+- ✅ `store_entry` appends and assigns ID + timestamp
+- ✅ Evicts oldest entry when `max_entries` is reached
+
+**Retrieval**
+- ✅ `retrieve_by_agent` filters by agent name; respects `limit`
+- ✅ `retrieve_relevant` filters by tag intersection; falls back when no tags
+
+**Formatting and persistence**
+- ✅ `format_context` returns empty string for no entries; produces `[MEMORY]`-prefixed lines for entries
+- ✅ `save` / `load` round-trip JSON persistence
+- ✅ `make_entry` factory builds entry from `ControlDecision` and `IntegrationState`
+- ✅ Corrupt JSON degrades gracefully; `auto_save=False` does not write file
+
+**`IntegrationCore` hooks**
+- ✅ `attach_memory_store` wires store to core
+- ✅ `get_memory_context` returns empty string when no store; returns formatted context with store
+- ✅ `record_decision` is a no-op when no store; persists entry when store is attached
+
+**`FixySemanticController` auto-recording**
+- ✅ `attach_memory_store` wires store to controller; no error when no store attached
+- ✅ `validate_guidance_compliance` records to memory; `detect_semantic_loop` records to memory
+- ✅ Loop-detected result tagged `loop_detected`; weak-reasoning result tagged `weak_reasoning`
+- ✅ Targeted retrieval by `fixy_validation` and `semantic_loop` tags
+
+---
+
+### 🎚️ Session Turn Selector Tests (9 tests)
+
+```bash
+pytest tests/test_session_turn_selector.py -v
+```
+
+Tests verify `_pick_numbered_option` and `select_session_turns` in `Entelgia_production_meta.py`:
+
+**`_pick_numbered_option`**
+- ✅ Enter returns the default option
+- ✅ Valid choice returns the correct value from the option list
+- ✅ Selecting the last item works correctly
+- ✅ Invalid input followed by a valid choice loops and accepts the valid one
+- ✅ Out-of-range input followed by a valid choice loops and accepts
+- ✅ Entry of `0` is rejected (options are 1-indexed)
+
+**`select_session_turns`**
+- ✅ Enter maps to the default turn count (15)
+- ✅ Each valid selection maps to the correct turn count option
+- ✅ Invalid input followed by Enter returns the default
