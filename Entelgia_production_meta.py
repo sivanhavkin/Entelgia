@@ -198,6 +198,7 @@ try:
         compute_semantic_repeat_alignment as _compute_semantic_repeat_alignment,
     )
     from entelgia.integration_core import IntegrationCore as _IntegrationCore
+    from entelgia.integration_memory_store import IntegrationMemoryStore as _IntegrationMemoryStore
 
     ENTELGIA_ENHANCED = True
 except ImportError:
@@ -7534,6 +7535,18 @@ class MainScript:
             self._integration_core = (
                 _IntegrationCore() if cfg.enable_observer else None
             )
+            # JSON-backed memory store: persists IntegrationCore decisions so
+            # that future turns can retrieve historical context per agent.
+            # Use cfg.data_dir so the file lands in the same writable runtime
+            # directory as all other Entelgia data files.
+            if self._integration_core is not None:
+                _mem_path = str(Path(cfg.data_dir) / "integration_memory.json")
+                _mem_store = _IntegrationMemoryStore(_mem_path)
+                self._integration_core.attach_memory_store(_mem_store)
+                # Also wire FixySemanticController so validation/loop results
+                # are persisted to the same store.
+                if self.semantic_controller is not None:
+                    self.semantic_controller.attach_memory_store(_mem_store)
             logger.info("Enhanced dialogue components initialized")
         else:
             self.dialogue_engine = None
@@ -8242,6 +8255,17 @@ class MainScript:
                     _pre_gen_decision = self._integration_core.pre_generation_decision(
                         speaker.name, _pre_gen_signals
                     )
+                    # Inject historical memory context into the seed so the
+                    # agent is aware of past integration decisions.
+                    _mem_context = self._integration_core.get_memory_context(
+                        speaker.name, limit=3
+                    )
+                    if _mem_context:
+                        seed = _mem_context + "\n\n" + seed
+                        logger.info(
+                            "[INTEGRATION-MEMORY-CONTEXT] injected for agent=%s",
+                            speaker.name,
+                        )
                     # Bind the decision to this specific agent so that any
                     # subsequent regeneration is issued by the same speaker,
                     # never by Fixy or a different agent.
@@ -8728,6 +8752,22 @@ class MainScript:
                     _cortex_decision = self._integration_core.evaluate_turn(
                         speaker.name, _cortex_signals
                     )
+                    # Persist the decision so future turns can retrieve
+                    # historical context from memory.
+                    try:
+                        self._integration_core.record_decision(
+                            speaker.name,
+                            _cortex_decision,
+                            self._integration_core.prepare_generation_state(
+                                speaker.name, _cortex_signals
+                            ),
+                        )
+                    except Exception:
+                        logger.debug(
+                            "[INTEGRATION-CORE] record_decision failed for agent=%s",
+                            speaker.name,
+                            exc_info=True,
+                        )
                 except Exception:
                     logger.warning(
                         "[INTEGRATION-CORE] evaluate_turn failed for agent=%s",

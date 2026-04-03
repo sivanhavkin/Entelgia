@@ -36,7 +36,10 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
+
+if TYPE_CHECKING:  # pragma: no cover
+    from entelgia.integration_memory_store import IntegrationMemoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -456,11 +459,118 @@ class FixySemanticController:
         LLM backend with a ``generate(model, prompt, **kwargs)`` method.
     model:
         Model identifier string passed to *llm*.
+
+    Memory integration
+    ------------------
+    An optional :class:`~entelgia.integration_memory_store.IntegrationMemoryStore`
+    can be attached via :meth:`attach_memory_store`.  Once wired, every
+    :class:`ValidationResult` and :class:`LoopCheckResult` produced by this
+    controller is automatically persisted to the store so that
+    :class:`~entelgia.integration_core.IntegrationCore` (or any other consumer)
+    can retrieve historical semantic-validation context for a given agent.
+
+    Logging tags
+    ------------
+    [FIXY-VALIDATION]          — guidance compliance check result
+    [FIXY-LOOP]                — semantic loop detection result
+    [FIXY-MEMORY-RECORD]       — entry written to attached memory store
     """
 
     def __init__(self, llm: Any, model: str) -> None:
         self.llm = llm
         self.model = model
+        # Optional JSON-backed memory store (wired via attach_memory_store)
+        self._memory_store: Optional[IntegrationMemoryStore] = None
+
+    # ------------------------------------------------------------------
+    # Memory store integration
+    # ------------------------------------------------------------------
+
+    def attach_memory_store(self, store: "Optional[IntegrationMemoryStore]") -> None:
+        """Wire an :class:`~entelgia.integration_memory_store.IntegrationMemoryStore`
+        so that validation and loop results are automatically persisted.
+
+        Parameters
+        ----------
+        store:
+            An initialised ``IntegrationMemoryStore`` instance.  Pass ``None``
+            to detach an existing store.
+        """
+        self._memory_store = store
+        logger.info(
+            "[FIXY-MEMORY] memory store %s",
+            "attached" if store is not None else "detached",
+        )
+
+    def _record_validation(self, result: ValidationResult) -> None:
+        """Persist *result* to the memory store (no-op when no store attached)."""
+        if self._memory_store is None:
+            return
+        entry = {
+            "agent": result.speaker,
+            "entry_type": "fixy_validation",
+            "active_mode": "VALIDATION",
+            "decision_reason": result.reason,
+            "priority_level": 0,
+            "regenerate": False,
+            "suppress_personality": False,
+            "enforce_fixy": False,
+            "stagnation": 0.0,
+            "loop_count": 0,
+            "unresolved": 0,
+            "fatigue": 0.0,
+            "energy": 100.0,
+            "expected_move": result.expected_move,
+            "compliant": result.compliant,
+            "partial": result.partial,
+            "confidence": result.confidence,
+            "tags": ["fixy_validation", result.expected_move.lower()],
+        }
+        self._memory_store.store_entry(entry)
+        logger.info(
+            "[FIXY-MEMORY-RECORD] type=validation agent=%s move=%s compliant=%s",
+            result.speaker,
+            result.expected_move,
+            result.compliant,
+        )
+
+    def _record_loop(self, result: LoopCheckResult) -> None:
+        """Persist *result* to the memory store (no-op when no store attached)."""
+        if self._memory_store is None:
+            return
+        tags = ["semantic_loop"]
+        if result.is_loop:
+            tags.append("loop_detected")
+        if result.reasoning_delta in ("none", "weak"):
+            tags.append("weak_reasoning")
+        entry = {
+            "agent": result.speaker,
+            "entry_type": "loop_check",
+            "active_mode": "LOOP_CHECK",
+            "decision_reason": result.reason,
+            "priority_level": 0,
+            "regenerate": False,
+            "suppress_personality": False,
+            "enforce_fixy": False,
+            "stagnation": 0.0,
+            "loop_count": 1 if result.is_loop else 0,
+            "unresolved": 0,
+            "fatigue": 0.0,
+            "energy": 100.0,
+            "is_loop": result.is_loop,
+            "reasoning_delta": result.reasoning_delta,
+            "new_move_type": result.new_move_type,
+            "confidence": result.confidence,
+            "tags": tags,
+        }
+        self._memory_store.store_entry(entry)
+        logger.info(
+            "[FIXY-MEMORY-RECORD] type=loop_check agent=%s is_loop=%s "
+            "reasoning_delta=%s",
+            result.speaker,
+            result.is_loop,
+            result.reasoning_delta,
+        )
 
     # ------------------------------------------------------------------
     # Guidance compliance validation
@@ -545,6 +655,7 @@ class FixySemanticController:
             result.confidence,
             result.reason,
         )
+        self._record_validation(result)
         return result
 
     # ------------------------------------------------------------------
@@ -620,6 +731,7 @@ class FixySemanticController:
             result.new_move_type,
             result.reason,
         )
+        self._record_loop(result)
         return result
 
     # ------------------------------------------------------------------
