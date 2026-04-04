@@ -4,26 +4,30 @@
 """
 Tests for dynamic continuation context helpers.
 
-Coverage:
-  1. extract_continuation_context — empty turns returns empty non-topic fields
-  2. extract_continuation_context — seed-role entries are skipped
-  3. extract_continuation_context — extracts last_claim from a declarative sentence > 20 chars
-  4. extract_continuation_context — extracts unresolved_question from a sentence ending with ?
-  5. extract_continuation_context — extracts tension_point via adversative marker
-  6. extract_continuation_context — dominant_topic is taken from the topic argument
-  7. build_continuation_prompt — returns "" for empty context
-  8. build_continuation_prompt — returns "" when only empty strings are in context
-  9. build_continuation_prompt — includes continuation instruction + topic line for topic-only context
- 10. build_continuation_prompt — includes all four fields when all are populated
- 11. SeedGenerator.generate_seed — uses continuation prompt (not TOPIC: header) when real turns exist
- 12. SeedGenerator.generate_seed — first session (seed-only / no real turns) uses TOPIC: header, not continuation instruction
- 13. SeedGenerator.generate_seed — first session with no memory preserves topic in seed
- 14. SeedGenerator.generate_seed — strategy instruction keywords still present after continuation prefix
+Coverage (20 test functions across 15 scenarios):
+  1.  extract_continuation_context — empty turns returns empty non-topic fields
+  2.  extract_continuation_context — seed-role entries are skipped
+  3.  extract_continuation_context — extracts last_claim from a declarative sentence > 20 chars
+  4a. extract_continuation_context — ignores short sentences for last_claim
+  4b. extract_continuation_context — extracts unresolved_question from a sentence ending with ?
+  4c. extract_continuation_context — ignores non-question sentences for unresolved_question
+  5a. extract_continuation_context — extracts tension_point via "but"
+  5b. extract_continuation_context — extracts tension_point via "however,"
+  5c. extract_continuation_context — tension_point not set without adversative marker
+  6a. extract_continuation_context — dominant_topic from argument
+  6b. extract_continuation_context — dominant_topic empty when no topic
+  7.  build_continuation_prompt — returns "" for empty context
+  8.  build_continuation_prompt — returns "" when only empty strings are in context
+  9.  build_continuation_prompt — topic-only context: includes instruction + topic line
+ 10.  build_continuation_prompt — full context includes all four fields; no double punctuation
+ 11.  SeedGenerator.generate_seed — has_prior_memory=True + real turns → continuation prompt
+ 12.  SeedGenerator.generate_seed — has_prior_memory=False + real turns → TOPIC: header (no continuation)
+ 13.  SeedGenerator.generate_seed — first session (seed-only turns, no prior memory) → TOPIC: header
+ 14.  SeedGenerator.generate_seed — empty dialog → TOPIC: header
+ 15.  SeedGenerator.generate_seed — strategy instruction keywords survive continuation prefix
 """
 
 import random
-
-import pytest
 
 from entelgia.dialogue_engine import (
     SeedGenerator,
@@ -219,14 +223,19 @@ def test_build_full_context_includes_all_fields():
     assert "The last claim made was: Determinism" in result
     assert "An unresolved question remains: Can moral" in result
     assert "The tension point was: Free will" in result
+    # Extracted sentences already end with terminal punctuation — must not
+    # produce doubles like ".." or "?."
+    assert ".." not in result
+    assert "?." not in result
+    assert "!." not in result
 
 
 # ---------------------------------------------------------------------------
-# 11. SeedGenerator — continuation prompt used when real turns exist
+# 11. SeedGenerator — has_prior_memory=True + real turns → continuation prompt
 # ---------------------------------------------------------------------------
 
 
-def test_seed_generator_uses_continuation_when_real_turns_exist():
+def test_seed_generator_uses_continuation_when_prior_memory_and_real_turns():
     sg = SeedGenerator()
     turns = [
         _turn(
@@ -234,7 +243,9 @@ def test_seed_generator_uses_continuation_when_real_turns_exist():
             "but society imposes necessary constraints."
         )
     ]
-    seed = sg.generate_seed("freedom", turns, _speaker(), turn_count=3)
+    seed = sg.generate_seed(
+        "freedom", turns, _speaker(), turn_count=3, has_prior_memory=True
+    )
     assert _CONTINUATION_INSTRUCTION in seed
     assert "The previous discussion focused on: freedom." in seed
     # TOPIC: header must NOT be present — it was replaced
@@ -242,7 +253,27 @@ def test_seed_generator_uses_continuation_when_real_turns_exist():
 
 
 # ---------------------------------------------------------------------------
-# 12. SeedGenerator — first session (seed-only / no real turns) uses TOPIC: header
+# 12. SeedGenerator — has_prior_memory=False + real turns → TOPIC: header (no continuation)
+# ---------------------------------------------------------------------------
+
+
+def test_seed_generator_no_continuation_when_no_prior_memory():
+    """Even with real turns, no continuation when has_prior_memory=False (first session)."""
+    sg = SeedGenerator()
+    turns = [
+        _turn(
+            "Freedom requires the absence of external coercion, "
+            "but society imposes necessary constraints."
+        )
+    ]
+    # has_prior_memory defaults to False — the first-session path
+    seed = sg.generate_seed("freedom", turns, _speaker(), turn_count=3)
+    assert _CONTINUATION_INSTRUCTION not in seed
+    assert "freedom" in seed
+
+
+# ---------------------------------------------------------------------------
+# 13. SeedGenerator — first session (seed-only turns, no prior memory) → TOPIC: header
 # ---------------------------------------------------------------------------
 
 
@@ -250,27 +281,31 @@ def test_seed_generator_first_session_no_real_turns_uses_topic_header():
     """When only a seed-role entry is in recent_turns, fall back to TOPIC: header."""
     sg = SeedGenerator()
     turns = [_seed_turn("philosophy of mind")]
-    seed = sg.generate_seed("free will", turns, _speaker(), turn_count=1)
-    # Must NOT inject the continuation instruction on the first session
+    seed = sg.generate_seed(
+        "free will", turns, _speaker(), turn_count=1, has_prior_memory=True
+    )
+    # No real speaker turns → build_continuation_prompt returns "" → TOPIC fallback
     assert _CONTINUATION_INSTRUCTION not in seed
     # The topic must still anchor the seed
     assert "free will" in seed
 
 
 # ---------------------------------------------------------------------------
-# 13. SeedGenerator — empty dialog (no turns at all) uses TOPIC: header
+# 14. SeedGenerator — empty dialog → TOPIC: header
 # ---------------------------------------------------------------------------
 
 
 def test_seed_generator_empty_dialog_uses_topic_header():
     sg = SeedGenerator()
-    seed = sg.generate_seed("consciousness", [], _speaker(), turn_count=0)
+    seed = sg.generate_seed(
+        "consciousness", [], _speaker(), turn_count=0, has_prior_memory=True
+    )
     assert _CONTINUATION_INSTRUCTION not in seed
     assert "consciousness" in seed
 
 
 # ---------------------------------------------------------------------------
-# 14. Strategy instruction keywords still present after continuation prefix
+# 15. Strategy instruction keywords still present after continuation prefix
 # ---------------------------------------------------------------------------
 
 _STRATEGY_KEYWORDS = {
@@ -298,7 +333,10 @@ def test_seed_generator_strategy_keyword_present_with_continuation():
     try:
         random.seed(0)
         for turn_count in range(1, 50):
-            seed = sg.generate_seed("consciousness", turns, _speaker(), turn_count=turn_count)
+            seed = sg.generate_seed(
+                "consciousness", turns, _speaker(), turn_count=turn_count,
+                has_prior_memory=True,
+            )
             for kw in _STRATEGY_KEYWORDS:
                 if kw in seed:
                     found_keywords.add(kw)

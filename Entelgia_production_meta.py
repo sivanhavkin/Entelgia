@@ -8133,6 +8133,7 @@ class MainScript:
                     speaker=speaker,
                     turn_count=self.turn_index,
                     agent_mode=_agent_mode,  # v2.9.0: inject mode when loop active
+                    has_prior_memory=self.turn_index > 0,  # v5.2.0: first turn → default topic seed
                 )
             else:
                 # Legacy or Fixy seed

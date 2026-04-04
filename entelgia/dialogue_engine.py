@@ -252,18 +252,24 @@ def build_continuation_prompt(context: Dict[str, str]) -> str:
     """
     context_lines: List[str] = []
 
+    def _end(text: str) -> str:
+        """Append a period only when the text is non-empty and doesn't already end with terminal punctuation."""
+        if not text:
+            return text
+        return text if text[-1] in ".!?" else text + "."
+
     if context.get("dominant_topic"):
         context_lines.append(
-            f"The previous discussion focused on: {context['dominant_topic']}."
+            f"The previous discussion focused on: {_end(context['dominant_topic'])}"
         )
     if context.get("last_claim"):
-        context_lines.append(f"The last claim made was: {context['last_claim']}.")
+        context_lines.append(f"The last claim made was: {_end(context['last_claim'])}")
     if context.get("unresolved_question"):
         context_lines.append(
-            f"An unresolved question remains: {context['unresolved_question']}."
+            f"An unresolved question remains: {_end(context['unresolved_question'])}"
         )
     if context.get("tension_point"):
-        context_lines.append(f"The tension point was: {context['tension_point']}.")
+        context_lines.append(f"The tension point was: {_end(context['tension_point'])}")
 
     if not context_lines:
         return ""
@@ -309,6 +315,7 @@ class SeedGenerator:
         turn_count: int,
         agent_mode: Optional[str] = None,
         fixy_guidance: "Optional[FixyGuidance]" = None,
+        has_prior_memory: bool = False,
     ) -> str:
         """
         Generate contextual seed based on dialogue state.
@@ -321,13 +328,14 @@ class SeedGenerator:
         v5.1.0: *fixy_guidance* (optional :class:`FixyGuidance`) probabilistically
         biases strategy selection toward the Fixy-recommended move type.
 
-        v5.2.0: Dynamic continuation context.  When *recent_turns* contains
-        real speaker turns the static ``TOPIC: {topic}`` header is replaced by
-        a continuation prompt built from
-        :func:`extract_continuation_context` / :func:`build_continuation_prompt`.
-        On the **first session with no memory** (no real speaker turns), the
-        function falls back to the original ``TOPIC: {topic}`` header so the
-        conversation is still anchored to the configured seed topic.
+        v5.2.0: Dynamic continuation context.  When *has_prior_memory* is
+        ``True`` **and** *recent_turns* contains real speaker turns, the static
+        ``TOPIC: {topic}`` header is replaced by a continuation prompt built
+        from :func:`extract_continuation_context` /
+        :func:`build_continuation_prompt`.  On the **first session with no
+        memory** (*has_prior_memory* ``False``), the function falls back to the
+        original ``TOPIC: {topic}`` header so the conversation is anchored to
+        the configured seed topic.
 
         Args:
             topic: Current topic label
@@ -336,6 +344,8 @@ class SeedGenerator:
             turn_count: Current turn number
             agent_mode: Optional AgentMode override injected when loop is active
             fixy_guidance: Optional Fixy guidance to bias strategy weights
+            has_prior_memory: Whether the agent has stored prior-session memory;
+                controls whether the continuation prompt is injected.
 
         Returns:
             Formatted seed instruction
@@ -365,19 +375,17 @@ class SeedGenerator:
             base = template.format(topic=topic)
 
         # ── Dynamic continuation context ─────────────────────────────────────
-        # When the dialogue contains real speaker turns, replace the static
-        # "TOPIC: {topic}" header with a continuation prompt derived from
-        # the actual conversation.  On the very first session (no real turns
-        # yet), extract_continuation_context returns empty strings for
-        # last_claim / unresolved_question / tension_point, causing
-        # build_continuation_prompt to return "" — we then fall back to the
-        # original TOPIC-prefix behaviour so the first turn is still anchored
-        # to the configured seed topic (first-session / no-memory path).
+        # Inject a structured continuation prompt only when the agent already
+        # has stored memory from prior turns (has_prior_memory=True) AND there
+        # are real speaker turns to extract context from.  On the very first
+        # session (has_prior_memory=False) the caller signals "no memory" and
+        # we fall back to the original TOPIC-header so the opening turn is
+        # anchored to the configured seed topic.
         real_turns = [
             t for t in recent_turns
             if t.get("role") != "seed" and t.get("text", "").strip()
         ]
-        if real_turns:
+        if has_prior_memory and real_turns:
             ctx = extract_continuation_context(recent_turns, topic)
             continuation_prefix = build_continuation_prompt(ctx)
         else:
@@ -643,6 +651,7 @@ class DialogueEngine:
         turn_count: int,
         agent_mode: Optional[str] = None,
         fixy_guidance: "Optional[FixyGuidance]" = None,
+        has_prior_memory: bool = False,
     ) -> str:
         """
         Generate contextual seed for speaker.
@@ -653,10 +662,11 @@ class DialogueEngine:
         v5.1.0: *fixy_guidance* is forwarded to probabilistically bias
         strategy weights toward the Fixy-recommended move type.
 
-        v5.2.0: Dynamic continuation context is derived from *dialog_history*
-        and injected in place of the static topic header when real speaker
-        turns are present.  Falls back to the default topic seed on the first
-        session when no memory exists yet.
+        v5.2.0: *has_prior_memory* is forwarded to
+        ``SeedGenerator.generate_seed``.  When ``True`` and real speaker turns
+        exist, the static ``TOPIC:`` header is replaced by a dynamic
+        continuation prompt.  When ``False`` (default — first session / no
+        stored memory), the original ``TOPIC: {topic}`` seed is used.
 
         Args:
             topic: Current topic
@@ -665,6 +675,7 @@ class DialogueEngine:
             turn_count: Turn number
             agent_mode: Optional AgentMode constant (injected when loop active)
             fixy_guidance: Optional Fixy guidance to bias strategy weights
+            has_prior_memory: Whether the agent has stored prior-session memory
 
         Returns:
             Seed instruction string
@@ -679,6 +690,7 @@ class DialogueEngine:
             turn_count,
             agent_mode=agent_mode,
             fixy_guidance=fixy_guidance,
+            has_prior_memory=has_prior_memory,
         )
 
     def should_allow_fixy(
