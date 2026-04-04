@@ -497,7 +497,7 @@ class FixySemanticController:
             to detach an existing store.
         """
         self._memory_store = store
-        logger.info(
+        logger.debug(
             "[FIXY-MEMORY] memory store %s",
             "attached" if store is not None else "detached",
         )
@@ -527,7 +527,7 @@ class FixySemanticController:
             "tags": ["fixy_validation", result.expected_move.lower()],
         }
         self._memory_store.store_entry(entry)
-        logger.info(
+        logger.debug(
             "[FIXY-MEMORY-RECORD] type=validation agent=%s move=%s compliant=%s",
             result.speaker,
             result.expected_move,
@@ -564,7 +564,7 @@ class FixySemanticController:
             "tags": tags,
         }
         self._memory_store.store_entry(entry)
-        logger.info(
+        logger.debug(
             "[FIXY-MEMORY-RECORD] type=loop_check agent=%s is_loop=%s "
             "reasoning_delta=%s",
             result.speaker,
@@ -645,7 +645,7 @@ class FixySemanticController:
             else:
                 result.reason = "low_confidence_treated_as_non_compliant"
 
-        logger.info(
+        logger.debug(
             "[FIXY-VALIDATION] speaker=%s expected=%s compliant=%s partial=%s"
             " confidence=%.2f reason=%s",
             speaker,
@@ -721,7 +721,7 @@ class FixySemanticController:
 
         result = _safe_parse_loop(raw, speaker)
 
-        logger.info(
+        logger.debug(
             "[FIXY-LOOP] speaker=%s is_loop=%s confidence=%.2f"
             " reasoning_delta=%s new_move_type=%s reason=%s",
             speaker,

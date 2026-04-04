@@ -998,7 +998,7 @@ class IntegrationCore:
             state = state_input
         else:
             state = self._build_state(agent_name, state_input)
-        logger.info(
+        logger.debug(
             "[INTEGRATION-STATE] agent=%s semantic_repeat=%s structural_repeat=%s "
             "loop_count=%d progress_after=%.2f unresolved=%d pressure=%.2f "
             "fatigue=%.2f stagnation=%.2f is_loop=%s compliance=%s "
@@ -1022,7 +1022,7 @@ class IntegrationCore:
         # TODO: call _supervisor_score(state) here once SupervisorNet is ready
         decision = self._apply_rules(state)
 
-        logger.info(
+        logger.debug(
             "[INTEGRATION-DECISION] agent=%s mode=%s priority=%d reason=%r "
             "regenerate=%s suppress_personality=%s enforce_fixy=%s",
             state.agent_name,
@@ -1058,7 +1058,7 @@ class IntegrationCore:
         """
         overlay = decision.prompt_overlay
         if overlay:
-            logger.info("[INTEGRATION-OVERLAY] %r", overlay)
+            logger.debug("[INTEGRATION-OVERLAY] %r", overlay)
         return overlay
 
     def should_regenerate(self, decision: ControlDecision) -> bool:
@@ -1138,7 +1138,7 @@ class IntegrationCore:
         else:
             state = self._build_state(agent_name, state_input)
 
-        logger.info(
+        logger.debug(
             "[PRE-GEN-STATE] agent=%s semantic_repeat=%s structural_repeat=%s "
             "loop_count=%d progress_after=%.2f unresolved=%d pressure=%.2f "
             "fatigue=%.2f stagnation=%.2f is_loop=%s compliance=%s "
@@ -1194,7 +1194,7 @@ class IntegrationCore:
         """
         overlay = decision.prompt_overlay
         if overlay:
-            logger.info("[PRE-GEN-OVERLAY] %r", overlay)
+            logger.debug("[PRE-GEN-OVERLAY] %r", overlay)
         return overlay
 
     def validate_generated_output(
@@ -1258,7 +1258,7 @@ class IntegrationCore:
         # mentioned inside a body paragraph does not satisfy the header check.
         # -----------------------------------------------------------------
         if decision.escalation_level >= _STRUCTURE_LOCK_LEVEL:
-            logger.info(
+            logger.debug(
                 "[STRUCTURE-LOCK] active escalation_level=%d required_sections=%s",
                 decision.escalation_level,
                 _STRUCTURE_LOCK_SECTIONS,
@@ -1284,7 +1284,7 @@ class IntegrationCore:
                 return False, content_reason
             # Headers present and content concrete — skip mode-based text
             # heuristics which are superseded by structural enforcement.
-            logger.info(
+            logger.debug(
                 "[STRUCTURE-LOCK] satisfied — skipping mode-based checks "
                 "(mode=%s escalation_level=%d)",
                 mode.value,
@@ -1299,7 +1299,7 @@ class IntegrationCore:
             if len(text.split()) >= _QUALITY_GATE_MIN_WORDS:
                 hits = sum(1 for pat in _QUALITY_GATE_PATTERNS if pat.search(t))
                 if hits >= _QUALITY_GATE_THRESHOLD:
-                    logger.info(
+                    logger.debug(
                         "[QUALITY-GATE] NORMAL mode: %d banned pattern hit(s) — "
                         "flagging for regeneration",
                         hits,

@@ -768,7 +768,7 @@ class DialogueLoopDetector:
             and not sig_conceptual_loop
             and not sig_axis_stagnation
         ):
-            logger.info(
+            logger.debug(
                 "[FIXY-SUPPRESS] semantic overlap only; no structural loop — "
                 "novelty clusters present: %s at turn %d",
                 novelty_clusters,
@@ -781,7 +781,7 @@ class DialogueLoopDetector:
 
         if sig_phrase_rep:
             modes.append(LOOP_REPETITION)
-            logger.info(
+            logger.debug(
                 "[FIXY-LOOP] detected: repeated contradiction without new variable "
                 "at turn %d (phrase_rep=True, role_lock=%s, text_sim=%s)",
                 turn_count,
@@ -791,14 +791,14 @@ class DialogueLoopDetector:
 
         if sig_weak_conflict:
             modes.append(WEAK_CONFLICT)
-            logger.info(
+            logger.debug(
                 "[FIXY-LOOP] detected: weak_conflict at turn %d",
                 turn_count,
             )
 
         if sig_premature_synth:
             modes.append(PREMATURE_SYNTHESIS)
-            logger.info(
+            logger.debug(
                 "[FIXY-LOOP] detected: premature_synthesis at turn %d",
                 turn_count,
             )
@@ -809,21 +809,21 @@ class DialogueLoopDetector:
             and self._check_topic_stagnation(recent)
         ):
             modes.append(TOPIC_STAGNATION)
-            logger.info(
+            logger.debug(
                 "[FIXY-LOOP] detected: topic_stagnation at turn %d",
                 turn_count,
             )
 
         if sig_conceptual_loop:
             modes.append(CONCEPTUAL_LOOP)
-            logger.info(
+            logger.debug(
                 "[FIXY-LOOP] detected: conceptual_dependency_loop at turn %d",
                 turn_count,
             )
 
         if sig_axis_stagnation:
             modes.append(AXIS_STAGNATION)
-            logger.info(
+            logger.debug(
                 "[FIXY-LOOP] detected: axis_stagnation at turn %d",
                 turn_count,
             )

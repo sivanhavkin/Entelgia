@@ -1124,7 +1124,7 @@ class InteractiveFixy:
             return
 
         self.semantic_loop_count += 1
-        logger.info(
+        logger.debug(
             "[FIXY-LOOP] semantic loop recorded (speaker=%r confidence=%.2f"
             " reasoning_delta=%s new_move_type=%s total_loops=%d)",
             speaker,
@@ -1138,7 +1138,7 @@ class InteractiveFixy:
             self.fixy_guidance.confidence = min(
                 1.0, self.fixy_guidance.confidence + 0.1
             )
-            logger.info(
+            logger.debug(
                 "[FIXY-LOOP] guidance confidence boosted to %.2f after semantic loop",
                 self.fixy_guidance.confidence,
             )
@@ -1151,7 +1151,7 @@ class InteractiveFixy:
                 bias_move = _SEMANTIC_LOOP_BIAS_MOVES[
                     (self.semantic_loop_count - 1) % len(_SEMANTIC_LOOP_BIAS_MOVES)
                 ]
-                logger.info(
+                logger.debug(
                     "[FIXY-LOOP] biasing preferred_move %r → %r after semantic loop",
                     self.fixy_guidance.preferred_move,
                     bias_move,
@@ -1312,7 +1312,7 @@ class InteractiveFixy:
                     primary, FixyMode.FORCE_CASE
                 )
                 self._pending_rewrite_mode = rewrite_mode
-                logger.info(
+                logger.debug(
                     "[FIXY-LOOP] Loop detected: modes=%s turn=%d topic=%r → Fixy will break loop",
                     active_modes,
                     turn_count,
