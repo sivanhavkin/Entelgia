@@ -8722,9 +8722,12 @@ class MainScript:
             # Call evaluate_reply after each non-Fixy agent turn to check guidance
             # compliance and detect semantic loops.  Results are logged and fed back
             # into the progress score to penalise non-compliance and looping.
-            _deferred_fixy_validation_args: Optional[tuple] = None
-            _deferred_fixy_loop_args: Optional[tuple] = None
-            _deferred_fixy_coupling_args: Optional[tuple] = None
+            FixyValidationLogArgs = Tuple[object, ...]
+            FixyLoopLogArgs = Tuple[object, ...]
+            FixyCouplingLogArgs = Tuple[object, ...]
+            _deferred_fixy_validation_args: Optional[FixyValidationLogArgs] = None
+            _deferred_fixy_loop_args: Optional[FixyLoopLogArgs] = None
+            _deferred_fixy_coupling_args: Optional[FixyCouplingLogArgs] = None
             if (
                 self.semantic_controller is not None
                 and speaker.name != "Fixy"
