@@ -626,39 +626,39 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Up to 200 words. Do NOT summarize or recycle dialogue content. Do NOT moralize."
     ),
     FixyMode.CONTRADICT: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "A genuine contradiction is being softened into apparent agreement.\n"
+        "You are Fixy. A genuine contradiction is being softened into apparent agreement.\n"
         "Begin with 'It seems the disagreement is really about...' "
         "or 'Both of you may be using this concept in different senses...'\n"
-        "Do NOT use 'Deadlock:' or 'Next move:'. Up to 200 words. Do NOT bridge or reconcile."
+        "Name the contradiction. Do NOT bridge or reconcile.\n"
+        "Up to 100 words."
     ),
     FixyMode.CONCRETIZE: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The exchange has remained abstract without concrete grounding.\n"
-        "Begin with 'A missing distinction here may be...' or "
-        "'What neither side has yet examined is a specific instance...'\n"
-        "Up to 200 words. Do NOT summarize the dialogue."
+        "You are Fixy. The exchange has remained abstract without concrete grounding.\n"
+        "Begin with 'What neither side has yet examined is a specific instance...' "
+        "or 'Both sides may be assuming something that a real case would complicate...'\n"
+        "Point to the gap. Do NOT summarize the dialogue.\n"
+        "Up to 100 words."
     ),
     FixyMode.INVERT: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "One view has been repeated without genuine challenge.\n"
+        "You are Fixy. One view has been repeated without genuine challenge.\n"
         "Begin with 'What remains unclear is what the strongest objection to this position would be...' "
-        "or 'A missing distinction may emerge if the dominant view is tested against...'\n"
-        "Up to 200 words. Do NOT recycle dialogue content."
+        "or 'The dominant view has not been tested against...'\n"
+        "Name the absence of challenge. Do NOT recycle dialogue content.\n"
+        "Up to 100 words."
     ),
     FixyMode.PIVOT: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The conversation appears locked within one conceptual domain.\n"
+        "You are Fixy. The conversation is locked within one conceptual domain.\n"
         "Begin with 'What remains unaddressed is...' "
         "or 'The conversation seems anchored to a single frame...'\n"
-        "Up to 200 words. Do NOT philosophize or prescribe a direction."
+        "Name the constraint. Do NOT philosophize or prescribe a direction.\n"
+        "Up to 100 words."
     ),
     FixyMode.EXPOSE_SYNTHESIS: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "A synthesis has been claimed without resolving the underlying contradiction.\n"
-        "Begin with 'A missing distinction here may be...' "
-        "or 'The synthesis claimed here may paper over...'\n"
-        "Up to 200 words. Do NOT accept the synthesis. Do NOT recycle dialogue content."
+        "You are Fixy. A synthesis has been claimed without resolving the underlying contradiction.\n"
+        "Begin with 'The synthesis claimed here may paper over...' "
+        "or 'What remains unresolved beneath the apparent agreement is...'\n"
+        "Expose the bypass. Do NOT accept the synthesis.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_MECHANISM: (
         "You are Fixy. Claims have been made without a stated causal mechanism.\n"
@@ -682,32 +682,32 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Up to 100 words."
     ),
     FixyMode.FORCE_DIRECT_DISAGREEMENT: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The exchange has converged toward agreement without naming the underlying tension.\n"
+        "You are Fixy. The exchange has converged toward agreement without naming the underlying tension.\n"
         "Begin with 'It seems the disagreement is really about...' "
         "or 'Both of you may be using this concept in different senses...'\n"
-        "Up to 200 words. Do NOT reconcile or bridge the positions."
+        "Surface the tension. Do NOT reconcile or bridge the positions.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_TOPIC_RETURN: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The conversation has drifted from its original question.\n"
+        "You are Fixy. The conversation has drifted from its original question.\n"
         "Begin with 'What remains unaddressed is the original question of...' "
-        "or 'A tension emerges when the current frame is held against what was first asked...'\n"
-        "Up to 200 words. Do NOT moralize or prescribe a direction."
+        "or 'The current frame has not been held against what was first asked...'\n"
+        "Name the drift. Do NOT moralize or prescribe a direction.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_SHORT_ANSWER: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "A central question has gone unanswered in the exchange.\n"
+        "You are Fixy. A central question has gone unanswered in the exchange.\n"
         "Begin with 'What remains unclear is whether...' "
         "followed by a precise articulation of the unresolved question.\n"
-        "Up to 200 words. Do NOT prescribe an answer."
+        "Name the gap. Do NOT prescribe an answer.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_NEW_DOMAIN: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The conversation appears anchored to a single conceptual cluster.\n"
+        "You are Fixy. The conversation is anchored to a single conceptual cluster.\n"
         "Begin with 'The conversation seems anchored to a single frame...' "
         "or 'A tension emerges when this argument is held against a different domain...'\n"
-        "Up to 200 words. Do NOT moralize or prescribe a next step."
+        "Name the constraint. Do NOT moralize or prescribe a next step.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_METRIC: (
         "You are Fixy. No criterion for evaluation has appeared in this exchange.\n"
@@ -717,11 +717,11 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Up to 100 words."
     ),
     FixyMode.FORCE_CHOICE: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "Both positions are held simultaneously without genuine conflict.\n"
+        "You are Fixy. Both positions are held simultaneously without genuine conflict.\n"
         "Begin with 'It seems the disagreement is really about...' "
         "or 'A tension emerges when both views are held at once — specifically...'\n"
-        "Up to 200 words. Do NOT resolve the tension or prescribe a commitment."
+        "Surface the tension. Do NOT resolve it or prescribe a commitment.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_TEST: (
         "You are Fixy. Claims have not been grounded in any testable prediction.\n"
@@ -1574,12 +1574,14 @@ class InteractiveFixy:
             return mode
 
         # Escalate to a harder/rotated mode when this reason has already failed
-        # at least twice without producing dialogue change.
+        # at least twice without producing dialogue change.  Index starts at 0
+        # on the first escalation (fail_count==2) so all loop-breaking modes
+        # are reachable in sequence without skipping the early entries.
         fail_count = self._failed_reasons.get(reason, 0)
         if fail_count >= 2:
-            idx = fail_count % len(_LOOP_BREAKING_MODES)
+            idx = (fail_count - 2) % len(_LOOP_BREAKING_MODES)
             mode = _LOOP_BREAKING_MODES[idx]
-            self._loop_break_rotation += 1
+            self._loop_break_rotation = idx + 1
             logger.info(
                 "[FIXY-ESCALATE] reason=%r failed %d time(s) → escalating to %s",
                 reason,
@@ -1802,6 +1804,12 @@ class InteractiveFixy:
             if self.get_mode_type(mode) == FIXY_MODE_CONTROL
             else "Up to 200 words."
         )
+        # Use a single-source response limit consistent with word_limit
+        response_limit_instruction = (
+            "IMPORTANT: Please answer in maximum 100 words."
+            if self.get_mode_type(mode) == FIXY_MODE_CONTROL
+            else LLM_FIXY_RESPONSE_LIMIT
+        )
         full_prompt = (
             f"{prompt_template}\n\n"
             f"{topic_instruction}"
@@ -1810,7 +1818,7 @@ class InteractiveFixy:
             f"Output rule: {output_instruction}\n"
             f"{word_limit} Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
-            f"{LLM_FIXY_RESPONSE_LIMIT}\n"
+            f"{response_limit_instruction}\n"
         )
         if cortex_overlay:
             full_prompt = (

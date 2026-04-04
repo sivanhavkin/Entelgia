@@ -712,3 +712,126 @@ class TestScoreProgressGuidanceAdjustments:
                 assert (
                     0.0 <= score <= 1.0
                 ), f"score={score} out of range for text={text!r}, count={count}"
+
+
+# ---------------------------------------------------------------------------
+# 22. _failed_reasons tracking and get_fixy_mode escalation
+# ---------------------------------------------------------------------------
+
+
+class TestFailedReasonsTracking:
+    """_failed_reasons must increment on non-compliance, clear on compliance,
+    and cause get_fixy_mode() to escalate after 2 consecutive failures."""
+
+    def _make_fixy(self):
+        class _StubLLM:
+            def generate(self, model, prompt, **kw):
+                return "stub"
+
+        return InteractiveFixy(llm=_StubLLM(), model="stub-model")
+
+    def _guidance(self, reason="premature_synthesis"):
+        return FixyGuidance(
+            goal="define_test",
+            preferred_move="TEST",
+            confidence=0.7,
+            reason=reason,
+        )
+
+    def test_failed_reasons_starts_empty(self):
+        """_failed_reasons must be an empty dict on construction."""
+        fixy = self._make_fixy()
+        assert fixy._failed_reasons == {}
+
+    def test_non_compliance_increments_failed_reasons(self):
+        """record_agent_move with wrong move must increment _failed_reasons."""
+        fixy = self._make_fixy()
+        fixy.fixy_guidance = self._guidance(reason="premature_synthesis")
+        fixy.record_agent_move("NEW_CLAIM")  # wrong move
+        assert fixy._failed_reasons.get("premature_synthesis", 0) == 1
+
+    def test_two_failures_increments_to_two(self):
+        """Two consecutive non-compliant moves must set count to 2."""
+        fixy = self._make_fixy()
+        fixy.fixy_guidance = self._guidance(reason="premature_synthesis")
+        fixy.record_agent_move("NEW_CLAIM")
+        fixy.fixy_guidance = self._guidance(reason="premature_synthesis")
+        fixy.record_agent_move("NEW_CLAIM")
+        assert fixy._failed_reasons.get("premature_synthesis", 0) == 2
+
+    def test_compliance_clears_failed_reasons(self):
+        """record_agent_move with matching move must remove reason from _failed_reasons."""
+        fixy = self._make_fixy()
+        fixy.fixy_guidance = self._guidance(reason="premature_synthesis")
+        fixy.record_agent_move("NEW_CLAIM")  # fail
+        assert fixy._failed_reasons.get("premature_synthesis", 0) == 1
+        fixy.fixy_guidance = self._guidance(reason="premature_synthesis")
+        fixy.record_agent_move("TEST")  # comply
+        assert "premature_synthesis" not in fixy._failed_reasons
+
+    def test_different_reasons_tracked_independently(self):
+        """Failures for distinct reasons must not interfere with each other."""
+        fixy = self._make_fixy()
+        fixy.fixy_guidance = self._guidance(reason="loop_repetition")
+        fixy.record_agent_move("NEW_CLAIM")  # fail for loop_repetition
+        fixy.fixy_guidance = self._guidance(reason="shallow_discussion")
+        fixy.record_agent_move("NEW_CLAIM")  # fail for shallow_discussion
+        assert fixy._failed_reasons.get("loop_repetition", 0) == 1
+        assert fixy._failed_reasons.get("shallow_discussion", 0) == 1
+
+    def test_get_fixy_mode_normal_before_threshold(self):
+        """get_fixy_mode must return the standard mode when fail_count < 2."""
+        from entelgia.fixy_interactive import _LOOP_MODE_POLICY, FixyMode
+
+        fixy = self._make_fixy()
+        reason = "topic_stagnation"
+        fixy._failed_reasons[reason] = 1  # below threshold
+        mode = fixy.get_fixy_mode(reason)
+        assert mode == _LOOP_MODE_POLICY.get(reason, FixyMode.MEDIATE)
+
+    def test_get_fixy_mode_escalates_at_two_failures(self):
+        """get_fixy_mode must return a loop-breaking mode when fail_count >= 2."""
+        from entelgia.fixy_interactive import _LOOP_BREAKING_MODES
+
+        fixy = self._make_fixy()
+        reason = "topic_stagnation"
+        fixy._failed_reasons[reason] = 2
+        mode = fixy.get_fixy_mode(reason)
+        assert mode in _LOOP_BREAKING_MODES, (
+            f"Expected escalated mode from _LOOP_BREAKING_MODES, got {mode!r}"
+        )
+
+    def test_escalation_uses_index_zero_at_first_escalation(self):
+        """First escalation (fail_count==2) must use _LOOP_BREAKING_MODES[0]."""
+        from entelgia.fixy_interactive import _LOOP_BREAKING_MODES
+
+        fixy = self._make_fixy()
+        reason = "topic_stagnation"
+        fixy._failed_reasons[reason] = 2
+        mode = fixy.get_fixy_mode(reason)
+        assert mode == _LOOP_BREAKING_MODES[0], (
+            f"First escalation must use index 0; got {mode!r}"
+        )
+
+    def test_escalation_advances_loop_break_rotation(self):
+        """Escalation must set _loop_break_rotation so subsequent rotations resume correctly."""
+        fixy = self._make_fixy()
+        reason = "topic_stagnation"
+        fixy._failed_reasons[reason] = 2
+        fixy.get_fixy_mode(reason)
+        # After escalation at idx=0, rotation should be set to 1
+        assert fixy._loop_break_rotation == 1
+
+    def test_escalation_cycles_through_modes(self):
+        """Repeated escalations must cycle sequentially through _LOOP_BREAKING_MODES."""
+        from entelgia.fixy_interactive import _LOOP_BREAKING_MODES
+
+        fixy = self._make_fixy()
+        reason = "topic_stagnation"
+        for expected_idx in range(len(_LOOP_BREAKING_MODES)):
+            fixy._failed_reasons[reason] = expected_idx + 2
+            mode = fixy.get_fixy_mode(reason)
+            assert mode == _LOOP_BREAKING_MODES[expected_idx], (
+                f"fail_count={expected_idx + 2}: expected {_LOOP_BREAKING_MODES[expected_idx]!r},"
+                f" got {mode!r}"
+            )
