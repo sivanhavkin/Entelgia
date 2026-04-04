@@ -193,10 +193,11 @@ _HARD_INTERVENTION_MODES: frozenset = frozenset(
 # Operational mode: guidance vs. high-pressure control
 # ---------------------------------------------------------------------------
 # Guidance mode (FIXY_MODE_GUIDANCE): soft, reflective, identifies structural
-# issues without prescribing solutions.  Used in early dialogue or when new
-# claims are still arriving.
-# Control mode (FIXY_MODE_CONTROL): short, directive, operational.  Used once
-# the dialogue has stalled and guidance has already been tried.
+# issues without prescribing solutions.  Applies to early-stage or staged modes.
+# Control mode (FIXY_MODE_CONTROL): short, directive, operational.  Applies to
+# FORCE_* and hard disruption modes regardless of dialogue stage.
+# The mode type is determined solely by which FixyMode constant is selected;
+# see _CONTROL_OUTPUT_MODES for the complete set of control-mode outputs.
 FIXY_MODE_GUIDANCE: str = "guidance"
 FIXY_MODE_CONTROL: str = "control"
 
@@ -1576,7 +1577,7 @@ class InteractiveFixy:
         # at least twice without producing dialogue change.
         fail_count = self._failed_reasons.get(reason, 0)
         if fail_count >= 2:
-            idx = (self._loop_break_rotation + fail_count) % len(_LOOP_BREAKING_MODES)
+            idx = fail_count % len(_LOOP_BREAKING_MODES)
             mode = _LOOP_BREAKING_MODES[idx]
             self._loop_break_rotation += 1
             logger.info(
@@ -1594,8 +1595,10 @@ class InteractiveFixy:
 
         Guidance mode (``FIXY_MODE_GUIDANCE``) is soft and reflective;
         control mode (``FIXY_MODE_CONTROL``) is short, directive, and
-        operational.  Callers can use this to adjust prompt word limits,
-        logging, or downstream behaviour.
+        operational.  This method is used primarily in prompt construction
+        to apply appropriate word limits and formatting based on intervention
+        intensity — control modes receive a stricter word limit and more
+        imperative framing than guidance modes.
 
         Parameters
         ----------
@@ -1793,14 +1796,19 @@ class InteractiveFixy:
                 f"Use a completely different angle.\n"
             )
 
+        # Apply a stricter word limit for control-mode interventions
+        word_limit = (
+            "Up to 100 words."
+            if self.get_mode_type(mode) == FIXY_MODE_CONTROL
+            else "Up to 200 words."
+        )
         full_prompt = (
             f"{prompt_template}\n\n"
             f"{topic_instruction}"
             f"{dedup_instruction}"
             f"RECENT DIALOGUE:\n{context}\n\n"
             f"Output rule: {output_instruction}\n"
-            f"{'Up to 100 words.' if self.get_mode_type(mode) == FIXY_MODE_CONTROL else 'Up to 200 words.'}"
-            f" Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
+            f"{word_limit} Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
             f"{LLM_FIXY_RESPONSE_LIMIT}\n"
         )
