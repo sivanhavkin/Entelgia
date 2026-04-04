@@ -7662,24 +7662,6 @@ class MainScript:
             print(dim + f"  Actions: {', '.join(actions)}" + reset)
         print(dim + bar + reset)
         print()
-        logger.debug(
-            "[META: %s] Id=%.1f Ego=%.1f SuperEgo=%.1f SA=%.2f"
-            " energy=%.1f conflict=%.2f pressure=%.2f stagnation=%.2f"
-            " emotion=%s(%.2f) dominant=%s temp=%.2f",
-            agent.name,
-            ide,
-            ego,
-            sup,
-            sa,
-            agent.energy_level,
-            conflict,
-            agent.drive_pressure,
-            agent._last_stagnation,
-            agent._last_emotion,
-            agent._last_emotion_intensity,
-            dominant_label,
-            temp,
-        )
 
     def log_turn(self, agent_name: str, text: str, topic: str):
         """Log dialogue turn to CSV."""
