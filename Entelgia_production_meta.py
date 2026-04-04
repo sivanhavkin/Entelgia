@@ -8689,6 +8689,10 @@ class MainScript:
                                         + Style.RESET_ALL
                                         + "\n"
                                     )
+                                # The escalated candidate was rejected and
+                                # replaced, so its loop evaluation must not be
+                                # reused for downstream validation/state sync.
+                                _pre_accept_loop_result = None
                             else:
                                 logger.info(
                                     "[INTEGRATION-LOOP-BREAK] loop resolved by"
