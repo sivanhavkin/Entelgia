@@ -6354,7 +6354,7 @@ class Agent:
         # pattern can be analysed; do NOT regenerate — Stage 2 already had a chance
         # to concretise the response.
         if _check_abstraction_penalty(out) and not _skip_draft_transform:
-            logger.info(
+            logger.debug(
                 "[ABSTRACTION-PENALTY] agent=%s — response still abstract after Stage 2 — accepted",
                 self.name,
             )
@@ -6463,7 +6463,7 @@ class Agent:
         _pe_claims_mem = _pe_get_claims_memory(self.name)
         _pe_move = _pe_classify_move(out, _history_texts)
         _pe_score = _pe_score_progress(out, _history_texts, _pe_claims_mem)
-        logger.info(
+        logger.debug(
             "[PROGRESS] agent=%s score=%.2f move_type=%s",
             self.name,
             _pe_score,
@@ -6820,7 +6820,7 @@ class Agent:
             # or to items already promoted in this cycle.
             _dedup_corpus = _recent_conscious_texts + _promoted_this_cycle
             if _is_too_similar(content, _dedup_corpus):
-                logger.info(
+                logger.debug(
                     "[DEDUP] self_replicate skipped (similar to recent conscious): "
                     "agent=%s content=%r",
                     self.name,
@@ -6844,7 +6844,7 @@ class Agent:
             promoted_count += 1
 
         if topic_pipeline_enabled(CFG) and CFG.self_replication_topic_gate_enabled:
-            logger.info(
+            logger.debug(
                 "[SELF-REPL-TOPIC-GATE] agent=%s kept=%d rejected=%d promoted=%d",
                 self.name,
                 kept_count,
@@ -8281,7 +8281,7 @@ class MainScript:
                     )
                     if _mem_context:
                         seed = _mem_context + "\n\n" + seed
-                        logger.info(
+                        logger.debug(
                             "[INTEGRATION-MEMORY-CONTEXT] injected for agent=%s",
                             speaker.name,
                         )
@@ -8722,9 +8722,12 @@ class MainScript:
             # Call evaluate_reply after each non-Fixy agent turn to check guidance
             # compliance and detect semantic loops.  Results are logged and fed back
             # into the progress score to penalise non-compliance and looping.
-            _deferred_fixy_validation_str: Optional[str] = None
-            _deferred_fixy_loop_str: Optional[str] = None
-            _deferred_fixy_coupling_args: Optional[tuple] = None
+            FixyValidationLogArgs = Tuple[object, ...]
+            FixyLoopLogArgs = Tuple[object, ...]
+            FixyCouplingLogArgs = Tuple[object, ...]
+            _deferred_fixy_validation_args: Optional[FixyValidationLogArgs] = None
+            _deferred_fixy_loop_args: Optional[FixyLoopLogArgs] = None
+            _deferred_fixy_coupling_args: Optional[FixyCouplingLogArgs] = None
             if (
                 self.semantic_controller is not None
                 and speaker.name != "Fixy"
@@ -8775,15 +8778,14 @@ class MainScript:
                     # includes any rejected attempts in its comparison window.
                     if _pre_accept_loop_result is not None:
                         _loop_result = _pre_accept_loop_result
-                    if self.cfg.show_meta:
-                        _deferred_fixy_validation_str = (
-                            f"[FIXY-VALIDATION] speaker={speaker.name}"
-                            f" compliant={_validation_result.compliant}"
-                        )
-                        _deferred_fixy_loop_str = (
-                            f"[FIXY-LOOP] speaker={speaker.name}"
-                            f" is_loop={_loop_result.is_loop}"
-                        )
+                    _deferred_fixy_validation_args = (
+                        speaker.name,
+                        _validation_result.compliant,
+                    )
+                    _deferred_fixy_loop_args = (
+                        speaker.name,
+                        _loop_result.is_loop,
+                    )
                     _progress_score = speaker._last_pe_score
                     _ignored_count = (
                         self.interactive_fixy.ignored_guidance_count
@@ -8897,12 +8899,12 @@ class MainScript:
 
             # Log evaluation scores before the visible response so that
             # [EVAL] and [DIALOGUE] appear before the agent output in the log.
-            logger.info(
+            logger.debug(
                 "[EVAL] agent=%s linguistic_score=%.2f",
                 speaker.name,
                 speaker._last_eval_score,
             )
-            logger.info(
+            logger.debug(
                 "[DIALOGUE] agent=%s dialogue_score=%.2f new_claim=%s pressure=%s resolution=%s semantic_repeat=%s",
                 speaker.name,
                 speaker._last_dialogue_score,
@@ -8921,24 +8923,36 @@ class MainScript:
             # ── Post-output Fixy diagnostics and progress ──────────────────────────
             # Emitted after print_agent so they appear in the log after the agent's
             # visible response rather than before it.
-            if _deferred_fixy_validation_str is not None:
-                print(_deferred_fixy_validation_str)
-            if _deferred_fixy_loop_str is not None:
-                print(_deferred_fixy_loop_str)
+            if _deferred_fixy_validation_args is not None:
+                _fv_speaker, _fv_compliant = _deferred_fixy_validation_args
+                _fv_log = logger.debug if _fv_compliant else logger.info
+                _fv_log(
+                    "[FIXY-VALIDATION] speaker=%s compliant=%s",
+                    _fv_speaker,
+                    _fv_compliant,
+                )
+            if _deferred_fixy_loop_args is not None:
+                _fl_speaker, _fl_is_loop = _deferred_fixy_loop_args
+                _fl_log = logger.info if _fl_is_loop else logger.debug
+                _fl_log(
+                    "[FIXY-LOOP] speaker=%s is_loop=%s",
+                    _fl_speaker,
+                    _fl_is_loop,
+                )
             if _deferred_fixy_coupling_args is not None:
-                logger.info(
+                logger.debug(
                     "[FIXY-COUPLING] speaker=%s compliant=%s is_loop=%s"
                     " loop_overrides_compliant=%s progress_after=%.2f"
                     " semantic_repeat=%s",
                     *_deferred_fixy_coupling_args,
                 )
-            logger.info(
+            logger.debug(
                 "[PROGRESS] agent=%s score=%.2f move_type=%s",
                 speaker.name,
                 speaker._last_pe_score,
                 speaker._last_pe_move,
             )
-            logger.info(
+            logger.debug(
                 "[LOOP-DIAG] agent=%s structural_repeat=%s fatigue_level=%.2f fatigue_bias=%.2f",
                 speaker.name,
                 bool(_active_loop_modes),
@@ -8957,14 +8971,14 @@ class MainScript:
 
             # Display meta-cognitive state for this speaker
             self.print_meta_state(speaker, _meta_actions)
-            logger.info(
+            logger.debug(
                 "[PRESSURE-SYNC] agent=%s meta_pressure=%.2f dialogue_pressure=%s alignment=%s",
                 speaker.name,
                 speaker.drive_pressure,
                 speaker._last_dialogue_signals["pressure"],
                 speaker._last_pressure_sync,
             )
-            logger.info(
+            logger.debug(
                 "[RESOLUTION-SYNC] agent=%s dialogue_resolution=%s"
                 " unresolved=%d conflict=%.2f stagnation=%.2f alignment=%s",
                 speaker.name,
@@ -8974,7 +8988,7 @@ class MainScript:
                 speaker._last_stagnation,
                 speaker._last_resolution_alignment,
             )
-            logger.info(
+            logger.debug(
                 "[SEMANTIC-REPEAT-SYNC] agent=%s dialogue_semantic_repeat=%s"
                 " stagnation=%.2f conflict=%.2f unresolved=%d alignment=%s",
                 speaker.name,

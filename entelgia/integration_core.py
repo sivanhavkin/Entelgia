@@ -1405,7 +1405,12 @@ class IntegrationCore:
             return False
 
         compliant, reason = self.validate_generated_output(text, decision)
-        logger.info(
+        _post_gen_log = (
+            logger.debug
+            if decision.active_mode == IntegrationMode.NORMAL and compliant
+            else logger.info
+        )
+        _post_gen_log(
             "[POST-GEN-VALIDATION] mode=%s compliant=%s reason=%r",
             decision.active_mode.value,
             compliant,
@@ -1739,7 +1744,7 @@ class IntegrationCore:
             agent=agent_name, tags=tags, limit=limit
         )
         context = self._memory_store.format_context(entries)
-        logger.info(
+        logger.debug(
             "[INTEGRATION-MEMORY-CONTEXT] agent=%s entries=%d",
             agent_name,
             len(entries),
@@ -1779,7 +1784,7 @@ class IntegrationCore:
             tags=tags,
         )
         self._memory_store.store_entry(entry)
-        logger.info(
+        logger.debug(
             "[INTEGRATION-MEMORY-RECORD] agent=%s mode=%s",
             agent_name,
             getattr(decision, "active_mode", "NORMAL"),
