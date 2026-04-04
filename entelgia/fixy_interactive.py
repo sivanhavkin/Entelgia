@@ -189,6 +189,43 @@ _HARD_INTERVENTION_MODES: frozenset = frozenset(
     }
 )
 
+# ---------------------------------------------------------------------------
+# Operational mode: guidance vs. high-pressure control
+# ---------------------------------------------------------------------------
+# Guidance mode (FIXY_MODE_GUIDANCE): soft, reflective, identifies structural
+# issues without prescribing solutions.  Used in early dialogue or when new
+# claims are still arriving.
+# Control mode (FIXY_MODE_CONTROL): short, directive, operational.  Used once
+# the dialogue has stalled and guidance has already been tried.
+FIXY_MODE_GUIDANCE: str = "guidance"
+FIXY_MODE_CONTROL: str = "control"
+
+#: Output modes that run under the high-pressure control protocol.
+#: Prompts in this set are shorter, more directive, and prefer operational
+#: instructions over reflective commentary.
+_CONTROL_OUTPUT_MODES: frozenset = frozenset(
+    {
+        FixyMode.HARD_CONSTRAINT,
+        FixyMode.CONTRADICT,
+        FixyMode.FORCE_CHOICE,
+        FixyMode.FORCE_DIRECT_DISAGREEMENT,
+        FixyMode.FORCE_SHORT_ANSWER,
+        FixyMode.FORCE_COUNTEREXAMPLE,
+        FixyMode.EXPOSE_SYNTHESIS,
+        FixyMode.FORCE_MECHANISM,
+        FixyMode.FORCE_CONCRETE_EXAMPLE,
+        FixyMode.FORCE_TOPIC_RETURN,
+        FixyMode.FORCE_NEW_DOMAIN,
+        FixyMode.FORCE_METRIC,
+        FixyMode.FORCE_TEST,
+        FixyMode.FORCE_CASE,
+        FixyMode.FORCE_DEFINITION,
+        FixyMode.CONCRETIZE,
+        FixyMode.INVERT,
+        FixyMode.PIVOT,
+    }
+)
+
 
 # Policy: loop failure mode → preferred Fixy mode
 # (imported lazily to avoid circular import — loop_guard must not import fixy)
@@ -200,6 +237,13 @@ _LOOP_MODE_POLICY: Dict[str, str] = {
     "fixy_mediation_loop": FixyMode.FORCE_SHORT_ANSWER,
     "conceptual_loop": FixyMode.FORCE_MECHANISM,
     "axis_stagnation": FixyMode.CONCRETIZE,
+    # Extended intervention types
+    "missing_distinction": FixyMode.FORCE_DEFINITION,
+    "unresolved_contradiction": FixyMode.CONTRADICT,
+    "category_confusion": FixyMode.FORCE_DEFINITION,
+    "false_dichotomy": FixyMode.FORCE_NEW_DOMAIN,
+    "repeated_abstraction": FixyMode.FORCE_CONCRETE_EXAMPLE,
+    "no_structural_challenge": FixyMode.FORCE_DIRECT_DISAGREEMENT,
 }
 
 # Rotation list for loop_repetition / fixy_mediation_loop — cycles through
@@ -236,6 +280,13 @@ _LOOP_REWRITE_MODE_POLICY: Dict[str, str] = {
     "high_conflict_no_resolution": FixyMode.FORCE_CHOICE,
     "shallow_discussion": FixyMode.FORCE_TEST,
     "synthesis_opportunity": FixyMode.FORCE_METRIC,
+    # Extended intervention types
+    "missing_distinction": FixyMode.FORCE_DEFINITION,
+    "unresolved_contradiction": FixyMode.FORCE_CHOICE,
+    "category_confusion": FixyMode.FORCE_DEFINITION,
+    "false_dichotomy": FixyMode.FORCE_METRIC,
+    "repeated_abstraction": FixyMode.FORCE_CASE,
+    "no_structural_challenge": FixyMode.FORCE_CHOICE,
 }
 
 # Structural rewrite directives — one per FORCE_* mode.
@@ -297,8 +348,8 @@ _REASON_LABEL_MAP: Dict[str, str] = {
     "circular_reasoning": (
         "Do NOT use 'Loop:' or 'Next move:'. "
         "Begin with 'It seems both positions are grounded in the same assumption...' "
-        "or 'A missing variable here is...' "
-        "The hidden shared premise may be what remains unexamined by both sides."
+        "or 'The hidden shared premise that neither side has questioned is...' "
+        "The shared premise may be what remains unexamined by both sides."
     ),
     "high_conflict_no_resolution": (
         "Do NOT use 'Deadlock:'. "
@@ -309,7 +360,7 @@ _REASON_LABEL_MAP: Dict[str, str] = {
     "shallow_discussion": (
         "Do NOT use 'Loop:' or 'Next move:'. "
         "Begin with 'What remains unclear is whether...' "
-        "or 'A missing distinction here may be...' "
+        "or 'Neither side has yet asked what mechanism would explain this...' "
         "What neither side has yet examined may be where the depth lies."
     ),
     "synthesis_opportunity": (
@@ -321,8 +372,45 @@ _REASON_LABEL_MAP: Dict[str, str] = {
     "fixy_mediation_loop": (
         "Do NOT repeat bridging or mediation language. "
         "Begin with 'What remains unclear is whether...' "
-        "or 'A missing distinction here may be...' "
+        "or 'What remains unaddressed is the underlying difference in how the question is being posed...' "
         "A different frame may be what this exchange has not yet considered."
+    ),
+    # Extended intervention types
+    "missing_distinction": (
+        "Do NOT use 'Deadlock:'. "
+        "Begin with 'It seems both sides are treating two things as equivalent that may not be...' "
+        "or 'What remains unclear is whether the distinction between these concepts has been drawn...' "
+        "The conflation may be what is blocking progress here."
+    ),
+    "unresolved_contradiction": (
+        "Do NOT use 'Deadlock:' or 'Loop:'. "
+        "Begin with 'It seems both claims cannot hold simultaneously...' "
+        "or 'What remains unclear is how both positions are being treated as compatible...' "
+        "The contradiction may still be active beneath the apparent agreement."
+    ),
+    "category_confusion": (
+        "Do NOT use rigid labels. "
+        "Begin with 'It seems two different types of claim are being treated as the same kind...' "
+        "or 'What remains unclear is whether both sides are arguing at the same level of analysis...' "
+        "The category mismatch may be what is generating the apparent impasse."
+    ),
+    "false_dichotomy": (
+        "Do NOT use 'Deadlock:'. "
+        "Begin with 'It seems the exchange is treating a spectrum as a binary...' "
+        "or 'What remains unclear is whether the two positions are truly exhaustive...' "
+        "A third position may exist but has not yet been named."
+    ),
+    "repeated_abstraction": (
+        "Do NOT use 'Loop:' or 'Next move:'. "
+        "Begin with 'It seems neither side has grounded the argument in a specific instance...' "
+        "or 'What remains unclear is whether the abstract claim survives contact with a real case...' "
+        "The abstraction may be what is protecting both positions from genuine test."
+    ),
+    "no_structural_challenge": (
+        "Do NOT use 'Deadlock:'. "
+        "Begin with 'It seems the framing of the question itself has not been challenged...' "
+        "or 'What remains unclear is whether both sides are accepting a premise that may deserve scrutiny...' "
+        "The frame itself may be what needs to be questioned."
     ),
 }
 
@@ -347,6 +435,13 @@ _REASON_GUIDANCE_MAP: Dict[str, Tuple[str, str, float]] = {
     "axis_stagnation": ("break_repetition", "EXAMPLE", 0.65),
     "conceptual_loop": ("define_mechanism", "NEW_CLAIM", 0.7),
     "meta_reflection_needed": ("reflect_on_progress", "NEW_FRAME", 0.5),
+    # Extended intervention types
+    "missing_distinction": ("define_distinction", "NEW_CLAIM", 0.7),
+    "unresolved_contradiction": ("surface_contradiction", "DIRECT_ATTACK", 0.75),
+    "category_confusion": ("clarify_category", "NEW_CLAIM", 0.65),
+    "false_dichotomy": ("break_false_binary", "NEW_FRAME", 0.7),
+    "repeated_abstraction": ("force_concrete", "EXAMPLE", 0.7),
+    "no_structural_challenge": ("challenge_frame", "DIRECT_ATTACK", 0.7),
 }
 
 #: Per-repetition confidence increment added when the same goal recurs in
@@ -376,7 +471,13 @@ _FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION: str = (
 
 # Reasons that trigger rotation through all loop-breaking strategies
 _ROTATION_TRIGGER_REASONS: frozenset = frozenset(
-    {"loop_repetition", "fixy_mediation_loop", "circular_reasoning"}
+    {
+        "loop_repetition",
+        "fixy_mediation_loop",
+        "circular_reasoning",
+        "repeated_abstraction",
+        "no_structural_challenge",
+    }
 )
 
 #: Guidance move types that break semantic loops.  When :meth:`InteractiveFixy.record_semantic_loop`
@@ -508,12 +609,11 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Up to 200 words. Sound like a theorist, not a policy engine."
     ),
     FixyMode.HARD_CONSTRAINT: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The dialogue has persisted long enough to reveal its underlying structural tensions.\n"
+        "You are Fixy. The dialogue has persisted long enough to reveal a structural problem.\n"
+        "Name it directly. Do not summarize. Do not prescribe next steps.\n"
         "Begin with 'It seems the tension here is fundamentally between...' "
         "or 'What remains unresolved beneath the surface is...'\n"
-        "Do NOT instruct, prescribe, or propose next steps. Illuminate the structure of the disagreement.\n"
-        "Up to 200 words. Sound like a thinker inside the dialogue, not an arbiter above it."
+        "Up to 100 words."
     ),
     # ── Legacy / default mode ──────────────────────────────────────────────
     FixyMode.MEDIATE: (
@@ -560,25 +660,25 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Up to 200 words. Do NOT accept the synthesis. Do NOT recycle dialogue content."
     ),
     FixyMode.FORCE_MECHANISM: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "Claims are being made without a stated causal mechanism.\n"
-        "Begin with 'A missing variable here is the causal chain from...' "
-        "or 'What remains unclear is how one leads to the other...'\n"
-        "Up to 200 words. Do NOT prescribe a mechanism or direct next steps."
+        "You are Fixy. Claims have been made without a stated causal mechanism.\n"
+        "Begin with 'What remains unclear is how one leads to the other...' "
+        "or 'The causal chain from X to Y has not been established here...'\n"
+        "State the gap. Do NOT prescribe a mechanism.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_CONCRETE_EXAMPLE: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The exchange has remained abstract without any real-world grounding.\n"
+        "You are Fixy. The exchange has remained abstract with no real-world grounding.\n"
         "Begin with 'What neither side has yet examined is a specific real-world instance...' "
-        "or 'A missing distinction may become visible in a concrete situation where...'\n"
-        "Up to 200 words. Do NOT summarize or moralize."
+        "or 'The argument has not been tested against a concrete situation where...'\n"
+        "Point to the gap. Do NOT supply the example.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_COUNTEREXAMPLE: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "A central assertion has not been subjected to a disconfirming case.\n"
-        "Begin with 'A missing variable here is a case where this claim does not hold...' "
-        "or 'What remains unclear is whether this position survives a situation where...'\n"
-        "Up to 200 words. Do NOT resolve or prescribe an answer."
+        "You are Fixy. A central assertion has not been tested against a disconfirming case.\n"
+        "Begin with 'What remains unclear is whether this holds when...' "
+        "or 'The claim has not survived a case where...'\n"
+        "Name the gap. Do NOT resolve it.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_DIRECT_DISAGREEMENT: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
@@ -609,11 +709,11 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Up to 200 words. Do NOT moralize or prescribe a next step."
     ),
     FixyMode.FORCE_METRIC: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "No measurable criterion or benchmark has appeared in the exchange.\n"
-        "Begin with 'A missing variable here is a measurable criterion for...' "
-        "or 'What remains unclear is how either position could be evaluated against...'\n"
-        "Up to 200 words. Do NOT prescribe what to measure."
+        "You are Fixy. No criterion for evaluation has appeared in this exchange.\n"
+        "Begin with 'What remains unclear is how either position could be evaluated...' "
+        "or 'The exchange needs a measurable benchmark — specifically...'\n"
+        "Name the absence. Do NOT prescribe what to measure.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_CHOICE: (
         "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
@@ -623,25 +723,25 @@ _MODE_PROMPTS: Dict[str, str] = {
         "Up to 200 words. Do NOT resolve the tension or prescribe a commitment."
     ),
     FixyMode.FORCE_TEST: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The exchange contains claims that have not yet been grounded empirically.\n"
-        "Begin with 'A missing variable here is a testable prediction for...' "
-        "or 'What remains unclear is what observable difference would follow from...'\n"
-        "Up to 200 words. Do NOT demand proof or prescribe a test."
+        "You are Fixy. Claims have not been grounded in any testable prediction.\n"
+        "Begin with 'What remains unclear is what observable difference would follow from...' "
+        "or 'No falsifiable prediction has been stated for...'\n"
+        "Name the untested claim. Do NOT demand proof.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_CASE: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "The reasoning has remained at an abstract level with no grounded instance.\n"
-        "Begin with 'A missing distinction may be visible in a specific historical or situational case where...' "
-        "or 'Both of you may be assuming something that a particular case would complicate...'\n"
-        "Up to 200 words. Do NOT prescribe which case to examine."
+        "You are Fixy. The reasoning has stayed abstract with no grounded instance.\n"
+        "Begin with 'Both of you may be assuming something that a particular case would complicate...' "
+        "or 'What remains unclear is whether this holds in a real instance where...'\n"
+        "Point to the need. Do NOT prescribe which case to examine.\n"
+        "Up to 100 words."
     ),
     FixyMode.FORCE_DEFINITION: (
-        "You are Fixy, a sharp mediator and pattern-sensitive observer.\n"
-        "A central term is being used by both sides without a shared definition.\n"
+        "You are Fixy. A central term is being used without a shared definition.\n"
         "Begin with 'Both of you may be using this term in different senses...' "
         "or 'What remains unclear is whether the same word is carrying different meanings...'\n"
-        "Up to 200 words. Do NOT define the term or prescribe a resolution."
+        "Name the ambiguity. Do NOT define the term.\n"
+        "Up to 100 words."
     ),
 }
 
@@ -799,6 +899,12 @@ class InteractiveFixy:
         # get_fixy_mode to select a soft staged mode instead of a disruptive one.
         # Resets to False at the start of every should_intervene call.
         self._soft_mode_forced: bool = False
+
+        # Tracks how many consecutive times each intervention reason has fired
+        # without the agent following the associated guidance.  When a reason
+        # accumulates >= 2 failures, get_fixy_mode escalates to a harder/rotated
+        # mode so Fixy does not repeat a correction that has already failed.
+        self._failed_reasons: Dict[str, int] = {}
 
         # ── Pair-window tracking ──────────────────────────────────────────────
         # The pair gate must be evaluated only over the window since the last
@@ -981,6 +1087,11 @@ class InteractiveFixy:
                 agent_move,
             )
             self.ignored_guidance_count = 0
+            # Clear failure tracking for this reason on compliance.
+            reason = self.fixy_guidance.reason
+            if reason in self._failed_reasons:
+                del self._failed_reasons[reason]
+                logger.debug("[FIXY-FAILED] reason=%r failure count cleared on compliance", reason)
         else:
             self.ignored_guidance_count += 1
             logger.info(
@@ -989,6 +1100,14 @@ class InteractiveFixy:
                 agent_move,
                 self.fixy_guidance.preferred_move,
                 self.ignored_guidance_count,
+            )
+            # Track per-reason failure so get_fixy_mode can escalate later.
+            reason = self.fixy_guidance.reason
+            self._failed_reasons[reason] = self._failed_reasons.get(reason, 0) + 1
+            logger.info(
+                "[FIXY-FAILED] reason=%r failed %d time(s) consecutively",
+                reason,
+                self._failed_reasons[reason],
             )
             # Soft escalation: boost confidence when guidance is repeatedly ignored
             if self.ignored_guidance_count >= 2:
@@ -1044,6 +1163,14 @@ class InteractiveFixy:
                 confidence,
             )
             self.ignored_guidance_count = 0
+            # Clear failure tracking for this reason on full compliance.
+            reason = self.fixy_guidance.reason
+            if reason in self._failed_reasons:
+                del self._failed_reasons[reason]
+                logger.debug(
+                    "[FIXY-FAILED] reason=%r failure count cleared on full compliance",
+                    reason,
+                )
         elif partial:
             logger.info(
                 "[FIXY-VALIDATION] partial compliance (speaker=%r expected=%r"
@@ -1062,6 +1189,14 @@ class InteractiveFixy:
                 getattr(result, "expected_move", "?"),
                 confidence,
                 self.ignored_guidance_count,
+            )
+            # Track per-reason failure for escalation in get_fixy_mode.
+            reason = self.fixy_guidance.reason
+            self._failed_reasons[reason] = self._failed_reasons.get(reason, 0) + 1
+            logger.info(
+                "[FIXY-FAILED] reason=%r failed %d time(s) consecutively (via validation)",
+                reason,
+                self._failed_reasons[reason],
             )
             if self.ignored_guidance_count >= 2:
                 self.fixy_guidance.confidence = min(
@@ -1436,7 +1571,43 @@ class InteractiveFixy:
                 self._loop_break_rotation,
             )
             return mode
+
+        # Escalate to a harder/rotated mode when this reason has already failed
+        # at least twice without producing dialogue change.
+        fail_count = self._failed_reasons.get(reason, 0)
+        if fail_count >= 2:
+            idx = (self._loop_break_rotation + fail_count) % len(_LOOP_BREAKING_MODES)
+            mode = _LOOP_BREAKING_MODES[idx]
+            self._loop_break_rotation += 1
+            logger.info(
+                "[FIXY-ESCALATE] reason=%r failed %d time(s) → escalating to %s",
+                reason,
+                fail_count,
+                mode,
+            )
+            return mode
+
         return _LOOP_MODE_POLICY.get(reason, FixyMode.MEDIATE)
+
+    def get_mode_type(self, mode: str) -> str:
+        """Return the operational type of *mode*: guidance or control.
+
+        Guidance mode (``FIXY_MODE_GUIDANCE``) is soft and reflective;
+        control mode (``FIXY_MODE_CONTROL``) is short, directive, and
+        operational.  Callers can use this to adjust prompt word limits,
+        logging, or downstream behaviour.
+
+        Parameters
+        ----------
+        mode:
+            One of the ``FixyMode`` constants.
+
+        Returns
+        -------
+        ``FIXY_MODE_CONTROL`` when *mode* belongs to :data:`_CONTROL_OUTPUT_MODES`,
+        otherwise ``FIXY_MODE_GUIDANCE``.
+        """
+        return FIXY_MODE_CONTROL if mode in _CONTROL_OUTPUT_MODES else FIXY_MODE_GUIDANCE
 
     def get_rewrite_hint(
         self,
@@ -1628,7 +1799,8 @@ class InteractiveFixy:
             f"{dedup_instruction}"
             f"RECENT DIALOGUE:\n{context}\n\n"
             f"Output rule: {output_instruction}\n"
-            f"Up to 200 words. Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
+            f"{'Up to 100 words.' if self.get_mode_type(mode) == FIXY_MODE_CONTROL else 'Up to 200 words.'}"
+            f" Do NOT recycle dialogue content. Do NOT prescribe policy.\n"
             f"{_FIXY_FORBIDDEN_CONCEPTS_INSTRUCTION}\n"
             f"{LLM_FIXY_RESPONSE_LIMIT}\n"
         )
@@ -1970,6 +2142,13 @@ class InteractiveFixy:
             "synthesis_opportunity": "A named conceptual bridge connecting both positions.",
             "fixy_mediation_loop": "A frame shift that neither side has yet proposed.",
             "meta_reflection_needed": "A structural review of what has actually been established.",
+            # Extended intervention types
+            "missing_distinction": "A precise separation of the conflated concepts.",
+            "unresolved_contradiction": "Acknowledgment of the logical incompatibility between both claims.",
+            "category_confusion": "Recognition that both sides are arguing at different levels of analysis.",
+            "false_dichotomy": "A third position or spectrum that neither side has named.",
+            "repeated_abstraction": "A grounded instance that tests the abstract claim.",
+            "no_structural_challenge": "A challenge to the underlying question itself, not just its answers.",
         }
         missing_element = _reason_missing.get(reason, "A novel variable or frame.")
 
