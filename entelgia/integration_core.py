@@ -579,6 +579,29 @@ _OVERLAY_LOOP_FAILSAFE: str = (
     "No abstract reasoning. No philosophy. One concrete case only."
 )
 
+# Overlay injected during the post-max-attempts escalation step.  This
+# overlay enforces the strictest possible generation constraints: personality
+# suppressed, no philosophical questions, no abstract reasoning, direct
+# concrete answer in 1–2 sentences only.
+_OVERLAY_LOOP_ESCALATION_STRATEGY: str = (
+    "LOOP ESCALATION: This response has been rejected multiple times for repeating "
+    "existing reasoning without progress.\n"
+    "MANDATORY CONSTRAINTS:\n"
+    "- Personality style is disabled\n"
+    "- No philosophical questions\n"
+    "- No abstract reasoning\n"
+    "- Direct answer only\n"
+    "- 1\u20132 sentences maximum\n"
+    "Give one direct, concrete statement that introduces genuinely new content."
+)
+
+# System-generated fallback text returned when the escalation attempt still
+# produces a semantic loop.  This text is used as the dialogue output instead
+# of the looping response, so the loop never enters the dialogue.
+_FALLBACK_LOOP_RESET_TEXT: str = (
+    "This line of reasoning is repeating without progress. Resetting perspective."
+)
+
 # ---------------------------------------------------------------------------
 # Post-generation validation signal lists
 # ---------------------------------------------------------------------------
@@ -1594,6 +1617,36 @@ class IntegrationCore:
         if regen_attempt == 1:
             return _OVERLAY_LOOP_BREAK_HARD
         return _OVERLAY_LOOP_BREAK
+
+    def build_loop_escalation_overlay(self) -> str:
+        """Return the escalation overlay for the post-max-attempts escalation step.
+
+        This overlay is injected when all within-turn loop-break attempts are
+        exhausted and the response is still a semantic loop.  It enforces the
+        strictest generation constraints: personality suppressed, no
+        philosophical questions, no abstract reasoning, direct answer in
+        1–2 sentences.
+
+        Returns
+        -------
+        str
+            Imperative overlay text for the escalation regeneration attempt.
+        """
+        return _OVERLAY_LOOP_ESCALATION_STRATEGY
+
+    def get_loop_reset_fallback(self) -> str:
+        """Return the system-generated fallback for an unresolvable loop.
+
+        Called when the escalation step still produces a semantic loop.
+        The returned text replaces the looping response so that a known
+        loop never enters the dialogue as a valid utterance.
+
+        Returns
+        -------
+        str
+            Short system-generated message signalling a perspective reset.
+        """
+        return _FALLBACK_LOOP_RESET_TEXT
 
     def record_response_hash(self, text: str) -> bool:
         """Record the reasoning hash of *text* and return True when a repeated
