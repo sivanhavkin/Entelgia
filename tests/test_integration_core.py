@@ -1544,7 +1544,63 @@ class TestBuildLoopBreakOverlay:
 
 
 # ---------------------------------------------------------------------------
-# 38. ControlDecision carries is_loop and reasoning_delta from loop rule
+# 38. build_loop_escalation_overlay — post-max-attempts escalation overlay
+# ---------------------------------------------------------------------------
+
+
+class TestBuildLoopEscalationOverlay:
+    """Tests for IntegrationCore.build_loop_escalation_overlay."""
+
+    @pytest.fixture
+    def core(self) -> IntegrationCore:
+        return IntegrationCore()
+
+    def test_returns_non_empty_string(self, core):
+        overlay = core.build_loop_escalation_overlay()
+        assert isinstance(overlay, str)
+        assert overlay
+
+    def test_contains_loop_escalation_signal(self, core):
+        overlay = core.build_loop_escalation_overlay()
+        assert "LOOP ESCALATION" in overlay
+
+    def test_enforces_no_questions_constraint(self, core):
+        overlay = core.build_loop_escalation_overlay()
+        assert "No philosophical questions" in overlay or "no questions" in overlay.lower()
+
+    def test_enforces_personality_suppression(self, core):
+        overlay = core.build_loop_escalation_overlay()
+        assert "Personality style is disabled" in overlay or "personality" in overlay.lower()
+
+
+# ---------------------------------------------------------------------------
+# 39. get_loop_reset_fallback — system fallback for unresolvable loops
+# ---------------------------------------------------------------------------
+
+
+class TestGetLoopResetFallback:
+    """Tests for IntegrationCore.get_loop_reset_fallback."""
+
+    @pytest.fixture
+    def core(self) -> IntegrationCore:
+        return IntegrationCore()
+
+    def test_returns_non_empty_string(self, core):
+        text = core.get_loop_reset_fallback()
+        assert isinstance(text, str)
+        assert text
+
+    def test_contains_reset_or_repeat_signal(self, core):
+        text = core.get_loop_reset_fallback()
+        lower = text.lower()
+        assert "repeat" in lower or "reset" in lower or "progress" in lower
+
+    def test_is_idempotent(self, core):
+        assert core.get_loop_reset_fallback() == core.get_loop_reset_fallback()
+
+
+# ---------------------------------------------------------------------------
+# 40. ControlDecision carries is_loop and reasoning_delta from loop rule
 # ---------------------------------------------------------------------------
 
 

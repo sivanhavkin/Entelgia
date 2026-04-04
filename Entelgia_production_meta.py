@@ -8461,9 +8461,12 @@ class MainScript:
             # checks above), and (3) NOT a semantic loop.  When a loop is
             # detected — is_loop=True AND reasoning_delta in ("none", "weak") —
             # the response is rejected immediately and regenerated.  Up to
-            # _MAX_LOOP_BREAK_ATTEMPTS retries are allowed; if the response is
-            # still a loop after all attempts the fail-safe accepts the
-            # best-effort response with a warning.
+            # _MAX_LOOP_BREAK_ATTEMPTS retries are allowed.  If the response is
+            # still a loop after all retries the system escalates strategy
+            # (suppress personality, low-complexity mode, truncated context)
+            # and attempts one final recovery regen.  If that also fails the
+            # response is replaced by a system-generated fallback message so
+            # that a known loop never enters the dialogue.
             if (
                 self.semantic_controller is not None
                 and self._integration_core is not None
@@ -8596,10 +8599,8 @@ class MainScript:
                         )
                         _pre_accept_loop_result = _pa_loop
 
-                    # Only emit the fail-safe warning when the budget is
-                    # exhausted AND the final regenerated output is still a
-                    # loop -- if the last regen actually broke the loop the
-                    # response is accepted silently.
+                    # Budget exhausted.  If the final regen still produced a
+                    # loop → escalate strategy; otherwise accept silently.
                     if _loop_regen_count >= _IC_MAX_LOOP_BREAK:
                         _final_reject, _ = (
                             self._integration_core.check_loop_rejection(
@@ -8609,12 +8610,91 @@ class MainScript:
                             )
                         )
                         if _final_reject:
+                            # ── ESCALATE STRATEGY ────────────────────────────
+                            # Suppress personality, enforce shorter output,
+                            # no philosophical reasoning, no questions, direct
+                            # answer only, ultra-truncated context (last 2 turns).
+                            _esc_overlay = (
+                                self._integration_core.build_loop_escalation_overlay()
+                            )
+                            _esc_seed = _esc_overlay + "\n\n" + _pre_gen_base_seed
                             logger.warning(
-                                "[INTEGRATION-LOOP-FAILSAFE] repeated loop after %d"
-                                " regen(s) for agent=%s -- accepting best-effort response",
+                                "[INTEGRATION-LOOP-ESCALATION] loop persisted after"
+                                " %d regen(s) for agent=%s -- escalating strategy",
                                 _loop_regen_count,
                                 speaker.name,
                             )
+                            if self.cfg.show_meta:
+                                print(
+                                    Fore.RED
+                                    + Style.BRIGHT
+                                    + f"[INTEGRATION-LOOP-ESCALATION]"
+                                    f" agent={speaker.name}"
+                                    + Style.RESET_ALL
+                                    + "\n"
+                                )
+                            out = _pre_gen_agent.speak(
+                                _esc_seed, self.dialog[-2:]
+                            )
+                            _, _esc_loop = self.semantic_controller.evaluate_reply(
+                                speaker=speaker.name,
+                                text=out,
+                                fixy_guidance=(
+                                    self.interactive_fixy.fixy_guidance
+                                    if self.interactive_fixy is not None
+                                    else None
+                                ),
+                                recent_texts=_pa_recent_texts
+                                + _pa_rejected_texts,
+                                stagnation=speaker._last_stagnation,
+                                repeated_moves=bool(_active_loop_modes),
+                                ignored_recently=(
+                                    self.interactive_fixy.ignored_guidance_count
+                                    >= 1
+                                    if self.interactive_fixy is not None
+                                    else False
+                                ),
+                                unresolved_rising=(
+                                    speaker.open_questions >= 2
+                                ),
+                            )
+                            _pre_accept_loop_result = _esc_loop
+                            _esc_reject, _ = (
+                                self._integration_core.check_loop_rejection(
+                                    _esc_loop.is_loop,
+                                    getattr(_esc_loop, "reasoning_delta", None),
+                                    getattr(_esc_loop, "new_move_type", None),
+                                )
+                            )
+                            if _esc_reject:
+                                # ── FINAL FALLBACK ───────────────────────────
+                                # Never accept a known loop.  Replace the
+                                # generated output with a system message that
+                                # signals a perspective reset.
+                                out = (
+                                    self._integration_core.get_loop_reset_fallback()
+                                )
+                                logger.warning(
+                                    "[INTEGRATION-LOOP-RESET] loop not resolved"
+                                    " after escalation for agent=%s"
+                                    " -- using system fallback",
+                                    speaker.name,
+                                )
+                                if self.cfg.show_meta:
+                                    print(
+                                        Fore.RED
+                                        + Style.BRIGHT
+                                        + f"[INTEGRATION-LOOP-RESET]"
+                                        f" agent={speaker.name}"
+                                        + Style.RESET_ALL
+                                        + "\n"
+                                    )
+                            else:
+                                logger.info(
+                                    "[INTEGRATION-LOOP-BREAK] loop resolved by"
+                                    " escalation for agent=%s",
+                                    speaker.name,
+                                )
                         else:
                             logger.info(
                                 "[INTEGRATION-LOOP-BREAK] loop resolved by final"
