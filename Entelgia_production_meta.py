@@ -8298,7 +8298,7 @@ class MainScript:
                         )
                         if _pre_gen_overlay:
                             seed = _pre_gen_overlay + "\n\n" + seed
-                            logger.info(
+                            logger.debug(
                                 "[PRE-GEN-OVERLAY] injected for agent=%s mode=%s",
                                 speaker.name,
                                 _pre_gen_decision.active_mode.value,
