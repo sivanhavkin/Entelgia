@@ -10,6 +10,7 @@ v2.9.0: Added AgentMode enum and cluster-aware topic pivot support.
 
 import logging
 import random
+import re
 from typing import Dict, List, Any, Tuple, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -106,6 +107,175 @@ _GUIDANCE_SUPPRESS: float = 0.15
 #: biases the dialogue, it does not control it.
 _GUIDANCE_MIN_WEIGHT: float = 0.02
 
+# ---------------------------------------------------------------------------
+# Dynamic continuation context helpers
+# ---------------------------------------------------------------------------
+
+#: Instruction injected before each continuation prompt to stop the agent
+#: from restarting the topic or repeating prior arguments.
+_CONTINUATION_INSTRUCTION: str = (
+    "Continue the dialogue from its last meaningful state.\n"
+    "Do not restart the topic.\n"
+    "Do not repeat prior arguments."
+)
+
+#: Adversative conjunctions used to detect tension points in dialogue text.
+_TENSION_MARKERS: tuple = (
+    "but ",
+    "however,",
+    "yet ",
+    "although ",
+    "nevertheless,",
+    "despite ",
+)
+
+#: Minimum character length for a sentence to qualify as a last_claim or
+#: tension_point candidate.
+_MIN_SENTENCE_LEN: int = 20
+
+#: Minimum character length for a sentence to qualify as an
+#: unresolved_question candidate.
+_MIN_QUESTION_LEN: int = 10
+
+#: Maximum characters taken from any extracted sentence field.
+_MAX_FIELD_LEN: int = 120
+
+
+def extract_continuation_context(
+    recent_turns: List[Dict[str, str]],
+    topic: str = "",
+) -> Dict[str, str]:
+    """Extract continuation context from recent dialogue turns.
+
+    Scans *recent_turns* (most recent last) for:
+
+    - ``dominant_topic``      — taken from *topic* when provided.
+    - ``last_claim``          — the most recent declarative sentence
+      (non-question, length > :data:`_MIN_SENTENCE_LEN`).
+    - ``unresolved_question`` — the most recent question sentence
+      (ends with ``?``, length > :data:`_MIN_QUESTION_LEN`).
+    - ``tension_point``       — the most recent sentence containing an
+      adversative conjunction that is longer than :data:`_MIN_SENTENCE_LEN`.
+
+    Entries whose ``role`` is ``"seed"`` are skipped so the static opening
+    seed text is never treated as conversation content.
+
+    When *recent_turns* contains **no real speaker turns** (first session
+    with no memory), ``last_claim``, ``unresolved_question``, and
+    ``tension_point`` are all empty strings.  Callers should treat that
+    signal as "first session — fall back to the default topic seed."
+
+    Args:
+        recent_turns: Slice of the dialogue history to scan.
+        topic: Active topic label; becomes ``dominant_topic`` in the result.
+
+    Returns:
+        Dict with keys ``dominant_topic``, ``last_claim``,
+        ``unresolved_question``, ``tension_point``.
+    """
+    dominant_topic: str = topic
+    last_claim: str = ""
+    unresolved_question: str = ""
+    tension_point: str = ""
+
+    # Walk from most-recent to oldest to surface the latest signals first.
+    for turn in reversed(recent_turns):
+        if turn.get("role") == "seed":
+            continue
+        text = turn.get("text", "").strip()
+        if not text:
+            continue
+
+        # Split on terminal punctuation boundaries.
+        sentences: List[str] = [
+            s.strip()
+            for s in re.split(r"(?<=[.!?])\s+", text)
+            if s.strip()
+        ]
+
+        for sentence in reversed(sentences):
+            lower = sentence.lower()
+
+            if not last_claim and not sentence.endswith("?") and len(sentence) > _MIN_SENTENCE_LEN:
+                last_claim = sentence[:_MAX_FIELD_LEN]
+
+            if (
+                not unresolved_question
+                and sentence.endswith("?")
+                and len(sentence) > _MIN_QUESTION_LEN
+            ):
+                unresolved_question = sentence[:_MAX_FIELD_LEN]
+
+            if (
+                not tension_point
+                and any(marker in lower for marker in _TENSION_MARKERS)
+                and len(sentence) > _MIN_SENTENCE_LEN
+            ):
+                tension_point = sentence[:_MAX_FIELD_LEN]
+
+        # Stop scanning once all three contextual signals have been found.
+        if last_claim and unresolved_question and tension_point:
+            break
+
+    return {
+        "dominant_topic": dominant_topic,
+        "last_claim": last_claim,
+        "unresolved_question": unresolved_question,
+        "tension_point": tension_point,
+    }
+
+
+def build_continuation_prompt(context: Dict[str, str]) -> str:
+    """Build a continuation prompt from extracted context.
+
+    Constructs a multi-line prompt of the form::
+
+        Continue the dialogue from its last meaningful state.
+        Do not restart the topic.
+        Do not repeat prior arguments.
+
+        The previous discussion focused on: <dominant_topic>.
+        The last claim made was: <last_claim>.
+        An unresolved question remains: <unresolved_question>.
+        The tension point was: <tension_point>.
+
+    Only lines whose values are non-empty are included.  Returns an **empty
+    string** when the context carries no meaningful content (e.g. first
+    session with no prior memory), so that callers can transparently fall
+    back to the default topic-seed behaviour.
+
+    Args:
+        context: Dict produced by :func:`extract_continuation_context`.
+
+    Returns:
+        Formatted continuation prompt string, or ``""`` if context is empty.
+    """
+    context_lines: List[str] = []
+
+    def _end(text: str) -> str:
+        """Append a period only when the text is non-empty and doesn't already end with terminal punctuation."""
+        if not text:
+            return text
+        return text if text[-1] in ".!?" else text + "."
+
+    if context.get("dominant_topic"):
+        context_lines.append(
+            f"The previous discussion focused on: {_end(context['dominant_topic'])}"
+        )
+    if context.get("last_claim"):
+        context_lines.append(f"The last claim made was: {_end(context['last_claim'])}")
+    if context.get("unresolved_question"):
+        context_lines.append(
+            f"An unresolved question remains: {_end(context['unresolved_question'])}"
+        )
+    if context.get("tension_point"):
+        context_lines.append(f"The tension point was: {_end(context['tension_point'])}")
+
+    if not context_lines:
+        return ""
+
+    return _CONTINUATION_INSTRUCTION + "\n\n" + "\n".join(context_lines)
+
 
 class SeedGenerator:
     """Generates varied, context-aware dialogue seeds."""
@@ -145,6 +315,7 @@ class SeedGenerator:
         turn_count: int,
         agent_mode: Optional[str] = None,
         fixy_guidance: "Optional[FixyGuidance]" = None,
+        has_prior_memory: bool = False,
     ) -> str:
         """
         Generate contextual seed based on dialogue state.
@@ -157,6 +328,15 @@ class SeedGenerator:
         v5.1.0: *fixy_guidance* (optional :class:`FixyGuidance`) probabilistically
         biases strategy selection toward the Fixy-recommended move type.
 
+        v5.2.0: Dynamic continuation context.  When *has_prior_memory* is
+        ``True`` **and** *recent_turns* contains real speaker turns, the static
+        ``TOPIC: {topic}`` header is replaced by a continuation prompt built
+        from :func:`extract_continuation_context` /
+        :func:`build_continuation_prompt`.  On the **first session with no
+        memory** (*has_prior_memory* ``False``), the function falls back to the
+        original ``TOPIC: {topic}`` header so the conversation is anchored to
+        the configured seed topic.
+
         Args:
             topic: Current topic label
             recent_turns: Recent dialogue turns
@@ -164,6 +344,8 @@ class SeedGenerator:
             turn_count: Current turn number
             agent_mode: Optional AgentMode override injected when loop is active
             fixy_guidance: Optional Fixy guidance to bias strategy weights
+            has_prior_memory: Whether the agent has stored prior-session memory;
+                controls whether the continuation prompt is injected.
 
         Returns:
             Formatted seed instruction
@@ -192,11 +374,35 @@ class SeedGenerator:
             )
             base = template.format(topic=topic)
 
-        # When the topic subsystem is disabled (topic is empty) strip the
-        # "TOPIC: \n" header that all seed templates inject, so no topic
-        # reference leaks into the prompt.
-        if not topic:
+        # ── Dynamic continuation context ─────────────────────────────────────
+        # Inject a structured continuation prompt only when the agent already
+        # has stored memory from prior turns (has_prior_memory=True) AND there
+        # are real speaker turns to extract context from.  On the very first
+        # session (has_prior_memory=False) the caller signals "no memory" and
+        # we fall back to the original TOPIC-header so the opening turn is
+        # anchored to the configured seed topic.
+        real_turns = [
+            t for t in recent_turns
+            if t.get("role") != "seed" and t.get("text", "").strip()
+        ]
+        if has_prior_memory and real_turns:
+            ctx = extract_continuation_context(recent_turns, topic)
+            continuation_prefix = build_continuation_prompt(ctx)
+        else:
+            continuation_prefix = ""
+
+        if continuation_prefix:
+            # Extract the strategy instruction (text after the first newline)
+            # and pair it with the dynamic continuation header.
+            nl_pos = base.find("\n")
+            strategy_instruction = base[nl_pos + 1:] if nl_pos >= 0 else base
+            base = continuation_prefix + "\n\n" + strategy_instruction
+        elif not topic:
+            # Legacy path: topic subsystem disabled and no continuation
+            # context — strip the empty "TOPIC: \n" header.
             base = base.removeprefix(_SEED_TOPIC_PREFIX)
+        # else: first session with a topic — keep the original
+        # "TOPIC: {topic}\n<strategy>" base unchanged.
 
         # Append mode-specific instruction when a loop is active
         mode_instruction = ""
@@ -445,6 +651,7 @@ class DialogueEngine:
         turn_count: int,
         agent_mode: Optional[str] = None,
         fixy_guidance: "Optional[FixyGuidance]" = None,
+        has_prior_memory: bool = False,
     ) -> str:
         """
         Generate contextual seed for speaker.
@@ -455,6 +662,12 @@ class DialogueEngine:
         v5.1.0: *fixy_guidance* is forwarded to probabilistically bias
         strategy weights toward the Fixy-recommended move type.
 
+        v5.2.0: *has_prior_memory* is forwarded to
+        ``SeedGenerator.generate_seed``.  When ``True`` and real speaker turns
+        exist, the static ``TOPIC:`` header is replaced by a dynamic
+        continuation prompt.  When ``False`` (default — first session / no
+        stored memory), the original ``TOPIC: {topic}`` seed is used.
+
         Args:
             topic: Current topic
             dialog_history: Recent dialogue
@@ -462,6 +675,7 @@ class DialogueEngine:
             turn_count: Turn number
             agent_mode: Optional AgentMode constant (injected when loop active)
             fixy_guidance: Optional Fixy guidance to bias strategy weights
+            has_prior_memory: Whether the agent has stored prior-session memory
 
         Returns:
             Seed instruction string
@@ -476,6 +690,7 @@ class DialogueEngine:
             turn_count,
             agent_mode=agent_mode,
             fixy_guidance=fixy_guidance,
+            has_prior_memory=has_prior_memory,
         )
 
     def should_allow_fixy(
