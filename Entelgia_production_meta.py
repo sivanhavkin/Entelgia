@@ -527,7 +527,10 @@ ANTHROPIC_MODELS: list[str] = [
     "claude-haiku-4-5",
 ]
 
-# Mapping of backend name → available model list (single source of truth for menus)
+# Mapping of backend name → available model list.
+# This is the single source of truth consumed by the startup menu
+# (_pick_agent_backend_and_model, select_llm_backend_and_models) so that
+# adding a new backend or updating model names only requires editing here.
 _BACKEND_MODELS: dict[str, list[str]] = {
     "grok": GROK_MODELS,
     "ollama": OLLAMA_MODELS,
@@ -9671,7 +9674,7 @@ def select_session_turns() -> int:
     )
 
 
-def _pick_agent_backend_and_model(agent_label: str) -> tuple[str, str] | None:
+def _pick_agent_backend_and_model(agent_label: str) -> Optional[Tuple[str, str]]:
     """Interactively pick a backend and model for a single agent.
 
     Presents the backend list, then the model list for the chosen backend.
@@ -9854,20 +9857,20 @@ def select_llm_backend_and_models(cfg: "Config") -> None:
 def _print_llm_config_summary(cfg: "Config") -> None:
     """Print the active LLM configuration summary."""
 
-    def _eff_backend(agent_backend: str) -> str:
+    def _effective_backend(agent_backend: str) -> str:
         return agent_backend if agent_backend else cfg.llm_backend
 
     print()
     print(Fore.GREEN + "[LLM CONFIG]" + Style.RESET_ALL)
     print(f"  Global backend:  {cfg.llm_backend}")
     print(
-        f"  Socrates:  [{_eff_backend(cfg.backend_socrates)}]  {cfg.model_socrates}"
+        f"  Socrates:  [{_effective_backend(cfg.backend_socrates)}]  {cfg.model_socrates}"
     )
     print(
-        f"  Athena:    [{_eff_backend(cfg.backend_athena)}]  {cfg.model_athena}"
+        f"  Athena:    [{_effective_backend(cfg.backend_athena)}]  {cfg.model_athena}"
     )
     print(
-        f"  Fixy:      [{_eff_backend(cfg.backend_fixy)}]  {cfg.model_fixy}"
+        f"  Fixy:      [{_effective_backend(cfg.backend_fixy)}]  {cfg.model_fixy}"
     )
     print()
 
