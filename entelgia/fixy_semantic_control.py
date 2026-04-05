@@ -476,9 +476,10 @@ class FixySemanticController:
     [FIXY-MEMORY-RECORD]       — entry written to attached memory store
     """
 
-    def __init__(self, llm: Any, model: str) -> None:
+    def __init__(self, llm: Any, model: str, backend: str = "") -> None:
         self.llm = llm
         self.model = model
+        self.backend = backend  # per-agent backend override
         # Optional JSON-backed memory store (wired via attach_memory_store)
         self._memory_store: Optional[IntegrationMemoryStore] = None
 
@@ -614,7 +615,7 @@ class FixySemanticController:
         prompt = prompt_template.format(speaker=speaker, text=text)
 
         try:
-            raw = self.llm.generate(self.model, prompt)
+            raw = self.llm.generate(self.model, prompt, backend=self.backend)
         except Exception as exc:
             logger.debug(
                 "[FIXY-VALIDATION] LLM error for speaker=%r move=%r: %s",
@@ -705,7 +706,7 @@ class FixySemanticController:
         )
 
         try:
-            raw = self.llm.generate(self.model, prompt)
+            raw = self.llm.generate(self.model, prompt, backend=self.backend)
         except Exception as exc:
             logger.debug(
                 "[FIXY-LOOP] LLM error for speaker=%r: %s",
