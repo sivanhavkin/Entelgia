@@ -1085,14 +1085,15 @@ class TestTopicsDisabledSuppression:
     def test_topic_shift_reset_suppressed_when_topics_disabled(self, caplog):
         """notify_pair_reset('topic_shift') must be a no-op when topics_enabled=False."""
         fixy = self._make_fixy(topics_enabled=False)
-        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_interactive"):
             fixy.notify_pair_reset(4, "topic_shift")
 
-        # The INFO-level pair-window reset must NOT appear.
+        # The pair-window reset must NOT appear (suppressed path logs a separate "suppressed" entry).
         assert not any(
-            "pair window reset" in m and "topic_shift" in m for m in caplog.messages
+            "pair window reset" in m and "topic_shift" in m and "suppressed" not in m
+            for m in caplog.messages
         ), (
-            "notify_pair_reset('topic_shift') must not log an INFO pair window "
+            "notify_pair_reset('topic_shift') must not log a pair window "
             "reset message when topics_enabled=False"
         )
 
@@ -1115,7 +1116,7 @@ class TestTopicsDisabledSuppression:
     def test_non_topic_reset_still_works_when_topics_disabled(self, caplog):
         """dream_cycle and rewrite_injection resets must still fire when topics_enabled=False."""
         fixy = self._make_fixy(topics_enabled=False)
-        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_interactive"):
             fixy.notify_pair_reset(4, "dream_cycle")
 
         assert any(
@@ -1127,7 +1128,7 @@ class TestTopicsDisabledSuppression:
     def test_topic_shift_reset_works_when_topics_enabled(self, caplog):
         """With topics_enabled=True (default), topic_shift resets must fire normally."""
         fixy = self._make_fixy(topics_enabled=True)
-        with caplog.at_level(logging.INFO, logger="entelgia.fixy_interactive"):
+        with caplog.at_level(logging.DEBUG, logger="entelgia.fixy_interactive"):
             fixy.notify_pair_reset(6, "topic_shift")
 
         assert any(

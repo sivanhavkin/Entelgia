@@ -1033,9 +1033,12 @@ class IntegrationCore:
             decision.suppress_personality,
             decision.enforce_fixy,
         )
-        logger.info(
-            "[INTEGRATION-MODE] %s", decision.active_mode.value
+        _mode_log = (
+            logger.debug
+            if decision.active_mode == IntegrationMode.NORMAL
+            else logger.info
         )
+        _mode_log("[INTEGRATION-MODE] %s", decision.active_mode.value)
         return decision
 
     def build_prompt_overlay(self, decision: ControlDecision) -> str:
@@ -1160,7 +1163,12 @@ class IntegrationCore:
 
         decision = self._apply_rules(state)
 
-        logger.info(
+        _pgd_log = (
+            logger.debug
+            if decision.active_mode == IntegrationMode.NORMAL
+            else logger.info
+        )
+        _pgd_log(
             "[PRE-GEN-DECISION] agent=%s mode=%s priority=%d reason=%r "
             "suppress_personality=%s enforce_fixy=%s",
             state.agent_name,
@@ -1405,11 +1413,7 @@ class IntegrationCore:
             return False
 
         compliant, reason = self.validate_generated_output(text, decision)
-        _post_gen_log = (
-            logger.debug
-            if decision.active_mode == IntegrationMode.NORMAL and compliant
-            else logger.info
-        )
+        _post_gen_log = logger.debug if compliant else logger.info
         _post_gen_log(
             "[POST-GEN-VALIDATION] mode=%s compliant=%s reason=%r",
             decision.active_mode.value,

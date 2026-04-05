@@ -997,7 +997,7 @@ class InteractiveFixy:
             return
         self._pair_window_start = dialog_length
         self._pair_reset_reason = reason
-        logger.info(
+        logger.debug(
             "[FIXY-GATE] pair window reset: reason=%s dialog_idx=%d",
             reason or "external",
             dialog_length,
