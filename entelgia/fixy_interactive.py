@@ -853,6 +853,7 @@ class InteractiveFixy:
         topics_enabled: bool = True,
         min_turns_hard: int = MIN_TURNS_BEFORE_FIXY_HARD_INTERVENTION,
         min_pairs_hard: int = MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION,
+        backend: str = "",
     ):
         """
         Initialize Interactive Fixy.
@@ -870,9 +871,12 @@ class InteractiveFixy:
             min_pairs_hard: Minimum consecutive full-pair observations before
                 hard interventions are allowed.  Defaults to
                 ``MIN_FULL_PAIRS_BEFORE_FIXY_HARD_INTERVENTION``.
+            backend: Per-agent backend override passed to ``llm.generate()``.
+                Empty string means "use the global backend from config".
         """
         self.llm = llm
         self.model = model
+        self.backend = backend  # per-agent backend override
         # Mirror of CFG.topics_enabled captured at construction time.
         # Used to gate topic-shift pair-window resets and topic-aware
         # prompt anchoring so that all topic-related behaviour is fully
@@ -1827,7 +1831,8 @@ class InteractiveFixy:
             ) + full_prompt
 
         intervention = self.llm.generate(
-            self.model, full_prompt, temperature=0.4, use_cache=False
+            self.model, full_prompt, temperature=0.4, use_cache=False,
+            backend=self.backend,
         )
 
         result = (

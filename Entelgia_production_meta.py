@@ -527,6 +527,14 @@ ANTHROPIC_MODELS: list[str] = [
     "claude-haiku-4-5",
 ]
 
+# Mapping of backend name → available model list (single source of truth for menus)
+_BACKEND_MODELS: dict[str, list[str]] = {
+    "grok": GROK_MODELS,
+    "ollama": OLLAMA_MODELS,
+    "openai": OPENAI_MODELS,
+    "anthropic": ANTHROPIC_MODELS,
+}
+
 # LLM Response Length Instruction - used in all agent prompts
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
 LLM_FIXY_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
@@ -2069,6 +2077,12 @@ class Config:
     model_socrates: str = "qwen2.5:7b"
     model_athena: str = "qwen2.5:7b"
     model_fixy: str = "qwen2.5:7b"
+    # Per-agent backend overrides.  An empty string means "use the global
+    # llm_backend".  Set to any valid backend name to route that agent's LLM
+    # calls through a different backend than the others.
+    backend_socrates: str = ""
+    backend_athena: str = ""
+    backend_fixy: str = ""
     data_dir: str = "entelgia_data"
     db_path: str = "entelgia_data/entelgia_memory.sqlite"
     csv_log_path: str = "entelgia_data/entelgia_log.csv"
@@ -2231,6 +2245,35 @@ class Config:
             if not self.anthropic_api_key:
                 raise ValueError(
                     "anthropic_api_key must be set when llm_backend is 'anthropic' "
+                    "(set ANTHROPIC_API_KEY in your .env or environment)"
+                )
+        # Validate per-agent backend overrides and their required API keys.
+        _VALID_BACKENDS = ("ollama", "grok", "openai", "anthropic")
+        for _agent_label, _agent_backend in (
+            ("socrates", self.backend_socrates),
+            ("athena", self.backend_athena),
+            ("fixy", self.backend_fixy),
+        ):
+            if not _agent_backend:
+                continue
+            if _agent_backend not in _VALID_BACKENDS:
+                raise ValueError(
+                    f"backend_{_agent_label} must be one of {_VALID_BACKENDS} "
+                    f"(got '{_agent_backend}')"
+                )
+            if _agent_backend == "grok" and not self.grok_api_key:
+                raise ValueError(
+                    f"grok_api_key must be set when backend_{_agent_label} is 'grok' "
+                    "(set GROK_API_KEY in your .env or environment)"
+                )
+            if _agent_backend == "openai" and not self.openai_api_key:
+                raise ValueError(
+                    f"openai_api_key must be set when backend_{_agent_label} is 'openai' "
+                    "(set OPENAI_API_KEY in your .env or environment)"
+                )
+            if _agent_backend == "anthropic" and not self.anthropic_api_key:
+                raise ValueError(
+                    f"anthropic_api_key must be set when backend_{_agent_label} is 'anthropic' "
                     "(set ANTHROPIC_API_KEY in your .env or environment)"
                 )
         if self.timeout_minutes < 0:
@@ -2856,6 +2899,7 @@ def transform_draft_to_final(
     temperature: float = 0.7,
     recent_forms: Optional[List[str]] = None,
     topic_reanchor_hint: str = "",
+    backend: str = "",
 ) -> str:
     """Stage 2 (REWRITE) of the DRAFT → REWRITE two-stage generation pipeline.
 
@@ -2960,7 +3004,7 @@ def transform_draft_to_final(
 
     try:
         raw = llm.generate(
-            model, transform_prompt, temperature=temperature, use_cache=False
+            model, transform_prompt, temperature=temperature, use_cache=False, backend=backend
         )
         if not raw or not raw.strip():
             logger.warning(
@@ -3381,9 +3425,20 @@ class LLM:
         logger.info(f"LLM initialized: backend={cfg.llm_backend}")
 
     def generate(
-        self, model: str, prompt: str, temperature: float = 0.7, use_cache: bool = True
+        self,
+        model: str,
+        prompt: str,
+        temperature: float = 0.7,
+        use_cache: bool = True,
+        backend: str = "",
     ) -> str:
-        """Generate text using the configured LLM backend (Ollama or Grok)."""
+        """Generate text using the configured LLM backend.
+
+        *backend* overrides ``cfg.llm_backend`` for this single call, allowing
+        different agents to use different backends without changing global config.
+        When *backend* is empty the global ``cfg.llm_backend`` is used.
+        """
+        _active_backend = backend or self.cfg.llm_backend
         cache_key = sha256_text(prompt)[:16]
 
         if use_cache:
@@ -3402,7 +3457,7 @@ class LLM:
                 start_time = time.time()
                 # Run the blocking HTTP request in a daemon thread so that
                 # Ctrl+C (SIGINT) can interrupt it within ~0.5 seconds.
-                if self.cfg.llm_backend == "grok":
+                if _active_backend == "grok":
                     _future = self._executor.submit(
                         requests.post,
                         self.cfg.grok_url,
@@ -3417,7 +3472,7 @@ class LLM:
                         },
                         timeout=(10, self.cfg.llm_timeout),
                     )
-                elif self.cfg.llm_backend == "openai":
+                elif _active_backend == "openai":
                     _future = self._executor.submit(
                         requests.post,
                         self.cfg.openai_url,
@@ -3432,7 +3487,7 @@ class LLM:
                         },
                         timeout=(10, self.cfg.llm_timeout),
                     )
-                elif self.cfg.llm_backend == "anthropic":
+                elif _active_backend == "anthropic":
                     _future = self._executor.submit(
                         requests.post,
                         self.cfg.anthropic_url,
@@ -3475,7 +3530,7 @@ class LLM:
                     raise
                 r.raise_for_status()
                 data = r.json()
-                if self.cfg.llm_backend == "grok":
+                if _active_backend == "grok":
                     output = data.get("output") or []
                     result = ""
                     for item in output:
@@ -3487,14 +3542,14 @@ class LLM:
                             if result:
                                 break
                     result = result.strip()
-                elif self.cfg.llm_backend == "openai":
+                elif _active_backend == "openai":
                     choices = data.get("choices") or []
                     result = (
                         ((choices[0].get("message") or {}).get("content") or "").strip()
                         if choices
                         else ""
                     )
-                elif self.cfg.llm_backend == "anthropic":
+                elif _active_backend == "anthropic":
                     content = data.get("content") or []
                     result = (content[0].get("text") or "").strip() if content else ""
                 else:
@@ -4229,7 +4284,7 @@ class EmotionCore:
         self.llm = llm
         logger.info("EmotionCore initialized")
 
-    def infer(self, model: str, text: str) -> Tuple[str, float]:
+    def infer(self, model: str, text: str, backend: str = "") -> Tuple[str, float]:
         """Infer emotion and intensity from text (cached)."""
         if not text or len(text) < 5:
             return ("neutral", 0.2)
@@ -4239,7 +4294,7 @@ class EmotionCore:
             'Return JSON: {"emotion": string, "intensity": number}\n'
             f"TEXT:\n{text[:200]}\n"
         )
-        raw = self.llm.generate(model, prompt, temperature=0.2, use_cache=True)
+        raw = self.llm.generate(model, prompt, temperature=0.2, use_cache=True, backend=backend)
 
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if not m:
@@ -4348,7 +4403,7 @@ class BehaviorCore:
         return min(1.0, score)
 
     def dream_reflection(
-        self, model: str, stm_batch: List[Dict[str, Any]], llm: LLM
+        self, model: str, stm_batch: List[Dict[str, Any]], llm: LLM, backend: str = ""
     ) -> str:
         """Create dream reflection from STM."""
         if not stm_batch:
@@ -4361,7 +4416,7 @@ class BehaviorCore:
             f"RECENT:\n{chunk}\n"
             f"{LLM_RESPONSE_LIMIT}\n"
         )
-        result = llm.generate(model, prompt, temperature=0.6, use_cache=False)
+        result = llm.generate(model, prompt, temperature=0.6, use_cache=False, backend=backend)
         return validate_output(result)
 
 
@@ -4387,9 +4442,11 @@ class Agent:
         persona: str,
         use_enhanced: bool = True,
         cfg: Optional["Config"] = None,
+        backend: str = "",
     ):
         self.name = name
         self.model = model
+        self.backend = backend  # per-agent backend override ("" = use global cfg.llm_backend)
         self.color = color
         self.llm = llm
         self.memory = memory
@@ -5812,7 +5869,8 @@ class Agent:
 
         raw_response = (
             self.llm.generate(
-                self.model, prompt, temperature=temperature, use_cache=False
+                self.model, prompt, temperature=temperature, use_cache=False,
+                backend=self.backend,
             )
             or "[No response]"
         )
@@ -5893,7 +5951,8 @@ class Agent:
                     )
                 out = validate_output(
                     self.llm.generate(
-                        self.model, critique_prompt, temperature=0.25, use_cache=False
+                        self.model, critique_prompt, temperature=0.25, use_cache=False,
+                        backend=self.backend,
                     )
                     or out
                 )
@@ -6048,6 +6107,7 @@ class Agent:
                         _hard_prompt,
                         temperature=temperature,
                         use_cache=False,
+                        backend=self.backend,
                     )
                     or out
                 )
@@ -6282,7 +6342,8 @@ class Agent:
             )
             _circ_raw = (
                 self.llm.generate(
-                    self.model, _circ_prompt, temperature=temperature, use_cache=False
+                    self.model, _circ_prompt, temperature=temperature, use_cache=False,
+                    backend=self.backend,
                 )
                 or out
             )
@@ -6311,6 +6372,7 @@ class Agent:
                 temperature=temperature,
                 recent_forms=list(self._last_response_forms),
                 topic_reanchor_hint=_draft_reanchor_hint,
+                backend=self.backend,
             )
             logger.debug(
                 "[REWRITE] agent=%s result=%r",
@@ -6412,7 +6474,8 @@ class Agent:
             )
             _family_raw = validate_output(
                 self.llm.generate(
-                    self.model, _family_prompt, temperature=temperature, use_cache=False
+                    self.model, _family_prompt, temperature=temperature, use_cache=False,
+                    backend=self.backend,
                 )
                 or out
             )
@@ -6511,7 +6574,8 @@ class Agent:
             )
             _pe_raw = (
                 self.llm.generate(
-                    self.model, _pe_prompt, temperature=temperature, use_cache=False
+                    self.model, _pe_prompt, temperature=temperature, use_cache=False,
+                    backend=self.backend,
                 )
                 or out
             )
@@ -6540,6 +6604,7 @@ class Agent:
                     _pe_regen_prompt,
                     temperature=temperature,
                     use_cache=False,
+                    backend=self.backend,
                 )
                 or out
             )
@@ -6563,7 +6628,7 @@ class Agent:
         # ── Emotion inference (on final text, after all post-processing) ──────────
         # Placed here so the cached result matches what store_turn() will use,
         # avoiding a redundant blocking LLM call in store_turn() every turn.
-        emo, inten = self.emotion.infer(self.model, out)
+        emo, inten = self.emotion.infer(self.model, out, backend=self.backend)
         # During Athena's limbic hijack, register emotion as anger so that
         # drive updates correctly amplify the id-dominant state.
         if self.name == "Athena" and self.limbic_hijack:
@@ -6656,7 +6721,7 @@ class Agent:
 
     def store_turn(self, text: str, topic: str, source: str = "stm"):
         """Store dialogue turn in memory."""
-        emo, inten = self.emotion.infer(self.model, text)
+        emo, inten = self.emotion.infer(self.model, text, backend=self.backend)
         imp = self.behavior.importance_score(text)
 
         sensitive = is_sensitive_text(text)
@@ -7464,6 +7529,7 @@ class MainScript:
             conscious=self.conscious,
             persona="I am a philosophical interrogator using the Socratic method. I question assumptions, search for contradictions between claims, and demand precise definitions — I do not prematurely reconcile opposing positions or synthesize before contradictions are fully examined.",
             cfg=cfg,
+            backend=cfg.backend_socrates,
         )
         self.athena = Agent(
             name="Athena",
@@ -7477,6 +7543,7 @@ class MainScript:
             conscious=self.conscious,
             persona="I am a systems thinker who constructs explanatory models. I transform abstract ideas into structured conceptual models, identify causal relationships, and offer frameworks over rhetorical reflections — when disagreements arise, I propose a model that accounts for both positions.",
             cfg=cfg,
+            backend=cfg.backend_athena,
         )
 
         # Language tracking removed for gender-neutral output
@@ -7499,6 +7566,7 @@ class MainScript:
             conscious=self.conscious,
             persona="I am a meta-cognitive dialogue debugger, not a participant philosopher. I detect failure modes — repetition, weak conflict, topic drift, or premature synthesis — and intervene briefly to redirect the conversation.",
             cfg=cfg,
+            backend=cfg.backend_fixy,
         )
 
         # Initialize enhanced dialogue components if available
@@ -7514,6 +7582,7 @@ class MainScript:
                     topics_enabled=topic_pipeline_enabled(cfg),
                     min_turns_hard=cfg.min_turns_before_fixy_hard_intervention,
                     min_pairs_hard=cfg.min_full_pairs_before_fixy_hard_intervention,
+                    backend=cfg.backend_fixy,
                 )
                 if cfg.enable_observer
                 else None
@@ -7526,7 +7595,7 @@ class MainScript:
             # Only instantiate when the observer (Fixy) is enabled to avoid extra
             # Fixy-model LLM calls when users disable Fixy for performance/cost.
             self.semantic_controller = (
-                FixySemanticController(self.llm, cfg.model_fixy)
+                FixySemanticController(self.llm, cfg.model_fixy, backend=cfg.backend_fixy)
                 if cfg.enable_observer
                 else None
             )
@@ -7683,10 +7752,10 @@ class MainScript:
             return
 
         batch = stm[-60:]
-        reflection = self.behavior.dream_reflection(agent.model, batch, self.llm)
+        reflection = self.behavior.dream_reflection(agent.model, batch, self.llm, backend=agent.backend)
         agent.conscious.update_reflection(agent.name, reflection)
 
-        emo, inten = self.emotion.infer(agent.model, reflection)
+        emo, inten = self.emotion.infer(agent.model, reflection, backend=agent.backend)
         imp = self.behavior.importance_score(reflection)
 
         sensitive = is_sensitive_text(reflection)
@@ -9602,121 +9671,204 @@ def select_session_turns() -> int:
     )
 
 
+def _pick_agent_backend_and_model(agent_label: str) -> tuple[str, str] | None:
+    """Interactively pick a backend and model for a single agent.
+
+    Presents the backend list, then the model list for the chosen backend.
+    Returns ``(backend, model)`` on success, or ``None`` if the user skips.
+    """
+    _BACKENDS = list(_BACKEND_MODELS.keys())
+    print()
+    print(Fore.CYAN + f"  {agent_label} — choose backend:" + Style.RESET_ALL)
+    for i, b in enumerate(_BACKENDS, 1):
+        print(f"    [{i}] {b}")
+    print(f"    [0] skip / keep default")
+    while True:
+        sys.stdout.flush()
+        raw = input(f"  Enter choice [0-{len(_BACKENDS)}]: ").strip()
+        if raw == "0":
+            return None
+        try:
+            idx = int(raw)
+            if 1 <= idx <= len(_BACKENDS):
+                chosen_backend = _BACKENDS[idx - 1]
+                break
+        except ValueError:
+            pass
+        print(
+            Fore.YELLOW
+            + f"    [WARN] '{raw}' is not valid. Enter 1–{len(_BACKENDS)} or 0 to skip."
+            + Style.RESET_ALL
+        )
+
+    models = _BACKEND_MODELS[chosen_backend]
+    print()
+    print(Fore.CYAN + f"  {agent_label} — choose model ({chosen_backend}):" + Style.RESET_ALL)
+    chosen_model = _pick_from_list("  Enter choice:", models)
+    if chosen_model is None:
+        print(
+            Fore.YELLOW
+            + f"  [WARN] Model skipped — keeping default for {agent_label}."
+            + Style.RESET_ALL
+        )
+        return None
+    return (chosen_backend, chosen_model)
+
+
 def select_llm_backend_and_models(cfg: "Config") -> None:
     """Interactive startup selector for LLM backend and per-agent models.
+
+    Offers three modes:
+      [0] Keep defaults — no change.
+      [1] Same backend for all agents — pick one backend, then model(s).
+      [2] Mix backends — pick backend + model independently per agent.
 
     Modifies *cfg* in-place as a runtime override only.
     The config file and .env are never written to.
     """
     print()
-    print(Fore.CYAN + "Select backend:" + Style.RESET_ALL)
-    print("  [1] grok")
-    print("  [2] ollama")
-    print("  [3] openai")
-    print("  [4] anthropic")
-    print("  [0] defaults (keep config as-is)")
+    print(Fore.CYAN + "Select LLM configuration mode:" + Style.RESET_ALL)
+    print("  [0] Keep defaults (keep config as-is)")
+    print("  [1] Same backend for all agents")
+    print("  [2] Mix backends — choose independently per agent")
 
     while True:
         sys.stdout.flush()
-        backend_raw = input("Enter choice [0/1/2/3/4]: ").strip()
-        if backend_raw in ("0", "1", "2", "3", "4"):
+        mode_raw = input("Enter choice [0/1/2]: ").strip()
+        if mode_raw in ("0", "1", "2"):
             break
-        if backend_raw == "":
+        if mode_raw == "":
             print(
                 Fore.YELLOW
-                + "  Please enter 1 for grok, 2 for ollama, 3 for openai, 4 for anthropic, or 0 to keep defaults."
+                + "  Please enter 0, 1, or 2."
                 + Style.RESET_ALL
             )
         else:
             print(
                 Fore.YELLOW
-                + f"  [WARN] '{backend_raw}' is not a valid choice. Please enter 0, 1, 2, 3, or 4."
+                + f"  [WARN] '{mode_raw}' is not a valid choice. Please enter 0, 1, or 2."
                 + Style.RESET_ALL
             )
 
-    if backend_raw == "0":
-        # Keep everything as configured – just print the summary and return.
+    if mode_raw == "0":
         _print_llm_config_summary(cfg)
         return
 
-    if backend_raw == "1":
-        cfg.llm_backend = "grok"
-        available_models = GROK_MODELS
-        backend_label = "Grok"
-    elif backend_raw == "3":
-        cfg.llm_backend = "openai"
-        available_models = OPENAI_MODELS
-        backend_label = "OpenAI"
-    elif backend_raw == "4":
-        cfg.llm_backend = "anthropic"
-        available_models = ANTHROPIC_MODELS
-        backend_label = "Anthropic"
-    else:  # backend_raw == "2"
-        cfg.llm_backend = "ollama"
-        available_models = OLLAMA_MODELS
-        backend_label = "Ollama"
-
-    print()
-    print(Fore.CYAN + f"Available {backend_label} models:" + Style.RESET_ALL)
-    while True:
-        sys.stdout.flush()
-        same = input("  Use same model for all agents? (y/n): ").strip().lower()
-        if same in ("y", "yes", "n", "no"):
-            break
-        print(
-            Fore.YELLOW + "  Please enter 'y' for yes or 'n' for no." + Style.RESET_ALL
-        )
-
-    if same in ("y", "yes"):
+    if mode_raw == "1":
+        # ── Same backend for all agents ────────────────────────────────────────
+        _BACKENDS = list(_BACKEND_MODELS.keys())
         print()
-        print(Fore.CYAN + "Choose model:" + Style.RESET_ALL)
-        model = _pick_from_list("Enter choice:", available_models)
-        if model is None:
+        print(Fore.CYAN + "Select backend:" + Style.RESET_ALL)
+        for i, b in enumerate(_BACKENDS, 1):
+            print(f"  [{i}] {b}")
+        print("  [0] cancel / keep defaults")
+
+        while True:
+            sys.stdout.flush()
+            backend_raw = input(f"Enter choice [0-{len(_BACKENDS)}]: ").strip()
+            if backend_raw == "0":
+                _print_llm_config_summary(cfg)
+                return
+            try:
+                bidx = int(backend_raw)
+                if 1 <= bidx <= len(_BACKENDS):
+                    chosen_backend = _BACKENDS[bidx - 1]
+                    break
+            except ValueError:
+                pass
             print(
                 Fore.YELLOW
-                + "[WARN] Model selection skipped – keeping defaults."
+                + f"  [WARN] '{backend_raw}' is not valid. Enter 1–{len(_BACKENDS)} or 0 to cancel."
                 + Style.RESET_ALL
             )
-            _print_llm_config_summary(cfg)
-            return
-        cfg.model_socrates = model
-        cfg.model_athena = model
-        cfg.model_fixy = model
+
+        cfg.llm_backend = chosen_backend
+        cfg.backend_socrates = ""
+        cfg.backend_athena = ""
+        cfg.backend_fixy = ""
+        available_models = _BACKEND_MODELS[chosen_backend]
+
+        print()
+        print(Fore.CYAN + f"Available {chosen_backend} models:" + Style.RESET_ALL)
+        while True:
+            sys.stdout.flush()
+            same = input("  Use same model for all agents? (y/n): ").strip().lower()
+            if same in ("y", "yes", "n", "no"):
+                break
+            print(Fore.YELLOW + "  Please enter 'y' or 'n'." + Style.RESET_ALL)
+
+        if same in ("y", "yes"):
+            print()
+            print(Fore.CYAN + "Choose model:" + Style.RESET_ALL)
+            model = _pick_from_list("Enter choice:", available_models)
+            if model is None:
+                print(Fore.YELLOW + "[WARN] Model skipped — keeping defaults." + Style.RESET_ALL)
+                _print_llm_config_summary(cfg)
+                return
+            cfg.model_socrates = model
+            cfg.model_athena = model
+            cfg.model_fixy = model
+        else:
+            print()
+            print(Fore.CYAN + "Choose model for Socrates:" + Style.RESET_ALL)
+            model_s = _pick_from_list("Enter choice:", available_models)
+            print()
+            print(Fore.CYAN + "Choose model for Athena:" + Style.RESET_ALL)
+            model_a = _pick_from_list("Enter choice:", available_models)
+            print()
+            print(Fore.CYAN + "Choose model for Fixy:" + Style.RESET_ALL)
+            model_f = _pick_from_list("Enter choice:", available_models)
+
+            if model_s is None or model_a is None or model_f is None:
+                print(
+                    Fore.YELLOW
+                    + "[WARN] Incomplete selection — keeping defaults."
+                    + Style.RESET_ALL
+                )
+                _print_llm_config_summary(cfg)
+                return
+
+            cfg.model_socrates = model_s
+            cfg.model_athena = model_a
+            cfg.model_fixy = model_f
+
     else:
+        # ── Mix backends — per-agent selection ────────────────────────────────
         print()
-        print(Fore.CYAN + "Choose model for Socrates:" + Style.RESET_ALL)
-        model_s = _pick_from_list("Enter choice:", available_models)
-        print()
-        print(Fore.CYAN + "Choose model for Athena:" + Style.RESET_ALL)
-        model_a = _pick_from_list("Enter choice:", available_models)
-        print()
-        print(Fore.CYAN + "Choose model for Fixy:" + Style.RESET_ALL)
-        model_f = _pick_from_list("Enter choice:", available_models)
+        print(Fore.CYAN + "Configure each agent independently:" + Style.RESET_ALL)
 
-        if model_s is None or model_a is None or model_f is None:
-            print(
-                Fore.YELLOW
-                + "[WARN] Incomplete model selection – keeping defaults."
-                + Style.RESET_ALL
-            )
-            _print_llm_config_summary(cfg)
-            return
+        result_s = _pick_agent_backend_and_model("Socrates")
+        result_a = _pick_agent_backend_and_model("Athena")
+        result_f = _pick_agent_backend_and_model("Fixy")
 
-        cfg.model_socrates = model_s
-        cfg.model_athena = model_a
-        cfg.model_fixy = model_f
+        if result_s is not None:
+            cfg.backend_socrates, cfg.model_socrates = result_s
+        if result_a is not None:
+            cfg.backend_athena, cfg.model_athena = result_a
+        if result_f is not None:
+            cfg.backend_fixy, cfg.model_fixy = result_f
 
     _print_llm_config_summary(cfg)
 
 
 def _print_llm_config_summary(cfg: "Config") -> None:
     """Print the active LLM configuration summary."""
+
+    def _eff_backend(agent_backend: str) -> str:
+        return agent_backend if agent_backend else cfg.llm_backend
+
     print()
     print(Fore.GREEN + "[LLM CONFIG]" + Style.RESET_ALL)
-    print(f"  Backend:   {cfg.llm_backend}")
-    print(f"  Socrates:  {cfg.model_socrates}")
-    print(f"  Athena:    {cfg.model_athena}")
-    print(f"  Fixy:      {cfg.model_fixy}")
+    print(f"  Global backend:  {cfg.llm_backend}")
+    print(
+        f"  Socrates:  [{_eff_backend(cfg.backend_socrates)}]  {cfg.model_socrates}"
+    )
+    print(
+        f"  Athena:    [{_eff_backend(cfg.backend_athena)}]  {cfg.model_athena}"
+    )
+    print(
+        f"  Fixy:      [{_eff_backend(cfg.backend_fixy)}]  {cfg.model_fixy}"
+    )
     print()
 
 
