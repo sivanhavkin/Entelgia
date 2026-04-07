@@ -932,17 +932,25 @@ def detect_stagnation(
     return False, ""
 
 
-def get_intervention_policy(stagnation_reason: str) -> str:
+def get_intervention_policy(
+    stagnation_reason: str, in_recovery: bool = False
+) -> str:
     """Return an intervention policy constant for the given stagnation reason.
 
     Possible return values:
       "REQUIRE_COMMITMENT"   — force the agent to choose A or B
       "REQUIRE_ATTACK"       — force the agent to directly challenge a prior claim
       "REQUIRE_EVIDENCE"     — force the agent to provide an example or counterexample
+
+    When *in_recovery* is True (post-dream recovery mode), REQUIRE_ATTACK is
+    suppressed in favour of REQUIRE_EVIDENCE so that aggressive adversarial
+    forcing is not applied to a recovering agent.
     """
     if stagnation_reason == "low_scores":
         return "REQUIRE_COMMITMENT"
     if stagnation_reason == "repeated_moves":
+        if in_recovery:
+            return "REQUIRE_EVIDENCE"
         return "REQUIRE_ATTACK"
     if stagnation_reason == "no_state_change":
         return "REQUIRE_EVIDENCE"

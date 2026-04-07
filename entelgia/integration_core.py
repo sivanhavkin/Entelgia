@@ -2218,6 +2218,7 @@ class IntegrationCore:
           5. Unresolved count growing without closure → REQUIRE_BRANCH_CLOSURE
           6. Real reasoning happening but stagnating (reasoning_delta moderate/strong)
              AND not in recovery → REQUIRE_STRUCTURAL_CHALLENGE
+             AND in recovery → REQUIRE_CONCRETE_CASE (adversarial suppressed)
           7. Fence-sitting / unclassified stagnation fallback → REQUIRE_FORCED_CHOICE
 
         REQUIRE_STRUCTURAL_CHALLENGE is only selected when there is explicit
@@ -2319,12 +2320,12 @@ class IntegrationCore:
                 state.agent_name,
             )
             logger.info(
-                "[INTEGRATION-FALLBACK] epistemic fallback selected=REQUIRE_FORCED_CHOICE "
+                "[INTEGRATION-FALLBACK] recovery fallback selected=REQUIRE_CONCRETE_CASE "
                 "agent=%s (adversarial suppressed by recovery)",
                 state.agent_name,
             )
             return IntegrationCore._decide_from_mode(
-                state, IntegrationMode.REQUIRE_FORCED_CHOICE
+                state, IntegrationMode.REQUIRE_CONCRETE_CASE
             )
 
         # 7. Fence-sitting / unclassified stagnation → force a committed position
