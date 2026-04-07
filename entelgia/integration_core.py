@@ -2279,28 +2279,14 @@ class IntegrationCore:
                 state, IntegrationMode.REQUIRE_CONCRETE_CASE
             )
 
-        # 5. Unresolved accumulation (log explicitly for observability)
-        if (
-            state.unresolved >= _UNRESOLVED_RESOLUTION_TRIGGER
-            and state.progress_after < _PROGRESS_RESOLUTION_TRIGGER
-        ):
+        # 5. Unresolved accumulation
+        if state.unresolved >= _UNRESOLVED_RESOLUTION_TRIGGER:
             logger.info(
                 "[INTEGRATION-DECISION] unresolved overload -> REQUIRE_BRANCH_CLOSURE "
                 "agent=%s unresolved=%d progress=%.2f",
                 state.agent_name,
                 state.unresolved,
                 state.progress_after,
-            )
-            return IntegrationCore._decide_from_mode(
-                state, IntegrationMode.REQUIRE_BRANCH_CLOSURE
-            )
-        # Also trigger branch closure on high unresolved alone (no progress gate)
-        if state.unresolved >= _UNRESOLVED_RESOLUTION_TRIGGER:
-            logger.info(
-                "[INTEGRATION-DECISION] unresolved overload -> REQUIRE_BRANCH_CLOSURE "
-                "agent=%s unresolved=%d (progress gate skipped)",
-                state.agent_name,
-                state.unresolved,
             )
             return IntegrationCore._decide_from_mode(
                 state, IntegrationMode.REQUIRE_BRANCH_CLOSURE
