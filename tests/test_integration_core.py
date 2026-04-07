@@ -1674,87 +1674,87 @@ class TestReadFixySoftSignal:
     never calls enforcement functions directly.
     """
 
-    def _signal(self, text: Optional[str]) -> Optional[IntegrationMode]:
+    def _parse_fixy_hint(self, text: Optional[str]) -> Optional[IntegrationMode]:
         return IntegrationCore._read_fixy_soft_signal(text)
 
     # None / empty input ──────────────────────────────────────────────────────
 
     def test_none_returns_none(self):
-        assert self._signal(None) is None
+        assert self._parse_fixy_hint(None) is None
 
     def test_empty_string_returns_none(self):
-        assert self._signal("") is None
+        assert self._parse_fixy_hint("") is None
 
     def test_unrelated_text_returns_none(self):
-        assert self._signal("Everything is fine here, good conversation.") is None
+        assert self._parse_fixy_hint("Everything is fine here, good conversation.") is None
 
     # REQUIRE_NEW_VARIABLE ────────────────────────────────────────────────────
 
     def test_missing_variable_maps_to_require_new_variable(self):
-        assert self._signal("I notice a missing variable in this argument.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint("I notice a missing variable in this argument.") == IntegrationMode.REQUIRE_NEW_VARIABLE
 
     def test_new_variable_maps_to_require_new_variable(self):
-        assert self._signal("A new variable should be introduced here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint("A new variable should be introduced here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
 
     def test_new_dimension_maps_to_require_new_variable(self):
-        assert self._signal("Consider a new dimension that has not been addressed.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint("Consider a new dimension that has not been addressed.") == IntegrationMode.REQUIRE_NEW_VARIABLE
 
     def test_introduce_a_variable_maps_to_require_new_variable(self):
-        assert self._signal("We should introduce a variable to distinguish these cases.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint("We should introduce a variable to distinguish these cases.") == IntegrationMode.REQUIRE_NEW_VARIABLE
 
     def test_new_concept_maps_to_require_new_variable(self):
-        assert self._signal("Introduce a new concept to break out of this loop.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint("Introduce a new concept to break out of this loop.") == IntegrationMode.REQUIRE_NEW_VARIABLE
 
     # REQUIRE_TEST ─────────────────────────────────────────────────────────────
 
     def test_falsif_maps_to_require_test(self):
-        assert self._signal("This claim is not falsifiable as stated.") == IntegrationMode.REQUIRE_TEST
+        assert self._parse_fixy_hint("This claim is not falsifiable as stated.") == IntegrationMode.REQUIRE_TEST
 
     def test_testable_maps_to_require_test(self):
-        assert self._signal("The argument needs a testable criterion.") == IntegrationMode.REQUIRE_TEST
+        assert self._parse_fixy_hint("The argument needs a testable criterion.") == IntegrationMode.REQUIRE_TEST
 
     def test_no_criterion_maps_to_require_test(self):
-        assert self._signal("There is no criterion for distinguishing these positions.") == IntegrationMode.REQUIRE_TEST
+        assert self._parse_fixy_hint("There is no criterion for distinguishing these positions.") == IntegrationMode.REQUIRE_TEST
 
     def test_cannot_be_tested_maps_to_require_test(self):
-        assert self._signal("This position cannot be tested against evidence.") == IntegrationMode.REQUIRE_TEST
+        assert self._parse_fixy_hint("This position cannot be tested against evidence.") == IntegrationMode.REQUIRE_TEST
 
     def test_untestable_maps_to_require_test(self):
-        assert self._signal("The claim is untestable in its current form.") == IntegrationMode.REQUIRE_TEST
+        assert self._parse_fixy_hint("The claim is untestable in its current form.") == IntegrationMode.REQUIRE_TEST
 
     # REQUIRE_CONCRETE_CASE ────────────────────────────────────────────────────
 
     def test_abstract_loop_maps_to_require_concrete_case(self):
-        assert self._signal("We are stuck in an abstract loop without grounding.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._parse_fixy_hint("We are stuck in an abstract loop without grounding.") == IntegrationMode.REQUIRE_CONCRETE_CASE
 
     def test_conceptual_fog_maps_to_require_concrete_case(self):
-        assert self._signal("There is too much conceptual fog here.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._parse_fixy_hint("There is too much conceptual fog here.") == IntegrationMode.REQUIRE_CONCRETE_CASE
 
     def test_too_abstract_maps_to_require_concrete_case(self):
-        assert self._signal("The discussion is too abstract to make progress.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._parse_fixy_hint("The discussion is too abstract to make progress.") == IntegrationMode.REQUIRE_CONCRETE_CASE
 
     def test_no_concrete_maps_to_require_concrete_case(self):
-        assert self._signal("No concrete example has been offered.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._parse_fixy_hint("No concrete example has been offered.") == IntegrationMode.REQUIRE_CONCRETE_CASE
 
     def test_concretize_maps_to_require_concrete_case(self):
-        assert self._signal("We need to concretize this argument.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._parse_fixy_hint("We need to concretize this argument.") == IntegrationMode.REQUIRE_CONCRETE_CASE
 
     # REQUIRE_BRANCH_CLOSURE ──────────────────────────────────────────────────
 
     def test_no_closure_maps_to_require_branch_closure(self):
-        assert self._signal("There is no closure to this line of argument.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        assert self._parse_fixy_hint("There is no closure to this line of argument.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
     def test_open_branch_maps_to_require_branch_closure(self):
-        assert self._signal("An open branch has been left unaddressed for too long.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        assert self._parse_fixy_hint("An open branch has been left unaddressed for too long.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
     def test_endless_recursion_maps_to_require_branch_closure(self):
-        assert self._signal("This is endless recursion without termination.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        assert self._parse_fixy_hint("This is endless recursion without termination.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
     def test_unresolved_maps_to_require_branch_closure(self):
-        assert self._signal("The original question remains unresolved.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        assert self._parse_fixy_hint("The original question remains unresolved.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
     def test_no_resolution_maps_to_require_branch_closure(self):
-        assert self._signal("We have no resolution to the core tension.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        assert self._parse_fixy_hint("We have no resolution to the core tension.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
     # Priority: REQUIRE_NEW_VARIABLE is checked first ────────────────────────
 
@@ -1762,15 +1762,15 @@ class TestReadFixySoftSignal:
         """When a message contains both variable and falsifiability signals,
         REQUIRE_NEW_VARIABLE wins (checked first)."""
         msg = "We are missing a new variable and the claim is not falsifiable."
-        assert self._signal(msg) == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint(msg) == IntegrationMode.REQUIRE_NEW_VARIABLE
 
     # Case-insensitivity ───────────────────────────────────────────────────────
 
     def test_matching_is_case_insensitive(self):
-        assert self._signal("MISSING VARIABLE present here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
-        assert self._signal("NOT FALSIFIABLE.") == IntegrationMode.REQUIRE_TEST
-        assert self._signal("ABSTRACT LOOP detected.") == IntegrationMode.REQUIRE_CONCRETE_CASE
-        assert self._signal("NO CLOSURE found.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        assert self._parse_fixy_hint("MISSING VARIABLE present here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint("NOT FALSIFIABLE.") == IntegrationMode.REQUIRE_TEST
+        assert self._parse_fixy_hint("ABSTRACT LOOP detected.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._parse_fixy_hint("NO CLOSURE found.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
 
 # ---------------------------------------------------------------------------
