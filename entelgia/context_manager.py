@@ -636,6 +636,9 @@ class EnhancedMemoryIntegration:
         """Batch-encode query and all memory contents; return per-memory cosine
         similarity lists for (topic, dialog).
 
+        Empty *topic* or *dialog_text* strings produce zero scores for that
+        component without calling the model, avoiding a wasted encode call.
+
         Returns ``(None, None)`` when the semantic model is unavailable or
         encoding fails, so the caller falls back to keyword similarity.
         """
@@ -643,22 +646,56 @@ class EnhancedMemoryIntegration:
         if model is None:
             return None, None
         try:
+            n = len(memories)
+            zero_scores = [0.0] * n
             contents = [mem.get("content", "") for mem in memories]
-            # Encode in one batch: [topic, dialog, *contents]
-            all_texts = [topic, dialog_text] + contents
-            embeddings = model.encode(all_texts, show_progress_bar=False)
-            topic_emb = embeddings[0:1]   # shape (1, D)
-            dialog_emb = embeddings[1:2]  # shape (1, D)
-            mem_embs = embeddings[2:]     # shape (N, D)
 
-            topic_sims = _cosine_similarity(mem_embs, topic_emb).flatten().tolist()
-            dialog_sims = _cosine_similarity(mem_embs, dialog_emb).flatten().tolist()
-            # Clamp to [0, 1]
-            topic_sims = [max(0.0, min(1.0, s)) for s in topic_sims]
-            dialog_sims = [max(0.0, min(1.0, s)) for s in dialog_sims]
+            # Determine which query components need encoding
+            encode_topic = bool(topic.strip())
+            encode_dialog = bool(dialog_text.strip())
+
+            if not encode_topic and not encode_dialog:
+                # Both queries are empty — similarity is zero for both
+                return zero_scores, zero_scores
+
+            # Build the minimal batch to encode
+            query_texts: List[str] = []
+            if encode_topic:
+                query_texts.append(topic)
+            if encode_dialog:
+                query_texts.append(dialog_text)
+
+            all_texts = query_texts + contents
+            embeddings = model.encode(all_texts, show_progress_bar=False)
+
+            query_embs = embeddings[: len(query_texts)]
+            mem_embs = embeddings[len(query_texts):]  # shape (N, D)
+
+            qi = 0
+            if encode_topic:
+                topic_sims = (
+                    _cosine_similarity(mem_embs, query_embs[qi : qi + 1])
+                    .flatten()
+                    .tolist()
+                )
+                topic_sims = [max(0.0, min(1.0, s)) for s in topic_sims]
+                qi += 1
+            else:
+                topic_sims = zero_scores
+
+            if encode_dialog:
+                dialog_sims = (
+                    _cosine_similarity(mem_embs, query_embs[qi : qi + 1])
+                    .flatten()
+                    .tolist()
+                )
+                dialog_sims = [max(0.0, min(1.0, s)) for s in dialog_sims]
+            else:
+                dialog_sims = zero_scores
+
             logger.debug(
                 "EnhancedMemoryIntegration: semantic scores computed for %d memories.",
-                len(memories),
+                n,
             )
             return topic_sims, dialog_sims
         except Exception as exc:  # pragma: no cover
