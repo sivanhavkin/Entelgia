@@ -8054,10 +8054,6 @@ class MainScript:
             if _shutdown_event.is_set():
                 raise KeyboardInterrupt()
             self.turn_index += 1
-            # Decrement post-dream recovery counter for all tracked agents
-            for _rkey in list(_post_dream_recovery.keys()):
-                if _post_dream_recovery[_rkey] > 0:
-                    _post_dream_recovery[_rkey] -= 1
 
             # ── v2.9.0: Loop guard — run detection before each turn ──────────
             # Detect active failure modes (loop_repetition, weak_conflict,
@@ -8809,6 +8805,18 @@ class MainScript:
             # ─────────────────────────────────────────────────────────────────────
 
             self.dialog.append({"role": speaker.name, "text": out})
+
+            # Decrement post-dream recovery counter for the speaker that just
+            # completed their turn.  Decrementing here (not at turn-start)
+            # ensures the counter tracks the speaker's own turns, not global
+            # turns that may be spoken by other agents.
+            if speaker.name in _post_dream_recovery and _post_dream_recovery[speaker.name] > 0:
+                _post_dream_recovery[speaker.name] -= 1
+                if _post_dream_recovery[speaker.name] == 0:
+                    logger.info(
+                        "[DREAM-RECOVERY] agent=%s post-dream recovery mode ended",
+                        speaker.name,
+                    )
 
             # ── Semantic validation and loop detection (FixySemanticController) ─────
             # Call evaluate_reply after each non-Fixy agent turn to check guidance

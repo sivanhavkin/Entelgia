@@ -369,6 +369,8 @@ class TestShouldRegenerate:
         # CONCRETE_OVERRIDE fires but does not force regenerate=True;
         # that is the caller's responsibility after validate_generated_output.
         assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+        assert decision.regenerate is False
+        assert core.should_regenerate(decision) is False
 
     def test_false_on_nominal(self, core):
         decision = core.evaluate_turn("Socrates", _nominal_signals())
@@ -1657,3 +1659,180 @@ class TestControlDecisionLoopFields:
         decision = core.evaluate_turn("Socrates", state)
         assert decision.is_loop is False
         assert decision.reasoning_delta is None
+
+
+# ---------------------------------------------------------------------------
+# New: _read_fixy_soft_signal — controller-owned Fixy hint mapping
+# ---------------------------------------------------------------------------
+
+
+class TestReadFixySoftSignal:
+    """Unit tests for IntegrationCore._read_fixy_soft_signal.
+
+    Verifies that the static method correctly maps Fixy's last utterance to a
+    preferred IntegrationMode hint.  The mapping is controller-owned; Fixy
+    never calls enforcement functions directly.
+    """
+
+    def _signal(self, text: Optional[str]) -> Optional[IntegrationMode]:
+        return IntegrationCore._read_fixy_soft_signal(text)
+
+    # None / empty input ──────────────────────────────────────────────────────
+
+    def test_none_returns_none(self):
+        assert self._signal(None) is None
+
+    def test_empty_string_returns_none(self):
+        assert self._signal("") is None
+
+    def test_unrelated_text_returns_none(self):
+        assert self._signal("Everything is fine here, good conversation.") is None
+
+    # REQUIRE_NEW_VARIABLE ────────────────────────────────────────────────────
+
+    def test_missing_variable_maps_to_require_new_variable(self):
+        assert self._signal("I notice a missing variable in this argument.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_new_variable_maps_to_require_new_variable(self):
+        assert self._signal("A new variable should be introduced here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_new_dimension_maps_to_require_new_variable(self):
+        assert self._signal("Consider a new dimension that has not been addressed.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_introduce_a_variable_maps_to_require_new_variable(self):
+        assert self._signal("We should introduce a variable to distinguish these cases.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_new_concept_maps_to_require_new_variable(self):
+        assert self._signal("Introduce a new concept to break out of this loop.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    # REQUIRE_TEST ─────────────────────────────────────────────────────────────
+
+    def test_falsif_maps_to_require_test(self):
+        assert self._signal("This claim is not falsifiable as stated.") == IntegrationMode.REQUIRE_TEST
+
+    def test_testable_maps_to_require_test(self):
+        assert self._signal("The argument needs a testable criterion.") == IntegrationMode.REQUIRE_TEST
+
+    def test_no_criterion_maps_to_require_test(self):
+        assert self._signal("There is no criterion for distinguishing these positions.") == IntegrationMode.REQUIRE_TEST
+
+    def test_cannot_be_tested_maps_to_require_test(self):
+        assert self._signal("This position cannot be tested against evidence.") == IntegrationMode.REQUIRE_TEST
+
+    def test_untestable_maps_to_require_test(self):
+        assert self._signal("The claim is untestable in its current form.") == IntegrationMode.REQUIRE_TEST
+
+    # REQUIRE_CONCRETE_CASE ────────────────────────────────────────────────────
+
+    def test_abstract_loop_maps_to_require_concrete_case(self):
+        assert self._signal("We are stuck in an abstract loop without grounding.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_conceptual_fog_maps_to_require_concrete_case(self):
+        assert self._signal("There is too much conceptual fog here.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_too_abstract_maps_to_require_concrete_case(self):
+        assert self._signal("The discussion is too abstract to make progress.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_no_concrete_maps_to_require_concrete_case(self):
+        assert self._signal("No concrete example has been offered.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_concretize_maps_to_require_concrete_case(self):
+        assert self._signal("We need to concretize this argument.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    # REQUIRE_BRANCH_CLOSURE ──────────────────────────────────────────────────
+
+    def test_no_closure_maps_to_require_branch_closure(self):
+        assert self._signal("There is no closure to this line of argument.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_open_branch_maps_to_require_branch_closure(self):
+        assert self._signal("An open branch has been left unaddressed for too long.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_endless_recursion_maps_to_require_branch_closure(self):
+        assert self._signal("This is endless recursion without termination.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_unresolved_maps_to_require_branch_closure(self):
+        assert self._signal("The original question remains unresolved.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_no_resolution_maps_to_require_branch_closure(self):
+        assert self._signal("We have no resolution to the core tension.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    # Priority: REQUIRE_NEW_VARIABLE is checked first ────────────────────────
+
+    def test_new_variable_takes_priority_over_falsifiability(self):
+        """When a message contains both variable and falsifiability signals,
+        REQUIRE_NEW_VARIABLE wins (checked first)."""
+        msg = "We are missing a new variable and the claim is not falsifiable."
+        assert self._signal(msg) == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    # Case-insensitivity ───────────────────────────────────────────────────────
+
+    def test_matching_is_case_insensitive(self):
+        assert self._signal("MISSING VARIABLE present here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._signal("NOT FALSIFIABLE.") == IntegrationMode.REQUIRE_TEST
+        assert self._signal("ABSTRACT LOOP detected.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._signal("NO CLOSURE found.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+
+# ---------------------------------------------------------------------------
+# New: soft Fixy signal integration with stagnation intervention
+# ---------------------------------------------------------------------------
+
+
+class TestFixySoftSignalIntegration:
+    """Verify that fixy_last_message influences stagnation intervention selection
+    when stagnation is active and no other higher-priority rule fires."""
+
+    def _stagnation_signals(self, fixy_msg: Optional[str] = None) -> dict:
+        """Return signals that will trigger _rule_stagnation()."""
+        signals = _nominal_signals()
+        signals["stagnation"] = 0.30  # above _STAGNATION_SUPPRESS_THRESHOLD
+        if fixy_msg is not None:
+            signals["fixy_last_message"] = fixy_msg
+        return signals
+
+    def test_no_fixy_hint_gives_structural_challenge(self, core):
+        """Without a Fixy hint the adversarial-pressure fallback fires."""
+        decision = core.evaluate_turn("Socrates", self._stagnation_signals())
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+
+    def test_missing_variable_hint_selects_require_new_variable(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("I notice a missing variable here.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_no_falsifiability_hint_selects_require_test(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("The claim is not falsifiable.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
+    def test_conceptual_fog_hint_selects_require_concrete_case(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("Too much conceptual fog here.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_no_closure_hint_selects_require_branch_closure(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("There is no closure to this branch.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_unrelated_fixy_hint_falls_through_to_default(self, core):
+        """An unrecognised Fixy hint falls through to the normal stagnation logic."""
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("Interesting point, keep going."),
+        )
+        # No matching hint → falls through; adversarial-pressure fallback
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+
+    def test_post_dream_recovery_suppresses_structural_challenge(self, core):
+        """Post-dream recovery prevents REQUIRE_STRUCTURAL_CHALLENGE from firing."""
+        signals = self._stagnation_signals()
+        signals["post_dream_recovery_turns"] = 1
+        decision = core.evaluate_turn("Socrates", signals)
+        # In recovery → DREAM_RECOVERY fires before stagnation rule
+        assert decision.active_mode == IntegrationMode.DREAM_RECOVERY
+        assert decision.active_mode != IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE

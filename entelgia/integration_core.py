@@ -48,7 +48,7 @@ REQUIRE_FORCED_CHOICE     — demand a committed binary choice
 REQUIRE_STRUCTURAL_CHALLENGE — adversarial: challenge underlying structure
 DREAM_RECOVERY            — post-dream recovery; low-pressure, low-complexity
 # Kept for backward compatibility but no longer triggered as a hard rule:
-FIXY_AUTHORITY_OVERRIDE   — deprecated; maps to REQUIRE_CONCRETE_CASE at runtime
+FIXY_AUTHORITY_OVERRIDE   — deprecated; kept for backward compat; never selected by the rule engine
 
 Escalation levels
 -----------------
@@ -66,6 +66,7 @@ State priority order (highest → lowest)
                                             REQUIRE_CONCRETE_CASE, REQUIRE_BRANCH_CLOSURE,
                                             REQUIRE_FORCED_CHOICE, REQUIRE_COUNTEREXAMPLE)
 4. Structural challenge / attack           (ATTACK_OVERRIDE / REQUIRE_STRUCTURAL_CHALLENGE)
+   (selected inside _decide_stagnation_intervention as adversarial-pressure case)
 5. Style / personality                     (PERSONALITY_SUPPRESSION)
 6. Default                                 (NORMAL)
 
@@ -315,8 +316,9 @@ class IntegrationMode(str, Enum):
     ATTACK_OVERRIDE = "ATTACK_OVERRIDE"
     LOW_COMPLEXITY = "LOW_COMPLEXITY"
     PERSONALITY_SUPPRESSION = "PERSONALITY_SUPPRESSION"
-    # Kept for backward compatibility; no longer triggered as a hard rule.
-    # At runtime it resolves to REQUIRE_CONCRETE_CASE behaviour.
+    # Kept for backward compatibility with external code that may reference the
+    # string value.  This mode is never selected by any rule in the rule engine;
+    # no runtime remapping is performed.
     FIXY_AUTHORITY_OVERRIDE = "FIXY_AUTHORITY_OVERRIDE"
     # --- Expanded operationalisation taxonomy ---
     # Demand a falsifiable / testable claim
@@ -2001,15 +2003,11 @@ class IntegrationCore:
         if self._rule_unresolved_resolution(state):
             return self._decide_unresolved_resolution(state)
 
-        # Priority 5 — Structural challenge / attack (only when not in recovery)
-        if not in_recovery and self._rule_stagnation_attack(state):
-            return self._decide_stagnation_attack(state)
-
-        # Priority 6 — Pressure misalignment (advisory)
+        # Priority 5 — Pressure misalignment (advisory)
         if self._rule_pressure_misalignment(state):
             return self._decide_pressure_misalignment(state)
 
-        # Priority 7 — Default
+        # Priority 6 — Default
         return ControlDecision(
             active_mode=IntegrationMode.NORMAL,
             decision_reason="All signals within acceptable range. No override required.",
@@ -2037,19 +2035,6 @@ class IntegrationCore:
     def _rule_stagnation(state: IntegrationState) -> bool:
         """Stagnation above suppression threshold (primary stagnation gate)."""
         return state.stagnation >= _STAGNATION_SUPPRESS_THRESHOLD
-
-    @staticmethod
-    def _rule_stagnation_attack(state: IntegrationState) -> bool:
-        """Stagnation above suppression threshold without semantic_repeat.
-
-        Only fires when the real issue is adversarial pressure deficit —
-        i.e. no semantic loop detected (that is handled by loop rules) but
-        stagnation is significant.
-        """
-        return (
-            state.stagnation >= _STAGNATION_SUPPRESS_THRESHOLD
-            and not state.semantic_repeat
-        )
 
     @staticmethod
     def _rule_unresolved_resolution(state: IntegrationState) -> bool:
@@ -2322,22 +2307,6 @@ class IntegrationCore:
             decision_reason=reason,
             priority_level=_PRIORITY_LOOP,
             active_mode=IntegrationMode.PERSONALITY_SUPPRESSION,
-        )
-
-    @staticmethod
-    def _decide_stagnation_attack(state: IntegrationState) -> ControlDecision:
-        reason = (
-            f"Stagnation={state.stagnation:.2f} detected for '{state.agent_name}' "
-            "(adversarial pressure deficit). "
-            "REQUIRE_STRUCTURAL_CHALLENGE activated."
-        )
-        return ControlDecision(
-            force_attack_mode=True,
-            suppress_personality=True,
-            prompt_overlay=_OVERLAY_REQUIRE_STRUCTURAL_CHALLENGE,
-            decision_reason=reason,
-            priority_level=_PRIORITY_STAGNATION,
-            active_mode=IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
         )
 
     @staticmethod
