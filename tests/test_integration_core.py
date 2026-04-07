@@ -720,14 +720,15 @@ class TestValidateGeneratedOutput:
         )
         assert compliant is True
 
-    def test_branch_closure_passes_for_any_text(self, core):
+    def test_branch_closure_fails_without_closure_signal(self, core):
         decision = self._decision_for(
             core, {"unresolved": 3, "progress_after": 0.2}
         )
         text = "I still think there are many open questions here."
-        compliant, _ = core.validate_generated_output(text, decision)
-        # REQUIRE_BRANCH_CLOSURE is an informational overlay; no hard text gate
-        assert compliant is True
+        compliant, reason = core.validate_generated_output(text, decision)
+        # REQUIRE_BRANCH_CLOSURE now enforces a hard text gate (PATCH 1)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason or "closure" in reason.lower()
 
     # REQUIRE_STRUCTURAL_CHALLENGE (only fires with adversarial evidence) ──
 
@@ -2038,3 +2039,167 @@ class TestFixySoftSignalIntegration:
         assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
         assert decision.active_mode != IntegrationMode.REQUIRE_FORCED_CHOICE
 
+
+# ---------------------------------------------------------------------------
+# Output contract enforcement (PATCH 1 — state-transition contracts)
+# ---------------------------------------------------------------------------
+
+
+class TestOutputContracts:
+    """Validate the new per-mode output contracts introduced by PATCH 1."""
+
+    def _decision_for(self, core, overrides):
+        signals = {**_nominal_signals(), **overrides}
+        return core.pre_generation_decision("Socrates", signals)
+
+    # REQUIRE_TEST ────────────────────────────────────────────────────────────
+
+    def test_require_test_passes_with_test_signal(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_TEST,
+            prompt_overlay="",
+        )
+        text = "We can test this: if the intervention is effective, we should observe a measurable improvement."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True
+        assert "STATE-TRANSITION-SUCCESS" in reason
+
+    def test_require_test_fails_without_test_signal(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_TEST,
+            prompt_overlay="",
+        )
+        text = "I believe this is an important philosophical position worth considering."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "no concrete test" in reason
+
+    def test_require_test_passes_with_experiment_signal(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_TEST,
+            prompt_overlay="",
+        )
+        text = "An experiment could verify this: run a controlled study and measure outcomes."
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    # REQUIRE_CONCRETE_CASE ───────────────────────────────────────────────────
+
+    def test_require_concrete_case_passes_with_real_case(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_CONCRETE_CASE,
+            prompt_overlay="",
+        )
+        # Uses "specifically" — a concrete signal not in _PSEUDO_COMPLIANCE_TRIGGERS,
+        # so detect_pseudo_compliance does not fire.
+        text = (
+            "Specifically, a nurse reported a medication error during the morning shift. "
+            "The incident was escalated and the patient received corrective treatment."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True
+        assert "STATE-TRANSITION-SUCCESS" in reason
+
+    def test_require_concrete_case_fails_with_pure_abstraction(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_CONCRETE_CASE,
+            prompt_overlay="",
+        )
+        text = "This is an abstract claim about human behaviour that applies generally."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+
+    # REQUIRE_COUNTEREXAMPLE (evidence contract) ──────────────────────────────
+
+    def test_require_counterexample_passes_with_causal_explanation(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_COUNTEREXAMPLE,
+            prompt_overlay="",
+        )
+        text = "This outcome results because of feedback loops — delayed signals cause overcorrection."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True
+        assert "STATE-TRANSITION-SUCCESS" in reason
+
+    def test_require_counterexample_passes_with_evidence_keyword(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_COUNTEREXAMPLE,
+            prompt_overlay="",
+        )
+        text = "The evidence demonstrates that early intervention reduces escalation."
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    def test_require_counterexample_fails_with_empty_assertion(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_COUNTEREXAMPLE,
+            prompt_overlay="",
+        )
+        text = "I think this is simply how things are and always will be."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "no concrete mechanism" in reason
+
+    # REQUIRE_FORCED_CHOICE ───────────────────────────────────────────────────
+
+    def test_require_forced_choice_passes_with_committed_choice(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_FORCED_CHOICE,
+            prompt_overlay="",
+        )
+        text = "I choose option A: individual agency is primary. Structural forces are secondary."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True
+        assert "STATE-TRANSITION-SUCCESS" in reason
+
+    def test_require_forced_choice_passes_with_position_signal(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_FORCED_CHOICE,
+            prompt_overlay="",
+        )
+        text = "My position is that determinism is correct. Free will is an illusion."
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    def test_require_forced_choice_fails_with_hedging(self, core):
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_FORCED_CHOICE,
+            prompt_overlay="",
+        )
+        text = "Both perspectives have valid points. We should consider them together."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "no committed choice" in reason
+
+    # REQUIRE_BRANCH_CLOSURE ──────────────────────────────────────────────────
+
+    def test_require_branch_closure_passes_with_conclusion_signal(self, core):
+        decision = self._decision_for(
+            core, {"unresolved": 3, "progress_after": 0.2}
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        text = "To conclude this open question: the causal link is not established. I am closing this thread."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True
+        assert "STATE-TRANSITION-SUCCESS" in reason
+
+    def test_require_branch_closure_passes_with_resolved_signal(self, core):
+        decision = self._decision_for(
+            core, {"unresolved": 3, "progress_after": 0.2}
+        )
+        text = "The earlier open question is now resolved: the mechanism is feedback delay."
+        compliant, _ = core.validate_generated_output(text, decision)
+        assert compliant is True
+
+    def test_require_branch_closure_fails_without_closure_signal(self, core):
+        decision = self._decision_for(
+            core, {"unresolved": 3, "progress_after": 0.2}
+        )
+        text = "I still think there are many open questions here."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason

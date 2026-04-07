@@ -713,6 +713,16 @@ LIMBIC_HIJACK_SUPEREGO_MULTIPLIER: float = 0.3
 # Number of consecutive turns (without re-trigger) before limbic hijack auto-exits
 LIMBIC_HIJACK_MAX_TURNS: int = 3
 
+# ── Unresolved topic state constants (PATCH 4) ───────────────────────────────
+#: Initial state — open, not yet addressed.  Maps to the existing "unresolved" tag.
+_UT_STATE_OPEN: str = "unresolved"
+#: Transition state — converted into a testable hypothesis; must lead to RESOLVED or DISCARDED.
+_UT_STATE_TESTABLE: str = "testable"
+#: Terminal state — clear conclusion reached; removes item from active unresolved set.
+_UT_STATE_RESOLVED: str = "resolved"
+#: Terminal state — explicitly marked non-critical; removes item from active unresolved set.
+_UT_STATE_DISCARDED: str = "discarded"
+
 # ── Fatigue threshold constants ───────────────────────────────────────────────
 #: Energy level above which there is no fatigue penalty.
 _FATIGUE_ENERGY_THRESHOLD: float = 60.0
@@ -2707,6 +2717,82 @@ def compute_drive_pressure(
 # EWM coefficient for the dialogue → meta-pressure soft feedback loop.
 # Small value (0.1–0.2) so each turn only nudges drive_pressure slightly.
 _PRESSURE_FEEDBACK_ALPHA: float = 0.15
+
+
+def _transition_unresolved_item(
+    unresolved_topics: list,
+    output_text: str,
+    agent_name: str,
+) -> bool:
+    """Select the highest-salience OPEN unresolved topic and transition its state.
+
+    Examines *output_text* to determine the appropriate target state:
+
+    * ``_UT_STATE_RESOLVED`` — if the output contains resolution language
+      (conclude, settled, closed, resolved, etc.).
+    * ``_UT_STATE_DISCARDED`` — if the output contains discard language
+      (set aside, discard, not critical, irrelevant, etc.).
+    * ``_UT_STATE_TESTABLE`` — fallback: output contains test/measure/
+      observe language but not full resolution.
+
+    Returns ``True`` when at least one item was transitioned, ``False``
+    when no OPEN items exist or the output contains no actionable signal.
+    """
+    t = output_text.lower()
+
+    # Determine target state from output content
+    _RESOLVED_SIGNALS = (
+        "conclud", "settled", "resolv", "closed", "close this",
+        "the answer is", "therefore i", "thus i", "parking",
+    )
+    _DISCARDED_SIGNALS = (
+        "set aside", "discard", "not critical", "irrelevant",
+        "drop this", "abandon", "put aside",
+    )
+    _TESTABLE_SIGNALS = (
+        "test", "measur", "observ", "experiment", "falsif",
+        "verif", "predict", "criterion",
+    )
+
+    if any(s in t for s in _RESOLVED_SIGNALS):
+        target_state = _UT_STATE_RESOLVED
+    elif any(s in t for s in _DISCARDED_SIGNALS):
+        target_state = _UT_STATE_DISCARDED
+    elif any(s in t for s in _TESTABLE_SIGNALS):
+        target_state = _UT_STATE_TESTABLE
+    else:
+        return False
+
+    # Select the highest-salience OPEN item
+    open_items = [
+        item for item in unresolved_topics
+        if item.get("status") == _UT_STATE_OPEN
+    ]
+    if not open_items:
+        return False
+
+    # Sort by salience: intensity + conflict + log(repetition)
+    import math as _math
+    open_items.sort(
+        key=lambda i: (
+            float(i.get("intensity", 0.0))
+            + float(i.get("conflict", 0.0))
+            + _math.log(int(i.get("repetition", 1)) + 1)
+        ),
+        reverse=True,
+    )
+    item = open_items[0]
+    prev_state = item["status"]
+    item["status"] = target_state
+
+    logger.info(
+        "[UNRESOLVED-TRANSITION] agent=%s item_id=%s from=%s to=%s",
+        agent_name,
+        item.get("topic", "?"),
+        prev_state,
+        target_state,
+    )
+    return True
 
 
 def _trim_to_word_limit(text: str, max_words: int) -> str:
@@ -8561,6 +8647,61 @@ class MainScript:
                 except Exception:
                     logger.warning(
                         "[POST-GEN-VALIDATION] validation raised exception for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────
+
+            # ── UNRESOLVED TRANSITION: enforce branch-closure state change ─────
+            # PATCH 2: When REQUIRE_BRANCH_CLOSURE is active OR open_questions
+            # has reached the trigger threshold, the agent MUST transition at
+            # least one OPEN unresolved item to RESOLVED, TESTABLE, or DISCARDED.
+            # This enforces the hard constraint that unresolved count does not
+            # monotonically increase and that REQUIRE_BRANCH_CLOSURE produces
+            # a measurable state change.
+            if (
+                _pre_gen_decision is not None
+                and _pre_gen_agent is not None
+                and _pre_gen_agent.name == speaker.name
+                and _pre_gen_agent.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                try:
+                    from entelgia.integration_core import (
+                        IntegrationMode as _IM_UT,
+                        _UNRESOLVED_RESOLUTION_TRIGGER as _UT_TRIGGER,
+                    )
+                    _ut_mode = _pre_gen_decision.active_mode
+                    _ut_active = (
+                        _ut_mode == _IM_UT.REQUIRE_BRANCH_CLOSURE
+                        or speaker.open_questions >= _UT_TRIGGER
+                    )
+                    if _ut_active:
+                        _ut_transitioned = _transition_unresolved_item(
+                            speaker.unresolved_topics, out, speaker.name
+                        )
+                        _ut_open_remaining = sum(
+                            1 for _t in speaker.unresolved_topics
+                            if _t.get("status") == _UT_STATE_OPEN
+                        )
+                        if _ut_transitioned:
+                            # Decrement open_questions to reflect the resolved item
+                            speaker.open_questions = max(0, speaker.open_questions - 1)
+                            logger.info(
+                                "[STATE-TRANSITION-SUCCESS] mode=%s resolved=1 remaining=%d",
+                                _ut_mode.value,
+                                _ut_open_remaining - 1,
+                            )
+                        else:
+                            logger.warning(
+                                "[STATE-TRANSITION-FAIL] mode=%s reason=\"no unresolved item transitioned\" "
+                                "open=%d — unresolved count unchanged this turn",
+                                _ut_mode.value,
+                                speaker.open_questions,
+                            )
+                except Exception:
+                    logger.warning(
+                        "[UNRESOLVED-TRANSITION] exception during transition for agent=%s",
                         speaker.name,
                         exc_info=True,
                     )
