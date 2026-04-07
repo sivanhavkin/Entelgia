@@ -9,8 +9,28 @@ Version Note: Pronoun support and 150-word limit features added for v2.2.0
 Latest official release: v2.7.0
 """
 
+import logging
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Optional semantic-similarity dependencies (sentence-transformers + sklearn)
+# ---------------------------------------------------------------------------
+try:
+    from sentence_transformers import SentenceTransformer as _SentenceTransformer
+    from sklearn.metrics.pairwise import cosine_similarity as _cosine_similarity
+
+    _CTX_ST_MODEL: Optional[_SentenceTransformer] = None
+    _CTX_SEMANTIC_AVAILABLE = True
+except ImportError:
+    _CTX_SEMANTIC_AVAILABLE = False
+    _CTX_ST_MODEL = None
+    _cosine_similarity = None  # type: ignore[assignment]
+
+#: Sentence-transformers model name used for semantic memory retrieval.
+_CTX_SEMANTIC_MODEL_NAME: str = "all-MiniLM-L6-v2"
 
 # LLM Response Length Instruction
 LLM_RESPONSE_LIMIT = "IMPORTANT: Please answer in maximum 200 words."
@@ -491,11 +511,50 @@ class ContextManager:
         return prompt
 
 
-class EnhancedMemoryIntegration:
-    """Integrate memories more meaningfully into prompts."""
+def _get_ctx_semantic_model() -> Optional["_SentenceTransformer"]:
+    """Lazily load and cache the SentenceTransformer model for memory retrieval.
 
-    def __init__(self):
-        pass
+    On first call the model is loaded and stored in *_CTX_ST_MODEL*.  If the
+    load fails *_CTX_SEMANTIC_AVAILABLE* is flipped to ``False`` so that every
+    subsequent call returns ``None`` immediately without retrying the load.
+    """
+    # Both module-level singletons are mutated: _CTX_ST_MODEL is populated on
+    # success; _CTX_SEMANTIC_AVAILABLE is cleared to False on failure so we
+    # never attempt a costly re-load in the same session.
+    global _CTX_ST_MODEL, _CTX_SEMANTIC_AVAILABLE
+    if not _CTX_SEMANTIC_AVAILABLE:
+        return None
+    if _CTX_ST_MODEL is None:
+        try:
+            logger.info(
+                "EnhancedMemoryIntegration: loading SentenceTransformer '%s'…",
+                _CTX_SEMANTIC_MODEL_NAME,
+            )
+            _CTX_ST_MODEL = _SentenceTransformer(_CTX_SEMANTIC_MODEL_NAME)  # type: ignore[name-defined]
+            logger.info("EnhancedMemoryIntegration: semantic model loaded.")
+        except Exception as exc:  # pragma: no cover
+            logger.warning(
+                "EnhancedMemoryIntegration: could not load semantic model: %s — "
+                "disabling semantic scoring for this session.",
+                exc,
+            )
+            _CTX_SEMANTIC_AVAILABLE = False  # cache failure; skip retries
+    return _CTX_ST_MODEL
+
+
+class EnhancedMemoryIntegration:
+    """Integrate memories more meaningfully into prompts.
+
+    When *use_semantic* is ``True`` (default) **and** the optional
+    ``sentence-transformers`` package is installed, memory relevance scoring
+    uses transformer-based cosine similarity (``all-MiniLM-L6-v2``) for both
+    topic and dialog components.  If the package is absent the class falls
+    back automatically to keyword (Jaccard) similarity, so the optional
+    dependency never breaks the pipeline.
+    """
+
+    def __init__(self, use_semantic: bool = True):
+        self.use_semantic = use_semantic
 
     def retrieve_relevant_memories(
         self,
@@ -508,6 +567,12 @@ class EnhancedMemoryIntegration:
     ) -> List[Dict[str, Any]]:
         """
         Retrieve memories based on relevance scoring.
+
+        When ``use_semantic=True`` (the instance default) and the optional
+        ``sentence-transformers`` package is available, topic and dialog
+        similarity components are computed using transformer embeddings
+        (``all-MiniLM-L6-v2``).  When the package is absent, the method
+        falls back transparently to keyword (Jaccard) similarity.
 
         Args:
             agent_name: Agent requesting memories
@@ -530,11 +595,40 @@ class EnhancedMemoryIntegration:
         # scoring cannot be biased by a stale or irrelevant topic string.
         effective_topic = current_topic if topics_enabled else ""
 
+        # Build dialog query string (last 3 turns, same as keyword path)
+        dialog_text = " ".join(
+            [t.get("text", "") for t in recent_dialog[-3:]]
+        ).strip()
+
+        # ── Attempt batch semantic scoring ───────────────────────────────
+        semantic_topic_scores: Optional[List[float]] = None
+        semantic_dialog_scores: Optional[List[float]] = None
+        if self.use_semantic:
+            semantic_topic_scores, semantic_dialog_scores = (
+                self._batch_semantic_scores(
+                    effective_topic, dialog_text, ltm_entries
+                )
+            )
+
         # Score each memory
         scored_memories = []
-        for mem in ltm_entries:
+        for idx, mem in enumerate(ltm_entries):
+            sem_topic = (
+                semantic_topic_scores[idx]
+                if semantic_topic_scores is not None
+                else None
+            )
+            sem_dialog = (
+                semantic_dialog_scores[idx]
+                if semantic_dialog_scores is not None
+                else None
+            )
             score = self._calculate_relevance_score(
-                memory=mem, topic=effective_topic, recent_dialog=recent_dialog
+                memory=mem,
+                topic=effective_topic,
+                recent_dialog=recent_dialog,
+                semantic_topic_score=sem_topic,
+                semantic_dialog_score=sem_dialog,
             )
             scored_memories.append((score, mem))
 
@@ -542,8 +636,92 @@ class EnhancedMemoryIntegration:
         scored_memories.sort(reverse=True, key=lambda x: x[0])
         return [mem for score, mem in scored_memories[:limit]]
 
+    def _batch_semantic_scores(
+        self,
+        topic: str,
+        dialog_text: str,
+        memories: List[Dict[str, Any]],
+    ) -> Tuple[Optional[List[float]], Optional[List[float]]]:
+        """Batch-encode query and all memory contents; return per-memory cosine
+        similarity lists for (topic, dialog).
+
+        Empty *topic* or *dialog_text* strings produce zero scores for that
+        component without calling the model, avoiding a wasted encode call.
+
+        Returns ``(None, None)`` when the semantic model is unavailable or
+        encoding fails, so the caller falls back to keyword similarity.
+        """
+        model = _get_ctx_semantic_model()
+        if model is None:
+            return None, None
+        try:
+            n = len(memories)
+            zero_scores = [0.0] * n
+            contents = [mem.get("content", "") for mem in memories]
+
+            # Determine which query components need encoding
+            encode_topic = bool(topic.strip())
+            encode_dialog = bool(dialog_text.strip())
+
+            if not encode_topic and not encode_dialog:
+                # Both queries are empty — similarity is zero for both
+                return zero_scores, zero_scores
+
+            # Build the minimal batch to encode
+            query_texts: List[str] = []
+            if encode_topic:
+                query_texts.append(topic)
+            if encode_dialog:
+                query_texts.append(dialog_text)
+
+            all_texts = query_texts + contents
+            embeddings = model.encode(all_texts, show_progress_bar=False)
+
+            query_embs = embeddings[: len(query_texts)]
+            mem_embs = embeddings[len(query_texts):]  # shape (N, D)
+
+            qi = 0
+            if encode_topic:
+                topic_sims = (
+                    _cosine_similarity(mem_embs, query_embs[qi : qi + 1])
+                    .flatten()
+                    .tolist()
+                )
+                topic_sims = [max(0.0, min(1.0, s)) for s in topic_sims]
+                qi += 1
+            else:
+                topic_sims = zero_scores
+
+            if encode_dialog:
+                dialog_sims = (
+                    _cosine_similarity(mem_embs, query_embs[qi : qi + 1])
+                    .flatten()
+                    .tolist()
+                )
+                dialog_sims = [max(0.0, min(1.0, s)) for s in dialog_sims]
+            else:
+                dialog_sims = zero_scores
+
+            logger.debug(
+                "EnhancedMemoryIntegration: semantic scores computed for %d memories.",
+                n,
+            )
+            return topic_sims, dialog_sims
+        except Exception as exc:  # pragma: no cover
+            logger.warning(
+                "EnhancedMemoryIntegration: semantic scoring failed, "
+                "falling back to keyword similarity: %s",
+                exc,
+            )
+            return None, None
+
     def _calculate_relevance_score(
-        self, memory: Dict[str, Any], topic: str, recent_dialog: List[Dict[str, str]]
+        self,
+        memory: Dict[str, Any],
+        topic: str,
+        recent_dialog: List[Dict[str, str]],
+        semantic_topic_score: Optional[float] = None,
+        semantic_dialog_score: Optional[float] = None,
     ) -> float:
         """
         Score memory relevance.
@@ -555,25 +733,37 @@ class EnhancedMemoryIntegration:
             recency * 0.1
         )
 
+        When *semantic_topic_score* / *semantic_dialog_score* are provided
+        (pre-computed by ``_batch_semantic_scores``), they replace the
+        keyword-based topic and dialog similarity values respectively.
+
         Args:
             memory: Memory entry
             topic: Current topic
             recent_dialog: Recent dialogue
+            semantic_topic_score: Optional pre-computed semantic topic similarity
+            semantic_dialog_score: Optional pre-computed semantic dialog similarity
 
         Returns:
             Relevance score (0.0 to 1.0)
         """
         content = memory.get("content", "").lower()
 
-        # Topic similarity (keyword overlap)
-        topic_sim = self._keyword_similarity(content, topic.lower())
+        # Topic similarity — prefer semantic score when available
+        if semantic_topic_score is not None:
+            topic_sim = semantic_topic_score
+        else:
+            topic_sim = self._keyword_similarity(content, topic.lower())
 
         # Importance (already in memory)
         importance = float(memory.get("importance", 0.5))
 
-        # Dialog relevance (mentions concepts from recent turns)
-        dialog_text = " ".join([t.get("text", "") for t in recent_dialog[-3:]]).lower()
-        dialog_rel = self._keyword_similarity(content, dialog_text)
+        # Dialog relevance — prefer semantic score when available
+        if semantic_dialog_score is not None:
+            dialog_rel = semantic_dialog_score
+        else:
+            dialog_text = " ".join([t.get("text", "") for t in recent_dialog[-3:]]).lower()
+            dialog_rel = self._keyword_similarity(content, dialog_text)
 
         # Recency (simple heuristic - could use timestamp)
         recency = 0.5  # Default for now

@@ -31,6 +31,9 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "pydantic>=2.0.0",
+    "sentence-transformers>=2.2.0",
+    "scikit-learn>=1.0.1",
+    "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]
@@ -42,11 +45,6 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.5.0",
     "pyreadline3>=3.4.1; sys_platform == 'win32'",
-]
-semantic = [
-    "sentence-transformers>=2.2.0",
-    "scikit-learn>=1.0.0",
-    "numpy>=1.24.0",
 ]
 
 [project.urls]

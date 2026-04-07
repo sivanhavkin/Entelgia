@@ -613,5 +613,171 @@ class TestAgentStateInPrompt:
             assert key in prompt, f"Expected '{key}' in prompt"
 
 
+
+# ---------------------------------------------------------------------------
+# EnhancedMemoryIntegration – semantic search path
+# ---------------------------------------------------------------------------
+
+from unittest.mock import MagicMock, patch
+
+
+class TestEnhancedMemoryIntegrationSemantic:
+    """Tests for the transformer-based semantic memory search path."""
+
+    def _memories(self):
+        return [
+            {"content": "consciousness and subjective experience", "importance": 0.5},
+            {"content": "quantum mechanics wave function", "importance": 0.5},
+            {"content": "justice and social equality", "importance": 0.5},
+        ]
+
+    def _dialog(self):
+        return [{"role": "Socrates", "text": "What is consciousness?"}]
+
+    # ── semantic path uses injected scores ────────────────────────────────
+
+    def test_semantic_scores_used_when_model_available(self):
+        """When _batch_semantic_scores returns scores, they are used for ranking."""
+        emi = EnhancedMemoryIntegration(use_semantic=True)
+        memories = self._memories()
+        # Inject scores: first memory gets highest topic + dialog similarity
+        topic_scores = [0.9, 0.1, 0.1]
+        dialog_scores = [0.8, 0.1, 0.1]
+        with patch.object(
+            emi,
+            "_batch_semantic_scores",
+            return_value=(topic_scores, dialog_scores),
+        ):
+            result = emi.retrieve_relevant_memories(
+                agent_name="Socrates",
+                current_topic="consciousness",
+                recent_dialog=self._dialog(),
+                ltm_entries=memories,
+                limit=3,
+            )
+        assert result[0]["content"] == "consciousness and subjective experience"
+
+    def test_semantic_fallback_when_batch_returns_none(self):
+        """When _batch_semantic_scores returns (None, None), keyword path is used."""
+        emi = EnhancedMemoryIntegration(use_semantic=True)
+        memories = self._memories()
+        with patch.object(
+            emi, "_batch_semantic_scores", return_value=(None, None)
+        ):
+            result = emi.retrieve_relevant_memories(
+                agent_name="Socrates",
+                current_topic="consciousness",
+                recent_dialog=self._dialog(),
+                ltm_entries=memories,
+                limit=3,
+            )
+        # Should still return a list (keyword fallback)
+        assert isinstance(result, list)
+        assert len(result) <= 3
+
+    def test_use_semantic_false_skips_batch(self):
+        """With use_semantic=False, _batch_semantic_scores is never called."""
+        emi = EnhancedMemoryIntegration(use_semantic=False)
+        with patch.object(emi, "_batch_semantic_scores") as mock_batch:
+            emi.retrieve_relevant_memories(
+                agent_name="Socrates",
+                current_topic="consciousness",
+                recent_dialog=self._dialog(),
+                ltm_entries=self._memories(),
+                limit=3,
+            )
+        mock_batch.assert_not_called()
+
+    def test_semantic_scores_respect_topics_disabled(self):
+        """With topics_enabled=False, semantic scores still rank by importance."""
+        emi = EnhancedMemoryIntegration(use_semantic=True)
+        mem_topic_match = {
+            "content": "wealth inequality economics distribution",
+            "importance": 0.1,
+        }
+        mem_high_importance = {
+            "content": "consciousness identity mind",
+            "importance": 0.9,
+        }
+        # Even if semantic topic similarity is high for first memory, topics_enabled=False
+        # should zero out the topic label so the semantic query is empty-string-based.
+        # We simulate the model returning equal scores (empty query → no bias).
+        topic_scores = [0.5, 0.5]
+        dialog_scores = [0.1, 0.1]
+        with patch.object(
+            emi,
+            "_batch_semantic_scores",
+            return_value=(topic_scores, dialog_scores),
+        ):
+            result = emi.retrieve_relevant_memories(
+                agent_name="Socrates",
+                current_topic="wealth inequality",
+                recent_dialog=[{"role": "Socrates", "text": "philosophy of mind"}],
+                ltm_entries=[mem_topic_match, mem_high_importance],
+                limit=2,
+                topics_enabled=False,
+            )
+        assert result, "Must return at least one memory"
+        # With equal topic/dialog scores, importance (0.9) should decide ranking
+        assert (
+            result[0]["content"] == "consciousness identity mind"
+        ), "High-importance memory must rank first when topic/dialog scores are equal"
+
+    # ── _batch_semantic_scores unit tests ─────────────────────────────────
+
+    def test_batch_semantic_scores_returns_none_when_unavailable(self):
+        """When sentence-transformers is not available, returns (None, None)."""
+        import entelgia.context_manager as cm_module
+
+        original = cm_module._CTX_SEMANTIC_AVAILABLE
+        try:
+            cm_module._CTX_SEMANTIC_AVAILABLE = False
+            emi = EnhancedMemoryIntegration(use_semantic=True)
+            t_scores, d_scores = emi._batch_semantic_scores(
+                "topic", "dialog", self._memories()
+            )
+            assert t_scores is None
+            assert d_scores is None
+        finally:
+            cm_module._CTX_SEMANTIC_AVAILABLE = original
+
+    def test_batch_semantic_scores_uses_model(self):
+        """When a model is returned by _get_ctx_semantic_model, it is used to encode."""
+        np = pytest.importorskip("numpy")
+        import entelgia.context_manager as cm_module
+
+        if not cm_module._CTX_SEMANTIC_AVAILABLE:
+            pytest.skip("sentence-transformers / sklearn not installed")
+
+        memories = self._memories()
+        # Build a minimal mock model that returns plausible embeddings
+        mock_model = MagicMock()
+        # [topic, dialog, mem0, mem1, mem2] → shape (5, 4)
+        mock_model.encode.return_value = np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.9, 0.1, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            dtype=float,
+        )
+
+        emi = EnhancedMemoryIntegration(use_semantic=True)
+        with patch.object(cm_module, "_get_ctx_semantic_model", return_value=mock_model):
+            t_scores, d_scores = emi._batch_semantic_scores(
+                "consciousness", "what is mind", memories
+            )
+
+        assert t_scores is not None
+        assert d_scores is not None
+        assert len(t_scores) == len(memories)
+        assert len(d_scores) == len(memories)
+        # All scores should be clamped to [0, 1]
+        for s in t_scores + d_scores:
+            assert 0.0 <= s <= 1.0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
