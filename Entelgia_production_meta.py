@@ -198,11 +198,15 @@ try:
         compute_semantic_repeat_alignment as _compute_semantic_repeat_alignment,
     )
     from entelgia.integration_core import IntegrationCore as _IntegrationCore
+    from entelgia.integration_core import (
+        FIXY_SOFT_SIGNAL_MAX_TURNS as _IC_FIXY_SIGNAL_MAX_TURNS,
+    )
     from entelgia.integration_memory_store import IntegrationMemoryStore as _IntegrationMemoryStore
 
     ENTELGIA_ENHANCED = True
 except ImportError:
     ENTELGIA_ENHANCED = False
+    _IC_FIXY_SIGNAL_MAX_TURNS = 12  # fallback when integration_core is unavailable
     print("Warning: Enhanced dialogue modules not available. Using legacy mode.")
 
     # Fallback stubs for topic_enforcer when enhanced modules are unavailable.
@@ -8324,11 +8328,16 @@ class MainScript:
                     "abstraction_detected": False,
                     "energy": float(speaker.energy_level),
                     "status": str(speaker._last_fatigue_state or "active"),
-                    # Soft Fixy signal: last Fixy utterance for controller hint
+                    # Soft Fixy signal: last Fixy utterance for controller hint.
+                    # Only look back _IC_FIXY_SIGNAL_MAX_TURNS turns so that a
+                    # stale Fixy message from many turns ago does not pollute the
+                    # current decision.
                     "fixy_last_message": next(
                         (
                             t.get("text", "")
-                            for t in reversed(self.dialog)
+                            for t in reversed(
+                                self.dialog[-_IC_FIXY_SIGNAL_MAX_TURNS:]
+                            )
                             if t.get("role") == "Fixy"
                         ),
                         None,
@@ -9156,11 +9165,16 @@ class MainScript:
                         if "_loop_result" in dir()
                         else None
                     ),
-                    # Soft Fixy signal: last Fixy utterance for controller hint
+                    # Soft Fixy signal: last Fixy utterance for controller hint.
+                    # Only look back _IC_FIXY_SIGNAL_MAX_TURNS turns so that a
+                    # stale Fixy message from many turns ago does not pollute the
+                    # current decision.
                     "fixy_last_message": next(
                         (
                             t.get("text", "")
-                            for t in reversed(self.dialog)
+                            for t in reversed(
+                                self.dialog[-_IC_FIXY_SIGNAL_MAX_TURNS:]
+                            )
                             if t.get("role") == "Fixy"
                         ),
                         None,

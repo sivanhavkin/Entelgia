@@ -66,7 +66,7 @@ State priority order (highest → lowest)
                                             REQUIRE_CONCRETE_CASE, REQUIRE_BRANCH_CLOSURE,
                                             REQUIRE_FORCED_CHOICE, REQUIRE_COUNTEREXAMPLE)
 4. Structural challenge / attack           (ATTACK_OVERRIDE / REQUIRE_STRUCTURAL_CHALLENGE)
-   (selected inside _decide_stagnation_intervention as adversarial-pressure case)
+   (only when reasoning_delta is "moderate"/"strong" — adversarial pressure truly needed)
 5. Style / personality                     (PERSONALITY_SUPPRESSION)
 6. Default                                 (NORMAL)
 
@@ -76,10 +76,15 @@ The controller may optionally read ``state.fixy_last_message`` to select a
 more semantically appropriate intervention.  This mapping is controller-owned;
 Fixy never calls enforcement functions directly.
 
-  "missing variable"       → REQUIRE_NEW_VARIABLE
-  "no falsifiability"      → REQUIRE_TEST
-  "conceptual fog/abstract loop" → REQUIRE_CONCRETE_CASE
-  "endless recursion/no closure" → REQUIRE_BRANCH_CLOSURE
+Priority (highest → lowest):
+  REQUIRE_TEST           — "falsifiab*", "observable condition", "measurable", "experiment", etc.
+  REQUIRE_BRANCH_CLOSURE — "no closure", "circular", "looping without resolution", etc.
+  REQUIRE_CONCRETE_CASE  — "abstract loop", "conceptual fog", "too abstract", etc.
+  REQUIRE_NEW_VARIABLE   — "missing variable", "hidden variable", "new dimension", etc.
+  REQUIRE_STRUCTURAL_CHALLENGE — only with explicit adversarial-pressure evidence
+
+Only the most recent Fixy message is considered and only within a short window
+of :data:`_FIXY_SOFT_SIGNAL_MAX_TURNS` dialogue turns.
 
 Post-dream recovery
 -------------------
@@ -151,6 +156,13 @@ _PRIORITY_UNRESOLVED: int = 6
 _PRIORITY_FATIGUE: int = 4
 _PRIORITY_PRESSURE: int = 2
 _PRIORITY_DEFAULT: int = 0
+
+# Maximum number of dialogue turns to look back when reading a Fixy soft
+# signal.  Messages older than this window are treated as stale and ignored.
+# Exposed as a public constant so callers can reference it without importing
+# a module-private name.
+FIXY_SOFT_SIGNAL_MAX_TURNS: int = 12
+_FIXY_SOFT_SIGNAL_MAX_TURNS: int = FIXY_SOFT_SIGNAL_MAX_TURNS  # internal alias
 
 # Escalation engine constants
 _ESCALATION_LOOP_COUNT_LEVEL1: int = 1
@@ -2067,6 +2079,14 @@ class IntegrationCore:
         a more semantically appropriate intervention when stagnation is
         detected.
 
+        Priority order (deterministic, highest wins):
+          REQUIRE_TEST           > REQUIRE_BRANCH_CLOSURE > REQUIRE_CONCRETE_CASE
+          > REQUIRE_NEW_VARIABLE > REQUIRE_STRUCTURAL_CHALLENGE
+
+        Only the most recent Fixy message within the last
+        :data:`_FIXY_SOFT_SIGNAL_MAX_TURNS` dialogue turns should be supplied;
+        see :attr:`IntegrationState.fixy_last_message`.
+
         Parameters
         ----------
         fixy_message:
@@ -2081,30 +2101,87 @@ class IntegrationCore:
         if not fixy_message:
             return None
         m = fixy_message.lower()
-        # "missing variable" / "new dimension" / "new variable"
+
+        # Priority 1 — REQUIRE_TEST
+        # Fixy mentions falsifiability, testability, or empirical condition.
         if any(k in m for k in (
-            "missing variable", "new variable", "new dimension",
-            "introduce a variable", "new concept",
+            "falsif",
+            "falsifiable",
+            "falsifiability",
+            "observable condition",
+            "observable result",
+            "measurable",
+            "experiment",
+            "testable",
+            "testability",
+            "untestable",
+            "no criterion",
+            "no test",
+            "cannot be tested",
+            "empirical",
         )):
-            return IntegrationMode.REQUIRE_NEW_VARIABLE
-        # "no falsifiability" / "not falsifiable" / "untestable"
-        if any(k in m for k in (
-            "falsif", "testable", "testability", "untestable",
-            "no criterion", "no test", "cannot be tested",
-        )):
+            logger.info(
+                "[INTEGRATION-FIXY-SOFT] matched='falsifiability/testability' -> REQUIRE_TEST"
+            )
             return IntegrationMode.REQUIRE_TEST
-        # "conceptual fog" / "too abstract" / "abstract loop"
+
+        # Priority 2 — REQUIRE_BRANCH_CLOSURE
+        # Fixy mentions unresolved branches, endless loops, or circular dialogue.
         if any(k in m for k in (
-            "abstract loop", "conceptual fog", "too abstract",
-            "no concrete", "grounding", "concretize",
+            "no closure",
+            "open branch",
+            "endless recursion",
+            "unresolved",
+            "close this",
+            "no resolution",
+            "circular",
+            "looping without resolution",
+            "endless loop",
+            "going in circles",
+            "recursive loop",
         )):
-            return IntegrationMode.REQUIRE_CONCRETE_CASE
-        # "endless recursion" / "no closure" / "open branch"
-        if any(k in m for k in (
-            "no closure", "open branch", "endless recursion",
-            "unresolved", "close this", "no resolution",
-        )):
+            logger.info(
+                "[INTEGRATION-FIXY-SOFT] matched='no closure/circular/unresolved' -> REQUIRE_BRANCH_CLOSURE"
+            )
             return IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+        # Priority 3 — REQUIRE_CONCRETE_CASE
+        # Fixy mentions abstraction, fog, or lack of grounded examples.
+        if any(k in m for k in (
+            "abstract loop",
+            "conceptual fog",
+            "too abstract",
+            "no concrete",
+            "grounding",
+            "concretize",
+            "abstraction",
+            "too vague",
+            "vague",
+            "not concrete",
+            "ground",
+        )):
+            logger.info(
+                "[INTEGRATION-FIXY-SOFT] matched='abstraction/conceptual fog' -> REQUIRE_CONCRETE_CASE"
+            )
+            return IntegrationMode.REQUIRE_CONCRETE_CASE
+
+        # Priority 4 — REQUIRE_NEW_VARIABLE
+        # Fixy mentions a missing variable, hidden dimension, or new concept.
+        if any(k in m for k in (
+            "missing variable",
+            "hidden variable",
+            "new variable",
+            "new dimension",
+            "introduce a variable",
+            "new concept",
+            "missing dimension",
+            "unexplored variable",
+        )):
+            logger.info(
+                "[INTEGRATION-FIXY-SOFT] matched='missing/hidden variable' -> REQUIRE_NEW_VARIABLE"
+            )
+            return IntegrationMode.REQUIRE_NEW_VARIABLE
+
         return None
 
     # ------------------------------------------------------------------
@@ -2136,20 +2213,47 @@ class IntegrationCore:
           1. Fixy soft signal (controller-owned mapping)
           2. Repeated abstraction with no falsifier → REQUIRE_TEST
           3. Same claim restated with only rhetorical variation → REQUIRE_NEW_VARIABLE
+             or REQUIRE_CONCRETE_CASE
           4. Discussion remains abstract for too many turns → REQUIRE_CONCRETE_CASE
           5. Unresolved count growing without closure → REQUIRE_BRANCH_CLOSURE
-          6. Adversarial pressure deficit (not in recovery) → REQUIRE_STRUCTURAL_CHALLENGE
-             / ATTACK_OVERRIDE
-          7. Fallback → REQUIRE_CONCRETE_CASE (safer default than ATTACK_OVERRIDE)
+          6. Real reasoning happening but stagnating (reasoning_delta moderate/strong)
+             AND not in recovery → REQUIRE_STRUCTURAL_CHALLENGE
+          7. Fence-sitting / unclassified stagnation fallback → REQUIRE_FORCED_CHOICE
+
+        REQUIRE_STRUCTURAL_CHALLENGE is only selected when there is explicit
+        evidence of adversarial pressure deficit: the agent is producing
+        substantive reasoning (reasoning_delta "moderate" or "strong") but the
+        dialogue is still stagnating.  Generic stagnation without that evidence
+        no longer maps to structural challenge.
+
+        Post-dream recovery guard: ATTACK_OVERRIDE and REQUIRE_STRUCTURAL_CHALLENGE
+        are unconditionally blocked when in_recovery is True; a warning is logged.
         """
         # 1. Soft Fixy signal
         fixy_hint = IntegrationCore._read_fixy_soft_signal(state.fixy_last_message)
         if fixy_hint is not None:
-            logger.info(
+            # _read_fixy_soft_signal already emits an info-level [INTEGRATION-FIXY-SOFT]
+            # log with the matched keyword and selected mode.  Log the agent context
+            # here at debug level to avoid doubling the info log on every matching turn.
+            logger.debug(
                 "[INTEGRATION-FIXY-SOFT] agent=%s fixy_hint=%s",
                 state.agent_name,
                 fixy_hint.value,
             )
+            # Recovery guard: even Fixy hints cannot inject adversarial modes.
+            if in_recovery and fixy_hint in (
+                IntegrationMode.ATTACK_OVERRIDE,
+                IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+            ):
+                logger.warning(
+                    "[INTEGRATION-RECOVERY-SUPPRESS] blocked=%s "
+                    "reason='post_dream_recovery_turns=%d' "
+                    "agent=%s (fixy hint overridden)",
+                    fixy_hint.value,
+                    state.post_dream_recovery_turns,
+                    state.agent_name,
+                )
+                fixy_hint = IntegrationMode.REQUIRE_CONCRETE_CASE
             return IntegrationCore._decide_from_mode(state, fixy_hint)
 
         # 2. Repeated abstraction (no concrete grounding, no new move type)
@@ -2179,19 +2283,60 @@ class IntegrationCore:
 
         # 5. Unresolved accumulation
         if state.unresolved >= _UNRESOLVED_RESOLUTION_TRIGGER:
+            logger.info(
+                "[INTEGRATION-DECISION] unresolved overload -> REQUIRE_BRANCH_CLOSURE "
+                "agent=%s unresolved=%d progress=%.2f",
+                state.agent_name,
+                state.unresolved,
+                state.progress_after,
+            )
             return IntegrationCore._decide_from_mode(
                 state, IntegrationMode.REQUIRE_BRANCH_CLOSURE
             )
 
-        # 6. Adversarial pressure (only when not recovering from dream)
-        if not in_recovery:
+        # 6. Adversarial pressure deficit: real reasoning is happening
+        #    (reasoning_delta is moderate or strong) but dialogue is still
+        #    stagnating — structural challenge is genuinely needed.
+        _adversarial_delta = state.reasoning_delta not in (None, "none", "weak")
+        if _adversarial_delta and not in_recovery:
+            logger.info(
+                "[INTEGRATION-DECISION] adversarial pressure deficit "
+                "-> REQUIRE_STRUCTURAL_CHALLENGE "
+                "agent=%s reasoning_delta=%r",
+                state.agent_name,
+                state.reasoning_delta,
+            )
             return IntegrationCore._decide_from_mode(
                 state, IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
             )
 
-        # 7. Safe fallback
+        # Block structural challenge if recovery is active (defence-in-depth)
+        if _adversarial_delta and in_recovery:
+            logger.warning(
+                "[INTEGRATION-RECOVERY-SUPPRESS] blocked=REQUIRE_STRUCTURAL_CHALLENGE "
+                "reason='post_dream_recovery_turns=%d' agent=%s",
+                state.post_dream_recovery_turns,
+                state.agent_name,
+            )
+            logger.info(
+                "[INTEGRATION-FALLBACK] epistemic fallback selected=REQUIRE_FORCED_CHOICE "
+                "agent=%s (adversarial suppressed by recovery)",
+                state.agent_name,
+            )
+            return IntegrationCore._decide_from_mode(
+                state, IntegrationMode.REQUIRE_FORCED_CHOICE
+            )
+
+        # 7. Fence-sitting / unclassified stagnation → force a committed position
+        #    (safer than attacking when cause of stagnation is unclear)
+        logger.info(
+            "[INTEGRATION-FALLBACK] epistemic fallback selected=REQUIRE_FORCED_CHOICE "
+            "agent=%s stagnation=%.2f",
+            state.agent_name,
+            state.stagnation,
+        )
         return IntegrationCore._decide_from_mode(
-            state, IntegrationMode.REQUIRE_CONCRETE_CASE
+            state, IntegrationMode.REQUIRE_FORCED_CHOICE
         )
 
     @staticmethod
@@ -2199,7 +2344,31 @@ class IntegrationCore:
         state: IntegrationState,
         mode: IntegrationMode,
     ) -> ControlDecision:
-        """Build a ControlDecision for *mode* using the appropriate overlay."""
+        """Build a ControlDecision for *mode* using the appropriate overlay.
+
+        Post-dream recovery guard (defence-in-depth): when
+        ``state.post_dream_recovery_turns > 0`` and the requested *mode* is an
+        adversarial mode (ATTACK_OVERRIDE or REQUIRE_STRUCTURAL_CHALLENGE), the
+        mode is silently downgraded to REQUIRE_CONCRETE_CASE and a warning is
+        logged.  This guard is secondary to the early-return in
+        ``_apply_rules``; it exists to catch any future code path that could
+        bypass the primary guard.
+        """
+        _adversarial_modes = (
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+        )
+        # Recovery guard (defence-in-depth)
+        if state.post_dream_recovery_turns > 0 and mode in _adversarial_modes:
+            logger.warning(
+                "[INTEGRATION-RECOVERY-SUPPRESS] blocked=%s "
+                "reason='post_dream_recovery_turns=%d' agent=%s "
+                "(suppressed in _decide_from_mode)",
+                mode.value,
+                state.post_dream_recovery_turns,
+                state.agent_name,
+            )
+            mode = IntegrationMode.REQUIRE_CONCRETE_CASE
         _OVERLAY_MAP: Dict[IntegrationMode, str] = {
             IntegrationMode.REQUIRE_TEST: _OVERLAY_REQUIRE_TEST,
             IntegrationMode.REQUIRE_COUNTEREXAMPLE: _OVERLAY_REQUIRE_COUNTEREXAMPLE,
@@ -2225,10 +2394,6 @@ class IntegrationCore:
             "[INTEGRATION-DECISION] stagnation_intervention agent=%s mode=%s",
             state.agent_name,
             mode.value,
-        )
-        _adversarial_modes = (
-            IntegrationMode.ATTACK_OVERRIDE,
-            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
         )
         return ControlDecision(
             force_concrete_mode=(mode in (

@@ -13,7 +13,8 @@ Covers:
   6. Rule: fatigue -> LOW_COMPLEXITY
   7. Rule: is_loop + compliance flags no longer trigger FIXY_AUTHORITY_OVERRIDE
      (that rule was removed; FIXY_AUTHORITY_OVERRIDE is deprecated)
-  8. Rule: stagnation alone -> REQUIRE_STRUCTURAL_CHALLENGE (not ATTACK_OVERRIDE)
+  8. Rule: stagnation — REQUIRE_STRUCTURAL_CHALLENGE only when reasoning_delta is
+     "moderate"/"strong"; generic stagnation without evidence → REQUIRE_FORCED_CHOICE
   9. Rule: pressure misalignment -> overlay injected, mode=NORMAL
   10. No override when all signals are nominal -> mode=NORMAL, no regen
   11. build_prompt_overlay returns decision.prompt_overlay
@@ -269,23 +270,63 @@ class TestRuleFixyAuthority:
 
 
 # ---------------------------------------------------------------------------
-# 8. Rule: stagnation alone -> REQUIRE_STRUCTURAL_CHALLENGE
-#    (not ATTACK_OVERRIDE — that was the old coarse default)
+# 8. Rule: stagnation — REQUIRE_STRUCTURAL_CHALLENGE only with adversarial evidence
 # ---------------------------------------------------------------------------
 
 
 class TestRuleStagnationAttack:
-    def test_triggers_structural_challenge(self, core):
+    def test_stagnation_alone_does_not_trigger_structural_challenge(self, core):
+        """Generic stagnation without reasoning evidence should NOT produce
+        REQUIRE_STRUCTURAL_CHALLENGE.  Epistemic fallback (REQUIRE_FORCED_CHOICE)
+        is expected instead."""
         signals = _nominal_signals()
         signals["stagnation"] = 0.40
+        # reasoning_delta is None (default) → no adversarial evidence
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.active_mode not in (
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+        )
+        # Epistemic fallback should be selected
+        assert decision.active_mode == IntegrationMode.REQUIRE_FORCED_CHOICE
+
+    def test_triggers_structural_challenge_with_moderate_delta(self, core):
+        """When reasoning_delta is 'moderate', adversarial pressure is genuinely
+        needed — REQUIRE_STRUCTURAL_CHALLENGE should fire."""
+        signals = _nominal_signals()
+        signals["stagnation"] = 0.40
+        signals["reasoning_delta"] = "moderate"
         decision = core.evaluate_turn("Socrates", signals)
         assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
         assert decision.force_attack_mode is True
         assert decision.suppress_personality is True
 
+    def test_triggers_structural_challenge_with_strong_delta(self, core):
+        """When reasoning_delta is 'strong', adversarial pressure is genuinely
+        needed — REQUIRE_STRUCTURAL_CHALLENGE should fire."""
+        signals = _nominal_signals()
+        signals["stagnation"] = 0.40
+        signals["reasoning_delta"] = "strong"
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+        assert decision.force_attack_mode is True
+
     def test_not_triggered_below_threshold(self, core):
         signals = _nominal_signals()
         signals["stagnation"] = 0.10
+        decision = core.evaluate_turn("Socrates", signals)
+        assert decision.active_mode not in (
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+        )
+
+    def test_recovery_suppresses_structural_challenge_even_with_moderate_delta(self, core):
+        """REQUIRE_STRUCTURAL_CHALLENGE must be blocked during post-dream recovery
+        even when reasoning_delta is 'moderate'."""
+        signals = _nominal_signals()
+        signals["stagnation"] = 0.40
+        signals["reasoning_delta"] = "moderate"
+        signals["post_dream_recovery_turns"] = 1
         decision = core.evaluate_turn("Socrates", signals)
         assert decision.active_mode not in (
             IntegrationMode.ATTACK_OVERRIDE,
@@ -388,7 +429,7 @@ class TestPriorityFixyBeforeConcrete:
         # Both rules would fire
         signals["semantic_repeat"] = True
         signals["loop_count"] = 2
-        signals["stagnation"] = 0.40  # would trigger REQUIRE_STRUCTURAL_CHALLENGE
+        signals["stagnation"] = 0.40  # would trigger epistemic fallback alone
         decision = core.evaluate_turn("Socrates", signals)
         # semantic_repeat + loop_count >= 1 fires CONCRETE_OVERRIDE (via personality suppression)
         assert decision.active_mode in (
@@ -407,7 +448,7 @@ class TestPriorityConcreteBeforeAttack:
         signals = _nominal_signals()
         signals["semantic_repeat"] = True
         signals["loop_count"] = 1
-        signals["stagnation"] = 0.30  # would trigger REQUIRE_STRUCTURAL_CHALLENGE alone
+        signals["stagnation"] = 0.30  # would trigger epistemic fallback alone
         decision = core.evaluate_turn("Socrates", signals)
         # semantic_repeat + loop_count >= 1 should fire CONCRETE_OVERRIDE first
         assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
@@ -688,17 +729,24 @@ class TestValidateGeneratedOutput:
         # REQUIRE_BRANCH_CLOSURE is an informational overlay; no hard text gate
         assert compliant is True
 
-    # REQUIRE_STRUCTURAL_CHALLENGE (replaces ATTACK_OVERRIDE as stagnation default) ──
+    # REQUIRE_STRUCTURAL_CHALLENGE (only fires with adversarial evidence) ──
 
     def test_structural_challenge_passes_with_challenge_signal(self, core):
-        decision = self._decision_for(core, {"stagnation": 0.5})
+        # reasoning_delta="moderate" provides adversarial evidence
+        decision = self._decision_for(
+            core, {"stagnation": 0.5, "reasoning_delta": "moderate"}
+        )
         assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
         text = "That reasoning is flawed because it ignores the empirical evidence."
         compliant, _ = core.validate_generated_output(text, decision)
         assert compliant is True
 
     def test_structural_challenge_fails_without_challenge(self, core):
-        decision = self._decision_for(core, {"stagnation": 0.5})
+        # reasoning_delta="moderate" provides adversarial evidence
+        decision = self._decision_for(
+            core, {"stagnation": 0.5, "reasoning_delta": "moderate"}
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
         text = "I largely agree with what you have said and find it reasonable."
         compliant, reason = core.validate_generated_output(text, decision)
         assert compliant is False
@@ -1756,13 +1804,19 @@ class TestReadFixySoftSignal:
     def test_no_resolution_maps_to_require_branch_closure(self):
         assert self._parse_fixy_hint("We have no resolution to the core tension.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
-    # Priority: REQUIRE_NEW_VARIABLE is checked first ────────────────────────
+    # Priority: REQUIRE_TEST is highest ─────────────────────────────────────
 
-    def test_new_variable_takes_priority_over_falsifiability(self):
-        """When a message contains both variable and falsifiability signals,
-        REQUIRE_NEW_VARIABLE wins (checked first)."""
+    def test_test_takes_priority_over_new_variable(self):
+        """REQUIRE_TEST has higher priority than REQUIRE_NEW_VARIABLE.
+        When a message contains both variable and falsifiability signals,
+        REQUIRE_TEST wins."""
         msg = "We are missing a new variable and the claim is not falsifiable."
-        assert self._parse_fixy_hint(msg) == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint(msg) == IntegrationMode.REQUIRE_TEST
+
+    def test_test_takes_priority_over_branch_closure(self):
+        """REQUIRE_TEST has higher priority than REQUIRE_BRANCH_CLOSURE."""
+        msg = "There is no closure, and the claim is not falsifiable."
+        assert self._parse_fixy_hint(msg) == IntegrationMode.REQUIRE_TEST
 
     # Case-insensitivity ───────────────────────────────────────────────────────
 
@@ -1790,14 +1844,25 @@ class TestFixySoftSignalIntegration:
             signals["fixy_last_message"] = fixy_msg
         return signals
 
-    def test_no_fixy_hint_gives_structural_challenge(self, core):
-        """Without a Fixy hint the adversarial-pressure fallback fires."""
+    def test_no_fixy_hint_gives_epistemic_fallback(self, core):
+        """Without a Fixy hint and no adversarial evidence, epistemic fallback fires."""
         decision = core.evaluate_turn("Socrates", self._stagnation_signals())
-        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+        # reasoning_delta=None → no adversarial evidence → REQUIRE_FORCED_CHOICE
+        assert decision.active_mode == IntegrationMode.REQUIRE_FORCED_CHOICE
+        assert decision.active_mode not in (
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+        )
 
     def test_missing_variable_hint_selects_require_new_variable(self, core):
         decision = core.evaluate_turn(
             "Socrates", self._stagnation_signals("I notice a missing variable here.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_hidden_variable_hint_selects_require_new_variable(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("There is a hidden variable here.")
         )
         assert decision.active_mode == IntegrationMode.REQUIRE_NEW_VARIABLE
 
@@ -1807,9 +1872,44 @@ class TestFixySoftSignalIntegration:
         )
         assert decision.active_mode == IntegrationMode.REQUIRE_TEST
 
+    def test_falsifiability_keyword_selects_require_test(self, core):
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("We need to check the falsifiability of this claim."),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
+    def test_observable_condition_selects_require_test(self, core):
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("What observable condition would refute this?"),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
+    def test_measurable_selects_require_test(self, core):
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("Is this claim measurable?"),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
+    def test_experiment_selects_require_test(self, core):
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("Can we design an experiment to verify this?"),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
     def test_conceptual_fog_hint_selects_require_concrete_case(self, core):
         decision = core.evaluate_turn(
             "Socrates", self._stagnation_signals("Too much conceptual fog here.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_too_abstract_hint_selects_require_concrete_case(self, core):
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("This is too abstract to be useful."),
         )
         assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
 
@@ -1819,14 +1919,62 @@ class TestFixySoftSignalIntegration:
         )
         assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
 
-    def test_unrelated_fixy_hint_falls_through_to_default(self, core):
-        """An unrecognised Fixy hint falls through to the normal stagnation logic."""
+    def test_circular_hint_selects_require_branch_closure(self, core):
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("The dialogue is becoming circular."),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_looping_without_resolution_selects_branch_closure(self, core):
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("We are looping without resolution."),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_priority_test_over_new_variable(self, core):
+        """REQUIRE_TEST has higher priority than REQUIRE_NEW_VARIABLE."""
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals(
+                "There is a missing variable and the claim is not falsifiable."
+            ),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
+    def test_priority_test_over_branch_closure(self, core):
+        """REQUIRE_TEST has higher priority than REQUIRE_BRANCH_CLOSURE."""
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals(
+                "No closure, and I need falsifiability here."
+            ),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
+    def test_priority_branch_closure_over_concrete_case(self, core):
+        """REQUIRE_BRANCH_CLOSURE has higher priority than REQUIRE_CONCRETE_CASE."""
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals(
+                "Too abstract and there is no closure on the open branch."
+            ),
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_unrelated_fixy_hint_falls_through_to_epistemic_fallback(self, core):
+        """An unrecognised Fixy hint falls through; epistemic fallback fires."""
         decision = core.evaluate_turn(
             "Socrates",
             self._stagnation_signals("Interesting point, keep going."),
         )
-        # No matching hint → falls through; adversarial-pressure fallback
-        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+        # No matching hint → falls through; reasoning_delta=None → REQUIRE_FORCED_CHOICE
+        assert decision.active_mode == IntegrationMode.REQUIRE_FORCED_CHOICE
+        assert decision.active_mode not in (
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+        )
 
     def test_post_dream_recovery_suppresses_structural_challenge(self, core):
         """Post-dream recovery prevents REQUIRE_STRUCTURAL_CHALLENGE from firing."""
@@ -1836,3 +1984,19 @@ class TestFixySoftSignalIntegration:
         # In recovery → DREAM_RECOVERY fires before stagnation rule
         assert decision.active_mode == IntegrationMode.DREAM_RECOVERY
         assert decision.active_mode != IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+
+    def test_recovery_guard_in_decide_from_mode_blocks_attack(self, core):
+        """The defence-in-depth guard in _decide_from_mode blocks adversarial modes
+        when post_dream_recovery_turns > 0."""
+        from entelgia.integration_core import IntegrationState
+        state = IntegrationState(
+            agent_name="Socrates",
+            stagnation=0.40,
+            reasoning_delta="moderate",
+            post_dream_recovery_turns=2,
+        )
+        decision = core._decide_from_mode(state, IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE)
+        # Should be downgraded to REQUIRE_CONCRETE_CASE by the recovery guard
+        assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert decision.force_attack_mode is False
+
