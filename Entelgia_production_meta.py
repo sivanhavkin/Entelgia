@@ -377,7 +377,7 @@ except ImportError:
     def _pe_detect_stagnation(recent_scores, recent_move_types):  # type: ignore[no-redef]
         return False, ""
 
-    def _pe_intervention_policy(stagnation_reason):  # type: ignore[no-redef]
+    def _pe_intervention_policy(stagnation_reason, in_recovery: bool = False):  # type: ignore[no-redef]
         return "REQUIRE_COMMITMENT"
 
     def _pe_regen_instruction():  # type: ignore[no-redef]
