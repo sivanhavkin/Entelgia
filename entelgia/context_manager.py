@@ -512,7 +512,15 @@ class ContextManager:
 
 
 def _get_ctx_semantic_model() -> Optional["_SentenceTransformer"]:
-    """Lazily load and cache the SentenceTransformer model for memory retrieval."""
+    """Lazily load and cache the SentenceTransformer model for memory retrieval.
+
+    On first call the model is loaded and stored in *_CTX_ST_MODEL*.  If the
+    load fails *_CTX_SEMANTIC_AVAILABLE* is flipped to ``False`` so that every
+    subsequent call returns ``None`` immediately without retrying the load.
+    """
+    # Both module-level singletons are mutated: _CTX_ST_MODEL is populated on
+    # success; _CTX_SEMANTIC_AVAILABLE is cleared to False on failure so we
+    # never attempt a costly re-load in the same session.
     global _CTX_ST_MODEL, _CTX_SEMANTIC_AVAILABLE
     if not _CTX_SEMANTIC_AVAILABLE:
         return None
@@ -530,7 +538,7 @@ def _get_ctx_semantic_model() -> Optional["_SentenceTransformer"]:
                 "disabling semantic scoring for this session.",
                 exc,
             )
-            _CTX_SEMANTIC_AVAILABLE = False
+            _CTX_SEMANTIC_AVAILABLE = False  # cache failure; skip retries
     return _CTX_ST_MODEL
 
 
