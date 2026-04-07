@@ -7,6 +7,7 @@ Target: raise coverage from ~45% to ≥99%.
 
 from __future__ import annotations
 
+import builtins
 import hashlib
 import json
 import os
@@ -15,6 +16,10 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import importlib
+import logging
+import warnings
 
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock, call
@@ -54,6 +59,20 @@ from Entelgia_production_meta import (
     TOPIC_CLUSTERS,
     TOPIC_ANCHORS,
 )
+
+
+# ============================================================================
+# Module-level autouse fixture: isolate global state between tests
+# ============================================================================
+
+@pytest.fixture(autouse=True)
+def _restore_meta_globals(monkeypatch):
+    """Restore _meta.CFG and clear _shutdown_event after every test."""
+    original_cfg = _meta.CFG
+    _meta._shutdown_event.clear()
+    yield
+    monkeypatch.setattr(_meta, "CFG", original_cfg)
+    _meta._shutdown_event.clear()
 
 
 # ============================================================================
@@ -108,30 +127,68 @@ def mock_response(text="Test response", backend="ollama"):
 # ============================================================================
 
 class TestWindowsEncoding:
-    """Lines 70-72: Windows encoding path (simulated)."""
+    """Lines 70-72: Windows encoding path — covered via module reload with patched platform."""
 
-    def test_win32_path_not_triggered_on_linux(self):
-        # On Linux sys.platform != "win32"; lines 71-72 remain uncovered by design
-        # We simulate it via patching to cover those lines
-        import io as _io
-        fake_buf = MagicMock()
-        fake_buf.write = MagicMock()
-        fake_stdout = _io.TextIOWrapper(fake_buf, encoding="utf-8", errors="replace") if False else None
-        # Just confirm we don't crash importing the module on this platform
-        assert sys.platform != "win32" or _meta is not None
+    def test_win32_encoding_branch_via_reload(self):
+        """Patch sys.platform to 'win32' then reload the module so lines 71-72 execute."""
+        import io
+        import builtins
+
+        fake_buffer = MagicMock()
+        fake_buffer.write = MagicMock()
+
+        # Provide a real buffer-like object so TextIOWrapper.__init__ succeeds
+        real_buf = io.BytesIO()
+        fake_stdout = MagicMock()
+        fake_stdout.buffer = real_buf
+        fake_stderr = MagicMock()
+        fake_stderr.buffer = real_buf
+
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        original_platform = sys.platform
+
+        try:
+            sys.platform = "win32"
+            sys.stdout = fake_stdout
+            sys.stderr = fake_stderr
+
+            # Reload so the `if sys.platform == "win32":` block is reached
+            importlib.reload(_meta)
+        finally:
+            sys.platform = original_platform
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            # Reload back to normal state so other tests aren't affected
+            importlib.reload(_meta)
+
+        # If we got here without an exception, the branch executed
+        assert True
 
     def test_dotenv_import_error_path(self):
-        """Lines 78-81: dotenv import warning."""
-        import warnings
-        with warnings.catch_warnings(record=True) as w:
+        """Lines 78-81: cover the except ImportError: branch for dotenv via reload."""
+        original_import = builtins.__import__
+
+        def _blocking_import(name, *args, **kwargs):
+            if name == "dotenv":
+                raise ImportError("dotenv blocked for test")
+            return original_import(name, *args, **kwargs)
+
+        import builtins as _builtins
+        with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            # Simulate the dotenv ImportError by calling its warning directly
-            warnings.warn(
-                "python-dotenv is not installed; .env file will not be loaded. "
-                "Install it with: pip install python-dotenv",
-                stacklevel=1,
-            )
-        assert len(w) >= 1
+            with patch.object(_builtins, "__import__", side_effect=_blocking_import):
+                importlib.reload(_meta)
+
+        # Restore module to a working state after the test
+        importlib.reload(_meta)
+
+        # The reload should have emitted the dotenv warning
+        dotenv_warnings = [
+            w for w in caught
+            if "python-dotenv" in str(w.message) or "dotenv" in str(w.message).lower()
+        ]
+        assert len(dotenv_warnings) >= 1
 
 
 # ============================================================================
@@ -506,9 +563,16 @@ class TestConfigValidation:
             Config(backend_fixy="anthropic", anthropic_api_key="")
 
     def test_debug_mode_sets_log_level(self):
-        import logging
-        cfg = Config(debug=True)
-        assert logging.getLogger().level == logging.DEBUG
+        root_logger = logging.getLogger()
+        previous_level = root_logger.level
+        previous_handlers = root_logger.handlers[:]
+        try:
+            cfg = Config(debug=True)
+            assert root_logger.level == logging.DEBUG
+        finally:
+            root_logger.setLevel(previous_level)
+            root_logger.handlers.clear()
+            root_logger.handlers.extend(previous_handlers)
 
 
 # ============================================================================
@@ -553,7 +617,8 @@ class TestMetricsTracker:
         mt = MetricsTracker(path)
         mt.save()
         assert os.path.exists(path)
-        data = json.loads(open(path).read())
+        with open(path) as f:
+            data = json.load(f)
         assert "end_time" in data
 
     def test_hit_rate_zero(self, tmp_path):
@@ -1009,7 +1074,11 @@ class TestMemoryCore:
         mc.ltm_insert("Socrates", "conscious", "Important memory", emotion="neutral",
                       emotion_intensity=0.1, importance=0.95)
         result = mc.ltm_search_affective("Socrates", limit=5)
-        assert len(result) >= 0
+        assert isinstance(result, list)
+        assert len(result) >= 1
+        assert all("content" in m and "layer" in m for m in result)
+        returned_texts = {m["content"] for m in result}
+        assert {"Sad memory", "Important memory"} & returned_texts
 
     def test_ltm_search_affective_with_weight(self, tmp_path):
         cfg = make_cfg(tmp_path)
