@@ -2000,3 +2000,41 @@ class TestFixySoftSignalIntegration:
         assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
         assert decision.force_attack_mode is False
 
+    def test_adversarial_delta_in_recovery_falls_back_to_concrete_case(self, core):
+        """When reasoning_delta is moderate/strong but post_dream recovery is active,
+        _decide_stagnation_intervention must fall back to REQUIRE_CONCRETE_CASE
+        (not REQUIRE_FORCED_CHOICE) so the agent is guided toward concreteness."""
+        from entelgia.integration_core import IntegrationState
+        state = IntegrationState(
+            agent_name="Athena",
+            stagnation=0.45,
+            reasoning_delta="moderate",
+            abstraction_detected=False,
+            semantic_repeat=False,
+            unresolved=0,
+            post_dream_recovery_turns=1,
+        )
+        decision = core._decide_stagnation_intervention(state, in_recovery=True)
+        assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert decision.active_mode not in (
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_FORCED_CHOICE,
+        )
+
+    def test_adversarial_delta_in_recovery_strong_delta_concrete_case(self, core):
+        """Same as above but with reasoning_delta='strong'."""
+        from entelgia.integration_core import IntegrationState
+        state = IntegrationState(
+            agent_name="Socrates",
+            stagnation=0.55,
+            reasoning_delta="strong",
+            abstraction_detected=False,
+            semantic_repeat=False,
+            unresolved=0,
+            post_dream_recovery_turns=2,
+        )
+        decision = core._decide_stagnation_intervention(state, in_recovery=True)
+        assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert decision.active_mode != IntegrationMode.REQUIRE_FORCED_CHOICE
+

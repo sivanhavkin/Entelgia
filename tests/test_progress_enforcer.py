@@ -472,6 +472,26 @@ class TestGetInterventionPolicy:
     def test_unknown_reason_returns_commitment(self):
         assert pe.get_intervention_policy("unknown_reason") == "REQUIRE_COMMITMENT"
 
+    # -- post-dream recovery suppression ---
+
+    def test_repeated_moves_in_recovery_returns_evidence_not_attack(self):
+        """REQUIRE_ATTACK must be suppressed during post-dream recovery."""
+        policy = pe.get_intervention_policy("repeated_moves", in_recovery=True)
+        assert policy == "REQUIRE_EVIDENCE"
+        assert policy != "REQUIRE_ATTACK"
+
+    def test_low_scores_in_recovery_unchanged(self):
+        """REQUIRE_COMMITMENT is not adversarial; recovery does not change it."""
+        assert pe.get_intervention_policy("low_scores", in_recovery=True) == "REQUIRE_COMMITMENT"
+
+    def test_no_state_change_in_recovery_unchanged(self):
+        """REQUIRE_EVIDENCE is already concreteness-seeking; recovery leaves it."""
+        assert pe.get_intervention_policy("no_state_change", in_recovery=True) == "REQUIRE_EVIDENCE"
+
+    def test_in_recovery_false_preserves_attack_for_repeated_moves(self):
+        """Explicit in_recovery=False should preserve the normal REQUIRE_ATTACK mapping."""
+        assert pe.get_intervention_policy("repeated_moves", in_recovery=False) == "REQUIRE_ATTACK"
+
 
 # ===========================================================================
 # 7.  build_intervention_instruction

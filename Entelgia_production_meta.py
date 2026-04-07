@@ -377,7 +377,7 @@ except ImportError:
     def _pe_detect_stagnation(recent_scores, recent_move_types):  # type: ignore[no-redef]
         return False, ""
 
-    def _pe_intervention_policy(stagnation_reason):  # type: ignore[no-redef]
+    def _pe_intervention_policy(stagnation_reason, in_recovery: bool = False):  # type: ignore[no-redef]
         return "REQUIRE_COMMITMENT"
 
     def _pe_regen_instruction():  # type: ignore[no-redef]
@@ -4543,6 +4543,11 @@ class Agent:
         # Move type is set by speak() and is not modified by semantic validation.
         self._last_pe_score: float = 0.0
         self._last_pe_move: str = ""
+        # ── Post-dream recovery tracking ──────────────────────────────────────
+        # Remaining turns in post-dream recovery mode.  While > 0, aggressive
+        # intervention policies (REQUIRE_ATTACK) are suppressed in speak().
+        # Updated by MainScript after each dream cycle completes and each turn.
+        self.post_dream_recovery_turns: int = 0
         # ── Anti-repetition form tracking ─────────────────────────────────────
         # Tracks the last 3 rhetorical forms used by this agent.  The same
         # form must not be used more than 2 consecutive turns.
@@ -6556,7 +6561,16 @@ class Agent:
             _pe_get_moves(self.name),
         )
         if _pe_stagnant:
-            _pe_policy = _pe_intervention_policy(_pe_stag_reason)
+            _pe_policy = _pe_intervention_policy(
+                _pe_stag_reason, in_recovery=self.post_dream_recovery_turns > 0
+            )
+            if self.post_dream_recovery_turns > 0 and _pe_stag_reason == "repeated_moves":
+                logger.warning(
+                    "[DREAM-RECOVERY] REQUIRE_ATTACK suppressed -> REQUIRE_EVIDENCE "
+                    "agent=%s recovery_turns=%d",
+                    self.name,
+                    self.post_dream_recovery_turns,
+                )
             logger.info(
                 "[STAGNATION] agent=%s reason=%s",
                 self.name,
@@ -8821,6 +8835,7 @@ class MainScript:
             # turns that may be spoken by other agents.
             if speaker.name in _post_dream_recovery and _post_dream_recovery[speaker.name] > 0:
                 _post_dream_recovery[speaker.name] -= 1
+                speaker.post_dream_recovery_turns = _post_dream_recovery[speaker.name]
                 if _post_dream_recovery[speaker.name] == 0:
                     logger.info(
                         "[DREAM-RECOVERY] agent=%s post-dream recovery mode ended",
@@ -9443,6 +9458,7 @@ class MainScript:
                     )
                     # Activate post-dream recovery mode for next 2 turns
                     _post_dream_recovery[_agent.name] = 2
+                    _agent.post_dream_recovery_turns = 2
                     logger.info(
                         "[DREAM-RECOVERY] agent=%s post-dream recovery mode active for next 2 turns",
                         _agent.name,
