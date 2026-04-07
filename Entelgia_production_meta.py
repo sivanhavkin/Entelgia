@@ -2723,7 +2723,7 @@ def _transition_unresolved_item(
     unresolved_topics: list,
     output_text: str,
     agent_name: str,
-) -> bool:
+) -> Optional[str]:
     """Select the highest-salience OPEN unresolved topic and transition its state.
 
     Examines *output_text* to determine the appropriate target state:
@@ -2735,8 +2735,8 @@ def _transition_unresolved_item(
     * ``_UT_STATE_TESTABLE`` — fallback: output contains test/measure/
       observe language but not full resolution.
 
-    Returns ``True`` when at least one item was transitioned, ``False``
-    when no OPEN items exist or the output contains no actionable signal.
+    Returns the target state string when an item was transitioned, or
+    ``None`` when no OPEN items exist or the output contains no actionable signal.
     """
     t = output_text.lower()
 
@@ -2761,7 +2761,7 @@ def _transition_unresolved_item(
     elif any(s in t for s in _TESTABLE_SIGNALS):
         target_state = _UT_STATE_TESTABLE
     else:
-        return False
+        return None
 
     # Select the highest-salience OPEN item
     open_items = [
@@ -2769,15 +2769,14 @@ def _transition_unresolved_item(
         if item.get("status") == _UT_STATE_OPEN
     ]
     if not open_items:
-        return False
+        return None
 
     # Sort by salience: intensity + conflict + log(repetition)
-    import math as _math
     open_items.sort(
         key=lambda i: (
             float(i.get("intensity", 0.0))
             + float(i.get("conflict", 0.0))
-            + _math.log(int(i.get("repetition", 1)) + 1)
+            + math.log(int(i.get("repetition", 1)) + 1)
         ),
         reverse=True,
     )
@@ -2792,7 +2791,7 @@ def _transition_unresolved_item(
         prev_state,
         target_state,
     )
-    return True
+    return target_state
 
 
 def _trim_to_word_limit(text: str, max_words: int) -> str:
@@ -8677,20 +8676,24 @@ class MainScript:
                         or speaker.open_questions >= _UT_TRIGGER
                     )
                     if _ut_active:
-                        _ut_transitioned = _transition_unresolved_item(
+                        _ut_new_state = _transition_unresolved_item(
                             speaker.unresolved_topics, out, speaker.name
                         )
+                        # Recount OPEN items after potential transition
                         _ut_open_remaining = sum(
                             1 for _t in speaker.unresolved_topics
                             if _t.get("status") == _UT_STATE_OPEN
                         )
-                        if _ut_transitioned:
-                            # Decrement open_questions to reflect the resolved item
-                            speaker.open_questions = max(0, speaker.open_questions - 1)
+                        if _ut_new_state is not None:
+                            # Only decrement open_questions when the item reached a
+                            # terminal state (RESOLVED or DISCARDED).  TESTABLE items
+                            # still require follow-up and remain in the active count.
+                            if _ut_new_state in (_UT_STATE_RESOLVED, _UT_STATE_DISCARDED):
+                                speaker.open_questions = max(0, speaker.open_questions - 1)
                             logger.info(
                                 "[STATE-TRANSITION-SUCCESS] mode=%s resolved=1 remaining=%d",
                                 _ut_mode.value,
-                                _ut_open_remaining - 1,
+                                _ut_open_remaining,
                             )
                         else:
                             logger.warning(
