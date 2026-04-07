@@ -2218,8 +2218,7 @@ class IntegrationCore:
           5. Unresolved count growing without closure → REQUIRE_BRANCH_CLOSURE
           6. Real reasoning happening but stagnating (reasoning_delta moderate/strong)
              AND not in recovery → REQUIRE_STRUCTURAL_CHALLENGE
-          7. Fence-sitting / unclassified stagnation → REQUIRE_FORCED_CHOICE
-          8. Fallback → REQUIRE_CONCRETE_CASE (epistemically safer than any attack)
+          7. Fence-sitting / unclassified stagnation fallback → REQUIRE_FORCED_CHOICE
 
         REQUIRE_STRUCTURAL_CHALLENGE is only selected when there is explicit
         evidence of adversarial pressure deficit: the agent is producing
@@ -2233,7 +2232,10 @@ class IntegrationCore:
         # 1. Soft Fixy signal
         fixy_hint = IntegrationCore._read_fixy_soft_signal(state.fixy_last_message)
         if fixy_hint is not None:
-            logger.info(
+            # _read_fixy_soft_signal already emits an info-level [INTEGRATION-FIXY-SOFT]
+            # log with the matched keyword and selected mode.  Log the agent context
+            # here at debug level to avoid doubling the info log on every matching turn.
+            logger.debug(
                 "[INTEGRATION-FIXY-SOFT] agent=%s fixy_hint=%s",
                 state.agent_name,
                 fixy_hint.value,
