@@ -618,7 +618,6 @@ class TestAgentStateInPrompt:
 # EnhancedMemoryIntegration – semantic search path
 # ---------------------------------------------------------------------------
 
-import importlib
 from unittest.mock import MagicMock, patch
 
 
@@ -746,6 +745,9 @@ class TestEnhancedMemoryIntegrationSemantic:
         """When a model is returned by _get_ctx_semantic_model, it is used to encode."""
         np = pytest.importorskip("numpy")
         import entelgia.context_manager as cm_module
+
+        if not cm_module._CTX_SEMANTIC_AVAILABLE:
+            pytest.skip("sentence-transformers / sklearn not installed")
 
         memories = self._memories()
         # Build a minimal mock model that returns plausible embeddings

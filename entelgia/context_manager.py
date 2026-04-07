@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 try:
     from sentence_transformers import SentenceTransformer as _SentenceTransformer
     from sklearn.metrics.pairwise import cosine_similarity as _cosine_similarity
-    import numpy as _np
 
     _CTX_ST_MODEL: Optional[_SentenceTransformer] = None
     _CTX_SEMANTIC_AVAILABLE = True
@@ -29,7 +28,6 @@ except ImportError:
     _CTX_SEMANTIC_AVAILABLE = False
     _CTX_ST_MODEL = None
     _cosine_similarity = None  # type: ignore[assignment]
-    _np = None  # type: ignore[assignment]
 
 #: Sentence-transformers model name used for semantic memory retrieval.
 _CTX_SEMANTIC_MODEL_NAME: str = "all-MiniLM-L6-v2"
@@ -515,7 +513,7 @@ class ContextManager:
 
 def _get_ctx_semantic_model() -> Optional["_SentenceTransformer"]:
     """Lazily load and cache the SentenceTransformer model for memory retrieval."""
-    global _CTX_ST_MODEL
+    global _CTX_ST_MODEL, _CTX_SEMANTIC_AVAILABLE
     if not _CTX_SEMANTIC_AVAILABLE:
         return None
     if _CTX_ST_MODEL is None:
@@ -528,8 +526,11 @@ def _get_ctx_semantic_model() -> Optional["_SentenceTransformer"]:
             logger.info("EnhancedMemoryIntegration: semantic model loaded.")
         except Exception as exc:  # pragma: no cover
             logger.warning(
-                "EnhancedMemoryIntegration: could not load semantic model: %s", exc
+                "EnhancedMemoryIntegration: could not load semantic model: %s — "
+                "disabling semantic scoring for this session.",
+                exc,
             )
+            _CTX_SEMANTIC_AVAILABLE = False
     return _CTX_ST_MODEL
 
 
