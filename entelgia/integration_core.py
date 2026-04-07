@@ -9,9 +9,14 @@ Fixy.  It reads signals from the current turn, integrates them through a
 priority-ordered rule engine, and produces a :class:`ControlDecision` that
 the main loop can use to regulate the next generation step.
 
-This is NOT a passive logger.  It can suppress personality, enforce Fixy
-authority, force concrete/resolution/attack modes, and flag responses for
+This is NOT a passive logger.  It can suppress personality, force
+concrete/resolution/attack/operationalisation modes, and flag responses for
 regeneration.
+
+Fixy is NOT a supervisor here.  Fixy participates in the dialogue as a
+conversational observer only.  The controller may read Fixy's last message
+as a *soft signal source* to select a more precise intervention type, but
+all enforcement decisions remain exclusively with IntegrationCore.
 
 Public API
 ----------
@@ -31,10 +36,19 @@ Integration modes
 NORMAL
 CONCRETE_OVERRIDE
 RESOLUTION_OVERRIDE
-ATTACK_OVERRIDE
-LOW_COMPLEXITY
+ATTACK_OVERRIDE           — structural adversarial challenge (use sparingly)
+LOW_COMPLEXITY            — fatigue/dream recovery; simplified output
 PERSONALITY_SUPPRESSION
-FIXY_AUTHORITY_OVERRIDE
+REQUIRE_TEST              — demand a falsifiable/testable claim
+REQUIRE_COUNTEREXAMPLE    — demand a genuine counterexample
+REQUIRE_NEW_VARIABLE      — demand introduction of a new conceptual variable
+REQUIRE_CONCRETE_CASE     — demand a concrete real-world case (non-adversarial)
+REQUIRE_BRANCH_CLOSURE    — demand closure of a long-open unresolved branch
+REQUIRE_FORCED_CHOICE     — demand a committed binary choice
+REQUIRE_STRUCTURAL_CHALLENGE — adversarial: challenge underlying structure
+DREAM_RECOVERY            — post-dream recovery; low-pressure, low-complexity
+# Kept for backward compatibility but no longer triggered as a hard rule:
+FIXY_AUTHORITY_OVERRIDE   — deprecated; maps to REQUIRE_CONCRETE_CASE at runtime
 
 Escalation levels
 -----------------
@@ -44,14 +58,33 @@ Escalation levels
 3 → FORMAT_ENFORCED
 4 → HARD_OVERRIDE (personality suppressed)
 
-Priority order (highest → lowest)
-----------------------------------
-1. Loop / semantic repetition
-2. Stagnation
-3. Unresolved overload
-4. Fatigue degradation
-5. Pressure misalignment
-6. Personality style preservation (default)
+State priority order (highest → lowest)
+----------------------------------------
+1. Dream / critical fatigue                (DREAM_RECOVERY / LOW_COMPLEXITY)
+2. Topic safety / coherence
+3. Loop break by operationalisation        (REQUIRE_TEST, REQUIRE_NEW_VARIABLE,
+                                            REQUIRE_CONCRETE_CASE, REQUIRE_BRANCH_CLOSURE,
+                                            REQUIRE_FORCED_CHOICE, REQUIRE_COUNTEREXAMPLE)
+4. Structural challenge / attack           (ATTACK_OVERRIDE / REQUIRE_STRUCTURAL_CHALLENGE)
+5. Style / personality                     (PERSONALITY_SUPPRESSION)
+6. Default                                 (NORMAL)
+
+Soft Fixy signal reading
+------------------------
+The controller may optionally read ``state.fixy_last_message`` to select a
+more semantically appropriate intervention.  This mapping is controller-owned;
+Fixy never calls enforcement functions directly.
+
+  "missing variable"       → REQUIRE_NEW_VARIABLE
+  "no falsifiability"      → REQUIRE_TEST
+  "conceptual fog/abstract loop" → REQUIRE_CONCRETE_CASE
+  "endless recursion/no closure" → REQUIRE_BRANCH_CLOSURE
+
+Post-dream recovery
+-------------------
+When ``state.post_dream_recovery_turns > 0``, ATTACK_OVERRIDE and
+REQUIRE_STRUCTURAL_CHALLENGE are suppressed.  Preference is given to
+LOW_COMPLEXITY, REQUIRE_CONCRETE_CASE, and REQUIRE_TEST.
 
 Future-ready hook
 -----------------
@@ -79,6 +112,7 @@ Logging tags
 [INTEGRATION-ESCALATION]    — escalation level assigned
 [INTEGRATION-PSEUDO-COMPLIANCE] — pseudo-compliance detection result
 [INTEGRATION-FORCE-REGEN]   — forced regeneration with reason
+[INTEGRATION-FIXY-SOFT]     — soft Fixy signal mapped to intervention type
 [PRE-GEN-STATE]             — normalised input signals before LLM call
 [PRE-GEN-DECISION]          — ControlDecision produced before LLM call
 [PRE-GEN-OVERLAY]           — overlay text injected into current prompt
@@ -276,10 +310,31 @@ class IntegrationMode(str, Enum):
     NORMAL = "NORMAL"
     CONCRETE_OVERRIDE = "CONCRETE_OVERRIDE"
     RESOLUTION_OVERRIDE = "RESOLUTION_OVERRIDE"
+    # Adversarial pressure — use only when the real issue is lack of adversarial
+    # pressure, not when the issue is lack of operationalisation.
     ATTACK_OVERRIDE = "ATTACK_OVERRIDE"
     LOW_COMPLEXITY = "LOW_COMPLEXITY"
     PERSONALITY_SUPPRESSION = "PERSONALITY_SUPPRESSION"
+    # Kept for backward compatibility; no longer triggered as a hard rule.
+    # At runtime it resolves to REQUIRE_CONCRETE_CASE behaviour.
     FIXY_AUTHORITY_OVERRIDE = "FIXY_AUTHORITY_OVERRIDE"
+    # --- Expanded operationalisation taxonomy ---
+    # Demand a falsifiable / testable claim
+    REQUIRE_TEST = "REQUIRE_TEST"
+    # Demand a genuine counterexample (not just hypothetical)
+    REQUIRE_COUNTEREXAMPLE = "REQUIRE_COUNTEREXAMPLE"
+    # Demand introduction of a new conceptual variable or dimension
+    REQUIRE_NEW_VARIABLE = "REQUIRE_NEW_VARIABLE"
+    # Demand a concrete real-world case (non-adversarial, grounds abstraction)
+    REQUIRE_CONCRETE_CASE = "REQUIRE_CONCRETE_CASE"
+    # Demand closure of a long-open unresolved branch
+    REQUIRE_BRANCH_CLOSURE = "REQUIRE_BRANCH_CLOSURE"
+    # Demand a committed binary choice (eliminates fence-sitting)
+    REQUIRE_FORCED_CHOICE = "REQUIRE_FORCED_CHOICE"
+    # Adversarial structural challenge (stronger/more targeted than ATTACK_OVERRIDE)
+    REQUIRE_STRUCTURAL_CHALLENGE = "REQUIRE_STRUCTURAL_CHALLENGE"
+    # Post-dream recovery mode: low pressure, low complexity for 1-2 turns
+    DREAM_RECOVERY = "DREAM_RECOVERY"
 
 
 class EscalationLevel(IntEnum):
@@ -385,6 +440,17 @@ class IntegrationState:
     status: str = "active"
     reasoning_delta: Optional[str] = None
     new_move_type: Optional[str] = None
+    # --- Soft Fixy signal source ---
+    # When set, the controller may read this as a soft hint to select a more
+    # semantically appropriate intervention type.  Fixy never calls enforcement
+    # functions; this field is populated by the main loop from Fixy's last
+    # spoken utterance.
+    fixy_last_message: Optional[str] = None
+    # --- Post-dream recovery tracking ---
+    # Number of remaining turns in post-dream recovery mode.  While > 0,
+    # aggressive forcing (ATTACK_OVERRIDE, REQUIRE_STRUCTURAL_CHALLENGE) is
+    # suppressed in favour of LOW_COMPLEXITY / REQUIRE_CONCRETE_CASE.
+    post_dream_recovery_turns: int = 0
 
 
 @dataclass
@@ -426,7 +492,7 @@ class ControlDecision:
     allow_response: bool = True
     regenerate: bool = False
     suppress_personality: bool = False
-    enforce_fixy: bool = False
+    enforce_fixy: bool = False  # deprecated: kept for backward compatibility
     force_concrete_mode: bool = False
     force_resolution_mode: bool = False
     force_attack_mode: bool = False
@@ -471,6 +537,64 @@ _OVERLAY_FIXY: str = (
 _OVERLAY_ATTACK: str = (
     "You must directly challenge the structural assumption in the opposing argument. "
     "Tone adjustment alone is not sufficient — override the reasoning structure."
+)
+
+# ---------------------------------------------------------------------------
+# Expanded intervention taxonomy overlays
+# ---------------------------------------------------------------------------
+
+_OVERLAY_REQUIRE_TEST: str = (
+    "REQUIRE TEST: Abstract claims are not enough. "
+    "You must propose at least one specific, falsifiable test or empirical criterion "
+    "that would distinguish your position from the alternative. "
+    "What observable result would prove you wrong? State it explicitly."
+)
+
+_OVERLAY_REQUIRE_COUNTEREXAMPLE: str = (
+    "REQUIRE COUNTEREXAMPLE: You must provide one genuine counterexample — "
+    "a specific real-world case that directly challenges the claim being made. "
+    "Hypothetical scenarios alone do not count. Name a person, event, or documented case."
+)
+
+_OVERLAY_REQUIRE_NEW_VARIABLE: str = (
+    "REQUIRE NEW VARIABLE: The dialogue has been restating the same claim with minor variations. "
+    "You must introduce a genuinely new conceptual variable or dimension "
+    "that has not appeared in the previous turns. "
+    "Do not rephrase existing points — open a new angle entirely."
+)
+
+_OVERLAY_REQUIRE_CONCRETE_CASE: str = (
+    "REQUIRE CONCRETE CASE: The discussion has remained too abstract. "
+    "You must ground your next response in a specific, concrete real-world case. "
+    "Name a real person, situation, or documented event — "
+    "not a hypothetical or abstract illustration."
+)
+
+_OVERLAY_REQUIRE_BRANCH_CLOSURE: str = (
+    "REQUIRE BRANCH CLOSURE: An open reasoning branch has gone unresolved for too long. "
+    "You must close, park, or explicitly resolve at least one open thread "
+    "before introducing any new claim. "
+    "State clearly: what was the open question, and what is your current position on it?"
+)
+
+_OVERLAY_REQUIRE_FORCED_CHOICE: str = (
+    "REQUIRE FORCED CHOICE: Stop hedging. "
+    "You must commit to one side of the main question — choose A or B. "
+    "No 'both are needed' synthesis, no qualifications, no deferral. "
+    "State your position and the single strongest reason for it."
+)
+
+_OVERLAY_REQUIRE_STRUCTURAL_CHALLENGE: str = (
+    "REQUIRE STRUCTURAL CHALLENGE: The opposing position has a structural flaw. "
+    "You must identify the specific assumption that makes the argument invalid and state "
+    "why accepting it leads to contradiction or uninstructive conclusions. "
+    "Mere disagreement with tone or degree is not sufficient."
+)
+
+_OVERLAY_DREAM_RECOVERY: str = (
+    "RECOVERY MODE: Keep this response short, concrete, and low-pressure. "
+    "One clear point only — plain language, short sentences. "
+    "No philosophical speculation in this turn."
 )
 
 # ---------------------------------------------------------------------------
@@ -1219,11 +1343,12 @@ class IntegrationCore:
           response must contain at least one concrete signal phrase and must
           not be pseudo-compliant.
         * ``RESOLUTION_OVERRIDE`` — response must contain resolution language.
-        * ``ATTACK_OVERRIDE`` — response must contain a structural challenge.
-        * ``LOW_COMPLEXITY`` — response word count must not exceed
-          :data:`_LOW_COMPLEXITY_MAX_WORDS`.
-        * ``FIXY_AUTHORITY_OVERRIDE`` / ``NORMAL`` — always pass (no
-          additional detectable textual obligation).
+        * ``ATTACK_OVERRIDE`` / ``REQUIRE_STRUCTURAL_CHALLENGE`` —
+          response must contain a structural challenge.
+        * ``LOW_COMPLEXITY`` / ``DREAM_RECOVERY`` — response word count must
+          not exceed :data:`_LOW_COMPLEXITY_MAX_WORDS`.
+        * All other modes — always pass (no additional detectable textual
+          obligation).
 
         **STRUCTURE_LOCK** (escalation_level >= :data:`_STRUCTURE_LOCK_LEVEL`):
           Applied regardless of active mode.  When engaged, (1) every required
@@ -1358,6 +1483,14 @@ class IntegrationCore:
                 f"Active mode {mode.value}: no structural challenge detected.",
             )
 
+        if mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE:
+            if any(s in t for s in _VALIDATE_ATTACK_SIGNALS):
+                return True, f"Active mode {mode.value}: structural challenge detected."
+            return (
+                False,
+                f"Active mode {mode.value}: no structural challenge detected.",
+            )
+
         if mode == IntegrationMode.LOW_COMPLEXITY:
             word_count = len(text.split())
             if word_count <= _LOW_COMPLEXITY_MAX_WORDS:
@@ -1365,6 +1498,15 @@ class IntegrationCore:
             return (
                 False,
                 f"Active mode {mode.value}: response too long ({word_count} words > {_LOW_COMPLEXITY_MAX_WORDS}).",
+            )
+
+        if mode == IntegrationMode.DREAM_RECOVERY:
+            word_count = len(text.split())
+            if word_count <= _LOW_COMPLEXITY_MAX_WORDS:
+                return True, f"Active mode {mode.value}: response length {word_count} words is acceptable."
+            return (
+                False,
+                f"Active mode {mode.value}: response too long in recovery ({word_count} words > {_LOW_COMPLEXITY_MAX_WORDS}).",
             )
 
         # Any other mode — no textual constraint defined, treat as compliant.
@@ -1820,35 +1962,54 @@ class IntegrationCore:
     # ------------------------------------------------------------------
 
     def _apply_rules(self, state: IntegrationState) -> ControlDecision:
-        """Apply priority-ordered rules and return the first matching decision."""
+        """Apply priority-ordered rules and return the first matching decision.
 
-        # Priority 1 — Loop / semantic repetition
-        if self._rule_fixy_authority(state):
-            return self._decide_fixy_authority(state)
+        State priority order (highest → lowest):
+          1. Dream / critical fatigue  → DREAM_RECOVERY or LOW_COMPLEXITY
+          2. Loop break by operationalisation → richer taxonomy
+          3. Stagnation (operationalisation before attack)
+          4. Unresolved overload → REQUIRE_BRANCH_CLOSURE
+          5. Structural challenge (adversarial pressure deficit only)
+          6. Personality suppression
+          7. Pressure misalignment
+          8. Default
 
+        Post-dream recovery suppression: when post_dream_recovery_turns > 0,
+        ATTACK_OVERRIDE and REQUIRE_STRUCTURAL_CHALLENGE are skipped.
+        """
+        in_recovery = state.post_dream_recovery_turns > 0
+
+        # Priority 1 — Dream / critical fatigue (recovery first)
+        if in_recovery:
+            return self._decide_dream_recovery(state)
+
+        if self._rule_fatigue_low_complexity(state):
+            return self._decide_fatigue_low_complexity(state)
+
+        # Priority 2 — Loop / semantic repetition (operationalisation-first)
         if self._rule_loop_concrete(state):
             return self._decide_loop_concrete(state)
 
         if self._rule_personality_suppression(state):
             return self._decide_personality_suppression(state)
 
-        # Priority 2 — Stagnation → attack (only if it structurally changes reasoning)
-        if self._rule_stagnation_attack(state):
-            return self._decide_stagnation_attack(state)
+        # Priority 3 — Stagnation: select intervention by stagnation type
+        if self._rule_stagnation(state):
+            return self._decide_stagnation_intervention(state, in_recovery)
 
-        # Priority 3 — Unresolved overload
+        # Priority 4 — Unresolved overload
         if self._rule_unresolved_resolution(state):
             return self._decide_unresolved_resolution(state)
 
-        # Priority 4 — Fatigue degradation
-        if self._rule_fatigue_low_complexity(state):
-            return self._decide_fatigue_low_complexity(state)
+        # Priority 5 — Structural challenge / attack (only when not in recovery)
+        if not in_recovery and self._rule_stagnation_attack(state):
+            return self._decide_stagnation_attack(state)
 
-        # Priority 5 — Pressure misalignment (measurement-only, advisory)
+        # Priority 6 — Pressure misalignment (advisory)
         if self._rule_pressure_misalignment(state):
             return self._decide_pressure_misalignment(state)
 
-        # Priority 6 — Default
+        # Priority 7 — Default
         return ControlDecision(
             active_mode=IntegrationMode.NORMAL,
             decision_reason="All signals within acceptable range. No override required.",
@@ -1858,11 +2019,6 @@ class IntegrationCore:
     # ------------------------------------------------------------------
     # Rule predicates
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _rule_fixy_authority(state: IntegrationState) -> bool:
-        """Fixy flagged loop AND compliance was only superficial."""
-        return state.is_loop and not state.compliance
 
     @staticmethod
     def _rule_loop_concrete(state: IntegrationState) -> bool:
@@ -1878,9 +2034,22 @@ class IntegrationCore:
         )
 
     @staticmethod
-    def _rule_stagnation_attack(state: IntegrationState) -> bool:
-        """Stagnation above suppression threshold (without semantic_repeat)."""
+    def _rule_stagnation(state: IntegrationState) -> bool:
+        """Stagnation above suppression threshold (primary stagnation gate)."""
         return state.stagnation >= _STAGNATION_SUPPRESS_THRESHOLD
+
+    @staticmethod
+    def _rule_stagnation_attack(state: IntegrationState) -> bool:
+        """Stagnation above suppression threshold without semantic_repeat.
+
+        Only fires when the real issue is adversarial pressure deficit —
+        i.e. no semantic loop detected (that is handled by loop rules) but
+        stagnation is significant.
+        """
+        return (
+            state.stagnation >= _STAGNATION_SUPPRESS_THRESHOLD
+            and not state.semantic_repeat
+        )
 
     @staticmethod
     def _rule_unresolved_resolution(state: IntegrationState) -> bool:
@@ -1901,25 +2070,186 @@ class IntegrationCore:
         return state.alignment not in ("aligned", "neutral")
 
     # ------------------------------------------------------------------
+    # Soft Fixy signal reader
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _read_fixy_soft_signal(fixy_message: Optional[str]) -> Optional[IntegrationMode]:
+        """Map Fixy's last spoken message to a preferred intervention type.
+
+        This mapping is controller-owned and advisory.  Fixy never calls
+        enforcement functions.  The result is only a *hint* used to select
+        a more semantically appropriate intervention when stagnation is
+        detected.
+
+        Parameters
+        ----------
+        fixy_message:
+            The last utterance emitted by Fixy in the dialogue, or ``None``.
+
+        Returns
+        -------
+        Optional[IntegrationMode]
+            Preferred mode suggested by Fixy's content, or ``None`` when
+            no recognisable signal is present.
+        """
+        if not fixy_message:
+            return None
+        m = fixy_message.lower()
+        # "missing variable" / "new dimension" / "new variable"
+        if any(k in m for k in ("missing variable", "new variable", "new dimension",
+                                 "introduce a variable", "new concept")):
+            return IntegrationMode.REQUIRE_NEW_VARIABLE
+        # "no falsifiability" / "not falsifiable" / "untestable"
+        if any(k in m for k in ("falsif", "testable", "testability", "untestable",
+                                  "no criterion", "no test", "cannot be tested")):
+            return IntegrationMode.REQUIRE_TEST
+        # "conceptual fog" / "too abstract" / "abstract loop"
+        if any(k in m for k in ("abstract loop", "conceptual fog", "too abstract",
+                                  "no concrete", "grounding", "concretize")):
+            return IntegrationMode.REQUIRE_CONCRETE_CASE
+        # "endless recursion" / "no closure" / "open branch"
+        if any(k in m for k in ("no closure", "open branch", "endless recursion",
+                                  "unresolved", "close this", "no resolution")):
+            return IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        return None
+
+    # ------------------------------------------------------------------
     # Decision builders
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _decide_fixy_authority(state: IntegrationState) -> ControlDecision:
+    def _decide_dream_recovery(state: IntegrationState) -> ControlDecision:
         reason = (
-            f"Fixy flagged loop (is_loop=True) and agent '{state.agent_name}' "
-            "showed only superficial compliance (compliance=False). "
-            "Fixy authority override is mandatory."
+            f"Post-dream recovery mode active for agent '{state.agent_name}' "
+            f"(remaining_turns={state.post_dream_recovery_turns}). "
+            "Suppressing aggressive forcing. Low-complexity recovery preferred."
         )
         return ControlDecision(
-            regenerate=True,
-            suppress_personality=True,
-            enforce_fixy=True,
-            force_concrete_mode=True,
-            prompt_overlay=_OVERLAY_FIXY,
+            low_complexity_mode=True,
+            prompt_overlay=_OVERLAY_DREAM_RECOVERY,
             decision_reason=reason,
-            priority_level=_PRIORITY_LOOP,
-            active_mode=IntegrationMode.FIXY_AUTHORITY_OVERRIDE,
+            priority_level=_PRIORITY_LOOP,  # highest, to pre-empt all other rules
+            active_mode=IntegrationMode.DREAM_RECOVERY,
+        )
+
+    @staticmethod
+    def _decide_stagnation_intervention(
+        state: IntegrationState, in_recovery: bool
+    ) -> ControlDecision:
+        """Select the most appropriate stagnation intervention.
+
+        Decision policy (priority order):
+          1. Fixy soft signal (controller-owned mapping)
+          2. Repeated abstraction with no falsifier → REQUIRE_TEST
+          3. Same claim restated with only rhetorical variation → REQUIRE_NEW_VARIABLE
+          4. Discussion remains abstract for too many turns → REQUIRE_CONCRETE_CASE
+          5. Unresolved count growing without closure → REQUIRE_BRANCH_CLOSURE
+          6. Adversarial pressure deficit (not in recovery) → REQUIRE_STRUCTURAL_CHALLENGE
+             / ATTACK_OVERRIDE
+          7. Fallback → REQUIRE_CONCRETE_CASE (safer default than ATTACK_OVERRIDE)
+        """
+        # 1. Soft Fixy signal
+        fixy_hint = IntegrationCore._read_fixy_soft_signal(state.fixy_last_message)
+        if fixy_hint is not None:
+            logger.info(
+                "[INTEGRATION-FIXY-SOFT] agent=%s fixy_hint=%s",
+                state.agent_name,
+                fixy_hint.value,
+            )
+            return IntegrationCore._decide_from_mode(state, fixy_hint)
+
+        # 2. Repeated abstraction (no concrete grounding, no new move type)
+        if state.abstraction_detected and state.new_move_type in (
+            None, "none", "example_only"
+        ):
+            return IntegrationCore._decide_from_mode(
+                state, IntegrationMode.REQUIRE_TEST
+            )
+
+        # 3. Same claim restated (semantic loop, weak reasoning delta, move not new)
+        if state.semantic_repeat and state.reasoning_delta in ("none", "weak"):
+            # Determine whether the issue is lack of variable or lack of concreteness
+            if state.new_move_type in ("none", None):
+                return IntegrationCore._decide_from_mode(
+                    state, IntegrationMode.REQUIRE_NEW_VARIABLE
+                )
+            return IntegrationCore._decide_from_mode(
+                state, IntegrationMode.REQUIRE_CONCRETE_CASE
+            )
+
+        # 4. Abstract stagnation (no structural progress)
+        if state.abstraction_detected:
+            return IntegrationCore._decide_from_mode(
+                state, IntegrationMode.REQUIRE_CONCRETE_CASE
+            )
+
+        # 5. Unresolved accumulation
+        if state.unresolved >= _UNRESOLVED_RESOLUTION_TRIGGER:
+            return IntegrationCore._decide_from_mode(
+                state, IntegrationMode.REQUIRE_BRANCH_CLOSURE
+            )
+
+        # 6. Adversarial pressure (only when not recovering from dream)
+        if not in_recovery:
+            return IntegrationCore._decide_from_mode(
+                state, IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+            )
+
+        # 7. Safe fallback
+        return IntegrationCore._decide_from_mode(
+            state, IntegrationMode.REQUIRE_CONCRETE_CASE
+        )
+
+    @staticmethod
+    def _decide_from_mode(
+        state: IntegrationState,
+        mode: IntegrationMode,
+    ) -> ControlDecision:
+        """Build a ControlDecision for *mode* using the appropriate overlay."""
+        _OVERLAY_MAP: Dict[IntegrationMode, str] = {
+            IntegrationMode.REQUIRE_TEST: _OVERLAY_REQUIRE_TEST,
+            IntegrationMode.REQUIRE_COUNTEREXAMPLE: _OVERLAY_REQUIRE_COUNTEREXAMPLE,
+            IntegrationMode.REQUIRE_NEW_VARIABLE: _OVERLAY_REQUIRE_NEW_VARIABLE,
+            IntegrationMode.REQUIRE_CONCRETE_CASE: _OVERLAY_REQUIRE_CONCRETE_CASE,
+            IntegrationMode.REQUIRE_BRANCH_CLOSURE: _OVERLAY_REQUIRE_BRANCH_CLOSURE,
+            IntegrationMode.REQUIRE_FORCED_CHOICE: _OVERLAY_REQUIRE_FORCED_CHOICE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE: _OVERLAY_REQUIRE_STRUCTURAL_CHALLENGE,
+            IntegrationMode.DREAM_RECOVERY: _OVERLAY_DREAM_RECOVERY,
+            IntegrationMode.ATTACK_OVERRIDE: _OVERLAY_ATTACK,
+            IntegrationMode.CONCRETE_OVERRIDE: _OVERLAY_CONCRETE,
+            IntegrationMode.REQUIRE_COUNTEREXAMPLE: _OVERLAY_REQUIRE_COUNTEREXAMPLE,
+        }
+        overlay = _OVERLAY_MAP.get(mode, _OVERLAY_CONCRETE)
+        reason = (
+            f"Stagnation intervention for agent '{state.agent_name}': "
+            f"selected mode={mode.value} "
+            f"(stagnation={state.stagnation:.2f} semantic_repeat={state.semantic_repeat} "
+            f"abstraction={state.abstraction_detected} "
+            f"reasoning_delta={state.reasoning_delta!r} "
+            f"new_move_type={state.new_move_type!r})."
+        )
+        logger.info(
+            "[INTEGRATION-DECISION] stagnation_intervention agent=%s mode=%s",
+            state.agent_name,
+            mode.value,
+        )
+        _adversarial_modes = (
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+        )
+        return ControlDecision(
+            force_concrete_mode=(mode in (
+                IntegrationMode.REQUIRE_CONCRETE_CASE,
+                IntegrationMode.REQUIRE_COUNTEREXAMPLE,
+                IntegrationMode.CONCRETE_OVERRIDE,
+            )),
+            force_attack_mode=(mode in _adversarial_modes),
+            suppress_personality=(mode in _adversarial_modes),
+            prompt_overlay=overlay,
+            decision_reason=reason,
+            priority_level=_PRIORITY_STAGNATION,
+            active_mode=mode,
         )
 
     @staticmethod
@@ -1990,16 +2320,17 @@ class IntegrationCore:
     @staticmethod
     def _decide_stagnation_attack(state: IntegrationState) -> ControlDecision:
         reason = (
-            f"Stagnation={state.stagnation:.2f} detected for '{state.agent_name}'. "
-            "Attack override activated to force structural reasoning change."
+            f"Stagnation={state.stagnation:.2f} detected for '{state.agent_name}' "
+            "(adversarial pressure deficit). "
+            "REQUIRE_STRUCTURAL_CHALLENGE activated."
         )
         return ControlDecision(
             force_attack_mode=True,
             suppress_personality=True,
-            prompt_overlay=_OVERLAY_ATTACK,
+            prompt_overlay=_OVERLAY_REQUIRE_STRUCTURAL_CHALLENGE,
             decision_reason=reason,
             priority_level=_PRIORITY_STAGNATION,
-            active_mode=IntegrationMode.ATTACK_OVERRIDE,
+            active_mode=IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
         )
 
     @staticmethod
@@ -2007,14 +2338,14 @@ class IntegrationCore:
         reason = (
             f"Unresolved tensions={state.unresolved} >= {_UNRESOLVED_RESOLUTION_TRIGGER} "
             f"and progress_after={state.progress_after:.2f} < {_PROGRESS_RESOLUTION_TRIGGER} "
-            f"for '{state.agent_name}'. Resolution override required."
+            f"for '{state.agent_name}'. Branch-closure required."
         )
         return ControlDecision(
             force_resolution_mode=True,
-            prompt_overlay=_OVERLAY_RESOLUTION,
+            prompt_overlay=_OVERLAY_REQUIRE_BRANCH_CLOSURE,
             decision_reason=reason,
             priority_level=_PRIORITY_UNRESOLVED,
-            active_mode=IntegrationMode.RESOLUTION_OVERRIDE,
+            active_mode=IntegrationMode.REQUIRE_BRANCH_CLOSURE,
         )
 
     @staticmethod

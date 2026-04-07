@@ -229,7 +229,10 @@ _NOVELTY_ADVANCEMENT_KEYWORDS: frozenset = frozenset(
 # Minimum keyword hits in the novelty check to count a cluster as "present"
 _NOVELTY_CLUSTER_HIT_THRESHOLD: int = 1
 
-# Number of active novelty clusters required to suppress a loop declaration
+# Number of active *structural/epistemic* novelty clusters required to suppress
+# a loop declaration.  Rhetorical novelty (the "advancement" cluster) is NOT
+# counted here — sharpening phrasing or adding logical connectors ("therefore",
+# "consequently") does NOT constitute genuine epistemic progress.
 _NOVELTY_SUPPRESS_THRESHOLD: int = 1
 
 # ---------------------------------------------------------------------------
@@ -1053,13 +1056,19 @@ class DialogueLoopDetector:
         forced decision, testable claim, abstraction shift, or definitional
         clarification.
 
-        Checks 6 novelty clusters across the two most recent agent turns:
+        **Epistemic / structural novelty** (counts toward suppression):
           1. metric       — measurable criterion / benchmark / score
           2. case         — concrete example / scenario / historical instance
           3. decision     — forced choice / trade-off / commitment
           4. test         — testable / falsifiable / empirical prediction
           5. definition   — operational definition / clarification / distinction
-          6. advancement  — logical entailment / conclusion / contrast marker
+          6. abstraction  — abstraction-level shift (concretely, in practice…)
+
+        **Rhetorical novelty** (does NOT suppress loop declarations):
+          7. advancement  — logical connectors ("therefore", "consequently") and
+                            contrast markers.  Sharper phrasing, more aggressive
+                            wording, or adding "it follows that" to the same
+                            claim does NOT constitute real epistemic progress.
 
         Parameters
         ----------
@@ -1068,27 +1077,39 @@ class DialogueLoopDetector:
 
         Returns
         -------
-        A ``(List[str], int)`` tuple: list of active novelty cluster names
-        and the count of active clusters.
+        A ``(List[str], int)`` tuple: list of active *structural* novelty
+        cluster names and the count of active clusters.  The rhetorical
+        "advancement" cluster is enumerated separately and does not
+        contribute to the returned count used for loop suppression.
         """
         # Examine only the two most recent turns to catch fresh novelty
         inspection = turns[-2:] if len(turns) >= 2 else turns
         combined_text = " ".join(t.get("text", "").lower() for t in inspection)
 
-        _clusters: Dict[str, frozenset] = {
+        # Only structural/epistemic clusters count toward the suppressor.
+        _structural_clusters: Dict[str, frozenset] = {
             "metric": _NOVELTY_METRIC_KEYWORDS,
             "case": _NOVELTY_CASE_KEYWORDS,
             "decision": _NOVELTY_DECISION_KEYWORDS,
             "test": _NOVELTY_TEST_KEYWORDS,
             "definition": _NOVELTY_DEFINITION_KEYWORDS,
-            "advancement": _NOVELTY_ADVANCEMENT_KEYWORDS,
+            "abstraction": _NOVELTY_ABSTRACTION_KEYWORDS,
         }
 
         active: List[str] = []
-        for cluster_name, keywords in _clusters.items():
+        for cluster_name, keywords in _structural_clusters.items():
             hits = sum(1 for kw in keywords if kw in combined_text)
             if hits >= _NOVELTY_CLUSTER_HIT_THRESHOLD:
                 active.append(cluster_name)
+
+        # Check rhetorical cluster separately — logged but NOT counted for suppression
+        rhetorical_hits = sum(
+            1 for kw in _NOVELTY_ADVANCEMENT_KEYWORDS if kw in combined_text
+        )
+        if rhetorical_hits >= _NOVELTY_CLUSTER_HIT_THRESHOLD:
+            logger.debug(
+                "[NOVELTY] rhetorical advancement cluster active (not counted for suppression)"
+            )
 
         return active, len(active)
 
