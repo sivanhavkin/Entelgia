@@ -811,6 +811,103 @@ _VALIDATE_ATTACK_SIGNALS: tuple = (
     "rather than",
 )
 
+# ---------------------------------------------------------------------------
+# Intervention output contract signal lists (PATCH 1)
+# ---------------------------------------------------------------------------
+
+# REQUIRE_TEST: output must include a concrete testable/falsifiable criterion.
+# Note: "test" is checked via a word-boundary regex (_VALIDATE_TEST_RE) to avoid
+# false matches on "latest", "contest", "protest", etc.  The other multi-character
+# stems are safe as substring prefixes and are kept in the tuple.
+_VALIDATE_TEST_SIGNALS: tuple = (
+    "measur",
+    "observ",
+    "experiment",
+    "falsif",
+    "verif",
+    "predict",
+    "criterion",
+    "evidence would",
+    "evidence that",
+    "if true",
+    "if false",
+    "would prove",
+    "would disprove",
+    "would show",
+    "can be tested",
+    "could be tested",
+    "check if",
+    "check whether",
+)
+# Word-boundary pattern for the short stem "test" to prevent false positives.
+_VALIDATE_TEST_RE: re.Pattern = re.compile(r"\btest\b", re.IGNORECASE)
+
+# REQUIRE_EVIDENCE: output must include a mechanism, observable signal, or causal
+# explanation.  Generic discourse connectors ("therefore", "thus") are intentionally
+# excluded — they are rhetorical pivots that carry no evidential content by themselves.
+_VALIDATE_EVIDENCE_SIGNALS: tuple = (
+    "because",
+    "causes",
+    "mechanism",
+    "evidence",
+    "demonstrates",
+    "shows that",
+    "correlates",
+    "explains",
+    "leads to",
+    "results in",
+    "due to",
+    "consequence",
+    "observable",
+    "measurable",
+    "indicator",
+)
+
+# REQUIRE_FORCED_CHOICE: output must explicitly commit to one side.
+_VALIDATE_FORCED_CHOICE_SIGNALS: tuple = (
+    "i choose",
+    "i commit",
+    "my position is",
+    "i opt for",
+    "i side with",
+    "i prefer",
+    "i pick",
+    "i go with",
+    "i stand by",
+    "i take the position",
+    "i favor",
+    "i favour",
+    "i select",
+    "my choice is",
+    "i decide",
+    "i support",
+    "i claim",
+    "the answer is",
+)
+
+# REQUIRE_BRANCH_CLOSURE: output must name an open thread and state its resolution.
+_VALIDATE_BRANCH_CLOSURE_SIGNALS: tuple = (
+    "resolv",
+    "conclud",
+    "settled",
+    "closed",
+    "set aside",
+    "discard",
+    "parking",
+    "parked",
+    "returning to",
+    "previously asked",
+    "earlier question",
+    "closing this",
+    "close this",
+    "the question was",
+    "that thread",
+    "this branch",
+    "to conclude",
+    "i am closing",
+    "i will close",
+)
+
 # Word-count ceiling enforced for LOW_COMPLEXITY mode responses
 _LOW_COMPLEXITY_MAX_WORDS: int = 150
 
@@ -1523,6 +1620,63 @@ class IntegrationCore:
                 f"Active mode {mode.value}: response too long in recovery ({word_count} words > {_LOW_COMPLEXITY_MAX_WORDS}).",
             )
 
+        # ---------------------------------------------------------------------------
+        # Intervention output contracts (PATCH 1 — state-transition enforcement)
+        # ---------------------------------------------------------------------------
+
+        if mode == IntegrationMode.REQUIRE_TEST:
+            if any(s in t for s in _VALIDATE_TEST_SIGNALS) or bool(_VALIDATE_TEST_RE.search(text)):
+                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_TEST testable criterion detected."
+            return (
+                False,
+                "[STATE-TRANSITION-FAIL] mode=REQUIRE_TEST reason=\"no concrete test\": "
+                "response must include a falsifiable or measurable test criterion.",
+            )
+
+        if mode == IntegrationMode.REQUIRE_CONCRETE_CASE:
+            has_case = any(s in t for s in _VALIDATE_CONCRETE_SIGNALS)
+            pseudo = detect_pseudo_compliance(text)
+            if has_case and not pseudo:
+                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_CONCRETE_CASE concrete case detected."
+            if pseudo:
+                return (
+                    False,
+                    "[STATE-TRANSITION-FAIL] mode=REQUIRE_CONCRETE_CASE reason=\"pseudo-compliance\": "
+                    "response uses hypothetical framing without genuine concreteness.",
+                )
+            return (
+                False,
+                "[STATE-TRANSITION-FAIL] mode=REQUIRE_CONCRETE_CASE reason=\"no real case\": "
+                "response must include a specific real-world or concrete case.",
+            )
+
+        if mode == IntegrationMode.REQUIRE_COUNTEREXAMPLE:
+            if any(s in t for s in _VALIDATE_EVIDENCE_SIGNALS):
+                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_COUNTEREXAMPLE evidence/mechanism signal detected."
+            return (
+                False,
+                "[STATE-TRANSITION-FAIL] mode=REQUIRE_COUNTEREXAMPLE reason=\"no concrete mechanism\": "
+                "response must include a mechanism, observable signal, or causal explanation.",
+            )
+
+        if mode == IntegrationMode.REQUIRE_FORCED_CHOICE:
+            if any(s in t for s in _VALIDATE_FORCED_CHOICE_SIGNALS):
+                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_FORCED_CHOICE committed choice detected."
+            return (
+                False,
+                "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no committed choice\": "
+                "response must explicitly choose one side and justify it.",
+            )
+
+        if mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE:
+            if any(s in t for s in _VALIDATE_BRANCH_CLOSURE_SIGNALS):
+                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_BRANCH_CLOSURE branch closure signal detected."
+            return (
+                False,
+                "[STATE-TRANSITION-FAIL] mode=REQUIRE_BRANCH_CLOSURE reason=\"no closure action\": "
+                "response must explicitly close, resolve, or discard an open reasoning branch.",
+            )
+
         # Any other mode — no textual constraint defined, treat as compliant.
         return True, f"Active mode {mode.value}: no textual constraint defined."
 
@@ -1583,6 +1737,18 @@ class IntegrationCore:
                 reason,
                 decision.escalation_level,
             )
+            # Emit a structured state-transition failure log for intervention modes
+            # so the failure is traceable independently of the regen machinery.
+            if decision.active_mode not in (
+                IntegrationMode.NORMAL,
+                IntegrationMode.LOW_COMPLEXITY,
+                IntegrationMode.DREAM_RECOVERY,
+            ):
+                logger.warning(
+                    "[STATE-TRANSITION-FAIL] mode=%s reason=%r",
+                    decision.active_mode.value,
+                    reason,
+                )
 
         return not compliant
 

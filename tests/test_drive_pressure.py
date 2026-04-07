@@ -961,3 +961,131 @@ class TestStagnationConstants:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--override-ini=addopts="])
+
+
+# ---------------------------------------------------------------------------
+# _transition_unresolved_item — state machine unit tests
+# ---------------------------------------------------------------------------
+
+
+from Entelgia_production_meta import (
+    _transition_unresolved_item,
+    _UT_STATE_OPEN,
+    _UT_STATE_TESTABLE,
+    _UT_STATE_RESOLVED,
+    _UT_STATE_DISCARDED,
+)
+
+
+def _make_topic(topic="q1", status=None, intensity=0.5, conflict=0.5, repetition=1):
+    """Helper: build an unresolved-topic dict."""
+    d = {"topic": topic, "intensity": intensity, "conflict": conflict, "repetition": repetition}
+    if status is not None:
+        d["status"] = status
+    return d
+
+
+class TestTransitionUnresolvedItem:
+    """Unit tests for _transition_unresolved_item signal classification, candidate
+    selection, and state transitions."""
+
+    # ── Signal classification ─────────────────────────────────────────────────
+
+    def test_resolution_language_produces_resolved(self):
+        items = [_make_topic(status=_UT_STATE_OPEN)]
+        result = _transition_unresolved_item(items, "We can conclude this is settled.", "Socrates")
+        assert result == _UT_STATE_RESOLVED
+        assert items[0]["status"] == _UT_STATE_RESOLVED
+
+    def test_discard_language_produces_discarded(self):
+        items = [_make_topic(status=_UT_STATE_OPEN)]
+        result = _transition_unresolved_item(items, "Let's set aside this branch for now.", "Athena")
+        assert result == _UT_STATE_DISCARDED
+        assert items[0]["status"] == _UT_STATE_DISCARDED
+
+    def test_testable_language_produces_testable(self):
+        items = [_make_topic(status=_UT_STATE_OPEN)]
+        result = _transition_unresolved_item(items, "We can measure and observe this effect.", "Socrates")
+        assert result == _UT_STATE_TESTABLE
+        assert items[0]["status"] == _UT_STATE_TESTABLE
+
+    def test_no_signal_returns_none(self):
+        items = [_make_topic(status=_UT_STATE_OPEN)]
+        result = _transition_unresolved_item(items, "There are many perspectives here.", "Athena")
+        assert result is None
+        assert items[0]["status"] == _UT_STATE_OPEN
+
+    def test_empty_topics_returns_none(self):
+        result = _transition_unresolved_item([], "We can conclude this.", "Socrates")
+        assert result is None
+
+    # ── Legacy items (no explicit status) ────────────────────────────────────
+
+    def test_legacy_item_without_status_treated_as_open(self):
+        """Items with no 'status' key should default to OPEN and be eligible."""
+        item = {"topic": "q_legacy", "intensity": 0.5, "conflict": 0.3, "repetition": 1}
+        result = _transition_unresolved_item([item], "This is now resolved and concluded.", "Socrates")
+        assert result == _UT_STATE_RESOLVED
+        assert item["status"] == _UT_STATE_RESOLVED
+
+    # ── Candidate selection: salience ordering ────────────────────────────────
+
+    def test_highest_salience_open_item_selected(self):
+        low = _make_topic("low", status=_UT_STATE_OPEN, intensity=0.1, conflict=0.1, repetition=1)
+        high = _make_topic("high", status=_UT_STATE_OPEN, intensity=0.9, conflict=0.9, repetition=5)
+        _transition_unresolved_item([low, high], "Let us conclude this is settled.", "Socrates")
+        assert high["status"] == _UT_STATE_RESOLVED
+        assert low["status"] == _UT_STATE_OPEN
+
+    # ── TESTABLE → terminal state (PATCH: TESTABLE items are candidates) ──────
+
+    def test_testable_item_can_transition_to_resolved(self):
+        """A TESTABLE item must be selected when output contains resolution language."""
+        item = _make_topic("q2", status=_UT_STATE_TESTABLE, intensity=0.8, conflict=0.5)
+        result = _transition_unresolved_item([item], "We conclude the experiment is resolved.", "Athena")
+        assert result == _UT_STATE_RESOLVED
+        assert item["status"] == _UT_STATE_RESOLVED
+
+    def test_testable_item_can_transition_to_discarded(self):
+        item = _make_topic("q3", status=_UT_STATE_TESTABLE, intensity=0.8, conflict=0.5)
+        result = _transition_unresolved_item([item], "This branch can be set aside; it's irrelevant.", "Socrates")
+        assert result == _UT_STATE_DISCARDED
+        assert item["status"] == _UT_STATE_DISCARDED
+
+    def test_testable_item_not_selected_when_target_is_testable(self):
+        """A TESTABLE item should NOT be selected for a TESTABLE transition (no-op)."""
+        testable = _make_topic("q_t", status=_UT_STATE_TESTABLE, intensity=0.8, conflict=0.5)
+        result = _transition_unresolved_item([testable], "We can test and measure this effect.", "Athena")
+        # No OPEN candidate → returns None; TESTABLE item stays TESTABLE
+        assert result is None
+        assert testable["status"] == _UT_STATE_TESTABLE
+
+    def test_open_preferred_over_testable_for_terminal_transition(self):
+        """When both OPEN and TESTABLE candidates exist, the highest-salience wins
+        regardless of state — the salience function is the tie-breaker."""
+        open_item = _make_topic("q_open", status=_UT_STATE_OPEN, intensity=0.9, conflict=0.9)
+        testable_item = _make_topic("q_testable", status=_UT_STATE_TESTABLE, intensity=0.1, conflict=0.1)
+        _transition_unresolved_item([open_item, testable_item], "We conclude this is now resolved.", "Socrates")
+        assert open_item["status"] == _UT_STATE_RESOLVED
+        assert testable_item["status"] == _UT_STATE_TESTABLE
+
+    def test_testable_selected_when_no_open_items_for_resolved(self):
+        """When only TESTABLE candidates exist and target is RESOLVED, TESTABLE is selected."""
+        testable = _make_topic("q_only_testable", status=_UT_STATE_TESTABLE, intensity=0.5, conflict=0.5)
+        result = _transition_unresolved_item([testable], "This is settled and concluded.", "Athena")
+        assert result == _UT_STATE_RESOLVED
+        assert testable["status"] == _UT_STATE_RESOLVED
+
+    # ── Terminal items are not re-transitioned ────────────────────────────────
+
+    def test_resolved_item_not_transitioned(self):
+        item = _make_topic("q_done", status=_UT_STATE_RESOLVED)
+        result = _transition_unresolved_item([item], "We can conclude this is settled.", "Socrates")
+        assert result is None
+        assert item["status"] == _UT_STATE_RESOLVED
+
+    def test_discarded_item_not_transitioned(self):
+        item = _make_topic("q_dropped", status=_UT_STATE_DISCARDED)
+        result = _transition_unresolved_item([item], "Let us set aside this.", "Athena")
+        assert result is None
+        assert item["status"] == _UT_STATE_DISCARDED
