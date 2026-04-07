@@ -816,8 +816,10 @@ _VALIDATE_ATTACK_SIGNALS: tuple = (
 # ---------------------------------------------------------------------------
 
 # REQUIRE_TEST: output must include a concrete testable/falsifiable criterion.
+# Note: "test" is checked via a word-boundary regex (_VALIDATE_TEST_RE) to avoid
+# false matches on "latest", "contest", "protest", etc.  The other multi-character
+# stems are safe as substring prefixes and are kept in the tuple.
 _VALIDATE_TEST_SIGNALS: tuple = (
-    "test",
     "measur",
     "observ",
     "experiment",
@@ -837,8 +839,12 @@ _VALIDATE_TEST_SIGNALS: tuple = (
     "check if",
     "check whether",
 )
+# Word-boundary pattern for the short stem "test" to prevent false positives.
+_VALIDATE_TEST_RE: re.Pattern = re.compile(r"\btest\b", re.IGNORECASE)
 
-# REQUIRE_EVIDENCE: output must include a mechanism, observable signal, or causal explanation.
+# REQUIRE_EVIDENCE: output must include a mechanism, observable signal, or causal
+# explanation.  Generic discourse connectors ("therefore", "thus") are intentionally
+# excluded — they are rhetorical pivots that carry no evidential content by themselves.
 _VALIDATE_EVIDENCE_SIGNALS: tuple = (
     "because",
     "causes",
@@ -852,8 +858,6 @@ _VALIDATE_EVIDENCE_SIGNALS: tuple = (
     "results in",
     "due to",
     "consequence",
-    "therefore",
-    "thus",
     "observable",
     "measurable",
     "indicator",
@@ -1621,7 +1625,7 @@ class IntegrationCore:
         # ---------------------------------------------------------------------------
 
         if mode == IntegrationMode.REQUIRE_TEST:
-            if any(s in t for s in _VALIDATE_TEST_SIGNALS):
+            if any(s in t for s in _VALIDATE_TEST_SIGNALS) or bool(_VALIDATE_TEST_RE.search(text)):
                 return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_TEST testable criterion detected."
             return (
                 False,

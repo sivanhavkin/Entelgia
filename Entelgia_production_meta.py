@@ -2741,7 +2741,7 @@ def _transition_unresolved_item(
     output_text: str,
     agent_name: str,
 ) -> Optional[str]:
-    """Select the highest-salience OPEN unresolved topic and transition its state.
+    """Select the highest-salience active unresolved topic and transition its state.
 
     Examines *output_text* to determine the appropriate target state using
     module-level signal tuples:
@@ -2750,8 +2750,13 @@ def _transition_unresolved_item(
     * ``_UT_STATE_DISCARDED`` — output contains discard language.
     * ``_UT_STATE_TESTABLE`` — fallback when test/measure language is present.
 
+    Candidate selection considers both OPEN and TESTABLE items so that
+    TESTABLE (an intermediate state) can progress to terminal RESOLVED or
+    DISCARDED states, providing the full OPEN → TESTABLE → RESOLVED/DISCARDED
+    chain described by the state machine.
+
     Returns the target state string when an item was transitioned, or
-    ``None`` when no OPEN items exist or the output contains no actionable signal.
+    ``None`` when no active items exist or the output contains no actionable signal.
     """
     t = output_text.lower()
 
@@ -2764,12 +2769,21 @@ def _transition_unresolved_item(
     else:
         return None
 
-    # Select the highest-salience OPEN item
-    open_items = [
+    # Candidate set: OPEN items (highest priority) AND TESTABLE items when the
+    # target is a terminal state.  This allows TESTABLE → RESOLVED/DISCARDED
+    # transitions on subsequent turns.
+    if target_state in (_UT_STATE_RESOLVED, _UT_STATE_DISCARDED):
+        candidate_statuses = (_UT_STATE_OPEN, _UT_STATE_TESTABLE)
+    else:
+        # Transitioning to TESTABLE: only advance OPEN items.  A TESTABLE item
+        # that would transition to TESTABLE again is a no-op; skip it.
+        candidate_statuses = (_UT_STATE_OPEN,)
+
+    candidate_items = [
         item for item in unresolved_topics
-        if item.get("status", _UT_STATE_OPEN) == _UT_STATE_OPEN
+        if item.get("status", _UT_STATE_OPEN) in candidate_statuses
     ]
-    if not open_items:
+    if not candidate_items:
         return None
 
     # Pre-compute salience score to avoid repeated dict lookups during sort
@@ -2780,7 +2794,7 @@ def _transition_unresolved_item(
             + math.log(int(i.get("repetition", 1)) + 1)
         )
 
-    item = max(open_items, key=_salience)
+    item = max(candidate_items, key=_salience)
     prev_state = item.get("status", _UT_STATE_OPEN)
     item["status"] = target_state
 
@@ -8651,65 +8665,6 @@ class MainScript:
                     )
             # ─────────────────────────────────────────────────────────────────────
 
-            # ── UNRESOLVED TRANSITION: enforce branch-closure state change ─────
-            # PATCH 2: When REQUIRE_BRANCH_CLOSURE is active OR open_questions
-            # has reached the trigger threshold, the agent MUST transition at
-            # least one OPEN unresolved item to RESOLVED, TESTABLE, or DISCARDED.
-            # This enforces the hard constraint that unresolved count does not
-            # monotonically increase and that REQUIRE_BRANCH_CLOSURE produces
-            # a measurable state change.
-            if (
-                _pre_gen_decision is not None
-                and _pre_gen_agent is not None
-                and _pre_gen_agent.name == speaker.name
-                and _pre_gen_agent.name != "Fixy"
-                and ENTELGIA_ENHANCED
-            ):
-                try:
-                    from entelgia.integration_core import (
-                        IntegrationMode as _IM_UT,
-                        _UNRESOLVED_RESOLUTION_TRIGGER as _UT_TRIGGER,
-                    )
-                    _ut_mode = _pre_gen_decision.active_mode
-                    _ut_active = (
-                        _ut_mode == _IM_UT.REQUIRE_BRANCH_CLOSURE
-                        or speaker.open_questions >= _UT_TRIGGER
-                    )
-                    if _ut_active:
-                        _ut_new_state = _transition_unresolved_item(
-                            speaker.unresolved_topics, out, speaker.name
-                        )
-                        # Recount OPEN items after potential transition
-                        _ut_open_remaining = sum(
-                            1 for _t in speaker.unresolved_topics
-                            if _t.get("status") == _UT_STATE_OPEN
-                        )
-                        if _ut_new_state is not None:
-                            # Only decrement open_questions when the item reached a
-                            # terminal state (RESOLVED or DISCARDED).  TESTABLE items
-                            # still require follow-up and remain in the active count.
-                            if _ut_new_state in (_UT_STATE_RESOLVED, _UT_STATE_DISCARDED):
-                                speaker.open_questions = max(0, speaker.open_questions - 1)
-                            logger.info(
-                                "[STATE-TRANSITION-SUCCESS] mode=%s resolved=1 remaining=%d",
-                                _ut_mode.value,
-                                _ut_open_remaining,
-                            )
-                        else:
-                            logger.warning(
-                                "[STATE-TRANSITION-FAIL] mode=%s reason=\"no unresolved item transitioned\" "
-                                "open=%d — unresolved count unchanged this turn",
-                                _ut_mode.value,
-                                speaker.open_questions,
-                            )
-                except Exception:
-                    logger.warning(
-                        "[UNRESOLVED-TRANSITION] exception during transition for agent=%s",
-                        speaker.name,
-                        exc_info=True,
-                    )
-            # ─────────────────────────────────────────────────────────────────────
-
             # ── PRE-ACCEPT: semantic loop hard rejection ───────────────────────
             # Run semantic loop detection on the final *out* BEFORE appending
             # it to the dialogue history.  A response is valid only when all
@@ -8966,6 +8921,69 @@ class MainScript:
                     logger.warning(
                         "[PRE-ACCEPT-LOOP] loop rejection check raised exception"
                         " for agent=%s",
+                        speaker.name,
+                        exc_info=True,
+                    )
+            # ─────────────────────────────────────────────────────────────────────
+
+            # ── UNRESOLVED TRANSITION: enforce branch-closure state change ─────
+            # PATCH 2: Applied AFTER the PRE-ACCEPT loop-guard so that state
+            # transitions are based on the final accepted output, not an output
+            # that may be subsequently rejected and regenerated.
+            # When REQUIRE_BRANCH_CLOSURE is active OR open_questions has reached
+            # the trigger threshold, the agent MUST transition at least one active
+            # unresolved item to RESOLVED, TESTABLE, or DISCARDED.
+            if (
+                _pre_gen_decision is not None
+                and _pre_gen_agent is not None
+                and _pre_gen_agent.name == speaker.name
+                and _pre_gen_agent.name != "Fixy"
+                and ENTELGIA_ENHANCED
+            ):
+                try:
+                    from entelgia.integration_core import (
+                        IntegrationMode as _IM_UT,
+                        _UNRESOLVED_RESOLUTION_TRIGGER as _UT_TRIGGER,
+                    )
+                    _ut_mode = _pre_gen_decision.active_mode
+                    _ut_active = (
+                        _ut_mode == _IM_UT.REQUIRE_BRANCH_CLOSURE
+                        or speaker.open_questions >= _UT_TRIGGER
+                    )
+                    if _ut_active:
+                        _ut_new_state = _transition_unresolved_item(
+                            speaker.unresolved_topics, out, speaker.name
+                        )
+                        # Recount active items (OPEN + TESTABLE) after potential transition.
+                        # Legacy entries with no explicit status default to OPEN.
+                        # TESTABLE items remain part of the active follow-up set.
+                        _ut_open_remaining = sum(
+                            1 for _t in speaker.unresolved_topics
+                            if _t.get("status", _UT_STATE_OPEN) in (
+                                _UT_STATE_OPEN, _UT_STATE_TESTABLE
+                            )
+                        )
+                        if _ut_new_state is not None:
+                            # Only decrement open_questions when the item reached a
+                            # terminal state (RESOLVED or DISCARDED).  TESTABLE items
+                            # still require follow-up and remain in the active count.
+                            if _ut_new_state in (_UT_STATE_RESOLVED, _UT_STATE_DISCARDED):
+                                speaker.open_questions = max(0, speaker.open_questions - 1)
+                            logger.info(
+                                "[STATE-TRANSITION-SUCCESS] mode=%s resolved=1 remaining=%d",
+                                _ut_mode.value,
+                                _ut_open_remaining,
+                            )
+                        else:
+                            logger.warning(
+                                "[STATE-TRANSITION-FAIL] mode=%s reason=\"no unresolved item transitioned\" "
+                                "open=%d — unresolved count unchanged this turn",
+                                _ut_mode.value,
+                                speaker.open_questions,
+                            )
+                except Exception:
+                    logger.warning(
+                        "[UNRESOLVED-TRANSITION] exception during transition for agent=%s",
                         speaker.name,
                         exc_info=True,
                     )
