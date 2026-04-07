@@ -9,20 +9,21 @@ Covers:
   2. ControlDecision defaults
   3. Rule: loop + semantic_repeat -> CONCRETE_OVERRIDE
   4. Rule: semantic_repeat + stagnation -> PERSONALITY_SUPPRESSION
-  5. Rule: unresolved + low progress -> RESOLUTION_OVERRIDE
+  5. Rule: unresolved + low progress -> REQUIRE_BRANCH_CLOSURE
   6. Rule: fatigue -> LOW_COMPLEXITY
-  7. Rule: is_loop + superficial compliance -> FIXY_AUTHORITY_OVERRIDE + regenerate=True
-  8. Rule: stagnation alone -> ATTACK_OVERRIDE
+  7. Rule: is_loop + compliance flags no longer trigger FIXY_AUTHORITY_OVERRIDE
+     (that rule was removed; FIXY_AUTHORITY_OVERRIDE is deprecated)
+  8. Rule: stagnation alone -> REQUIRE_STRUCTURAL_CHALLENGE (not ATTACK_OVERRIDE)
   9. Rule: pressure misalignment -> overlay injected, mode=NORMAL
   10. No override when all signals are nominal -> mode=NORMAL, no regen
   11. build_prompt_overlay returns decision.prompt_overlay
   12. should_regenerate returns True iff decision.regenerate is True
-  13. Priority: FIXY_AUTHORITY_OVERRIDE beats CONCRETE_OVERRIDE
-  14. Priority: CONCRETE_OVERRIDE beats ATTACK_OVERRIDE
+  13. Priority: CONCRETE_OVERRIDE beats REQUIRE_STRUCTURAL_CHALLENGE
+  14. Priority: CONCRETE_OVERRIDE beats REQUIRE_STRUCTURAL_CHALLENGE (semantic_repeat+loop_count)
   15. make_integration_state factory helper
   16. evaluate_turn accepts state_dict directly (integration path)
   17. Overlay text is imperative (no "consider")
-  18. FIXY_AUTHORITY_OVERRIDE forces enforce_fixy=True
+  18. FIXY_AUTHORITY_OVERRIDE is deprecated; enforce_fixy is not forced
 """
 
 from __future__ import annotations
@@ -185,17 +186,17 @@ class TestRulePersonalitySuppression:
 
 
 # ---------------------------------------------------------------------------
-# 5. Rule: unresolved + low progress -> RESOLUTION_OVERRIDE
+# 5. Rule: unresolved + low progress -> REQUIRE_BRANCH_CLOSURE
 # ---------------------------------------------------------------------------
 
 
 class TestRuleResolutionOverride:
-    def test_triggers_resolution_override(self, core):
+    def test_triggers_branch_closure(self, core):
         signals = _nominal_signals()
         signals["unresolved"] = 3
         signals["progress_after"] = 0.3
         decision = core.evaluate_turn("Socrates", signals)
-        assert decision.active_mode == IntegrationMode.RESOLUTION_OVERRIDE
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
         assert decision.force_resolution_mode is True
 
     def test_not_triggered_when_progress_sufficient(self, core):
@@ -203,6 +204,7 @@ class TestRuleResolutionOverride:
         signals["unresolved"] = 4
         signals["progress_after"] = 0.7
         decision = core.evaluate_turn("Socrates", signals)
+        assert decision.active_mode != IntegrationMode.REQUIRE_BRANCH_CLOSURE
         assert decision.active_mode != IntegrationMode.RESOLUTION_OVERRIDE
 
     def test_not_triggered_when_unresolved_below_threshold(self, core):
@@ -210,6 +212,7 @@ class TestRuleResolutionOverride:
         signals["unresolved"] = 2
         signals["progress_after"] = 0.2
         decision = core.evaluate_turn("Socrates", signals)
+        assert decision.active_mode != IntegrationMode.REQUIRE_BRANCH_CLOSURE
         assert decision.active_mode != IntegrationMode.RESOLUTION_OVERRIDE
 
 
@@ -234,19 +237,21 @@ class TestRuleFatigueMode:
 
 
 # ---------------------------------------------------------------------------
-# 7. Rule: is_loop + superficial compliance -> FIXY_AUTHORITY_OVERRIDE
+# 7. Rule: FIXY_AUTHORITY_OVERRIDE is no longer a hard rule
+#    The old rule (is_loop + compliance=False -> FIXY_AUTHORITY_OVERRIDE) was
+#    removed.  Fixy is now a conversational participant only; the controller
+#    no longer forces Fixy intervention or sets enforce_fixy based on is_loop.
 # ---------------------------------------------------------------------------
 
 
 class TestRuleFixyAuthority:
-    def test_triggers_fixy_authority(self, core):
+    def test_fixy_authority_not_triggered_by_loop_noncompliance(self, core):
+        """FIXY_AUTHORITY_OVERRIDE is no longer triggered as a hard rule."""
         signals = _nominal_signals()
         signals["is_loop"] = True
         signals["compliance"] = False
         decision = core.evaluate_turn("Socrates", signals)
-        assert decision.active_mode == IntegrationMode.FIXY_AUTHORITY_OVERRIDE
-        assert decision.enforce_fixy is True
-        assert decision.regenerate is True
+        assert decision.active_mode != IntegrationMode.FIXY_AUTHORITY_OVERRIDE
 
     def test_not_triggered_when_compliant(self, core):
         signals = _nominal_signals()
@@ -264,16 +269,17 @@ class TestRuleFixyAuthority:
 
 
 # ---------------------------------------------------------------------------
-# 8. Rule: stagnation alone -> ATTACK_OVERRIDE
+# 8. Rule: stagnation alone -> REQUIRE_STRUCTURAL_CHALLENGE
+#    (not ATTACK_OVERRIDE — that was the old coarse default)
 # ---------------------------------------------------------------------------
 
 
 class TestRuleStagnationAttack:
-    def test_triggers_attack_override(self, core):
+    def test_triggers_structural_challenge(self, core):
         signals = _nominal_signals()
         signals["stagnation"] = 0.40
         decision = core.evaluate_turn("Socrates", signals)
-        assert decision.active_mode == IntegrationMode.ATTACK_OVERRIDE
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
         assert decision.force_attack_mode is True
         assert decision.suppress_personality is True
 
@@ -281,7 +287,10 @@ class TestRuleStagnationAttack:
         signals = _nominal_signals()
         signals["stagnation"] = 0.10
         decision = core.evaluate_turn("Socrates", signals)
-        assert decision.active_mode != IntegrationMode.ATTACK_OVERRIDE
+        assert decision.active_mode not in (
+            IntegrationMode.ATTACK_OVERRIDE,
+            IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -350,12 +359,18 @@ class TestBuildPromptOverlay:
 
 
 class TestShouldRegenerate:
-    def test_true_when_fixy_authority(self, core):
+    def test_loop_concrete_triggers_no_regen_by_default(self, core):
+        """Loop detection does not automatically force regenerate=True.
+        Regeneration is driven by validate_generated_output, not the rule engine."""
         signals = _nominal_signals()
-        signals["is_loop"] = True
-        signals["compliance"] = False
+        signals["semantic_repeat"] = True
+        signals["loop_count"] = 1
         decision = core.evaluate_turn("Socrates", signals)
-        assert core.should_regenerate(decision) is True
+        # CONCRETE_OVERRIDE fires but does not force regenerate=True;
+        # that is the caller's responsibility after validate_generated_output.
+        assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
+        assert decision.regenerate is False
+        assert core.should_regenerate(decision) is False
 
     def test_false_on_nominal(self, core):
         decision = core.evaluate_turn("Socrates", _nominal_signals())
@@ -363,24 +378,27 @@ class TestShouldRegenerate:
 
 
 # ---------------------------------------------------------------------------
-# 13. Priority: FIXY_AUTHORITY_OVERRIDE beats CONCRETE_OVERRIDE
+# 13. Priority: CONCRETE_OVERRIDE beats REQUIRE_STRUCTURAL_CHALLENGE
 # ---------------------------------------------------------------------------
 
 
 class TestPriorityFixyBeforeConcrete:
-    def test_fixy_wins(self, core):
+    def test_concrete_wins_over_structural_challenge(self, core):
         signals = _nominal_signals()
         # Both rules would fire
-        signals["is_loop"] = True
-        signals["compliance"] = False
         signals["semantic_repeat"] = True
         signals["loop_count"] = 2
+        signals["stagnation"] = 0.40  # would trigger REQUIRE_STRUCTURAL_CHALLENGE
         decision = core.evaluate_turn("Socrates", signals)
-        assert decision.active_mode == IntegrationMode.FIXY_AUTHORITY_OVERRIDE
+        # semantic_repeat + loop_count >= 1 fires CONCRETE_OVERRIDE (via personality suppression)
+        assert decision.active_mode in (
+            IntegrationMode.CONCRETE_OVERRIDE,
+            IntegrationMode.PERSONALITY_SUPPRESSION,
+        )
 
 
 # ---------------------------------------------------------------------------
-# 14. Priority: CONCRETE_OVERRIDE beats ATTACK_OVERRIDE
+# 14. Priority: CONCRETE_OVERRIDE beats REQUIRE_STRUCTURAL_CHALLENGE
 # ---------------------------------------------------------------------------
 
 
@@ -389,7 +407,7 @@ class TestPriorityConcreteBeforeAttack:
         signals = _nominal_signals()
         signals["semantic_repeat"] = True
         signals["loop_count"] = 1
-        signals["stagnation"] = 0.30  # would trigger ATTACK_OVERRIDE alone
+        signals["stagnation"] = 0.30  # would trigger REQUIRE_STRUCTURAL_CHALLENGE alone
         decision = core.evaluate_turn("Socrates", signals)
         # semantic_repeat + loop_count >= 1 should fire CONCRETE_OVERRIDE first
         assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
@@ -469,7 +487,6 @@ class TestOverlayTextIsImperative:
         {"fatigue": 0.9},
         {"semantic_repeat": True, "loop_count": 1},
         {"unresolved": 3, "progress_after": 0.2},
-        {"is_loop": True, "compliance": False},
         {"stagnation": 0.5},
     ]
 
@@ -492,17 +509,19 @@ class TestOverlayTextIsImperative:
 
 
 # ---------------------------------------------------------------------------
-# 18. FIXY_AUTHORITY_OVERRIDE enforces enforce_fixy=True
+# 18. FIXY_AUTHORITY_OVERRIDE is deprecated; enforce_fixy is no longer set
 # ---------------------------------------------------------------------------
 
 
 class TestFixyAuthorityEnforcesFlag:
-    def test_enforce_fixy_is_true(self, core):
+    def test_enforce_fixy_not_forced_by_loop_noncompliance(self, core):
+        """The old FIXY_AUTHORITY_OVERRIDE rule is gone.
+        enforce_fixy is no longer set by the rule engine."""
         signals = _nominal_signals()
         signals["is_loop"] = True
         signals["compliance"] = False
         decision = core.evaluate_turn("Socrates", signals)
-        assert decision.enforce_fixy is True
+        assert decision.enforce_fixy is False
 
 
 # ---------------------------------------------------------------------------
@@ -548,10 +567,11 @@ class TestPreGenerationDecision:
         decision = core.pre_generation_decision("Socrates", signals)
         assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
 
-    def test_fixy_authority_triggered_on_loop_plus_noncompliance(self, core):
+    def test_fixy_authority_not_triggered_on_loop_noncompliance(self, core):
+        """FIXY_AUTHORITY_OVERRIDE is no longer triggered by is_loop + compliance=False."""
         signals = {**_nominal_signals(), "is_loop": True, "compliance": False}
         decision = core.pre_generation_decision("Socrates", signals)
-        assert decision.active_mode == IntegrationMode.FIXY_AUTHORITY_OVERRIDE
+        assert decision.active_mode != IntegrationMode.FIXY_AUTHORITY_OVERRIDE
 
     def test_same_result_as_evaluate_turn(self, core):
         signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 2}
@@ -646,36 +666,38 @@ class TestValidateGeneratedOutput:
         assert compliant is False
         assert "concrete" in reason.lower()
 
-    # RESOLUTION_OVERRIDE ─────────────────────────────────────────────────────
+    # REQUIRE_BRANCH_CLOSURE (replaces RESOLUTION_OVERRIDE for unresolved+low-progress) ──
 
-    def test_resolution_override_passes_with_resolution_signal(self, core):
+    def test_branch_closure_passes_with_resolution_signal(self, core):
         decision = self._decision_for(
             core, {"unresolved": 3, "progress_after": 0.2}
         )
-        assert decision.active_mode == IntegrationMode.RESOLUTION_OVERRIDE
-        text = "Therefore we can conclude that the argument is settled."
-        compliant, _ = core.validate_generated_output(text, decision)
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+        # Branch closure has no strict textual validation → always passes
+        compliant, _ = core.validate_generated_output(
+            "Therefore we can conclude that the argument is settled.", decision
+        )
         assert compliant is True
 
-    def test_resolution_override_fails_without_resolution_language(self, core):
+    def test_branch_closure_passes_for_any_text(self, core):
         decision = self._decision_for(
             core, {"unresolved": 3, "progress_after": 0.2}
         )
         text = "I still think there are many open questions here."
-        compliant, reason = core.validate_generated_output(text, decision)
-        assert compliant is False
-        assert "resolution" in reason.lower()
+        compliant, _ = core.validate_generated_output(text, decision)
+        # REQUIRE_BRANCH_CLOSURE is an informational overlay; no hard text gate
+        assert compliant is True
 
-    # ATTACK_OVERRIDE ─────────────────────────────────────────────────────────
+    # REQUIRE_STRUCTURAL_CHALLENGE (replaces ATTACK_OVERRIDE as stagnation default) ──
 
-    def test_attack_override_passes_with_challenge_signal(self, core):
+    def test_structural_challenge_passes_with_challenge_signal(self, core):
         decision = self._decision_for(core, {"stagnation": 0.5})
-        assert decision.active_mode == IntegrationMode.ATTACK_OVERRIDE
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
         text = "That reasoning is flawed because it ignores the empirical evidence."
         compliant, _ = core.validate_generated_output(text, decision)
         assert compliant is True
 
-    def test_attack_override_fails_without_challenge(self, core):
+    def test_structural_challenge_fails_without_challenge(self, core):
         decision = self._decision_for(core, {"stagnation": 0.5})
         text = "I largely agree with what you have said and find it reasonable."
         compliant, reason = core.validate_generated_output(text, decision)
@@ -698,21 +720,13 @@ class TestValidateGeneratedOutput:
         assert compliant is False
         assert "long" in reason.lower() or "words" in reason.lower()
 
-    # FIXY_AUTHORITY_OVERRIDE ─────────────────────────────────────────────────
+    # Deprecated FIXY_AUTHORITY_OVERRIDE — no longer triggered as a hard rule ──
 
-    def test_fixy_authority_override_always_passes_for_any_text(self, core):
-        """FIXY_AUTHORITY_OVERRIDE has no detectable textual obligation —
-        always compliant so the cortex relies on Fixy-driven enforcement
-        rather than heuristic pattern matching."""
+    def test_deprecated_fixy_authority_mode_is_never_triggered(self, core):
+        """FIXY_AUTHORITY_OVERRIDE is no longer triggered by any rule."""
         signals = {**_nominal_signals(), "is_loop": True, "compliance": False}
         decision = self._decision_for(core, {"is_loop": True, "compliance": False})
-        assert decision.active_mode == IntegrationMode.FIXY_AUTHORITY_OVERRIDE
-        # Pure abstraction — no concrete signals
-        compliant, reason = core.validate_generated_output(
-            "An abstract philosophical argument with no examples.", decision
-        )
-        assert compliant is True
-        assert "FIXY_AUTHORITY_OVERRIDE" in reason
+        assert decision.active_mode != IntegrationMode.FIXY_AUTHORITY_OVERRIDE
 
 
 # ---------------------------------------------------------------------------
@@ -838,7 +852,8 @@ class TestAgentBinding:
 
     def test_stronger_overlay_is_agent_agnostic(self, core):
         """build_stronger_overlay prefix must not hardcode a speaker name."""
-        signals = {**_nominal_signals(), "is_loop": True, "compliance": False}
+        # Use semantic_repeat + loop_count to reliably trigger CONCRETE_OVERRIDE
+        signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
         decision = core.pre_generation_decision("Socrates", signals)
         stronger = core.build_stronger_overlay(decision)
         # Verify behaviour: the added prefix must signal a failed prior attempt.
@@ -1644,3 +1659,180 @@ class TestControlDecisionLoopFields:
         decision = core.evaluate_turn("Socrates", state)
         assert decision.is_loop is False
         assert decision.reasoning_delta is None
+
+
+# ---------------------------------------------------------------------------
+# New: _read_fixy_soft_signal — controller-owned Fixy hint mapping
+# ---------------------------------------------------------------------------
+
+
+class TestReadFixySoftSignal:
+    """Unit tests for IntegrationCore._read_fixy_soft_signal.
+
+    Verifies that the static method correctly maps Fixy's last utterance to a
+    preferred IntegrationMode hint.  The mapping is controller-owned; Fixy
+    never calls enforcement functions directly.
+    """
+
+    def _parse_fixy_hint(self, text: Optional[str]) -> Optional[IntegrationMode]:
+        return IntegrationCore._read_fixy_soft_signal(text)
+
+    # None / empty input ──────────────────────────────────────────────────────
+
+    def test_none_returns_none(self):
+        assert self._parse_fixy_hint(None) is None
+
+    def test_empty_string_returns_none(self):
+        assert self._parse_fixy_hint("") is None
+
+    def test_unrelated_text_returns_none(self):
+        assert self._parse_fixy_hint("Everything is fine here, good conversation.") is None
+
+    # REQUIRE_NEW_VARIABLE ────────────────────────────────────────────────────
+
+    def test_missing_variable_maps_to_require_new_variable(self):
+        assert self._parse_fixy_hint("I notice a missing variable in this argument.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_new_variable_maps_to_require_new_variable(self):
+        assert self._parse_fixy_hint("A new variable should be introduced here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_new_dimension_maps_to_require_new_variable(self):
+        assert self._parse_fixy_hint("Consider a new dimension that has not been addressed.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_introduce_a_variable_maps_to_require_new_variable(self):
+        assert self._parse_fixy_hint("We should introduce a variable to distinguish these cases.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_new_concept_maps_to_require_new_variable(self):
+        assert self._parse_fixy_hint("Introduce a new concept to break out of this loop.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    # REQUIRE_TEST ─────────────────────────────────────────────────────────────
+
+    def test_falsif_maps_to_require_test(self):
+        assert self._parse_fixy_hint("This claim is not falsifiable as stated.") == IntegrationMode.REQUIRE_TEST
+
+    def test_testable_maps_to_require_test(self):
+        assert self._parse_fixy_hint("The argument needs a testable criterion.") == IntegrationMode.REQUIRE_TEST
+
+    def test_no_criterion_maps_to_require_test(self):
+        assert self._parse_fixy_hint("There is no criterion for distinguishing these positions.") == IntegrationMode.REQUIRE_TEST
+
+    def test_cannot_be_tested_maps_to_require_test(self):
+        assert self._parse_fixy_hint("This position cannot be tested against evidence.") == IntegrationMode.REQUIRE_TEST
+
+    def test_untestable_maps_to_require_test(self):
+        assert self._parse_fixy_hint("The claim is untestable in its current form.") == IntegrationMode.REQUIRE_TEST
+
+    # REQUIRE_CONCRETE_CASE ────────────────────────────────────────────────────
+
+    def test_abstract_loop_maps_to_require_concrete_case(self):
+        assert self._parse_fixy_hint("We are stuck in an abstract loop without grounding.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_conceptual_fog_maps_to_require_concrete_case(self):
+        assert self._parse_fixy_hint("There is too much conceptual fog here.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_too_abstract_maps_to_require_concrete_case(self):
+        assert self._parse_fixy_hint("The discussion is too abstract to make progress.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_no_concrete_maps_to_require_concrete_case(self):
+        assert self._parse_fixy_hint("No concrete example has been offered.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_concretize_maps_to_require_concrete_case(self):
+        assert self._parse_fixy_hint("We need to concretize this argument.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    # REQUIRE_BRANCH_CLOSURE ──────────────────────────────────────────────────
+
+    def test_no_closure_maps_to_require_branch_closure(self):
+        assert self._parse_fixy_hint("There is no closure to this line of argument.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_open_branch_maps_to_require_branch_closure(self):
+        assert self._parse_fixy_hint("An open branch has been left unaddressed for too long.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_endless_recursion_maps_to_require_branch_closure(self):
+        assert self._parse_fixy_hint("This is endless recursion without termination.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_unresolved_maps_to_require_branch_closure(self):
+        assert self._parse_fixy_hint("The original question remains unresolved.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_no_resolution_maps_to_require_branch_closure(self):
+        assert self._parse_fixy_hint("We have no resolution to the core tension.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    # Priority: REQUIRE_NEW_VARIABLE is checked first ────────────────────────
+
+    def test_new_variable_takes_priority_over_falsifiability(self):
+        """When a message contains both variable and falsifiability signals,
+        REQUIRE_NEW_VARIABLE wins (checked first)."""
+        msg = "We are missing a new variable and the claim is not falsifiable."
+        assert self._parse_fixy_hint(msg) == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    # Case-insensitivity ───────────────────────────────────────────────────────
+
+    def test_matching_is_case_insensitive(self):
+        assert self._parse_fixy_hint("MISSING VARIABLE present here.") == IntegrationMode.REQUIRE_NEW_VARIABLE
+        assert self._parse_fixy_hint("NOT FALSIFIABLE.") == IntegrationMode.REQUIRE_TEST
+        assert self._parse_fixy_hint("ABSTRACT LOOP detected.") == IntegrationMode.REQUIRE_CONCRETE_CASE
+        assert self._parse_fixy_hint("NO CLOSURE found.") == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+
+# ---------------------------------------------------------------------------
+# New: soft Fixy signal integration with stagnation intervention
+# ---------------------------------------------------------------------------
+
+
+class TestFixySoftSignalIntegration:
+    """Verify that fixy_last_message influences stagnation intervention selection
+    when stagnation is active and no other higher-priority rule fires."""
+
+    def _stagnation_signals(self, fixy_msg: Optional[str] = None) -> dict:
+        """Return signals that will trigger _rule_stagnation()."""
+        signals = _nominal_signals()
+        signals["stagnation"] = 0.30  # above _STAGNATION_SUPPRESS_THRESHOLD
+        if fixy_msg is not None:
+            signals["fixy_last_message"] = fixy_msg
+        return signals
+
+    def test_no_fixy_hint_gives_structural_challenge(self, core):
+        """Without a Fixy hint the adversarial-pressure fallback fires."""
+        decision = core.evaluate_turn("Socrates", self._stagnation_signals())
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+
+    def test_missing_variable_hint_selects_require_new_variable(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("I notice a missing variable here.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_NEW_VARIABLE
+
+    def test_no_falsifiability_hint_selects_require_test(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("The claim is not falsifiable.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_TEST
+
+    def test_conceptual_fog_hint_selects_require_concrete_case(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("Too much conceptual fog here.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_CONCRETE_CASE
+
+    def test_no_closure_hint_selects_require_branch_closure(self, core):
+        decision = core.evaluate_turn(
+            "Socrates", self._stagnation_signals("There is no closure to this branch.")
+        )
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_unrelated_fixy_hint_falls_through_to_default(self, core):
+        """An unrecognised Fixy hint falls through to the normal stagnation logic."""
+        decision = core.evaluate_turn(
+            "Socrates",
+            self._stagnation_signals("Interesting point, keep going."),
+        )
+        # No matching hint → falls through; adversarial-pressure fallback
+        assert decision.active_mode == IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE
+
+    def test_post_dream_recovery_suppresses_structural_challenge(self, core):
+        """Post-dream recovery prevents REQUIRE_STRUCTURAL_CHALLENGE from firing."""
+        signals = self._stagnation_signals()
+        signals["post_dream_recovery_turns"] = 1
+        decision = core.evaluate_turn("Socrates", signals)
+        # In recovery → DREAM_RECOVERY fires before stagnation rule
+        assert decision.active_mode == IntegrationMode.DREAM_RECOVERY
+        assert decision.active_mode != IntegrationMode.REQUIRE_STRUCTURAL_CHALLENGE

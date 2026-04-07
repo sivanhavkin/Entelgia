@@ -691,7 +691,13 @@ class TestFalsePositiveReduction:
         ), f"Pure stagnation must still be flagged; got {modes}"
 
     def test_advancement_keywords_regression(self):
-        """'therefore', 'consequently', 'it follows' are advancement markers."""
+        """Verifies that rhetorical advancement markers alone ('therefore',
+        'consequently', 'it follows') do not trigger LOOP_REPETITION when only
+        one structural signal fires (two-condition gate requirement).
+        Under the current epistemic-novelty policy these markers are classified
+        as rhetorical, not structural, so they do not suppress loop detection;
+        the test passes because the gate threshold is not met, not because the
+        suppressor fires."""
         detector = DialogueLoopDetector()
         turns = _make_turns(
             [
@@ -705,7 +711,7 @@ class TestFalsePositiveReduction:
         modes = detector.detect(turns, turn_count=5)
         assert (
             LOOP_REPETITION not in modes
-        ), f"'therefore/consequently/it follows' must suppress loop; got {modes}"
+        ), f"Rhetorical-only advancement data must not trigger loop_repetition (two-condition gate); got {modes}"
 
 
 # ---------------------------------------------------------------------------

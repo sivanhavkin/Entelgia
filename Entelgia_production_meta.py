@@ -8031,6 +8031,9 @@ class MainScript:
         # previous turn; carried forward so PRE-GENERATION control can apply
         # the cortex's decision to the *current* LLM call, not only the next.
         _prev_cortex_decision = None
+        # Post-dream recovery: tracks remaining recovery turns per agent name.
+        # While > 0, the controller suppresses aggressive forcing modes.
+        _post_dream_recovery: dict = {}
 
         _timeout_label = (
             f"{self.cfg.timeout_minutes}-minute"
@@ -8321,6 +8324,19 @@ class MainScript:
                     "abstraction_detected": False,
                     "energy": float(speaker.energy_level),
                     "status": str(speaker._last_fatigue_state or "active"),
+                    # Soft Fixy signal: last Fixy utterance for controller hint
+                    "fixy_last_message": next(
+                        (
+                            t.get("text", "")
+                            for t in reversed(self.dialog)
+                            if t.get("role") == "Fixy"
+                        ),
+                        None,
+                    ),
+                    # Post-dream recovery: remaining suppression turns for this agent
+                    "post_dream_recovery_turns": _post_dream_recovery.get(
+                        speaker.name, 0
+                    ),
                 }
                 # ── Carry forward indicators from the previous turn's cortex
                 # decision so the pre-gen rule engine fires with at least the
@@ -8790,6 +8806,18 @@ class MainScript:
 
             self.dialog.append({"role": speaker.name, "text": out})
 
+            # Decrement post-dream recovery counter for the speaker that just
+            # completed their turn.  Decrementing here (not at turn-start)
+            # ensures the counter tracks the speaker's own turns, not global
+            # turns that may be spoken by other agents.
+            if speaker.name in _post_dream_recovery and _post_dream_recovery[speaker.name] > 0:
+                _post_dream_recovery[speaker.name] -= 1
+                if _post_dream_recovery[speaker.name] == 0:
+                    logger.info(
+                        "[DREAM-RECOVERY] agent=%s post-dream recovery mode ended",
+                        speaker.name,
+                    )
+
             # ── Semantic validation and loop detection (FixySemanticController) ─────
             # Call evaluate_reply after each non-Fixy agent turn to check guidance
             # compliance and detect semantic loops.  Results are logged and fed back
@@ -9128,6 +9156,19 @@ class MainScript:
                         if "_loop_result" in dir()
                         else None
                     ),
+                    # Soft Fixy signal: last Fixy utterance for controller hint
+                    "fixy_last_message": next(
+                        (
+                            t.get("text", "")
+                            for t in reversed(self.dialog)
+                            if t.get("role") == "Fixy"
+                        ),
+                        None,
+                    ),
+                    # Post-dream recovery: remaining suppression turns for this agent
+                    "post_dream_recovery_turns": _post_dream_recovery.get(
+                        speaker.name, 0
+                    ),
                 }
                 try:
                     _cortex_decision = self._integration_core.evaluate_turn(
@@ -9172,47 +9213,45 @@ class MainScript:
                 should_intervene, reason = self.interactive_fixy.should_intervene(
                     self.dialog, self.turn_index, current_topic=topic_label
                 )
-                # ── Executive Cortex: override Fixy should_intervene / mode ──────────
-                # When IntegrationCore sets enforce_fixy=True it currently signals a
-                # FIXY_AUTHORITY_OVERRIDE directive (loop detected + superficial
-                # compliance).  Force the intervention and remap the Fixy mode to
-                # the cortex directive.
+                # ── Executive Cortex: build overlay and optionally remap Fixy mode ─
+                # The controller does NOT force Fixy to intervene.
+                # It only provides an overlay hint and may remap Fixy's mode when
+                # Fixy has already decided to speak.
                 _cortex_overlay: str = ""
                 if _cortex_decision is not None:
                     _cortex_overlay = self._integration_core.build_prompt_overlay(
                         _cortex_decision
                     )
-                    if _cortex_decision.enforce_fixy and not should_intervene:
-                        should_intervene = True
-                        reason = "executive_cortex_override"
-                        logger.info(
-                            "[INTEGRATION-CORE] Fixy forced by cortex for agent=%s"
-                            " mode=%s reason=%r",
-                            speaker.name,
-                            _cortex_decision.active_mode.value,
-                            _cortex_decision.decision_reason,
-                        )
                 # ─────────────────────────────────────────────────────────────────────
                 if should_intervene:
                     # v2.9.0: Fixy selects disruption mode based on detected loop type
                     fixy_mode = self.interactive_fixy.get_fixy_mode(reason)
-                    # ── Cortex mode override ──────────────────────────────────────────
-                    # The cortex decision takes priority over Fixy's own mode selection
-                    # when a hard control mode is active.
+                    # ── Cortex mode hint ──────────────────────────────────────────────
+                    # Map cortex decision to a compatible Fixy mode so the spoken
+                    # intervention is contextually coherent.  This is a hint only.
                     if _cortex_decision is not None:
                         from entelgia.integration_core import IntegrationMode as _IM
                         _mode_map = {
-                            _IM.FIXY_AUTHORITY_OVERRIDE: FixyMode.CONTRADICT,
                             _IM.CONCRETE_OVERRIDE: FixyMode.CONCRETIZE,
                             _IM.PERSONALITY_SUPPRESSION: FixyMode.CONCRETIZE,
                             _IM.ATTACK_OVERRIDE: FixyMode.CONTRADICT,
+                            _IM.REQUIRE_STRUCTURAL_CHALLENGE: FixyMode.CONTRADICT,
                             _IM.RESOLUTION_OVERRIDE: FixyMode.EXPOSE_SYNTHESIS,
                             _IM.LOW_COMPLEXITY: FixyMode.GENTLE_NUDGE,
+                            _IM.DREAM_RECOVERY: FixyMode.GENTLE_NUDGE,
+                            _IM.REQUIRE_TEST: FixyMode.CONCRETIZE,
+                            _IM.REQUIRE_COUNTEREXAMPLE: FixyMode.CONCRETIZE,
+                            _IM.REQUIRE_NEW_VARIABLE: FixyMode.FORCE_NEW_DOMAIN,
+                            _IM.REQUIRE_CONCRETE_CASE: FixyMode.CONCRETIZE,
+                            _IM.REQUIRE_BRANCH_CLOSURE: FixyMode.EXPOSE_SYNTHESIS,
+                            _IM.REQUIRE_FORCED_CHOICE: FixyMode.FORCE_CHOICE,
+                            # Deprecated mode — treat like concrete case
+                            _IM.FIXY_AUTHORITY_OVERRIDE: FixyMode.CONCRETIZE,
                         }
                         _mapped = _mode_map.get(_cortex_decision.active_mode)
                         if _mapped is not None:
                             logger.info(
-                                "[INTEGRATION-CORE] Fixy mode overridden:"
+                                "[INTEGRATION-CORE] Fixy mode hint:"
                                 " %s → %s (cortex=%s)",
                                 fixy_mode,
                                 _mapped,
@@ -9371,10 +9410,29 @@ class MainScript:
                     if reason == "high_conflict_no_resolution":
                         _last_high_conflict_turn = self.turn_index
 
-            # Energy-based dream cycle: Fixy forces agents to sleep when energy is critically low
+            # Energy-based dream cycle: controller triggers dream when energy is below threshold
             for _agent in (self.socrates, self.athena, self.fixy_agent):
                 if _agent.energy_level <= self.cfg.energy_safety_threshold:
+                    _pre_dream_energy = _agent.energy_level
+                    logger.info(
+                        "[DREAM-TRIGGER] agent=%s pre_dream_energy=%.1f threshold=%.1f",
+                        _agent.name,
+                        _pre_dream_energy,
+                        self.cfg.energy_safety_threshold,
+                    )
                     self.dream_cycle(_agent, topic_label)
+                    _post_dream_energy = _agent.energy_level
+                    logger.info(
+                        "[DREAM-COMPLETED] agent=%s post_dream_energy=%.1f",
+                        _agent.name,
+                        _post_dream_energy,
+                    )
+                    # Activate post-dream recovery mode for next 2 turns
+                    _post_dream_recovery[_agent.name] = 2
+                    logger.info(
+                        "[DREAM-RECOVERY] agent=%s post-dream recovery mode active for next 2 turns",
+                        _agent.name,
+                    )
                     # Reset pair window after energy-triggered dream cycle too.
                     if self.interactive_fixy:
                         self.interactive_fixy.notify_pair_reset(
@@ -9384,7 +9442,22 @@ class MainScript:
                         print(
                             Fore.WHITE
                             + Style.DIM
-                            + f"[META-ACTION] {_agent.name} energy critical ({_agent.energy_level:.1f}); dream cycle forced"
+                            + f"[DREAM-TRIGGER] {_agent.name}: pre_dream_energy={_pre_dream_energy:.1f}"
+                            f" threshold={self.cfg.energy_safety_threshold}"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[DREAM-COMPLETED] {_agent.name}: post_dream_energy={_post_dream_energy:.1f}"
+                            + Style.RESET_ALL
+                            + "\n"
+                        )
+                        print(
+                            Fore.WHITE
+                            + Style.DIM
+                            + f"[DREAM-RECOVERY] {_agent.name}: recovery mode active for next 2 turns"
                             + Style.RESET_ALL
                             + "\n"
                         )
