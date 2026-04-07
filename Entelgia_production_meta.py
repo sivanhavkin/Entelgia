@@ -2718,6 +2718,23 @@ def compute_drive_pressure(
 # Small value (0.1–0.2) so each turn only nudges drive_pressure slightly.
 _PRESSURE_FEEDBACK_ALPHA: float = 0.15
 
+# ── Unresolved-transition content signal tuples (PATCH 2) ────────────────────
+# These are intentionally narrower than _VALIDATE_BRANCH_CLOSURE_SIGNALS in
+# integration_core.py: validation checks that *some* closure action was attempted,
+# while these signals classify *which specific state* the item should transition to.
+_UT_RESOLVED_SIGNALS: Tuple[str, ...] = (
+    "conclud", "settled", "resolv", "closed", "close this",
+    "the answer is", "therefore i", "thus i", "parking",
+)
+_UT_DISCARDED_SIGNALS: Tuple[str, ...] = (
+    "set aside", "discard", "not critical", "irrelevant",
+    "drop this", "abandon", "put aside",
+)
+_UT_TESTABLE_SIGNALS: Tuple[str, ...] = (
+    "test", "measur", "observ", "experiment", "falsif",
+    "verif", "predict", "criterion",
+)
+
 
 def _transition_unresolved_item(
     unresolved_topics: list,
@@ -2726,39 +2743,23 @@ def _transition_unresolved_item(
 ) -> Optional[str]:
     """Select the highest-salience OPEN unresolved topic and transition its state.
 
-    Examines *output_text* to determine the appropriate target state:
+    Examines *output_text* to determine the appropriate target state using
+    module-level signal tuples:
 
-    * ``_UT_STATE_RESOLVED`` — if the output contains resolution language
-      (conclude, settled, closed, resolved, etc.).
-    * ``_UT_STATE_DISCARDED`` — if the output contains discard language
-      (set aside, discard, not critical, irrelevant, etc.).
-    * ``_UT_STATE_TESTABLE`` — fallback: output contains test/measure/
-      observe language but not full resolution.
+    * ``_UT_STATE_RESOLVED`` — output contains resolution language.
+    * ``_UT_STATE_DISCARDED`` — output contains discard language.
+    * ``_UT_STATE_TESTABLE`` — fallback when test/measure language is present.
 
     Returns the target state string when an item was transitioned, or
     ``None`` when no OPEN items exist or the output contains no actionable signal.
     """
     t = output_text.lower()
 
-    # Determine target state from output content
-    _RESOLVED_SIGNALS = (
-        "conclud", "settled", "resolv", "closed", "close this",
-        "the answer is", "therefore i", "thus i", "parking",
-    )
-    _DISCARDED_SIGNALS = (
-        "set aside", "discard", "not critical", "irrelevant",
-        "drop this", "abandon", "put aside",
-    )
-    _TESTABLE_SIGNALS = (
-        "test", "measur", "observ", "experiment", "falsif",
-        "verif", "predict", "criterion",
-    )
-
-    if any(s in t for s in _RESOLVED_SIGNALS):
+    if any(s in t for s in _UT_RESOLVED_SIGNALS):
         target_state = _UT_STATE_RESOLVED
-    elif any(s in t for s in _DISCARDED_SIGNALS):
+    elif any(s in t for s in _UT_DISCARDED_SIGNALS):
         target_state = _UT_STATE_DISCARDED
-    elif any(s in t for s in _TESTABLE_SIGNALS):
+    elif any(s in t for s in _UT_TESTABLE_SIGNALS):
         target_state = _UT_STATE_TESTABLE
     else:
         return None
@@ -2766,22 +2767,21 @@ def _transition_unresolved_item(
     # Select the highest-salience OPEN item
     open_items = [
         item for item in unresolved_topics
-        if item.get("status") == _UT_STATE_OPEN
+        if item.get("status", _UT_STATE_OPEN) == _UT_STATE_OPEN
     ]
     if not open_items:
         return None
 
-    # Sort by salience: intensity + conflict + log(repetition)
-    open_items.sort(
-        key=lambda i: (
+    # Pre-compute salience score to avoid repeated dict lookups during sort
+    def _salience(i: dict) -> float:
+        return (
             float(i.get("intensity", 0.0))
             + float(i.get("conflict", 0.0))
             + math.log(int(i.get("repetition", 1)) + 1)
-        ),
-        reverse=True,
-    )
-    item = open_items[0]
-    prev_state = item["status"]
+        )
+
+    item = max(open_items, key=_salience)
+    prev_state = item.get("status", _UT_STATE_OPEN)
     item["status"] = target_state
 
     logger.info(
