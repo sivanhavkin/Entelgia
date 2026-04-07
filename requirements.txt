@@ -11,17 +11,17 @@ fastapi>=0.104.0
 uvicorn>=0.24.0
 pydantic>=2.0.0
 
-# Optional: semantic similarity in Fixy's _detect_repetition
-# Install with: pip install "entelgia[semantic]"  or  pip install sentence-transformers scikit-learn numpy
-# sentence-transformers>=2.2.0
-# scikit-learn>=1.0.0
-# numpy>=1.24.0
+# Semantic similarity — core dependency
+# Used by EnhancedMemoryIntegration (context_manager.py) and
+# CircularityGuard / LoopGuard / Fixy semantic loop detection.
+sentence-transformers>=2.2.0
+scikit-learn>=1.0.1
+numpy>=1.24.0
 
 # Development / testing
 pytest>=7.4.0
 pytest-mock>=3.12.0
 pytest-cov>=4.1.0
-numpy>=1.24.0
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.5.0
