@@ -2097,20 +2097,28 @@ class IntegrationCore:
             return None
         m = fixy_message.lower()
         # "missing variable" / "new dimension" / "new variable"
-        if any(k in m for k in ("missing variable", "new variable", "new dimension",
-                                 "introduce a variable", "new concept")):
+        if any(k in m for k in (
+            "missing variable", "new variable", "new dimension",
+            "introduce a variable", "new concept",
+        )):
             return IntegrationMode.REQUIRE_NEW_VARIABLE
         # "no falsifiability" / "not falsifiable" / "untestable"
-        if any(k in m for k in ("falsif", "testable", "testability", "untestable",
-                                  "no criterion", "no test", "cannot be tested")):
+        if any(k in m for k in (
+            "falsif", "testable", "testability", "untestable",
+            "no criterion", "no test", "cannot be tested",
+        )):
             return IntegrationMode.REQUIRE_TEST
         # "conceptual fog" / "too abstract" / "abstract loop"
-        if any(k in m for k in ("abstract loop", "conceptual fog", "too abstract",
-                                  "no concrete", "grounding", "concretize")):
+        if any(k in m for k in (
+            "abstract loop", "conceptual fog", "too abstract",
+            "no concrete", "grounding", "concretize",
+        )):
             return IntegrationMode.REQUIRE_CONCRETE_CASE
         # "endless recursion" / "no closure" / "open branch"
-        if any(k in m for k in ("no closure", "open branch", "endless recursion",
-                                  "unresolved", "close this", "no resolution")):
+        if any(k in m for k in (
+            "no closure", "open branch", "endless recursion",
+            "unresolved", "close this", "no resolution",
+        )):
             return IntegrationMode.REQUIRE_BRANCH_CLOSURE
         return None
 
@@ -2218,7 +2226,6 @@ class IntegrationCore:
             IntegrationMode.DREAM_RECOVERY: _OVERLAY_DREAM_RECOVERY,
             IntegrationMode.ATTACK_OVERRIDE: _OVERLAY_ATTACK,
             IntegrationMode.CONCRETE_OVERRIDE: _OVERLAY_CONCRETE,
-            IntegrationMode.REQUIRE_COUNTEREXAMPLE: _OVERLAY_REQUIRE_COUNTEREXAMPLE,
         }
         overlay = _OVERLAY_MAP.get(mode, _OVERLAY_CONCRETE)
         reason = (

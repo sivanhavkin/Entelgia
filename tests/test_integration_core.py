@@ -19,7 +19,7 @@ Covers:
   11. build_prompt_overlay returns decision.prompt_overlay
   12. should_regenerate returns True iff decision.regenerate is True
   13. Priority: CONCRETE_OVERRIDE beats REQUIRE_STRUCTURAL_CHALLENGE
-  14. Priority: CONCRETE_OVERRIDE beats REQUIRE_STRUCTURAL_CHALLENGE
+  14. Priority: CONCRETE_OVERRIDE beats REQUIRE_STRUCTURAL_CHALLENGE (semantic_repeat+loop_count)
   15. make_integration_state factory helper
   16. evaluate_turn accepts state_dict directly (integration path)
   17. Overlay text is imperative (no "consider")
