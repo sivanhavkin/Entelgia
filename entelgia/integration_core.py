@@ -1810,7 +1810,7 @@ class IntegrationCore:
                     "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no justification\": "
                     "response must justify the choice with a concrete reason.",
                 )
-            return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_FORCED_CHOICE committed choice with justification detected."
+            return True, "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_FORCED_CHOICE committed choice with justification detected."
 
         if mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE:
             # PATCH 1 — strict contract: must contain BOTH a closure signal AND an
@@ -1830,7 +1830,7 @@ class IntegrationCore:
                     "[STATE-TRANSITION-FAIL] mode=REQUIRE_BRANCH_CLOSURE reason=\"no state marker\": "
                     "response must explicitly mark the item as RESOLVED, TESTABLE, or DISCARDED.",
                 )
-            return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_BRANCH_CLOSURE branch closure with state marker detected."
+            return True, "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_BRANCH_CLOSURE branch closure with state marker detected."
 
         # Any other mode — no textual constraint defined, treat as compliant.
         return True, f"Active mode {mode.value}: no textual constraint defined."
