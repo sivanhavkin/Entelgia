@@ -642,7 +642,7 @@ _OVERLAY_FORCE_OUTCOME: str = (
     "  - A narrowed hypothesis: 'Narrowed hypothesis: [X].'\n"
     "  - An executable test: 'Executable test: [X].'\n"
     "  - A bounded unresolved list: 'Remaining open: [X, Y only].'\n"
-    "Failure to end with one of these outcomes is INVALID."
+    "End with one of these outcome formats."
 )
 
 # ---------------------------------------------------------------------------
@@ -1654,6 +1654,29 @@ class IntegrationCore:
                     )
             return True, "No active mode constraint."
 
+        # ---------------------------------------------------------------------------
+        # PATCH 5 — Rhetorical escape detection: for all active intervention modes,
+        # reject outputs that use rhetorical avoidance patterns rather than committing
+        # to an outcome.  This check runs BEFORE all per-mode validation branches so
+        # that every intervention mode (CONCRETE_OVERRIDE, PERSONALITY_SUPPRESSION,
+        # RESOLUTION_OVERRIDE, ATTACK_OVERRIDE, REQUIRE_* etc.) is covered uniformly.
+        # ---------------------------------------------------------------------------
+        _escape_hit = next(
+            (pat for pat in _RHETORICAL_ESCAPE_PATTERNS if pat.search(t)), None
+        )
+        if _escape_hit is not None:
+            logger.info(
+                "[RHETORICAL-ESCAPE] mode=%s pattern=%r — marking non-compliant",
+                mode.value,
+                _escape_hit.pattern,
+            )
+            return (
+                False,
+                f"[STATE-TRANSITION-FAIL] mode={mode.value} reason=\"rhetorical escape\": "
+                f"response uses avoidance pattern '{_escape_hit.pattern}' instead of "
+                "producing a concrete outcome.",
+            )
+
         if mode in (
             IntegrationMode.CONCRETE_OVERRIDE,
             IntegrationMode.PERSONALITY_SUPPRESSION,
@@ -1721,32 +1744,9 @@ class IntegrationCore:
 
         # ---------------------------------------------------------------------------
         # Intervention output contracts (PATCH 1 — state-transition enforcement)
+        # Note: rhetorical-escape check (PATCH 5) already ran above, before all
+        # per-mode branches, so any avoidance pattern was caught before reaching here.
         # ---------------------------------------------------------------------------
-        # PATCH 5 — Rhetorical escape detection: for all active intervention modes,
-        # reject outputs that use rhetorical avoidance patterns rather than committing
-        # to an outcome.  This check runs BEFORE mode-specific validation so that a
-        # response that escapes via "consider…" or "show me…" is always rejected.
-        _is_intervention_mode = mode not in (
-            IntegrationMode.NORMAL,
-            IntegrationMode.DREAM_RECOVERY,
-            IntegrationMode.LOW_COMPLEXITY,
-        )
-        if _is_intervention_mode:
-            _escape_hit = next(
-                (pat for pat in _RHETORICAL_ESCAPE_PATTERNS if pat.search(t)), None
-            )
-            if _escape_hit is not None:
-                logger.info(
-                    "[RHETORICAL-ESCAPE] mode=%s pattern=%r — marking non-compliant",
-                    mode.value,
-                    _escape_hit.pattern,
-                )
-                return (
-                    False,
-                    f"[STATE-TRANSITION-FAIL] mode={mode.value} reason=\"rhetorical escape\": "
-                    f"response uses avoidance pattern '{_escape_hit.pattern}' instead of "
-                    "producing a concrete outcome.",
-                )
 
         if mode == IntegrationMode.REQUIRE_TEST:
             # PATCH 1 — strict field contract: ALL required structural fields must be
@@ -1810,7 +1810,19 @@ class IntegrationCore:
                     "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no justification\": "
                     "response must justify the choice with a concrete reason.",
                 )
-            return True, "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_FORCED_CHOICE committed choice with justification detected."
+            has_change_condition = any(
+                s in t for s in _VALIDATE_FORCED_CHOICE_CONDITION_SIGNALS
+            )
+            if not has_change_condition:
+                return (
+                    False,
+                    "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no change condition\": "
+                    "response must state what evidence, observation, or condition would change the choice.",
+                )
+            return True, (
+                "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_FORCED_CHOICE committed choice "
+                "with justification and change condition detected."
+            )
 
         if mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE:
             # PATCH 1 — strict contract: must contain BOTH a closure signal AND an
@@ -2301,14 +2313,13 @@ class IntegrationCore:
 
         State priority order (highest → lowest):
           1. Dream / critical fatigue  → DREAM_RECOVERY or LOW_COMPLEXITY
-          2. Force outcome (PATCH 4)   → REQUIRE_BRANCH_CLOSURE (turns/stagnation/unresolved overload)
-          3. Loop break by operationalisation → richer taxonomy
-          4. Stagnation (operationalisation before attack)
+          2. Loop break by operationalisation → richer taxonomy
+          3. Stagnation (operationalisation before attack)
+          4. Force outcome (PATCH 4)   → fires after loop rules, before unresolved overload
           5. Unresolved overload → REQUIRE_BRANCH_CLOSURE
-          6. Structural challenge (adversarial pressure deficit only)
-          7. Personality suppression
-          8. Pressure misalignment
-          9. Default
+          6. Personality suppression
+          7. Pressure misalignment
+          8. Default
 
         Post-dream recovery suppression: when post_dream_recovery_turns > 0,
         ATTACK_OVERRIDE and REQUIRE_STRUCTURAL_CHALLENGE are skipped.
@@ -2322,21 +2333,22 @@ class IntegrationCore:
         if self._rule_fatigue_low_complexity(state):
             return self._decide_fatigue_low_complexity(state)
 
-        # Priority 2 — Force outcome (PATCH 4): long conversation + stagnation or
-        # unresolved overload → unconditional outcome enforcement.
-        if self._rule_force_outcome(state):
-            return self._decide_force_outcome(state)
-
-        # Priority 3 — Loop / semantic repetition (operationalisation-first)
+        # Priority 2 — Loop / semantic repetition (operationalisation-first)
         if self._rule_loop_concrete(state):
             return self._decide_loop_concrete(state)
 
         if self._rule_personality_suppression(state):
             return self._decide_personality_suppression(state)
 
-        # Priority 4 — Stagnation: select intervention by stagnation type
+        # Priority 3 — Stagnation: select intervention by stagnation type
         if self._rule_stagnation(state):
             return self._decide_stagnation_intervention(state, in_recovery)
+
+        # Priority 4 — Force outcome (PATCH 4): long conversation + stagnation or
+        # unresolved overload → unconditional outcome enforcement.
+        # Runs after loop rules so loop-breaking always takes precedence.
+        if self._rule_force_outcome(state):
+            return self._decide_force_outcome(state)
 
         # Priority 5 — Unresolved overload
         if self._rule_unresolved_resolution(state):
@@ -2836,11 +2848,11 @@ class IntegrationCore:
     def _decide_force_outcome(state: IntegrationState) -> ControlDecision:
         """PATCH 4 — Force an outcome-producing response when the conversation stagnates.
 
-        Chooses REQUIRE_BRANCH_CLOSURE when unresolved items are present;
+        Chooses REQUIRE_BRANCH_CLOSURE when any unresolved items are present (> 0);
         falls back to REQUIRE_FORCED_CHOICE when the queue is empty.
         Logs [OUTCOME-ENFORCED] with the type that was enforced.
         """
-        if state.unresolved >= _UNRESOLVED_RESOLUTION_TRIGGER:
+        if state.unresolved > 0:
             outcome_type = "closure"
             active_mode = IntegrationMode.REQUIRE_BRANCH_CLOSURE
             overlay = _OVERLAY_REQUIRE_BRANCH_CLOSURE
