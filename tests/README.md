@@ -4,7 +4,7 @@
   <div style="width: 120px;" aria-hidden="true"></div>
 </div>
 
-Entelgia ships with comprehensive test coverage across **1956 tests** (1956 collected) in 40 suites:
+Entelgia ships with comprehensive test coverage across **2460 tests** (2460 collected) in 42 suites:
 
 ### Enhanced Dialogue Tests (11 tests)
 
@@ -342,7 +342,7 @@ In addition to the unit tests, the continuous-integration (CI/CD) pipeline autom
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
-| **Unit Tests** | `pytest` | Runs 1956 total tests across 40 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator, fixy soft enforcement, fixy semantic control, fatigue tagging, integration core, integration memory store, session turn selector) |
+| **Unit Tests** | `pytest` | Runs 2460 total tests across 42 suites (web research, circularity guard, fixy improvements, progress enforcer, behavioral rules, generation quality, topic anchors, dialogue metrics, stabilization pass, LTM, topic enforcer, topic style, energy, revise draft, context manager, loop guard, transform draft, superego critique, ablation study, web tool, affective LTM, drive correlations, drive pressure, limbic hijack, memory security, semantic repetition, seed topic clusters, enhanced dialogue, enable observer, signing migration, demo dialogue, openai backend, response evaluator, fixy soft enforcement, fixy semantic control, fatigue tagging, integration core, integration memory store, session turn selector, continuation context, production meta coverage, text humanizer integration) |
 | **Code Quality** | `black`, `flake8`, `mypy` | Code formatting, linting, and static type checking |
 | **Security Scans** | `safety`, `bandit` | Dependency and code-security vulnerability detection |
 | **Scheduled Audits** | `pip-audit` | Weekly dependency security audit |
@@ -1050,3 +1050,45 @@ Tests verify `_pick_numbered_option` and `select_session_turns` in `Entelgia_pro
 - ✅ Enter maps to the default turn count (15)
 - ✅ Each valid selection maps to the correct turn count option
 - ✅ Invalid input followed by Enter returns the default
+
+---
+
+### 🔗 Continuation Context Tests (20 tests)
+
+```bash
+pytest tests/test_continuation_context.py -v
+```
+
+Tests verify `_extract_continuation_signals`, `_build_continuation_context`, and seed generator continuation logic in `Entelgia_production_meta.py`:
+- ✅ **Empty turns** — returns empty signal fields with no input
+- ✅ **Seed role skipping** — seed-role entries excluded from signal extraction
+- ✅ **Last claim extraction** — declarative sentence captured as last claim
+- ✅ **Short sentence filtering** — sentences below threshold ignored for last claim
+- ✅ **Unresolved question extraction** — question sentences captured
+- ✅ **Non-question filtering** — non-question sentences excluded from unresolved question
+- ✅ **Tension point via `but`** — adversative conjunction triggers tension point
+- ✅ **Tension point via `however`** — adversative conjunction triggers tension point
+- ✅ **No tension without adversative** — tension point empty when no adversative present
+- ✅ **Dominant topic extraction** — topic extracted from argumentative turns
+- ✅ **No topic when absent** — dominant topic empty when no topic present
+- ✅ **Empty context** — returns empty string for empty signal dict
+- ✅ **All-empty values** — returns empty string when all signals are empty
+- ✅ **Topic-only context** — builds context string from topic alone
+- ✅ **Full context** — all fields included in context string
+- ✅ **Seed generator continuation** — continuation used when prior memory and real turns present
+- ✅ **No continuation without prior memory** — seed falls back when no prior memory
+- ✅ **First session no real turns** — uses topic header on first session
+- ✅ **Empty dialog** — uses topic header when dialog is empty
+- ✅ **Continuation strategy keyword** — strategy keyword present in continuation output
+
+---
+
+### 🏗️ Production Meta Coverage Tests (278 tests)
+
+```bash
+pytest tests/test_production_meta_coverage.py -v
+```
+
+Tests verify a broad cross-section of functions and logic paths in `Entelgia_production_meta.py`, covering state management, speaker selection, prompt construction, loop detection, dream cycles, memory operations, and CLI entry points.
+
+---

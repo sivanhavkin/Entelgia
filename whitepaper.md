@@ -7,7 +7,7 @@
 ## A Multi-Agent Architecture for Persistent Identity and Emergent Moral Regulation
 
 **Author:** Sivan Havkin
-**Version:** 5.0.0
+**Version:** 5.5.0
 **Status:** Research / Production Hybrid
 
 ---
@@ -401,7 +401,7 @@ Entelgia supports 4 configuration methods (priority order):
 
 ### Core Settings
 * `max_turns: 200` - Maximum dialogue turns per session
-* `timeout_minutes: 30` - Auto-session timeout
+* `timeout_minutes: 0` - Wall-clock timeout in minutes; `0` = no time limit (interactive startup overrides to `0`)
 * `seed_topic: str` - Initial conversation topic
 * `llm_timeout: 300` - LLM response timeout (seconds)
 * `llm_max_retries: 3` - Retry attempts on failure
@@ -537,7 +537,7 @@ Via Ollama:
 
 ## 17.3 Runtime Modes
 
-* **CLI Mode** - Interactive terminal (30-minute sessions)
+* **CLI Mode** - Interactive terminal (session length selected at startup; no wall-clock limit)
 * **API Mode** - REST server on port 8000
 * **Demo Mode** - Quick 10-turn showcase
 * **Test Mode** - Automated test execution
@@ -571,7 +571,7 @@ It is a structured architectural investigation into whether identity continuity 
 * Robust security features (HMAC-SHA256, PII redaction)
 * Developer-friendly tooling (automated installation, memory management)
 * Drive-aware cognition (dynamic temperature, superego critique, ego-driven memory depth)
-* Long-duration 200-turn dialogue mode (`Entelgia_production_meta_200t.py`)
+* Interactive session turn selector — any length from 5 to 100 turns; no wall-clock limit
 
 Entelgia demonstrates that persistent identity and internal regulation can coexist with production-grade reliability.
 
@@ -734,22 +734,23 @@ After all validate/critique passes, `speak()` performs a final cleanup sweep:
 
 ---
 
-## 22. Long-Duration Dialogue (`Entelgia_production_meta_200t.py`)
+## 22. Session Turn Selector (v5.5.0)
 
-The standard `Entelgia_production_meta.py` runner enforces a 30-minute session timeout, which can terminate a session before all configured turns complete. `Entelgia_production_meta_200t.py` addresses this with a minimal subclass:
+As of v5.5.0, `Entelgia_production_meta_200t.py` has been **removed**. The interactive turn-count selector in the main `Entelgia_production_meta.py` entry point supersedes it, supporting any session length with no wall-clock limit.
 
-```python
-class MainScriptLong(MainScript):
-    def run(self):
-        while self.turn_index < self.cfg.max_turns:
-            ...  # no timeout check
+At startup, an interactive menu selects `max_turns`:
+
+```
+Select session length:
+  [1]  5 turns
+  [2] 15 turns  (default — press Enter)
+  [3] 25 turns
+  [4] 50 turns
+  [5] 75 turns
+  [6] 100 turns
 ```
 
-Key characteristics:
-- **Turn-count gate only** — `while turn_index < max_turns` replaces `while time < timeout`.
-- **`_NO_TIMEOUT_MINUTES = 9999`** sentinel passed to `Config.timeout_minutes`.
-- **Full inheritance** — memory, emotions, Fixy interventions, dream cycles, session persistence, and logging are all inherited unchanged from `MainScript`.
-- **Run via**: `python Entelgia_production_meta_200t.py`
+`timeout_minutes=0` is set for all session lengths (no wall-clock limit). `Entelgia_production_meta.py` is now the sole entry point covering all session lengths.
 
 ---
 

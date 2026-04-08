@@ -10,16 +10,20 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+---
+
+## [5.5.0] - 2026-04-08
+
 ### Added
 
-- **Explicit fatigue metric (`_compute_fatigue`)** (`Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`) — new module-level pure function that derives a fatigue score `[0.0, 1.0]` and a state label from `energy_level`. Three energy regimes: `energy > 60` → `fatigue = 0.0` (no cost); `35 ≤ energy ≤ 60` → fatigue scales linearly as `(60 − energy) / 25`; `energy < 35` → clamped at `1.0` (dream/recovery handles this regime). Two new module-level constants: `_FATIGUE_ENERGY_THRESHOLD = 60.0` and `_FATIGUE_ENERGY_SPAN = 25.0`.
+- **Explicit fatigue metric (`_compute_fatigue`)** (`Entelgia_production_meta.py`) — new module-level pure function that derives a fatigue score `[0.0, 1.0]` and a state label from `energy_level`. Three energy regimes: `energy > 60` → `fatigue = 0.0` (no cost); `35 ≤ energy ≤ 60` → fatigue scales linearly as `(60 − energy) / 25`; `energy < 35` → clamped at `1.0` (dream/recovery handles this regime). Two new module-level constants: `_FATIGUE_ENERGY_THRESHOLD = 60.0` and `_FATIGUE_ENERGY_SPAN = 25.0`.
 - **Four fatigue state labels** — `_compute_fatigue` maps the numeric score to a readable label: `0.0–0.2 → "none"`, `0.2–0.5 → "mild"`, `0.5–0.8 → "medium"`, `0.8–1.0 → "severe"`.
 - **`[FATIGUE-INJECT]` debug log** — emitted at `DEBUG` level when a fatigue modifier is injected into the prompt (energy 35–60 only), recording `fatigue`, `state`, and `energy` for prompt-level traceability.
 - **Gradual fatigue prompt injection (35–60 range)** — when `35.0 ≤ energy_level ≤ 60.0`, a `COGNITIVE STATE` instruction is inserted just before `\nRespond now:\n`. The wording scales continuously with fatigue level: `fatigue < 0.3` → slight hesitation acceptable; `0.3–0.6` → mild hedging, maintain clarity; `≥ 0.6` → blurrier phrasing and abstraction natural. No fabricated loops or stagnation. Energy above 60 receives no modifier; below 35 the dream/recovery system handles recovery instead.
 - **`[LOOP-DIAG]` per-turn log in `MainScript._run_loop()`** — emitted after `speak()` returns to make structural vs. fatigue causation explicitly visible side-by-side: `[LOOP-DIAG] agent=Socrates structural_repeat=False fatigue_level=0.68 fatigue_bias=0.29`. `structural_repeat` reflects the active loop modes from `DialogueLoopDetector`; `fatigue_level` and `fatigue_bias = max(0, (fatigue − 0.2) × 0.6)` come purely from energy. The two sources are never conflated.
 - **Fatigue fields on `Agent`** — `_last_fatigue: float = 0.0` and `_last_fatigue_state: str = "none"` initialised in `__init__`; updated by `speak()` every turn.
 - **Fatigue in META display** — `print_meta_state()` appends `Fatigue: X.XX  State: <label>` to the Energy/Conflict line: `Energy: 43.0  Conflict: 2.10  Fatigue: 0.68  State: medium`.
-- **Energy status label (`_compute_energy_status`)** (`Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`) — new module-level pure function that returns the energy regime label for the current `energy_level`: `energy > 60` → `"normal"`; `35 ≤ energy ≤ 60` → `"degrading"`; `energy < 35` → `"dream"`. New constant `_ENERGY_DREAM_THRESHOLD = 35.0`. Gives operators a single, unambiguous label for which energy regime the agent is operating in, making it immediately clear when energy has entered the degrading zone even when the fatigue score is still low (e.g. `Energy: 59.4  Conflict: 2.74  Fatigue: 0.02  State: none  Status: degrading`).
+- **Energy status label (`_compute_energy_status`)** (`Entelgia_production_meta.py`) — new module-level pure function that returns the energy regime label for the current `energy_level`: `energy > 60` → `"normal"`; `35 ≤ energy ≤ 60` → `"degrading"`; `energy < 35` → `"dream"`. New constant `_ENERGY_DREAM_THRESHOLD = 35.0`. Gives operators a single, unambiguous label for which energy regime the agent is operating in, making it immediately clear when energy has entered the degrading zone even when the fatigue score is still low (e.g. `Energy: 59.4  Conflict: 2.74  Fatigue: 0.02  State: none  Status: degrading`).
 - **Energy status field on `Agent`** — `_last_energy_status: str = "normal"` initialised in `__init__`; updated by `speak()` every turn alongside the fatigue fields.
 - **`[ENERGY-STATUS]` log line every turn** — emitted at `INFO` level inside `Agent.speak()` immediately after `[FATIGUE]`: `[ENERGY-STATUS] agent=Socrates status=degrading energy=59.4`. Provides a per-turn observable trace of the energy regime, independent of the fatigue score.
 - **Dynamic progress scoring in `score_progress()`** (`entelgia/progress_enforcer.py`) — replaces the static flat score for `NEW_CLAIM` moves with a composite system that rewards genuinely state-changing turns. Four dynamic bonuses stack on top of the base move-type score: (#350)
@@ -45,7 +49,7 @@ All notable changes to this project will be documented in this file. The format 
 - **`compute_pressure_alignment()` measurement signal** (`entelgia/response_evaluator.py`) — passive per-turn comparison between the agent's internal `drive_pressure` scalar (meta signal) and the text-detected `pressure` boolean. Uses banded thresholds `_META_PRESSURE_LOW_THRESHOLD = 2.5` and `_META_PRESSURE_HIGH_THRESHOLD = 4.5` to produce five labels: `aligned`, `internal_not_expressed`, `text_more_pressured_than_state`, `weak_alignment` (grey zone), `neutral`. Emitted as a `[PRESSURE-SYNC]` log line after `[DIALOGUE]`. (#359, #360)
 - **`compute_resolution_alignment()` and `compute_semantic_repeat_alignment()` measurement signals** (`entelgia/response_evaluator.py`) — passive per-turn alignment between text-detected resolution/semantic-repeat signals and internal dialogue state. Emitted as `[RESOLUTION-SYNC]` and `[SEMANTIC-REPEAT-SYNC]` log lines. (#362, #363)
 - **Dialogue pressure feedback loop** — soft exponential-weighted moving average (EWM) upward nudge from text-detected pressure into `drive_pressure`: `_PRESSURE_FEEDBACK_ALPHA = 0.15`, upward-only (existing `compute_drive_pressure` decay handles the downward direction), capped at `10.0`. Max single-turn delta is `α × (10 − current)` ≤ 1.5, diminishing as pressure rises. (#361)
-- **Stagnation metric: `_topic_keywords()` and `_keyword_jaccard()`** (`Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`) — replaces the MD5 hash-based exact-match comparison with Jaccard similarity on keyword frozensets. `_JACCARD_STAGNATION_THRESHOLD = 0.35` and `_PE_STAGNATION_INCREMENT = 0.25` are new named constants. Progress-enforcer stagnation detections now feed back into `_last_stagnation` (capped at 1.0), ensuring the meta-state scalar reflects detected behavioural stagnation. (#364)
+- **Stagnation metric: `_topic_keywords()` and `_keyword_jaccard()`** (`Entelgia_production_meta.py`) — replaces the MD5 hash-based exact-match comparison with Jaccard similarity on keyword frozensets. `_JACCARD_STAGNATION_THRESHOLD = 0.35` and `_PE_STAGNATION_INCREMENT = 0.25` are new named constants. Progress-enforcer stagnation detections now feed back into `_last_stagnation` (capped at 1.0), ensuring the meta-state scalar reflects detected behavioural stagnation. (#364)
 - **New module `entelgia/fixy_semantic_control.py` — Fixy Semantic Control Layer (v5.3.0)** — a unified semantic validation and loop-detection controller attached to Fixy's guidance system. Addresses a systematic weakness where Fixy asks for concrete examples, falsifiable tests, or concessions but debate agents produce abstractions while still receiving relatively high progress scores:
   - **`ValidationResult`** dataclass — `(speaker, expected_move, compliant, partial, confidence, reason)`. Produced by the LLM-backed compliance validator.
   - **`LoopCheckResult`** dataclass — `(speaker, is_loop, confidence, reason)`. Produced by the LLM-backed loop detector.
@@ -74,7 +78,7 @@ All notable changes to this project will be documented in this file. The format 
   - All existing callers are unchanged — both new params are keyword-only with safe defaults.
 - **Conceptual dependency loop detection** (`entelgia/loop_guard.py`) — new `CONCEPTUAL_LOOP` failure mode that detects circular justification patterns regardless of surface wording. Uses lightweight structural heuristics: extracts `(dependent, dependency)` concept pairs from forward phrases (`depends on`, `requires`, `stems from`, etc.) and reverse phrases (`enables`, `underlies`, `grounds`, etc.) via compiled regexes, then flags a loop when the same conceptual axis appears with reversed dependency direction across the recent turn window. Satisfies the two-condition gate independently (self-contained compound check). Novelty suppressor is bypassed — the structural signal overrides wording-based noise. Policy: `AgentMode.MECHANIZE` (force causal mechanism exposition) and `FixyMode.FORCE_MECHANISM` / `FixyMode.FORCE_DEFINITION` for Fixy and rewrite modes. When detected, `_last_stagnation` is incremented by `_PE_STAGNATION_INCREMENT` in both production scripts to keep meta-state coherent.
 - **Embedding-based same-axis detection** (`entelgia/loop_guard.py`) — new `check_same_axis(turns)` public method on `DialogueLoopDetector`. Uses sentence-transformers cosine similarity (`_AXIS_EMBEDDING_SIMILARITY_THRESHOLD = 0.82`) when available, falling back to mean pairwise Jaccard overlap (`_AXIS_JACCARD_THRESHOLD = 0.40`). Reuses the model cached by `circularity_guard` to avoid loading a second copy. **This is a supporting signal only** — it does not trigger stagnation on its own. When `same_axis=True` AND a structural loop is simultaneously active, `_last_stagnation` is further bumped by `_PE_STAGNATION_INCREMENT` and `_last_dialogue_signals["semantic_repeat"]` is set to `True` (reflecting the gap between structural detection and Jaccard-based repetition). Logged as `[AXIS-EMBED]` in both production scripts.
-- **Dream-cycle unresolved topic integration** (`entelgia/energy_regulation.py`, `Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`) — the dream cycle now processes pending unresolved topics instead of ignoring or blindly clearing them:
+- **Dream-cycle unresolved topic integration** (`entelgia/energy_regulation.py`, `Entelgia_production_meta.py`) — the dream cycle now processes pending unresolved topics instead of ignoring or blindly clearing them:
   - **`unresolved_topics`** — new per-agent store (`List[Dict]`). Each entry carries `topic`, `intensity`, `repetition`, `conflict`, `status` (`"unresolved"` / `"integrated"`), and `weight`. Topics are **never deleted** — structure is preserved across dream cycles.
   - **`dream_resolutions`** — new per-agent log (`List[Dict]`) appended by each dream cycle. Every record holds `type="dream_resolution"`, `topic`, and `insight`.
   - **`_score_unresolved(item)`** — salience score = `intensity + conflict + log(repetition + 1)`. Higher-salience topics are prioritised.
@@ -184,6 +188,58 @@ All notable changes to this project will be documented in this file. The format 
 - **Total test count**: **1956 tests** across **40 suites**.
 
 ---
+
+### Added (PRs #403–#417)
+
+- **Semantic loop detection as hard validation failure** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`) — loops were detected correctly but responses were still accepted. `ControlDecision` gains `is_loop: bool` and `reasoning_delta: Optional[str]` fields. New `check_loop_rejection(is_loop, reasoning_delta)` hard gate rejects when `is_loop=True AND reasoning_delta in ("none","weak")`, logging `[INTEGRATION-LOOP-REJECT]`. `build_loop_break_overlay(regen_attempt)` produces 3-tier escalating overlays (standard → hard critical → failsafe `[PERSON]/[ACTION]/[OUTCOME]` format). `MAX_LOOP_BREAK_ATTEMPTS = 2` exposed as public constant. PRE-ACCEPT block inserted before `dialog.append` — reruns semantic evaluation and regens up to `MAX_LOOP_BREAK_ATTEMPTS` times before best-effort accept. (#403)
+
+- **Loop failsafe replaced by escalation + system fallback** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`) — after exhausting `MAX_LOOP_BREAK_ATTEMPTS`, the system now runs one final escalation pass with `_OVERLAY_LOOP_ESCALATION_STRATEGY` (personality suppressed, no philosophical questions, 1–2 sentences max) and truncates context to `dialog[-2:]`, then falls back to `_FALLBACK_LOOP_RESET_TEXT` if the output is still a loop. The looping response is never accepted. Two-stage recovery: `[INTEGRATION-LOOP-ESCALATION]` → `[INTEGRATION-LOOP-RESET]`. (#404)
+
+- **Verbose internal-state log levels demoted to DEBUG** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`, `entelgia/loop_guard.py`, `entelgia/fixy_interactive.py`, `entelgia/fixy_semantic_control.py`) — `[INTEGRATION-STATE]`, `[INTEGRATION-DECISION]`, `[INTEGRATION-OVERLAY]`, `[PRE-GEN-STATE]`, `[PRE-GEN-OVERLAY]`, `[STRUCTURE-LOCK]` (active + satisfied), `[QUALITY-GATE]`, `[FIXY-SUPPRESS]`, all six `[FIXY-LOOP]` failure-mode detection logs, and semantic-controller logs demoted from `INFO` to `logger.debug`. No behavioural changes. (#405)
+
+- **Dynamic conversation continuation replaces static topic seed** (`entelgia/dialogue_engine.py`, `Entelgia_production_meta.py`) — `extract_continuation_context(recent_turns, topic)` scans recent speaker turns for `dominant_topic`, `last_claim`, `unresolved_question`, and `tension_point` (skipping `role="seed"` entries). `build_continuation_prompt(context)` formats these into a structured "Continue the dialogue from its last meaningful state" prompt. `SeedGenerator.generate_seed()` uses the continuation prompt when `has_prior_memory=True` and real turns exist; otherwise falls back to the original `TOPIC:` header. (#406)
+
+- **Logging refactor: per-turn telemetry demoted from INFO to DEBUG** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`) — `[EVAL]`, `[DIALOGUE]`, `[LOOP-DIAG]`, `[PRESSURE-SYNC]`, `[RESOLUTION-SYNC]`, `[SEMANTIC-REPEAT-SYNC]`, routine per-turn `[PROGRESS]`, `[FIXY-COUPLING]`, `[ABSTRACTION-PENALTY]`, and memory internals demoted. What stays `INFO`: session start/interrupt/save, loop-reject/escalation/reset events, interventions, mode changes, dream/resolve events, and all warnings/errors. `[FIXY-VALIDATION]` / `[FIXY-LOOP]` now conditional: `DEBUG` when benign, `INFO` when actionable. (#407)
+
+- **Fixy intervention taxonomy expanded, guidance/control split, failed-reason escalation** (`entelgia/fixy_interactive.py`) — six new intervention reasons: `missing_distinction`, `unresolved_contradiction`, `category_confusion`, `false_dichotomy`, `repeated_abstraction`, `no_structural_challenge`. New `FIXY_MODE_GUIDANCE` / `FIXY_MODE_CONTROL` constants and `get_mode_type(mode)` method. All `FORCE_*` / `HARD_CONSTRAINT` prompts rewritten to ≤100 words with imperative framing. `_failed_reasons` set added to `InteractiveFixy` — reasons that have failed before are escalated to harder modes automatically. (#408)
+
+- **Per-agent LLM backend mixing in startup menu** (`Entelgia_production_meta.py`, `Entelgia_production_meta.py`) — `Config` gains `backend_socrates`, `backend_athena`, `backend_fixy` fields (default `""` = inherit global); `LLM.generate()` gains `backend: str = ""` parameter threaded through `EmotionCore.infer()`, `BehaviorCore.dream_reflection()`, `Agent.speak()`, `InteractiveFixy`, and `FixySemanticController`. Startup menu redesigned with three modes: `[0] Keep defaults`, `[1] Same backend for all agents`, `[2] Mix backends — choose per agent`. `_BACKEND_MODELS` dict is the single source of truth for model lists. (#409)
+
+- **Normal/success log messages moved from INFO to DEBUG** (`entelgia/integration_core.py`, `entelgia/fixy_interactive.py`) — `[INTEGRATION-MODE]` and `[PRE-GEN-DECISION]` now emit `DEBUG` when `mode=NORMAL`, `INFO` only for elevated modes. `[POST-GEN-VALIDATION]` emits `DEBUG` whenever `compliant=True`. `[FIXY-GATE] pair window reset` unconditionally downgraded to `debug`. (#410)
+
+- **Semantic memory retrieval via sentence-transformers in `EnhancedMemoryIntegration`** (`entelgia/context_manager.py`) — `_get_ctx_semantic_model()` lazy-loads `all-MiniLM-L6-v2`. `_batch_semantic_scores(topic, dialog_text, memories)` encodes all texts in one `model.encode()` call; falls back transparently to keyword (Jaccard) scoring on any failure. `EnhancedMemoryIntegration.__init__` gains `use_semantic: bool = True`. `sentence-transformers`, `scikit-learn`, and `numpy` promoted from optional extras to core `[project.dependencies]` in `pyproject.toml` and `requirements.txt`. (#411)
+
+- **`Entelgia_production_meta.py` test coverage raised from 45% to 72%** — new `tests/test_production_meta_coverage.py` with **278 tests** targeting previously uncovered code paths: `Config.__post_init__` validation (all error branches including per-agent backend overrides), `MetricsTracker`, `LRUCache` (TTL expiry, eviction), utility functions (`now_iso`, `ensure_dirs`, `sha256_text`, `safe_json_dump`, `load_json`, `append_csv_row`), `MemoryCore` (LTM insert/recent/forgetting/affective/signing, STM load/save/append), `TopicManager`, `Agent` edge cases, `MainScript.__init__` paths. (#412)
+
+- **IntegrationCore architecture refactor: expanded intervention taxonomy, Fixy demoted to observer** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`) — eight new `IntegrationMode` values replace coarse `REQUIRE_ATTACK`-for-everything: `REQUIRE_TEST`, `REQUIRE_NEW_VARIABLE`, `REQUIRE_CONCRETE_CASE`, `REQUIRE_BRANCH_CLOSURE`, `REQUIRE_COUNTEREXAMPLE`, `REQUIRE_FORCED_CHOICE`, `REQUIRE_STRUCTURAL_CHALLENGE`, `DREAM_RECOVERY`. `FIXY_AUTHORITY_OVERRIDE` removed as a hard rule; Fixy's last message is read as a soft signal only via controller-owned `_read_fixy_soft_signal()`. State priority order: dream/fatigue → loop break → stagnation dispatch → unresolved overload → structural challenge → pressure. Post-dream recovery suppresses adversarial modes for 2 turns. (#413)
+
+- **Dialogue controller patches: REQUIRE_ATTACK overuse fixed, Fixy soft hint priority corrected, post-dream recovery enforced** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`) — `_decide_stagnation_intervention()` step 6 now requires explicit adversarial evidence (`reasoning_delta` not in `None/"none"/"weak"`) before dispatching `REQUIRE_STRUCTURAL_CHALLENGE`; generic stagnation falls back to `REQUIRE_FORCED_CHOICE`. `_read_fixy_soft_signal()` rewritten with deterministic priority: `REQUIRE_TEST > REQUIRE_BRANCH_CLOSURE > REQUIRE_CONCRETE_CASE > REQUIRE_NEW_VARIABLE`. `FIXY_SOFT_SIGNAL_MAX_TURNS=12` applied. `_decide_from_mode()` gains defence-in-depth post-dream guard: adversarial modes downgraded to `REQUIRE_CONCRETE_CASE` when `post_dream_recovery_turns > 0`. (#414)
+
+- **Post-dream recovery: REQUIRE_ATTACK blocked, REQUIRE_CONCRETE_CASE preferred** (`entelgia/progress_enforcer.py`, `entelgia/integration_core.py`, `Entelgia_production_meta.py`) — `get_intervention_policy()` gains `in_recovery: bool = False`; `repeated_moves` under recovery returns `REQUIRE_EVIDENCE` instead of `REQUIRE_ATTACK`. `_decide_stagnation_intervention` adversarial-delta-in-recovery fallback changed from `REQUIRE_FORCED_CHOICE` to `REQUIRE_CONCRETE_CASE`. `Agent` gains `post_dream_recovery_turns: int = 0` field updated by main loop. (#415)
+
+- **State-transition output contracts and UNRESOLVED item state machine** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`) — `validate_generated_output` now enforces hard output contracts per mode: `REQUIRE_TEST` checks five structural fields via `_VALIDATE_TEST_SIGNALS` + `_VALIDATE_TEST_RE` word-boundary regex; `REQUIRE_COUNTEREXAMPLE` checks mechanism/evidence/causal language; `REQUIRE_FORCED_CHOICE` checks commitment signal; `REQUIRE_BRANCH_CLOSURE` checks closure language. `[STATE-TRANSITION-FAIL]` logged by `should_regenerate_after_validation`. UNRESOLVED item state machine in `Entelgia_production_meta.py`: four states — `_UT_STATE_OPEN`, `_UT_STATE_TESTABLE`, `_UT_STATE_RESOLVED`, `_UT_STATE_DISCARDED`; `_transition_unresolved_item()` promotes items on each qualifying `REQUIRE_*` turn. (#416)
+
+- **Outcome-oriented reasoning: hard output contracts + full UNRESOLVED state machine + force-outcome rule** (`entelgia/integration_core.py`, `Entelgia_production_meta.py`) — `REQUIRE_TEST` strengthened to `all()` over five required structural fields; `REQUIRE_FORCED_CHOICE` requires commitment + justification + change-condition signals (all three); `REQUIRE_BRANCH_CLOSURE` requires closure signal + explicit state marker. `_RHETORICAL_ESCAPE_PATTERNS` checked in all non-NORMAL intervention modes before mode-specific validation — match → `[STATE-TRANSITION-FAIL] reason="rhetorical escape"`. New `_rule_force_outcome` fires when `turn_count > 15 AND stagnation ≥ 0.5` OR `unresolved ≥ 5`, selecting `REQUIRE_BRANCH_CLOSURE` (when unresolved ≥ 3) or `REQUIRE_FORCED_CHOICE`. All three intervention overlays rewritten to specify exact required structure. (#417)
+
+### Changed (PRs #403–#417)
+
+- **`Entelgia_production_meta_200t.py` removed** — superseded by the interactive turn-count selector; `Entelgia_production_meta.py` is now the sole entry point. (already noted in #401)
+- **`sentence-transformers`, `scikit-learn`, `numpy` promoted to core dependencies** in `pyproject.toml` and `requirements.txt` (was optional extras). (#411)
+- **Startup backend menu redesigned** with a three-mode flow (keep defaults / same for all / mix per agent). (#409)
+
+### Tests (PRs #403–#417)
+
+- **`tests/test_integration_core.py`** — **15 new tests** across `TestCheckLoopRejection`, `TestBuildLoopBreakOverlay`, `TestControlDecisionLoopFields` (#403); **4 new tests** for `TestBuildLoopEscalationOverlay` and `TestGetLoopResetFallback` (#404).
+- **`tests/test_fixy_improvements.py`** — 3 `caplog` calls updated to `logging.DEBUG` for pair-window-reset assertions. (#410)
+- **`tests/test_production_meta_coverage.py`** — new suite, **278 tests**. (#412)
+- **`tests/test_integration_core.py`** extended with integration-mode taxonomy and soft-signal tests. (#413, #414)
+- **`tests/test_progress_enforcer.py`** — 4 new recovery-mode policy tests. (#415)
+- **`tests/test_integration_core.py`** extended with state-transition output contract tests and UNRESOLVED machine. (#416, #417)
+- **`tests/test_drive_pressure.py`** — `TestTransitionUnresolvedItem` new class with full UNRESOLVED state machine coverage. (#416)
+- **`tests/test_continuation_context.py`** — new suite, **20 tests** for continuation context extraction and prompt building. (#406)
+- **Total test count**: **2460 tests** across **42 suites**.
+
+
 
 ## [5.0.0] - 2026-03-27
 
@@ -393,7 +449,7 @@ All notable changes to this project will be documented in this file. The format 
 
 - **FreudianSlip default probability** lowered from `0.15` to `0.05` to reduce `[SLIP]` output frequency during normal runs. (PR #205)
 - `Agent.apply_freudian_slip` now reuses a single persistent `FreudianSlip` engine instance (`self._slip_engine`) instead of constructing a new one per turn. This is required for cooldown and dedup state to be maintained across turns. (PR #205)
-- **Black formatting pass** applied to `Entelgia_production_meta.py`, `Entelgia_production_meta_200t.py`, and `tests/test_long_term_memory.py` — pure style changes, no logic modified. (PR #206)
+- **Black formatting pass** applied to `Entelgia_production_meta.py`, and `tests/test_long_term_memory.py` — pure style changes, no logic modified. (PR #206)
 
 ### Fixed
 
@@ -1269,8 +1325,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 ## 📊 Quick Reference
 
-- ✅ **Latest stable:** v5.0.0
-- 🔒 **Previous stable:** v4.1.0
+- ✅ **Latest stable:** v5.5.0
+- 🔒 **Previous stable:** v5.0.0
 - 🚧 **Next release:** TBD
 - 📅 **Release schedule:** Bi-weekly minor, as-needed patches
 - 📖 **Versioning:** [Semantic Versioning 2.0](https://semver.org/)
@@ -1281,7 +1337,8 @@ This pre‑release demonstrated the full multi‑agent architecture running end�
 
 | Version | Release Date | Type | Status | Description |
 |---------|--------------|------|--------|-------------|
-| **v5.0.0** | 2026-03-27 | Major | ✅ **Current** | Topics master switch, Fixy staged intervention ladder, perspective-driven prompts, topic pipeline predicate |
+| **v5.5.0** | 2026-04-08 | Minor | ✅ **Current** | IntegrationCore executive cortex, escalation system, quality gate, IntegrationMemoryStore, reasoning-delta loop evaluation, continuation context, production meta coverage |
+| **v5.0.0** | 2026-03-27 | Major | ✅ **Stable** | Topics master switch, Fixy staged intervention ladder, perspective-driven prompts, topic pipeline predicate |
 | **v4.1.0** | 2026-03-26 | Minor | ✅ **Stable** | OpenAI and Anthropic LLM backends, extended interactive startup selector |
 | **v4.0.0** | 2026-03-20 | Major | ✅ **Stable** | Version bump to 4.0.0; two-stage DRAFT→FINAL pipeline, proposal-aware topic selection, query rewriting improvements |
 | **v3.0.0** | 2026-03-12 | Minor | ⚠️ Superseded | Topic-aware style selection, forgetting policy, affective routing, confidence metadata, loop guard, enable_observer flag, semantic repetition detection, FreudianSlip rate-limiting |

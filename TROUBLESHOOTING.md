@@ -707,14 +707,16 @@ mkdir memories/
 - Conversation doesn't progress
 
 **Solution:**
-Fixy (the Observer agent) automatically detects and interrupts circular patterns via need-based intervention. If it persists:
+As of v5.5.0, semantic loops are **hard-rejected** before they are published to the dialogue. `IntegrationCore.check_loop_rejection()` intercepts any response where `is_loop=True` and `reasoning_delta` is `"none"` or `"weak"`, immediately regenerating up to `MAX_LOOP_BREAK_ATTEMPTS = 2` times. If all retries fail, a final escalation pass runs with a stripped-down hard-constraint overlay. If that still fails, a neutral system message replaces the output — the looping response is discarded entirely.
 
-1. Increase dream cycle frequency:
+If you still observe repetitive dialogue:
+
+1. Ensure the session has run enough turns for stagnation to build (the force-outcome rule activates after turn 15 when `stagnation ≥ 0.5` or when 5+ unresolved items accumulate)
+2. Increase dream cycle frequency to restore energy:
 ```python
 config.dream_every_n_turns = 5  # More frequent reflection
 ```
-
-2. Restart the session to reset context
+3. Restart the session to reset context
 
 ---
 
@@ -768,9 +770,9 @@ taskmgr
 ollama ps
 ```
 
-4. Reduce dialogue complexity:
+4. Reduce number of turns if hitting token limits:
 ```python
-config.max_output_words = 100  # Shorter responses
+# Select a smaller turn count at the interactive startup menu (e.g. 15 or 25)
 ```
 
 ---
@@ -999,5 +1001,5 @@ These patterns help ensure Entelgia works reliably:
 
 ---
 
-**Last Updated:** 07 March 2026  
-**Version:** 5.0.0
+**Last Updated:** 08 April 2026  
+**Version:** 5.5.0
