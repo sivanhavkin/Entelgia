@@ -95,19 +95,22 @@ External knowledge pipeline triggered by Fixy:
 
 
 
-## 2) Runtime Loop (“Physics Loop”)
+## 2) Runtime Loop ("Physics Loop")
 
 ### High-level loop
 1. **Select next speaker**
 2. **Select topic**
-3. **Generate seed** (instruction + strategy)
-4. **Build prompt** (enhanced or legacy)
-5. **LLM generates response**
-6. **Post-generation revision** (`revise_draft()`)
-7. **Log + print**
-8. **Update memory + drives**
-9. **Fixy intervention** (need-based or scheduled)
-10. **Dream/Reflection cycle** (if enabled)
+3. **Generate seed** (instruction + strategy; continuation context from turn 2 onward)
+4. **IntegrationCore pre-generation** (mode selection + overlay injection)
+5. **Build prompt** (enhanced or legacy, including IntegrationCore overlay)
+6. **LLM generates response**
+7. **IntegrationCore post-generation validation** (output contracts; loop hard-rejection; quality gate)
+8. **Post-generation revision** (`revise_draft()`)
+9. **Log + print**
+10. **Update memory + drives**
+11. **Fixy intervention** (need-based or scheduled; emits soft signal for next turn's IntegrationCore)
+12. **UNRESOLVED state machine** (transition items per qualifying `REQUIRE_*` turn)
+13. **Dream/Reflection cycle** (if enabled)
 
 ### Pseudocode
 ```python
@@ -118,15 +121,34 @@ while session_active:
 
     speaker = select_speaker(dialog_history, turn)  # dynamic or alternation
     
-    seed = generate_seed(topic, dialog_history, speaker, turn)  # dynamic or default
+    # continuation context injected from turn 2+
+    seed = generate_seed(topic, dialog_history, speaker, turn,
+                         has_prior_memory=(turn > 0))
 
-    prompt = speaker.build_prompt(seed, dialog_history)  # enhanced or legacy
+    # IntegrationCore pre-generation: select mode, build overlay
+    ic_decision = integration_core.decide(state)
+    overlay = integration_core.build_overlay(ic_decision)
 
-    raw_draft = LLM.generate(model=speaker.model, prompt=prompt)
+    prompt = speaker.build_prompt(seed, dialog_history, overlay=overlay)
+
+    # per-agent backend routing (LLM.generate gains backend= param)
+    raw_draft = LLM.generate(model=speaker.model, prompt=prompt,
+                              backend=speaker.backend)
     speaker._last_raw_draft = raw_draft        # debug only — never stored in LTM
-    logger.debug("[%s] raw_draft: %s", speaker.name, raw_draft[:200])
 
-    out = revise_draft(raw_draft, speaker.name, topic=topic)  # revision layer
+    # IntegrationCore post-generation: validate + regen loop
+    out = raw_draft
+    for attempt in range(MAX_LOOP_BREAK_ATTEMPTS + 1):
+        validation = integration_core.validate_generated_output(out, ic_decision)
+        is_reject, _ = integration_core.check_loop_rejection(...)
+        if validation.compliant and not is_reject:
+            break
+        out = LLM.generate(...)  # regenerate with stronger overlay
+
+    out = revise_draft(out, speaker.name, topic=topic)  # revision layer
+
+    # PRE-ACCEPT: semantic loop hard-rejection before dialog.append
+    # loop detected → escalation overlay → system fallback if still looping
 
     dialog_history.append({"role": speaker.name, "text": out})
     log_turn(speaker.name, out, topic)
@@ -134,11 +156,13 @@ while session_active:
     speaker.store_turn(out, topic)               # memory write (revised text only)
     speaker.update_drives_after_turn(...)        # state update
 
-    maybe_fixy_intervene(dialog_history, turn)
+    maybe_fixy_intervene(dialog_history, turn)   # soft signal → next turn's IntegrationCore
+
+    # UNRESOLVED TRANSITION: advance state machine per qualifying turn
+    maybe_transition_unresolved_items(out, ic_decision)
 
     maybe_dream_cycle(turn)
 ```
-
 ## 3) Modes: Enhanced vs Legacy
 
 ### Enhanced Mode
@@ -267,8 +291,22 @@ Example seed strategies (illustrative):
   * agent role (Socrates vs Athena)
 * Fixy (if speaking) uses a short corrective/meta seed or intervention prompt.
 
----
+### Continuation Context (v5.5.0)
 
+From the second turn onward (`has_prior_memory=True`), `generate_seed()` replaces the static `TOPIC: {topic}` header with a **continuation prompt** built by `extract_continuation_context()` + `build_continuation_prompt()`:
+
+```
+Continue the dialogue from its last meaningful state.
+Do not restart the topic.
+Do not repeat prior arguments.
+
+The previous discussion focused on: <dominant_topic>
+The last claim made was: <last_claim>
+An unresolved question remains: <unresolved_question>
+The tension point was: <tension_point>
+```
+
+Fields are extracted from the last few real speaker turns; `role="seed"` entries are skipped. When a field ends without terminal punctuation, a `.` is appended. If no real turns exist or `has_prior_memory=False`, the original `TOPIC: {topic}` header is used.
 ## 7) Prompt Construction Policy
 
 ### Enhanced Prompt (ContextManager)
@@ -302,9 +340,9 @@ Compact prompt with:
 
 ## 8) Observer Policy (Fixy)
 
-### Fixy’s role
+### Fixy's role
 
-Fixy is a **meta-cognitive guardian**, not a participant competing for answers.
+Fixy is a **meta-cognitive observer** — not a supervisor. As of v5.5.0, `IntegrationCore` is the sole supervisory authority. Fixy's last message is read by the controller as a soft signal source only.
 
 Fixy should:
 
@@ -317,9 +355,10 @@ Fixy must NOT:
 
 * dominate the conversation
 * produce long philosophical essays
-* override the agents’ autonomy every turn
+* override the agents' autonomy every turn
 * inject unrelated topics
 * use procedural labels (`Deadlock:`, `Next move:`, `Loop:`, `Pattern:`) in output
+* block or force-regenerate responses (IntegrationCore owns that authority)
 
 ### Staged Intervention Ladder
 
@@ -345,6 +384,10 @@ Fixy escalates through five levels rather than jumping straight to hard interven
 
 After each intervention, Fixy emits a `FixyGuidance` dataclass `(goal, preferred_move, confidence, reason)` that biases the next agent's seed-strategy selection toward a recommended move type (`EXAMPLE`, `TEST`, `CONCESSION`, etc.) without forcing it.  `record_agent_move()` tracks compliance and escalates `confidence` after 2 consecutive ignores.
 
+### Fixy → IntegrationCore Soft Signal
+
+`IntegrationCore._read_fixy_soft_signal(fixy_last_message)` maps Fixy hint keywords to `IntegrationMode` values. Priority order: `REQUIRE_TEST > REQUIRE_BRANCH_CLOSURE > REQUIRE_CONCRETE_CASE > REQUIRE_NEW_VARIABLE`. Fixy messages older than `FIXY_SOFT_SIGNAL_MAX_TURNS = 12` turns are ignored. This is **controller-owned** — Fixy never calls enforcement functions directly.
+
 ### Semantic Compliance & Loop Detection (`entelgia/fixy_semantic_control.py`, v5.3.0)
 
 A unified semantic control layer attached to the guidance system:
@@ -353,11 +396,11 @@ A unified semantic control layer attached to the guidance system:
 |---|---|
 | `FixySemanticController` | LLM-backed validator and loop detector |
 | `ValidationResult` | Dataclass: `(speaker, expected_move, compliant, partial, confidence, reason)` |
-| `LoopCheckResult` | Dataclass: `(speaker, is_loop, confidence, reason)` |
+| `LoopCheckResult` | Dataclass: `(speaker, is_loop, confidence, reason, reasoning_delta, new_move_type)` |
 
 **Validation** — Only `EXAMPLE`, `TEST`, `CONCESSION` are validated in v1.  An LLM prompt checks the reply against the corresponding rule set and returns a JSON compliance verdict.  Lightweight pre-signal heuristics (`quick_example_hint`, `quick_test_hint`) provide an early hint but are never the final authority.
 
-**Loop detection** — triggered when any of: `stagnation > 0.0`, `repeated_moves`, `ignored_recently`, or `unresolved_rising` is true.  Compares the current reply against the last 2–3 turns from the same speaker.
+**Loop detection** — triggered when any of: `stagnation > 0.0`, `repeated_moves`, `ignored_recently`, or `unresolved_rising` is true.  Compares the current reply against the last 2–3 turns from the same speaker.  Returns `LoopCheckResult` with `reasoning_delta` (`"none"` / `"weak"` / `"moderate"` / `"strong"`) and `new_move_type`.
 
 **Fixy state updates** — `record_guidance_compliance()` adjusts `ignored_guidance_count` based on the compliance verdict; `record_semantic_loop()` increments `semantic_loop_count` and boosts `fixy_guidance.confidence`.
 
@@ -368,9 +411,9 @@ A unified semantic control layer attached to the guidance system:
 * Non-compliance → `×0.85`; repeated non-compliance (≥ 3) caps score at `0.55`
 * Semantic loop → `×0.75`; high-confidence loop (≥ 0.75) also caps at `0.50`
 
-**This layer is always soft** — no rejection, regeneration, blocking, or retry.  Detect, score, bias, penalise only.
+**This layer is soft** — it detects, scores, biases, and penalises.  Hard rejection and regeneration are handled by `IntegrationCore`.
 
-Log tags: `[FIXY-VALIDATION]`, `[FIXY-LOOP]`.
+Log tags: `[FIXY-VALIDATION]` (DEBUG when compliant, INFO when not), `[FIXY-LOOP]` (DEBUG when benign, INFO when actionable).
 
 ### Intervention style
 
@@ -378,9 +421,6 @@ Log tags: `[FIXY-VALIDATION]`, `[FIXY-LOOP]`.
 * brief
 * concrete
 * no rigid output labels
-
----
-
 ## 9) Energy & Dream Cycles (v2.5.0)
 
 ### Overview
@@ -1276,19 +1316,174 @@ Structural detectors (`DialogueLoopDetector`, progress-enforcer, Jaccard stagnat
 
 ---
 
+---
+
+## 23) IntegrationCore — Executive Cortex (`entelgia/integration_core.py`, v5.5.0)
+
+### Overview
+
+`IntegrationCore` is the sole supervisory authority above dialogue agents and Fixy. It runs **twice per turn**: once to decide pre-generation constraints, and once to validate the generated output and enforce contracts.
+
+### IntegrationState
+
+`IntegrationState` is the per-turn signal bundle consumed by `_apply_rules()`:
+
+| Field | Source |
+|---|---|
+| `stagnation` | Jaccard stagnation metric |
+| `is_loop` | `FixySemanticController.evaluate_reply()` |
+| `reasoning_delta` | `LoopCheckResult.reasoning_delta` |
+| `unresolved` | count of open unresolved topics |
+| `turn_count` | `len(self.dialog)` |
+| `fixy_last_message` | last Fixy speaker turn text |
+| `post_dream_recovery_turns` | active recovery turns remaining |
+
+### Rule Priority
+
+`_apply_rules()` fires in this order — first matching rule wins:
+
+1. Fatigue / dream → `DREAM_RECOVERY` / `LOW_COMPLEXITY`
+2. Loop → `check_loop_rejection()` hard gate
+3. Personality suppression
+4. Stagnation → `_decide_stagnation_intervention()`
+5. Force-outcome (turn > 15 and stagnation ≥ 0.5, or unresolved ≥ 5)
+6. Unresolved overload → `REQUIRE_BRANCH_CLOSURE`
+7. Pressure misalignment (advisory)
+8. Default → `NORMAL`
+
+### Output Contracts
+
+`validate_generated_output()` checks each non-NORMAL mode:
+
+| Mode | Required signals |
+|---|---|
+| `REQUIRE_TEST` | `all()` over: hypothesis / test / expected outcome / if true / if false |
+| `REQUIRE_FORCED_CHOICE` | commitment signal + justification signal + change-condition signal |
+| `REQUIRE_BRANCH_CLOSURE` | closure phrase + state marker (resolved/testable/discarded/settled/closed/set aside) |
+| `REQUIRE_COUNTEREXAMPLE` | mechanism, evidence, or causal language |
+| `REQUIRE_CONCRETE_CASE` | concrete signal + pseudo-compliance check |
+
+Failure → `[STATE-TRANSITION-FAIL]` returned; `should_regenerate_after_validation()` triggers regen.
+
+### Rhetorical Escape Gate
+
+Checked in all non-NORMAL/non-DREAM_RECOVERY/non-LOW_COMPLEXITY modes, **before** mode-specific validation:
+
+```
+_RHETORICAL_ESCAPE_PATTERNS:
+  show me / consider this|that / imagine if|that
+  to use your / your own words / as you said|noted|argued|mentioned
+  according to your
+```
+
+Match → `[STATE-TRANSITION-FAIL] reason="rhetorical escape"`.
+
+### Loop Hard-Rejection
+
+```
+is_loop=True AND reasoning_delta in ("none","weak")
+  → [INTEGRATION-LOOP-REJECT]
+  → regen with build_loop_break_overlay(attempt)  (3-tier: standard → hard → failsafe)
+  → up to MAX_LOOP_BREAK_ATTEMPTS=2 retries
+  → escalation: _OVERLAY_LOOP_ESCALATION_STRATEGY + dialog[-2:]
+  → final fallback: get_loop_reset_fallback() system message
+```
+
+### Force-Outcome Rule
+
+`_rule_force_outcome` (priority 5):
+- fires when `turn_count > _FORCE_OUTCOME_TURNS_THRESHOLD (15)` AND `stagnation >= _FORCE_OUTCOME_STAGNATION_THRESHOLD (0.5)`, **OR** `unresolved >= _FORCE_OUTCOME_UNRESOLVED_THRESHOLD (5)`
+- `_decide_force_outcome()`: returns `REQUIRE_BRANCH_CLOSURE` when `unresolved >= 3`, else `REQUIRE_FORCED_CHOICE`
+- logs `[OUTCOME-ENFORCED] type=closure|decision`
+
+### Post-Dream Recovery
+
+When `post_dream_recovery_turns > 0`, `_decide_from_mode()` downgrades adversarial modes:
+- `ATTACK_OVERRIDE` → `REQUIRE_CONCRETE_CASE`
+- `REQUIRE_STRUCTURAL_CHALLENGE` → `REQUIRE_CONCRETE_CASE`
+
+---
+
+## 24) UNRESOLVED State Machine
+
+Unresolved topics carry a `status` field with four possible states:
+
+| State | Constant | Meaning |
+|---|---|---|
+| `"unresolved"` | `_UT_STATE_OPEN` | Open, no progress — backward-compatible default |
+| `"testable"` | `_UT_STATE_TESTABLE` | Converted to a falsifiable hypothesis |
+| `"resolved"` | `_UT_STATE_RESOLVED` | Terminal: decrements `open_questions` |
+| `"discarded"` | `_UT_STATE_DISCARDED` | Terminal: set aside with justification |
+
+`_transition_unresolved_item(item, output_text)` scans for transition signals and returns the target state or `None`:
+
+- **OPEN → TESTABLE**: `_UT_TESTABLE_SIGNALS` (falsifiable / hypothesis / experiment / predict / observable / measurable / if we / test whether / ...)
+- **OPEN/TESTABLE → RESOLVED**: `_UT_RESOLVED_SIGNALS` (resolved / agreed / settled / conclusion / established / confirmed / proven / accepted / ...)
+- **OPEN/TESTABLE → DISCARDED**: `_UT_DISCARDED_SIGNALS` (discarded / set aside / not relevant / dropped / dismiss / irrelevant / tangent / ...)
+- **TESTABLE → TESTABLE**: blocked (no-op)
+
+The transition block runs in the main loop **after** the PRE-ACCEPT loop-guard.
+
+---
+
+## 25) Session Turn Selector
+
+At startup, before backend selection, an interactive numbered menu selects `max_turns`:
+
+```
+Select session length:
+  [1]  5 turns
+  [2] 15 turns  (default — press Enter)
+  [3] 25 turns
+  [4] 50 turns
+  [5] 75 turns
+  [6] 100 turns
+```
+
+`Config(max_turns=<selection>, timeout_minutes=0)` — `timeout_minutes=0` sets `timeout_seconds = float("inf")` (no wall-clock limit).
+
+**`_pick_numbered_option(options, default)`** — shared helper used by both the turn selector and the backend menu; Enter returns the default.
+
+---
+
+## 26) Per-Agent LLM Backend
+
+`Config` gains three per-agent override fields:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `backend_socrates` | `""` | Override for Socrates; empty = inherit `llm_backend` |
+| `backend_athena` | `""` | Override for Athena; empty = inherit `llm_backend` |
+| `backend_fixy` | `""` | Override for Fixy; empty = inherit `llm_backend` |
+
+`LLM.generate()` gains a `backend: str = ""` parameter; effective backend = `backend or cfg.llm_backend`.
+
+Startup menu:
+```
+[0] Keep defaults
+[1] Same backend for all agents
+[2] Mix backends — choose per agent
+```
+
+Mode `[2]` calls `_pick_agent_backend_and_model()` per agent. `_BACKEND_MODELS` dict is the single source of truth for all model lists.
+
+---
+
+
 ## Appendix: Config Expectations (Example)
 
 All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.py`.
 
 ### LLM / Session
 
-* `llm_backend` — LLM backend selector: `"ollama"` (local) or `"grok"` (xAI cloud) (default: `"ollama"`). Selected interactively at startup via `select_llm_backend_and_models()`.
+* `llm_backend` — Global LLM backend selector: `"ollama"`, `"grok"`, `"openai"`, or `"anthropic"` (default: `"ollama"`). Selected interactively at startup.
+* `backend_socrates` / `backend_athena` / `backend_fixy` — Per-agent backend overrides (default: `""`; empty = inherit `llm_backend`). Set via startup mode `[2] Mix backends`.
 * `ollama_url` — Ollama API endpoint (default: `http://localhost:11434/api/generate`)
 * `grok_url` — xAI Grok API endpoint (default: `https://api.x.ai/v1/responses`)
-* `grok_api_key` — xAI Grok API key; read from `GROK_API_KEY` env var (default: `""`). Required when `llm_backend="grok"`.
-* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `qwen2.5:7b`; Grok backend users typically select from `GROK_MODELS` at startup)
-* `max_turns` — Maximum dialogue turns (default: `200`)
-* `timeout_minutes` — Session wall-clock timeout in minutes (default: `30`)
+* `grok_api_key` — xAI Grok API key; read from `GROK_API_KEY` env var. Required when using Grok backend.
+* `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `qwen2.5:7b`; selected from backend model list at startup)
+* `max_turns` — Maximum dialogue turns; selected interactively at startup (default: `15`)
+* `timeout_minutes` — Session wall-clock timeout in minutes; `0` = no limit (default: `0`)
 * `llm_timeout` — Per-request LLM timeout in seconds (default: `300`)
 * `llm_max_retries` — Retry attempts on LLM failure (default: `3`)
 * `seed_topic` — Opening topic when none is provided (default: `"what would you like to talk about?"`)

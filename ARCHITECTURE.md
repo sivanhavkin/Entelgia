@@ -162,13 +162,18 @@ Memory influences behavior without requiring explicit recall in every turn.
 
 ### Observer Layer (Fixy)
 
-Fixy acts as a meta-cognitive observer using perspective-driven language — no rigid procedural labels (`Deadlock:`, `Next move:`, `Loop:`, `Pattern:`) in output.
+Fixy acts as a **meta-cognitive observer** — not a supervisor. As of v5.5.0, `IntegrationCore` (the executive cortex) is the sole supervisory authority; Fixy's last message is read by the controller as a **soft signal source** only. The mapping from Fixy hints to intervention modes is controller-owned, never Fixy-owned.
 
-Responsibilities:
+Fixy responsibilities:
 - detect dialogue loops via `DialogueLoopDetector` (4 failure modes)
 - identify instability or escalation
 - reflect the structure of disagreement back without imposing a resolution path
 - preserve dialogue quality via a staged intervention ladder
+
+Fixy does **not**:
+- block or force-regenerate agent responses
+- act as a gatekeeper for post-generation validation
+- fire `FIXY_AUTHORITY_OVERRIDE` (removed in v5.5.0)
 
 **Staged intervention ladder:**
 
@@ -186,7 +191,7 @@ Hard modes are additionally blocked when `NEW_CLAIM` moves (detected via `progre
 
 **`topic_pipeline_enabled(cfg)`** — single authoritative predicate (exported from `entelgia/topic_enforcer.py`) replacing all ad-hoc `CFG.topics_enabled` checks. When `False`, the entire topic pipeline is a strict no-op with zero topic-related log output.
 
-**Semantic repetition detection** — `InteractiveFixy._detect_repetition` combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers/all-MiniLM-L6-v2`) when available. Degrades gracefully to Jaccard-only when the library is absent (`_SEMANTIC_AVAILABLE = False`).
+**Semantic repetition detection** — `InteractiveFixy._detect_repetition` combines Jaccard keyword overlap with sentence-embedding cosine similarity (via `sentence-transformers/all-MiniLM-L6-v2`, now a core dependency). Degrades gracefully to Jaccard-only when the library is absent (`_SEMANTIC_AVAILABLE = False`).
 
 **Observer toggle** — set `Config.enable_observer = False` (env: `ENTELGIA_ENABLE_OBSERVER`) to completely exclude Fixy from the dialogue. Set `Config.fixy_interventions_enabled = False` to suppress need-based interventions while keeping Fixy as a scheduled speaker.
 
@@ -230,28 +235,34 @@ Below is a high-level flow depicting how the system processes a conversational t
    Session start logs: `INFO — Topic style selected: <style> (<cluster>)`.
 
 3. **DialogueEngine Selects Next Actor and Seed**  
-   The DialogueEngine decides which agent speaks next and selects a dialogue strategy or "seed" for generating the next turn.
+   The DialogueEngine decides which agent speaks next and selects a dialogue strategy or "seed" for generating the next turn. From turn 2 onward, a **continuation context** (`extract_continuation_context`) is injected into the seed — capturing dominant topic, last claim, open question, and tension point — so agents advance the conversation rather than replay it.
 
-4. **ContextManager Assembles Interaction Context**  
+4. **IntegrationCore Pre-Generation** *(executive cortex)*  
+   `IntegrationCore._apply_rules()` evaluates all per-turn signals (stagnation, loops, unresolved items, fatigue, pressure) and selects an `IntegrationMode`. A constraint overlay is built and injected into the prompt.
+
+5. **ContextManager Assembles Interaction Context**  
    ContextManager gathers relevant context: 
    - the current agent's persona
    - dialogue history from Short-Term Memory
-   - relevant fragments from Long-Term Memory
+   - relevant fragments from Long-Term Memory (now scored with transformer embeddings via `EnhancedMemoryIntegration`)
    - internal agent state
-   - **topic-aware style instruction** (from `topic_style.py`)  
+   - **topic-aware style instruction** (from `topic_style.py`)
+   - **IntegrationCore overlay** (pre-generation constraint, if any)  
    This context is used to build a structured prompt for the language model.
 
-5. **Agent Produces Response**  
+6. **Agent Produces Response**  
    The designated agent generates a response, updating its own internal state as appropriate.
 
-6. **Memory Update**  
+7. **IntegrationCore Post-Generation Validation**  
+   `IntegrationCore.validate_generated_output()` checks the response against the active mode's output contract (structural fields, signal sets, rhetorical-escape patterns, quality gate). Non-compliant responses trigger regeneration. Semantic loops are hard-rejected via `check_loop_rejection()` before the response is accepted.
+
+8. **Memory Update**  
    The new interaction is appended to Short-Term Memory and, as needed, summarized or committed to Long-Term Memory.
 
-7. **Observer Layer Engaged**  
-   Fixy monitors for repetitive patterns, instability, or undesired conversational dynamics.
-   If intervention is required, Fixy may suggest a new topic, adjust agent priorities, or flag anomalies.
+9. **Observer Layer Engaged**  
+   Fixy reads the dialogue and emits soft signals. IntegrationCore reads Fixy's last message as a hint for the next turn's mode selection.
 
-8. **Cycle Repeats**  
+10. **Cycle Repeats**  
    The loop resumes with the DialogueEngine evaluating the new state and planning the next conversational turn.
 
 ---
@@ -267,24 +278,27 @@ TopicStyleDetector (topic_style.py)
    |                                  |
    v                                  v
 DialogueEngine                     Agents (Socrates / Athena / Fixy)
-   |                                  |
+   | (continuation context seed)      |
    v                                  |
 ContextManager ◄───────────────────┘
    |
+   ├─ IntegrationCore (pre-gen: mode + overlay)
    v
-Agent ↔ Memory (STM/LTM)
+Agent ↔ Memory (STM/LTM via EnhancedMemoryIntegration)
    |        |
    |        └─ DefenseMechanism → intrusive/suppressed flags
    |        └─ FreudianSlip     → surface defended memories
    |        └─ SelfReplication  → promote recurring patterns
+   |
+   ├─ IntegrationCore (post-gen: validate / reject / regen)
    |
    v
 FixyRegulator (energy supervision)
    └─ dream cycle ──────────────┘
    |
    v
-Observer (Fixy)
-   └─› feedback ─────────┘
+Observer (Fixy) ──► soft signal ──► IntegrationCore (next turn)
+   └─› IntegrationMemoryStore (persistent decision history)
 ```
 
 ---
@@ -585,16 +599,25 @@ Entelgia supports four interchangeable LLM backends, all selected interactively 
 
 ### Startup Backend Selector
 
+The startup menu offers three modes:
+
 ```
-Select backend:
-  [1] grok
-  [2] ollama
-  [3] openai
-  [4] anthropic
-  [0] defaults (keep config as-is)
+[0] Keep defaults
+[1] Same backend for all agents
+[2] Mix backends — choose per agent
 ```
 
-After choosing a backend, the user selects per-agent or uniform model names from the backend's available model list. All overrides apply to the in-memory `Config` object for that run only.
+Mode `[2]` prompts backend and model for each agent independently via `_pick_agent_backend_and_model()`. A `_BACKEND_MODELS` dict is the single source of truth for model lists per backend.
+
+After choosing a backend, the user selects per-agent or uniform model names. All overrides apply to the in-memory `Config` object for that run only. A config summary is printed:
+
+```
+[LLM CONFIG]
+  Global backend:  ollama
+  Socrates:  [anthropic]  claude-sonnet-4-6
+  Athena:    [openai]     gpt-4.1
+  Fixy:      [ollama]     qwen2.5:7b
+```
 
 ### Available Models per Backend
 
@@ -620,7 +643,10 @@ All backends share the same timeout, retry, and caching infrastructure. HTTP req
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `llm_backend` | `"ollama"` | Active backend (`"ollama"`, `"grok"`, `"openai"`, `"anthropic"`) |
+| `llm_backend` | `"ollama"` | Active global backend (`"ollama"`, `"grok"`, `"openai"`, `"anthropic"`) |
+| `backend_socrates` | `""` | Per-agent override for Socrates (empty = inherit global) |
+| `backend_athena` | `""` | Per-agent override for Athena (empty = inherit global) |
+| `backend_fixy` | `""` | Per-agent override for Fixy (empty = inherit global) |
 | `grok_api_key` | `$GROK_API_KEY` | API key for Grok backend |
 | `grok_url` | `https://api.x.ai/v1/responses` | Grok endpoint URL |
 | `openai_api_key` | `$OPENAI_API_KEY` | API key for OpenAI backend |
@@ -769,5 +795,121 @@ This version does **not**:
 - use embeddings
 - run multiple LLM checks per turn
 - apply hard constraints
+
+---
+
+## 24) IntegrationCore — Executive Cortex (`entelgia/integration_core.py`, v5.5.0)
+
+`IntegrationCore` is the sole supervisory authority above dialogue agents and Fixy. It runs twice per turn: once to decide pre-generation constraints and once to validate the generated output.
+
+### IntegrationMode Taxonomy
+
+Eight modes replace the prior `REQUIRE_ATTACK`-for-everything default:
+
+| Mode | Purpose |
+|---|---|
+| `NORMAL` | Default; no additional directive |
+| `REQUIRE_TEST` | Repeated abstraction with no falsifier |
+| `REQUIRE_NEW_VARIABLE` | Same claim restated with only rhetorical variation |
+| `REQUIRE_CONCRETE_CASE` | Discussion too abstract for too long |
+| `REQUIRE_BRANCH_CLOSURE` | Unresolved count grows without closure |
+| `REQUIRE_COUNTEREXAMPLE` | Needs a real-world disconfirming case |
+| `REQUIRE_FORCED_CHOICE` | Fence-sitting, no committed position |
+| `REQUIRE_STRUCTURAL_CHALLENGE` | Actual adversarial pressure deficit |
+| `DREAM_RECOVERY` | Post-dream recovery mode |
+
+### Rule Priority Order
+
+`_apply_rules()` fires rules in explicit priority:
+
+1. Dream / critical fatigue → `DREAM_RECOVERY` / `LOW_COMPLEXITY`
+2. Loop break (semantic loop hard-rejection)
+3. Personality suppression
+4. Stagnation dispatch (`_decide_stagnation_intervention`)
+5. Force-outcome rule
+6. Unresolved overload → `REQUIRE_BRANCH_CLOSURE`
+7. Pressure misalignment (advisory)
+8. Default (`NORMAL`)
+
+### Output Contracts
+
+`validate_generated_output()` enforces mode-specific contracts:
+
+| Mode | Contract |
+|---|---|
+| `REQUIRE_TEST` | `all()` over 5 fields: hypothesis / test / expected outcome / if true / if false |
+| `REQUIRE_FORCED_CHOICE` | Commitment signal + justification signal + change-condition signal |
+| `REQUIRE_BRANCH_CLOSURE` | Closure phrase + explicit state marker (resolved / testable / discarded) |
+| `REQUIRE_COUNTEREXAMPLE` | Mechanism, evidence, or causal language |
+| `REQUIRE_CONCRETE_CASE` | Concrete signal + pseudo-compliance check |
+
+Non-compliant responses return `[STATE-TRANSITION-FAIL]` and trigger regeneration.
+
+### Rhetorical Escape Detection
+
+`_RHETORICAL_ESCAPE_PATTERNS` (show me / consider this|that / imagine if / to use your / as you said/noted/argued / according to your) are checked in all non-NORMAL intervention modes **before** mode-specific validation. Match → `[STATE-TRANSITION-FAIL] reason="rhetorical escape"`.
+
+### Semantic Loop Hard-Rejection
+
+`check_loop_rejection(is_loop, reasoning_delta)` returns `(True, "SEMANTIC LOOP: no new reasoning")` when `is_loop=True AND reasoning_delta in ("none","weak")`. Up to `MAX_LOOP_BREAK_ATTEMPTS = 2` retries with escalating overlays. On exhaustion: final escalation with `_OVERLAY_LOOP_ESCALATION_STRATEGY` → if still looping → `get_loop_reset_fallback()` system message. Looping responses are **never published**.
+
+### Force-Outcome Rule
+
+`_rule_force_outcome` fires when `turn_count > 15 AND stagnation ≥ 0.5` OR `unresolved ≥ 5`. Selects `REQUIRE_BRANCH_CLOSURE` when `unresolved ≥ 3`, else `REQUIRE_FORCED_CHOICE`. Logs `[OUTCOME-ENFORCED]`.
+
+### Soft Fixy Signal Reading
+
+`_read_fixy_soft_signal(fixy_last_message)` maps Fixy hint keywords to intervention modes. Priority order: `REQUIRE_TEST > REQUIRE_BRANCH_CLOSURE > REQUIRE_CONCRETE_CASE > REQUIRE_NEW_VARIABLE`. Fixy messages older than `FIXY_SOFT_SIGNAL_MAX_TURNS = 12` turns are suppressed.
+
+### IntegrationMemoryStore
+
+`IntegrationMemoryStore` persists decision records across turns (max entries bounded, round-trip JSON). `IntegrationCore.attach_memory_store()` / `record_decision()` / `get_memory_context()` hooks provide decision history for downstream use. `FixySemanticController` auto-records `ValidationResult` and `LoopCheckResult` when a store is attached.
+
+### Post-Dream Recovery
+
+`post_dream_recovery_turns` on each `Agent` tracks active recovery. When `> 0`, adversarial modes (`ATTACK_OVERRIDE`, `REQUIRE_STRUCTURAL_CHALLENGE`) are downgraded to `REQUIRE_CONCRETE_CASE` by `_decide_from_mode()` as a defence-in-depth guard.
+
+---
+
+## 25) Session Turn Selector
+
+At session start, an interactive numbered menu is shown before backend selection:
+
+```
+Select session length:
+  [1]  5 turns
+  [2] 15 turns  (default)
+  [3] 25 turns
+  [4] 50 turns
+  [5] 75 turns
+  [6] 100 turns
+```
+
+Enter selects `Config(max_turns=<selection>, timeout_minutes=0)` — no wall-clock limit. `timeout_minutes=0` sets `timeout_seconds = float("inf")`.
+
+---
+
+## 26) Continuation Context Seed (`entelgia/dialogue_engine.py`)
+
+From turn 2 onward, `generate_seed()` injects a continuation prompt built from the last few real speaker turns:
+
+- `dominant_topic` — most recent explicit topic reference
+- `last_claim` — last substantive claim made
+- `unresolved_question` — latest open question
+- `tension_point` — most recent statement of tension
+
+`role="seed"` entries are skipped so the static opening text is never treated as conversation content. When `has_prior_memory=False` (first turn of a fresh session), the original `TOPIC: {topic}` header is used.
+
+---
+
+## 27) Semantic Memory Retrieval (`entelgia/context_manager.py`)
+
+`EnhancedMemoryIntegration` now uses transformer embeddings for memory ranking:
+
+- `_get_ctx_semantic_model()` — lazy-loads and caches `all-MiniLM-L6-v2`
+- `_batch_semantic_scores(topic, dialog_text, memories)` — single `model.encode()` call; empty query strings skip encoding; returns `(None, None)` on failure
+- `_calculate_relevance_score` — uses semantic scores when available; falls back to Jaccard when not
+
+`sentence-transformers`, `scikit-learn`, and `numpy` are core dependencies (not optional extras).
 
 ---

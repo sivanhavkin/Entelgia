@@ -171,14 +171,21 @@ When **Id dominates** (id > 7) alongside high emotional intensity and high confl
 
 ### What is Fixy's role?
 
-Fixy is the meta-observer that:
+Fixy is a **meta-cognitive observer** — not a supervisor. Fixy reads the dialogue, detects structural problems (loops, stagnation, unresolved items), and emits soft signals that the **IntegrationCore** (executive cortex) consumes to make enforcement decisions.
+
+Fixy:
 - Monitors dialogue patterns
 - Detects circular reasoning or repetition
 - Intervenes only when needed (not on a fixed schedule)
-- Provides corrective feedback
+- Provides corrective feedback as a speaker turn
 - Helps maintain dialogue quality
 
-In enhanced mode, Fixy uses intelligent detection rather than scheduled checks.
+Fixy does **not**:
+- Block or force-regenerate responses
+- Act as a gatekeeper for other agents' output
+- Override the IntegrationCore's decisions
+
+In enhanced mode, Fixy uses intelligent detection rather than scheduled checks. The IntegrationCore reads Fixy's last message as a soft signal source and maps it to the appropriate intervention mode — the mapping is controller-owned, never Fixy-owned.
 
 ### What is "enhanced mode"?
 
@@ -191,9 +198,9 @@ Enhanced mode (v2.2.0+) provides:
 
 ### What is the Dialogue Loop Guard?
 
-`entelgia/loop_guard.py` (v3.0.0) detects four failure modes that degrade dialogue quality and triggers targeted Fixy interventions:
+`entelgia/loop_guard.py` (v3.0.0) detects four structural failure modes that degrade dialogue quality:
 
-| Failure Mode | Detection | Fixy Response |
+| Failure Mode | Detection | Response |
 |---|---|---|
 | `loop_repetition` | Same ideas recycled in different words | `CONCRETIZE` — demand a concrete example |
 | `weak_conflict` | Agents disagree but never commit | `CONTRADICT` — force a binary choice |
@@ -202,18 +209,38 @@ Enhanced mode (v2.2.0+) provides:
 
 Two supporting classes: **`PhraseBanList`** suppresses overused n-grams for a configurable number of turns; **`DialogueRewriter`** compresses stale dialogue into a brief rewrite block to reclaim token budget.
 
+**As of v5.5.0, semantic loops are hard-rejected.** When `IntegrationCore.check_loop_rejection()` confirms a loop (detected by `FixySemanticController` with `reasoning_delta` of `"none"` or `"weak"`), the response is immediately regenerated — up to `MAX_LOOP_BREAK_ATTEMPTS = 2` retries. If all retries are exhausted, one final escalation pass runs with a stripped-down hard-constraint overlay. If that still fails, a neutral system message replaces the output. **Looping responses are never published to the dialogue.**
+
+### What is IntegrationCore?
+
+`entelgia/integration_core.py` is the **executive cortex** — the sole supervisory authority above dialogue agents and Fixy. It reads all per-turn signals and decides what constraints, if any, to impose on the next generation.
+
+IntegrationCore runs **twice per turn**:
+1. **Pre-generation** — selects the active `IntegrationMode` and builds a constraint overlay injected into the prompt
+2. **Post-generation** — validates the LLM output against the mode's output contract; triggers regeneration if the contract is not met
+
+**Eight intervention modes** (replacing the old `REQUIRE_ATTACK`-for-everything approach):
+
+| Mode | When to use |
+|---|---|
+| `REQUIRE_TEST` | Repeated abstraction with no falsifier |
+| `REQUIRE_NEW_VARIABLE` | Same claim restated with only rhetorical variation |
+| `REQUIRE_CONCRETE_CASE` | Discussion too abstract for too long |
+| `REQUIRE_BRANCH_CLOSURE` | Unresolved count grows without closure |
+| `REQUIRE_COUNTEREXAMPLE` | Needs a real-world disconfirming case |
+| `REQUIRE_FORCED_CHOICE` | Fence-sitting, no committed position |
+| `REQUIRE_STRUCTURAL_CHALLENGE` | Actual adversarial pressure deficit |
+| `DREAM_RECOVERY` | Post-dream recovery mode |
+
+Each mode validates that the generated response actually satisfies its intent. Responses that pass with rhetorical redirection ("show me", "consider this", "as you said") are caught by a `_RHETORICAL_ESCAPE_PATTERNS` gate and rejected. A **force-outcome rule** fires when `turn_count > 15 AND stagnation ≥ 0.5` or `unresolved ≥ 5` to push the dialogue toward a conclusion.
+
 ### How does Fixy detect repeated content?
 
 `InteractiveFixy` (v3.0.0) uses a **two-layer repetition signal**:
 1. **Jaccard keyword overlap** — always active; fast and dependency-free.
-2. **Sentence-embedding cosine similarity** — if `sentence-transformers` is installed, `all-MiniLM-L6-v2` is lazily loaded on first use and merged with the Jaccard score. This catches paraphrased repetition that keyword matching alone misses.
+2. **Sentence-embedding cosine similarity** — `all-MiniLM-L6-v2` is used by default (promoted to a core dependency in v5.5.0). This catches paraphrased repetition that keyword matching alone misses.
 
-Install the optional dependency for semantic detection:
-```bash
-pip install "entelgia[semantic]"
-# or
-pip install sentence-transformers scikit-learn numpy
-```
+`sentence-transformers`, `scikit-learn`, and `numpy` are now core dependencies and installed automatically. If they are unavailable at runtime the system falls back to Jaccard-only without error.
 
 ### Can I disable Fixy?
 
@@ -243,14 +270,16 @@ ollama serve
 # Run the quick demo (10 turns, ~2 minutes)
 python examples/demo_enhanced_dialogue.py
 
-# Or run the full system (30 minutes, stops when time limit is reached)
+# Run the full system — prompts for session length and backend at startup
 python Entelgia_production_meta.py
-
-# Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
-python Entelgia_production_meta_200t.py
 ```
 
-At startup you will be prompted to choose your LLM backend (**Ollama**, **Grok**, **OpenAI**, or **Anthropic**) and then select per-agent model names. If you choose a cloud backend, ensure the corresponding API key (`GROK_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) is set in your `.env` file before running.
+At startup you will be prompted to:
+1. **Choose session length** — an interactive menu lets you pick 5, 15, 25, 50, 75, or 100 turns (Enter defaults to 15). Sessions have no wall-clock time limit.
+2. **Choose your LLM backend** — either a single backend for all agents, or a different backend per agent (Ollama, Grok, OpenAI, or Anthropic).
+3. **Select model names** — per-agent or uniform, from the backend's available model list.
+
+If you choose a cloud backend, ensure the corresponding API key (`GROK_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`) is set in your `.env` file before running.
 
 ### What happens during a typical session?
 
@@ -269,13 +298,18 @@ At startup you will be prompted to choose your LLM backend (**Ollama**, **Grok**
 
 ### How long does a session take?
 
-- **Demo mode** (`demo_enhanced_dialogue.py`): ~2 minutes (10 turns)
-- **Full session** (`Entelgia_production_meta.py`): ~30 minutes (default 200 turns, time-bounded)
-- **Long session** (`Entelgia_production_meta_200t.py`): turn-count-bounded (200 turns, no time limit)
-- Duration depends on:
-  - Number of turns configured
-  - LLM response time
-  - Model size and system performance
+Session length is selected interactively at startup:
+
+| Option | Turns | Approximate duration |
+|---|---|---|
+| Default (Enter) | 15 | ~5–10 min |
+| Short | 5 | ~2 min |
+| Medium | 25 | ~10–15 min |
+| Standard | 50 | ~20–30 min |
+| Long | 75 | ~30–45 min |
+| Extended | 100 | ~45–60 min |
+
+Duration depends on LLM response time, model size, and system performance. Sessions have no wall-clock time limit — they run until the selected turn count is reached or you interrupt with `Ctrl+C`.
 
 ### Can I interrupt a running session?
 
@@ -375,28 +409,29 @@ Configuration is done through:
 2. **`Config` class**: Runtime parameters in code
 
 Key settings include:
-- `llm_backend`: LLM backend selector — `"ollama"` (default) or `"grok"`
+- `llm_backend`: Global LLM backend selector — `"ollama"` (default), `"grok"`, `"openai"`, or `"anthropic"`
+- `backend_socrates` / `backend_athena` / `backend_fixy`: Per-agent backend overrides (empty string = inherit global)
 - `grok_url`: xAI API endpoint (default: `https://api.x.ai/v1/responses`)
-- `grok_api_key`: Read from `GROK_API_KEY` env var; required when `llm_backend="grok"`
-- `max_output_words`: LLM response length guidance (default: 150)
+- `grok_api_key`: Read from `GROK_API_KEY` env var; required when using the Grok backend
+- `max_output_words`: LLM response length guidance (default: 200)
 - `llm_timeout`: Seconds to wait for LLM (default: 60)
-- `max_turns`: Maximum dialogue turns (default: 200)
+- `max_turns`: Maximum dialogue turns — selected interactively at startup (default: 15)
+- `timeout_minutes`: Wall-clock session limit; `0` = no time limit (default: 0)
 - `dream_every_n_turns`: Dream cycle frequency (default: 7)
 
 ### How do I switch to the Grok backend?
 
-At startup, Entelgia prompts you to choose your backend interactively:
+At startup, Entelgia prompts you to choose your backend interactively with a three-mode menu:
 
 ```
-Select backend:
-  [1] grok
-  [2] ollama
-  [3] openai
-  [4] anthropic
-  [0] defaults (keep config as-is)
+[0] Keep defaults
+[1] Same backend for all agents
+[2] Mix backends — choose per agent
 ```
 
-Enter `1` to use the Grok backend. You will then be prompted to select a Grok model from the available list.
+Choose `[1]` and then select Grok to use the Grok backend for all agents. Choose `[2]` to run Socrates, Athena, and Fixy on different backends independently.
+
+After selecting a backend, you will be prompted to select a model from the available list.
 
 To pre-configure Grok without the interactive prompt, add `GROK_API_KEY` to your `.env` file:
 ```
@@ -430,7 +465,7 @@ The installer (`python scripts/install.py`) also prompts for this key automatica
 
 ### How do I switch to the OpenAI backend?
 
-Enter `3` at the startup backend menu to use the OpenAI backend. You will be prompted to select a model from the available OpenAI models.
+Choose `[1] Same backend for all agents` at the startup menu and select OpenAI, or choose `[2] Mix backends` to assign OpenAI only to specific agents. You will be prompted to select a model from the available OpenAI models.
 
 To pre-configure OpenAI without the interactive prompt, add `OPENAI_API_KEY` to your `.env` file:
 ```
@@ -460,7 +495,7 @@ The installer (`python scripts/install.py`) also prompts for this key automatica
 
 ### How do I switch to the Anthropic backend?
 
-Enter `4` at the startup backend menu to use the Anthropic backend. You will be prompted to select a Claude model from the available Anthropic models.
+Choose `[1] Same backend for all agents` at the startup menu and select Anthropic, or choose `[2] Mix backends` to assign Anthropic only to specific agents. You will be prompted to select a Claude model from the available Anthropic models.
 
 To pre-configure Anthropic without the interactive prompt, add `ANTHROPIC_API_KEY` to your `.env` file:
 ```
@@ -486,6 +521,27 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 The installer (`python scripts/install.py`) also prompts for this key automatically when you choose the Anthropic backend.
+
+### Can I use different LLM backends per agent?
+
+Yes. As of v5.5.0, the startup menu offers a **three-mode backend selector**:
+
+```
+[0] Keep defaults
+[1] Same backend for all agents
+[2] Mix backends — choose per agent
+```
+
+Mode `[2]` prompts you to pick a backend and model for **Socrates**, **Athena**, and **Fixy** independently. For example, you can run Socrates on Claude, Athena on GPT-4.1, and Fixy on a local Ollama model within the same session.
+
+A summary is printed at session start:
+```
+[LLM CONFIG]
+  Global backend:  ollama
+  Socrates:  [anthropic]  claude-sonnet-4-6
+  Athena:    [openai]     gpt-4.1
+  Fixy:      [ollama]     qwen2.5:7b
+```
 
 ### Can I change agent personas?
 
