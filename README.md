@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://docs.python.org/3.10/)
 [![Status](https://img.shields.io/badge/Status-Research%20Hybrid-purple)](#-project-status)
-[![Tests](https://img.shields.io/badge/tests-1956%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
+[![Tests](https://img.shields.io/badge/tests-2460%20passed-brightgreen)](https://github.com/sivanhavkin/Entelgia/actions)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://black.readthedocs.io/en/stable/)
 [![Build Status](https://github.com/sivanhavkin/Entelgia/actions/workflows/ci.yml/badge.svg)](https://github.com/sivanhavkin/Entelgia/actions)
@@ -497,7 +497,7 @@ For the complete file and module layout — including all `entelgia/` modules, e
 
 ## 🧪 Test Suite
 
-Entelgia ships with **1956 tests** across 40 suites.
+Entelgia ships with **2460 tests** across 42 suites.
 
 For full test documentation, per-suite details, CI/CD pipeline information, and sample output, see the **[Test Suite README (tests/README.md)](tests/README.md)**.
 
@@ -513,12 +513,13 @@ pytest tests/ -v
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| **v5.0.0** | ✅ **Latest** | current |
+| **v5.5.0** | ✅ **Latest** | current |
+| **v5.0.0** | ✅ **Stable** | previous stable release |
 | **v4.1.0** | ✅ **Stable** | previous stable release |
 | **v4.0.0** | ✅ **Stable** | previous stable release |
-| **v3.0.0** | ⚠️ Superseded | Use v5.0.0 instead |
-| **v2.8.1** | ⚠️ Superseded | Use v5.0.0 instead |
-| **v2.8.0** | ⚠️ Superseded | Use v5.0.0 instead |
+| **v3.0.0** | ⚠️ Superseded | Use v5.5.0 instead |
+| **v2.8.1** | ⚠️ Superseded | Use v5.5.0 instead |
+| **v2.8.0** | ⚠️ Superseded | Use v5.5.0 instead |
 
 💡 **Note:** Starting from v2.1.1, we follow a controlled release schedule. Not every commit results in a new version. For the full version history, see [Changelog.md](Changelog.md).
 
@@ -602,6 +603,6 @@ Conceived and developed by **Sivan Havkin**.
 ## 📊 Project Status
 
 * **Status:** Research / Production Hybrid
-* **Version:** 5.0.0 
+* **Version:** 5.5.0 
 * **Last Updated:** 26 March 2026
 ---
