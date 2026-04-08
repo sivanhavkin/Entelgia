@@ -454,23 +454,6 @@ Agents with stronger ego / higher self-awareness pull deeper context and stabili
 
 ---
 
-## Long-Duration Dialogue
-
-`Entelgia_production_meta_200t.py` provides a turn-count-gated variant of the main runner:
-
-```python
-class MainScriptLong(MainScript):
-    def run(self):
-        while self.turn_index < self.cfg.max_turns:
-            ...  # no timeout check
-```
-
-- Uses `Config(max_turns=200, timeout_minutes=9999)` to disable time-based stopping.
-- All other behaviour (memory, emotions, Fixy, dream cycles, logging) is inherited unchanged.
-- Run via: `python Entelgia_production_meta_200t.py`
-
----
-
 
 
 ## Web Research Pipeline (v2.8.0)
@@ -855,7 +838,7 @@ Non-compliant responses return `[STATE-TRANSITION-FAIL]` and trigger regeneratio
 
 ### Force-Outcome Rule
 
-`_rule_force_outcome` fires when `turn_count > 15 AND stagnation ≥ 0.5` OR `unresolved ≥ 5`. Selects `REQUIRE_BRANCH_CLOSURE` when `unresolved ≥ 3`, else `REQUIRE_FORCED_CHOICE`. Logs `[OUTCOME-ENFORCED]`.
+`_rule_force_outcome` fires when `turn_count > 15 AND stagnation ≥ 0.5` OR `unresolved ≥ 5`. Selects `REQUIRE_BRANCH_CLOSURE` when `unresolved > 0` (any unresolved items), else `REQUIRE_FORCED_CHOICE`. Logs `[OUTCOME-ENFORCED]`.
 
 ### Soft Fixy Signal Reading
 

@@ -413,10 +413,10 @@ Key settings include:
 - `backend_socrates` / `backend_athena` / `backend_fixy`: Per-agent backend overrides (empty string = inherit global)
 - `grok_url`: xAI API endpoint (default: `https://api.x.ai/v1/responses`)
 - `grok_api_key`: Read from `GROK_API_KEY` env var; required when using the Grok backend
-- `max_output_words`: LLM response length guidance (default: 200)
-- `llm_timeout`: Seconds to wait for LLM (default: 60)
-- `max_turns`: Maximum dialogue turns — selected interactively at startup (default: 15)
-- `timeout_minutes`: Wall-clock session limit; `0` = no time limit (default: 0)
+- Response length is controlled by the active backend/request settings, not by a `Config.max_output_words` field
+- `llm_timeout`: Seconds to wait for LLM (`Config` dataclass default: `300`; applies per request)
+- `max_turns`: Maximum dialogue turns. `Config` dataclass default: `200`; interactive startup default: `15`
+- `timeout_minutes`: Wall-clock session limit; `0` = no time limit. `Config` dataclass default: `30`; interactive startup overrides to `0`
 - `dream_every_n_turns`: Dream cycle frequency (default: 7)
 
 ### How do I switch to the Grok backend?
@@ -596,13 +596,9 @@ Different models will produce different dialogue qualities and require varying r
 
 ### How do I adjust response length?
 
-Response length is controlled via LLM prompt instruction (not truncation):
+Response length is controlled via LLM prompt instruction (not truncation). The `LLM_OUTPUT_CONTRACT` injected into every prompt instructs agents to produce 2–3 sentences; there is no `Config.max_output_words` field. The `_trim_to_word_limit()` helper applies a post-generation hard cap (80 words in `LOW_COMPLEXITY` mode, 120 words in `DREAM_RECOVERY` mode) when those modes are active.
 
-```python
-config.max_output_words = 150  # Guidance for LLM
-```
-
-Starting from v2.2.0, responses are **never truncated** - the LLM is guided to produce concise responses naturally.
+Starting from v2.2.0, responses are **never truncated** in normal mode — the LLM is guided to produce concise responses naturally.
 
 ### How do I control FreudianSlip frequency?
 
@@ -921,7 +917,6 @@ pytest tests/test_memory_security.py -v
 ```
 Entelgia/
 ├── Entelgia_production_meta.py    # Main system file (Socrates, Athena, Fixy agents)
-├── Entelgia_production_meta_200t.py  # 200-turn production variant
 ├── entelgia/                       # Enhanced dialogue package
 │   ├── __init__.py
 │   ├── ablation_study.py          # 4-condition reproducible ablation study

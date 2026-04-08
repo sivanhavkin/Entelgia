@@ -151,11 +151,8 @@ python scripts/install.py
 
 ```bash
 
-# run the full system (30 minutes, stops when time limit is reached)
+# Run the full system — prompts for session length and backend at startup
 python Entelgia_production_meta.py
-
-# Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
-python Entelgia_production_meta_200t.py
 ```
 
 > 💡 **Having issues?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) for common problems and solutions.
@@ -227,11 +224,8 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ollama serve
 
-# run the full system (30 minutes, stops when time limit is reached)
+# Run the full system — prompts for session length and backend at startup
 python Entelgia_production_meta.py
-
-# Or run 200 turns with no time-based stopping (guaranteed to complete all turns)
-python Entelgia_production_meta_200t.py
 ```
 
 ---
@@ -487,7 +481,7 @@ Each dialogue is driven by three agents with distinct psychological profiles:
 |-------|-------------|------|
 | 🏛️ **Socrates** | Investigative questioner | Domain-aware inquiry; probes assumptions and causal chains |
 | 🦉 **Athena** | Strategic synthesizer | Builds frameworks and structured explanations in domain vocabulary |
-| 🔍 **Fixy** | Meta-cognitive supervisor | Diagnostic observer; identifies contradictions and reasoning gaps |
+| 🔍 **Fixy** | Meta-cognitive observer | Diagnostic observer; identifies contradictions and reasoning gaps; emits soft signals consumed by IntegrationCore |
 
 ### 📦 Package Structure
 
@@ -604,5 +598,5 @@ Conceived and developed by **Sivan Havkin**.
 
 * **Status:** Research / Production Hybrid
 * **Version:** 5.5.0 
-* **Last Updated:** 26 March 2026
+* **Last Updated:** 08 April 2026
 ---

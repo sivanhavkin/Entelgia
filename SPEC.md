@@ -1343,13 +1343,15 @@ Structural detectors (`DialogueLoopDetector`, progress-enforcer, Jaccard stagnat
 `_apply_rules()` fires in this order — first matching rule wins:
 
 1. Fatigue / dream → `DREAM_RECOVERY` / `LOW_COMPLEXITY`
-2. Loop → `check_loop_rejection()` hard gate
+2. Loop-break mode → `_rule_loop_concrete()` / `_decide_loop_concrete()` selects the loop-breaking *mode/overlay* (pre-generation)
 3. Personality suppression
 4. Stagnation → `_decide_stagnation_intervention()`
 5. Force-outcome (turn > 15 and stagnation ≥ 0.5, or unresolved ≥ 5)
 6. Unresolved overload → `REQUIRE_BRANCH_CLOSURE`
 7. Pressure misalignment (advisory)
 8. Default → `NORMAL`
+
+> **Note:** `check_loop_rejection()` is a **post-generation hard gate** (PRE-ACCEPT block), not a rule inside `_apply_rules()`. It runs after the LLM generates a response and decides whether to reject/regenerate it. The `_apply_rules()` loop-break rule at priority 2 selects the pre-generation mode/overlay; `check_loop_rejection()` performs the post-generation hard rejection.
 
 ### Output Contracts
 
@@ -1393,7 +1395,7 @@ is_loop=True AND reasoning_delta in ("none","weak")
 
 `_rule_force_outcome` (priority 5):
 - fires when `turn_count > _FORCE_OUTCOME_TURNS_THRESHOLD (15)` AND `stagnation >= _FORCE_OUTCOME_STAGNATION_THRESHOLD (0.5)`, **OR** `unresolved >= _FORCE_OUTCOME_UNRESOLVED_THRESHOLD (5)`
-- `_decide_force_outcome()`: returns `REQUIRE_BRANCH_CLOSURE` when `unresolved >= 3`, else `REQUIRE_FORCED_CHOICE`
+- `_decide_force_outcome()`: returns `REQUIRE_BRANCH_CLOSURE` when `unresolved > 0` (any unresolved items), else `REQUIRE_FORCED_CHOICE`
 - logs `[OUTCOME-ENFORCED] type=closure|decision`
 
 ### Post-Dream Recovery
@@ -1482,8 +1484,8 @@ All fields are defined in the `@dataclass Config` in `Entelgia_production_meta.p
 * `grok_url` — xAI Grok API endpoint (default: `https://api.x.ai/v1/responses`)
 * `grok_api_key` — xAI Grok API key; read from `GROK_API_KEY` env var. Required when using Grok backend.
 * `model_socrates` / `model_athena` / `model_fixy` — Per-agent model names (default: `qwen2.5:7b`; selected from backend model list at startup)
-* `max_turns` — Maximum dialogue turns; selected interactively at startup (default: `15`)
-* `timeout_minutes` — Session wall-clock timeout in minutes; `0` = no limit (default: `0`)
+* `max_turns` — Maximum dialogue turns. `Config` dataclass default: `200`. In the interactive `run_cli()` startup flow, this is selected at startup and defaults to `15`.
+* `timeout_minutes` — Session wall-clock timeout in minutes; `0` = no limit. `Config` dataclass default: `30`. In the interactive `run_cli()` startup flow, this is overridden to `0`.
 * `llm_timeout` — Per-request LLM timeout in seconds (default: `300`)
 * `llm_max_retries` — Retry attempts on LLM failure (default: `3`)
 * `seed_topic` — Opening topic when none is provided (default: `"what would you like to talk about?"`)

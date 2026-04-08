@@ -770,9 +770,9 @@ taskmgr
 ollama ps
 ```
 
-4. Reduce dialogue complexity:
+4. Reduce number of turns if hitting token limits:
 ```python
-config.max_output_words = 100  # Shorter responses
+# Select a smaller turn count at the interactive startup menu (e.g. 15 or 25)
 ```
 
 ---
@@ -1001,5 +1001,5 @@ These patterns help ensure Entelgia works reliably:
 
 ---
 
-**Last Updated:** 07 March 2026  
+**Last Updated:** 08 April 2026  
 **Version:** 5.5.0
