@@ -157,6 +157,15 @@ _PRIORITY_FATIGUE: int = 4
 _PRIORITY_PRESSURE: int = 2
 _PRIORITY_DEFAULT: int = 0
 
+# PATCH 4 — Force outcome condition thresholds.
+# When turn count exceeds the turns threshold AND stagnation persists above the
+# stagnation threshold, or UNRESOLVED count reaches the overload ceiling, the
+# cortex enforces an outcome mode (decision / test / closure).
+_FORCE_OUTCOME_TURNS_THRESHOLD: int = 15
+_FORCE_OUTCOME_STAGNATION_THRESHOLD: float = 0.5
+_FORCE_OUTCOME_UNRESOLVED_THRESHOLD: int = 5
+_PRIORITY_FORCE_OUTCOME: int = 9  # between LOOP (10) and STAGNATION (8)
+
 # Maximum number of dialogue turns to look back when reading a Fixy soft
 # signal.  Messages older than this window are treated as stale and ignored.
 # Exposed as a public constant so callers can reference it without importing
@@ -465,6 +474,11 @@ class IntegrationState:
     # aggressive forcing (ATTACK_OVERRIDE, REQUIRE_STRUCTURAL_CHALLENGE) is
     # suppressed in favour of LOW_COMPLEXITY / REQUIRE_CONCRETE_CASE.
     post_dream_recovery_turns: int = 0
+    # --- Turn counter (PATCH 4) ---
+    # Total dialogue turns completed so far (len of dialog list).  Used by the
+    # force-outcome rule to detect conversations that have run long enough that
+    # outcome enforcement is unconditional.
+    turn_count: int = 0
 
 
 @dataclass
@@ -559,9 +573,13 @@ _OVERLAY_ATTACK: str = (
 
 _OVERLAY_REQUIRE_TEST: str = (
     "REQUIRE TEST: Abstract claims are not enough. "
-    "You must propose at least one specific, falsifiable test or empirical criterion "
-    "that would distinguish your position from the alternative. "
-    "What observable result would prove you wrong? State it explicitly."
+    "You MUST produce a structured test using ALL of the following fields — no field may be omitted:\n"
+    "* Hypothesis: [state the claim to test]\n"
+    "* Test: [describe a concrete, executable test]\n"
+    "* Expected outcome: [what result would confirm the hypothesis]\n"
+    "* If true: [what the positive result implies]\n"
+    "* If false: [what the negative result implies]\n"
+    "Asking for examples, remaining abstract, or omitting any field is INVALID."
 )
 
 _OVERLAY_REQUIRE_COUNTEREXAMPLE: str = (
@@ -586,16 +604,20 @@ _OVERLAY_REQUIRE_CONCRETE_CASE: str = (
 
 _OVERLAY_REQUIRE_BRANCH_CLOSURE: str = (
     "REQUIRE BRANCH CLOSURE: An open reasoning branch has gone unresolved for too long. "
-    "You must close, park, or explicitly resolve at least one open thread "
-    "before introducing any new claim. "
-    "State clearly: what was the open question, and what is your current position on it?"
+    "You MUST select ONE specific open question, explicitly mark its final state "
+    "(RESOLVED / TESTABLE / DISCARDED), and justify the transition. "
+    "Example: 'The question of X is now RESOLVED: [reason].' "
+    "or 'Marking Y as TESTABLE: [describe the test needed].' "
+    "or 'Discarding Z as DISCARDED: [reason it is not critical].' "
+    "Discussing closure without performing it is INVALID."
 )
 
 _OVERLAY_REQUIRE_FORCED_CHOICE: str = (
     "REQUIRE FORCED CHOICE: Stop hedging. "
-    "You must commit to one side of the main question — choose A or B. "
+    "You MUST: (1) choose A or B explicitly, (2) justify your choice with the single strongest reason, "
+    "and (3) state what evidence or condition would change your choice. "
     "No 'both are needed' synthesis, no qualifications, no deferral. "
-    "State your position and the single strongest reason for it."
+    "Failing to commit, justify, or state a change condition is INVALID."
 )
 
 _OVERLAY_REQUIRE_STRUCTURAL_CHALLENGE: str = (
@@ -609,6 +631,18 @@ _OVERLAY_DREAM_RECOVERY: str = (
     "RECOVERY MODE: Keep this response short, concrete, and low-pressure. "
     "One clear point only — plain language, short sentences. "
     "No philosophical speculation in this turn."
+)
+
+# PATCH 4 — Force outcome overlay injected when stagnation + turns or unresolved overload
+# forces the dialogue into an unconditional outcome mode.
+_OVERLAY_FORCE_OUTCOME: str = (
+    "OUTCOME REQUIRED: This conversation has run long without converging. "
+    "Your response MUST end with exactly ONE of:\n"
+    "  - A decision: 'My decision is: [X].'\n"
+    "  - A narrowed hypothesis: 'Narrowed hypothesis: [X].'\n"
+    "  - An executable test: 'Executable test: [X].'\n"
+    "  - A bounded unresolved list: 'Remaining open: [X, Y only].'\n"
+    "End with one of these outcome formats."
 )
 
 # ---------------------------------------------------------------------------
@@ -906,6 +940,71 @@ _VALIDATE_BRANCH_CLOSURE_SIGNALS: tuple = (
     "to conclude",
     "i am closing",
     "i will close",
+)
+
+# PATCH 1 — REQUIRE_TEST: ALL of these fields must be present for the output to be valid.
+# The model is instructed to use bullet-point style: "* Hypothesis:", "* Test:", etc.
+_VALIDATE_TEST_REQUIRED_FIELDS: tuple = (
+    "hypothesis:",
+    "test:",
+    "expected outcome:",
+    "if true:",
+    "if false:",
+)
+
+# PATCH 1 — REQUIRE_FORCED_CHOICE: in addition to a commitment signal, the
+# output must include a justification signal and a change-condition signal.
+_VALIDATE_FORCED_CHOICE_JUSTIFICATION_SIGNALS: tuple = (
+    "because",
+    "since",
+    "the reason",
+    "reason is",
+    "reason:",
+    "justif",
+    "strongest reason",
+)
+_VALIDATE_FORCED_CHOICE_CONDITION_SIGNALS: tuple = (
+    "would change",
+    "unless",
+    "if only",
+    "only if",
+    "if i were",
+    "evidence that",
+    "what would",
+    "change my",
+    "change this",
+    "change if",
+    "change when",
+)
+
+# PATCH 1 — REQUIRE_BRANCH_CLOSURE: output must contain an explicit state
+# marker word so that _transition_unresolved_item can actually perform a
+# state transition, not just detect closure intent.  "settled" and "closed"
+# are included because _UT_RESOLVED_SIGNALS in the meta layer maps them to
+# the RESOLVED terminal state.
+_VALIDATE_BRANCH_CLOSURE_STATE_MARKERS: tuple = (
+    "resolved",
+    "testable",
+    "discarded",
+    "settled",
+    "closed",
+    "set aside",
+)
+
+# PATCH 5 — Rhetorical escape patterns that signal avoidance rather than
+# commitment during active intervention modes.  Any intervention-mode output
+# matching one of these patterns is treated as non-compliant and regenerated.
+_RHETORICAL_ESCAPE_PATTERNS: tuple = tuple(
+    re.compile(p, re.IGNORECASE)
+    for p in (
+        r"\bshow me\b",
+        r"\bconsider\s+(?:this|that|what|how|why|a|an|the)\b",
+        r"\bimagine\s+(?:if|that|a|an|the|you)\b",
+        r"\bto use your\b",
+        r"\byour own words\b",
+        r"\bas you (?:said|noted|mentioned|argued)\b",
+        r"\baccording to your\b",
+    )
 )
 
 # Word-count ceiling enforced for LOW_COMPLEXITY mode responses
@@ -1555,6 +1654,29 @@ class IntegrationCore:
                     )
             return True, "No active mode constraint."
 
+        # ---------------------------------------------------------------------------
+        # PATCH 5 — Rhetorical escape detection: for all active intervention modes,
+        # reject outputs that use rhetorical avoidance patterns rather than committing
+        # to an outcome.  This check runs BEFORE all per-mode validation branches so
+        # that every intervention mode (CONCRETE_OVERRIDE, PERSONALITY_SUPPRESSION,
+        # RESOLUTION_OVERRIDE, ATTACK_OVERRIDE, REQUIRE_* etc.) is covered uniformly.
+        # ---------------------------------------------------------------------------
+        _escape_hit = next(
+            (pat for pat in _RHETORICAL_ESCAPE_PATTERNS if pat.search(t)), None
+        )
+        if _escape_hit is not None:
+            logger.info(
+                "[RHETORICAL-ESCAPE] mode=%s pattern=%r — marking non-compliant",
+                mode.value,
+                _escape_hit.pattern,
+            )
+            return (
+                False,
+                f"[STATE-TRANSITION-FAIL] mode={mode.value} reason=\"rhetorical escape\": "
+                f"response uses avoidance pattern '{_escape_hit.pattern}' instead of "
+                "producing a concrete outcome.",
+            )
+
         if mode in (
             IntegrationMode.CONCRETE_OVERRIDE,
             IntegrationMode.PERSONALITY_SUPPRESSION,
@@ -1622,15 +1744,28 @@ class IntegrationCore:
 
         # ---------------------------------------------------------------------------
         # Intervention output contracts (PATCH 1 — state-transition enforcement)
+        # Note: rhetorical-escape check (PATCH 5) already ran above, before all
+        # per-mode branches, so any avoidance pattern was caught before reaching here.
         # ---------------------------------------------------------------------------
 
         if mode == IntegrationMode.REQUIRE_TEST:
-            if any(s in t for s in _VALIDATE_TEST_SIGNALS) or bool(_VALIDATE_TEST_RE.search(text)):
-                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_TEST testable criterion detected."
+            # PATCH 1 — strict field contract: ALL required structural fields must be
+            # present.  A response that contains test signals but omits any field is
+            # not a valid structured test and must be regenerated.
+            missing_fields = [
+                f for f in _VALIDATE_TEST_REQUIRED_FIELDS if f not in t
+            ]
+            if not missing_fields:
+                logger.info(
+                    "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_TEST valid_test=True"
+                )
+                return True, "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_TEST valid_test=True"
             return (
                 False,
                 "[STATE-TRANSITION-FAIL] mode=REQUIRE_TEST reason=\"no concrete test\": "
-                "response must include a falsifiable or measurable test criterion.",
+                "response must include ALL required fields: "
+                + ", ".join(f"'{f}'" for f in missing_fields)
+                + ". Use: Hypothesis / Test / Expected outcome / If true / If false.",
             )
 
         if mode == IntegrationMode.REQUIRE_CONCRETE_CASE:
@@ -1660,22 +1795,54 @@ class IntegrationCore:
             )
 
         if mode == IntegrationMode.REQUIRE_FORCED_CHOICE:
-            if any(s in t for s in _VALIDATE_FORCED_CHOICE_SIGNALS):
-                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_FORCED_CHOICE committed choice detected."
-            return (
-                False,
-                "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no committed choice\": "
-                "response must explicitly choose one side and justify it.",
+            # PATCH 1 — strict contract: must commit, justify, AND state change condition.
+            has_commitment = any(s in t for s in _VALIDATE_FORCED_CHOICE_SIGNALS)
+            if not has_commitment:
+                return (
+                    False,
+                    "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no committed choice\": "
+                    "response must explicitly choose one side and justify it.",
+                )
+            has_justification = any(s in t for s in _VALIDATE_FORCED_CHOICE_JUSTIFICATION_SIGNALS)
+            if not has_justification:
+                return (
+                    False,
+                    "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no justification\": "
+                    "response must justify the choice with a concrete reason.",
+                )
+            has_change_condition = any(
+                s in t for s in _VALIDATE_FORCED_CHOICE_CONDITION_SIGNALS
+            )
+            if not has_change_condition:
+                return (
+                    False,
+                    "[STATE-TRANSITION-FAIL] mode=REQUIRE_FORCED_CHOICE reason=\"no change condition\": "
+                    "response must state what evidence, observation, or condition would change the choice.",
+                )
+            return True, (
+                "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_FORCED_CHOICE committed choice "
+                "with justification and change condition detected."
             )
 
         if mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE:
-            if any(s in t for s in _VALIDATE_BRANCH_CLOSURE_SIGNALS):
-                return True, f"[STATE-TRANSITION-SUCCESS] mode=REQUIRE_BRANCH_CLOSURE branch closure signal detected."
-            return (
-                False,
-                "[STATE-TRANSITION-FAIL] mode=REQUIRE_BRANCH_CLOSURE reason=\"no closure action\": "
-                "response must explicitly close, resolve, or discard an open reasoning branch.",
-            )
+            # PATCH 1 — strict contract: must contain BOTH a closure signal AND an
+            # explicit state marker (RESOLVED / TESTABLE / DISCARDED) so that the
+            # _transition_unresolved_item machinery has the signal it needs to act.
+            has_closure = any(s in t for s in _VALIDATE_BRANCH_CLOSURE_SIGNALS)
+            if not has_closure:
+                return (
+                    False,
+                    "[STATE-TRANSITION-FAIL] mode=REQUIRE_BRANCH_CLOSURE reason=\"no closure action\": "
+                    "response must explicitly close, resolve, or discard an open reasoning branch.",
+                )
+            has_state_marker = any(m in t for m in _VALIDATE_BRANCH_CLOSURE_STATE_MARKERS)
+            if not has_state_marker:
+                return (
+                    False,
+                    "[STATE-TRANSITION-FAIL] mode=REQUIRE_BRANCH_CLOSURE reason=\"no state marker\": "
+                    "response must explicitly mark the item as RESOLVED, TESTABLE, or DISCARDED.",
+                )
+            return True, "[STATE-TRANSITION-SUCCESS] mode=REQUIRE_BRANCH_CLOSURE branch closure with state marker detected."
 
         # Any other mode — no textual constraint defined, treat as compliant.
         return True, f"Active mode {mode.value}: no textual constraint defined."
@@ -2148,8 +2315,8 @@ class IntegrationCore:
           1. Dream / critical fatigue  → DREAM_RECOVERY or LOW_COMPLEXITY
           2. Loop break by operationalisation → richer taxonomy
           3. Stagnation (operationalisation before attack)
-          4. Unresolved overload → REQUIRE_BRANCH_CLOSURE
-          5. Structural challenge (adversarial pressure deficit only)
+          4. Force outcome (PATCH 4)   → fires after loop rules, before unresolved overload
+          5. Unresolved overload → REQUIRE_BRANCH_CLOSURE
           6. Personality suppression
           7. Pressure misalignment
           8. Default
@@ -2177,15 +2344,21 @@ class IntegrationCore:
         if self._rule_stagnation(state):
             return self._decide_stagnation_intervention(state, in_recovery)
 
-        # Priority 4 — Unresolved overload
+        # Priority 4 — Force outcome (PATCH 4): long conversation + stagnation or
+        # unresolved overload → unconditional outcome enforcement.
+        # Runs after loop rules so loop-breaking always takes precedence.
+        if self._rule_force_outcome(state):
+            return self._decide_force_outcome(state)
+
+        # Priority 5 — Unresolved overload
         if self._rule_unresolved_resolution(state):
             return self._decide_unresolved_resolution(state)
 
-        # Priority 5 — Pressure misalignment (advisory)
+        # Priority 6 — Pressure misalignment (advisory)
         if self._rule_pressure_misalignment(state):
             return self._decide_pressure_misalignment(state)
 
-        # Priority 6 — Default
+        # Priority 7 — Default
         return ControlDecision(
             active_mode=IntegrationMode.NORMAL,
             decision_reason="All signals within acceptable range. No override required.",
@@ -2231,6 +2404,21 @@ class IntegrationCore:
     def _rule_pressure_misalignment(state: IntegrationState) -> bool:
         """Pressure alignment is not 'aligned'."""
         return state.alignment not in ("aligned", "neutral")
+
+    @staticmethod
+    def _rule_force_outcome(state: IntegrationState) -> bool:
+        """PATCH 4 — Force outcome when conversation is overdue for convergence.
+
+        Fires when ANY of:
+        * turn_count > _FORCE_OUTCOME_TURNS_THRESHOLD AND stagnation persists
+        * unresolved >= _FORCE_OUTCOME_UNRESOLVED_THRESHOLD (independent of turns)
+        """
+        turns_stagnation = (
+            state.turn_count > _FORCE_OUTCOME_TURNS_THRESHOLD
+            and state.stagnation >= _FORCE_OUTCOME_STAGNATION_THRESHOLD
+        )
+        unresolved_overload = state.unresolved >= _FORCE_OUTCOME_UNRESOLVED_THRESHOLD
+        return turns_stagnation or unresolved_overload
 
     # ------------------------------------------------------------------
     # Soft Fixy signal reader
@@ -2654,6 +2842,49 @@ class IntegrationCore:
             decision_reason=reason,
             priority_level=_PRIORITY_UNRESOLVED,
             active_mode=IntegrationMode.REQUIRE_BRANCH_CLOSURE,
+        )
+
+    @staticmethod
+    def _decide_force_outcome(state: IntegrationState) -> ControlDecision:
+        """PATCH 4 — Force an outcome-producing response when the conversation stagnates.
+
+        Chooses REQUIRE_BRANCH_CLOSURE when any unresolved items are present (> 0);
+        falls back to REQUIRE_FORCED_CHOICE when the queue is empty.
+        Logs [OUTCOME-ENFORCED] with the type that was enforced.
+        """
+        if state.unresolved > 0:
+            outcome_type = "closure"
+            active_mode = IntegrationMode.REQUIRE_BRANCH_CLOSURE
+            overlay = _OVERLAY_REQUIRE_BRANCH_CLOSURE
+            reason = (
+                f"FORCE OUTCOME: turn_count={state.turn_count} > {_FORCE_OUTCOME_TURNS_THRESHOLD} "
+                f"and stagnation={state.stagnation:.2f} >= {_FORCE_OUTCOME_STAGNATION_THRESHOLD}, "
+                f"OR unresolved={state.unresolved} >= {_FORCE_OUTCOME_UNRESOLVED_THRESHOLD}. "
+                "Forced closure of unresolved branch."
+            )
+        else:
+            outcome_type = "decision"
+            active_mode = IntegrationMode.REQUIRE_FORCED_CHOICE
+            overlay = _OVERLAY_REQUIRE_FORCED_CHOICE
+            reason = (
+                f"FORCE OUTCOME: turn_count={state.turn_count} > {_FORCE_OUTCOME_TURNS_THRESHOLD} "
+                f"and stagnation={state.stagnation:.2f} >= {_FORCE_OUTCOME_STAGNATION_THRESHOLD}. "
+                "Forced committed decision."
+            )
+        logger.warning(
+            "[OUTCOME-ENFORCED] type=%s agent=%s turn_count=%d stagnation=%.2f unresolved=%d",
+            outcome_type,
+            state.agent_name,
+            state.turn_count,
+            state.stagnation,
+            state.unresolved,
+        )
+        return ControlDecision(
+            force_resolution_mode=True,
+            prompt_overlay=_OVERLAY_FORCE_OUTCOME + "\n\n" + overlay,
+            decision_reason=reason,
+            priority_level=_PRIORITY_FORCE_OUTCOME,
+            active_mode=active_mode,
         )
 
     @staticmethod

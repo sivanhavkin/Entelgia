@@ -8459,6 +8459,8 @@ class MainScript:
                     "post_dream_recovery_turns": _post_dream_recovery.get(
                         speaker.name, 0
                     ),
+                    # PATCH 4 — turn count for force-outcome threshold check.
+                    "turn_count": len(self.dialog),
                 }
                 # ── Carry forward indicators from the previous turn's cortex
                 # decision so the pre-gen rule engine fires with at least the

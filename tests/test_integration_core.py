@@ -714,7 +714,8 @@ class TestValidateGeneratedOutput:
             core, {"unresolved": 3, "progress_after": 0.2}
         )
         assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
-        # Branch closure has no strict textual validation → always passes
+        # "settled" is in _VALIDATE_BRANCH_CLOSURE_STATE_MARKERS and "conclude" is
+        # in _VALIDATE_BRANCH_CLOSURE_SIGNALS — both constraints are satisfied.
         compliant, _ = core.validate_generated_output(
             "Therefore we can conclude that the argument is settled.", decision
         )
@@ -1196,11 +1197,17 @@ class TestPseudoComplianceValidation:
         signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
         decision = core.pre_generation_decision("Socrates", signals)
         assert decision.active_mode == IntegrationMode.CONCRETE_OVERRIDE
-        # Pseudo-compliance: has "for example" but no person / action / situation
+        # Pseudo-compliance: has "for example" but no person / action / situation.
+        # The word "imagine" also triggers the rhetorical escape check (now runs
+        # before mode-specific validation), so any of those failure reasons is valid.
         text = "For example, imagine a world where all decisions are optimal."
         compliant, reason = core.validate_generated_output(text, decision)
         assert compliant is False
-        assert "pseudo" in reason.lower() or "compliance" in reason.lower()
+        assert (
+            "pseudo" in reason.lower()
+            or "compliance" in reason.lower()
+            or "rhetorical escape" in reason.lower()
+        )
 
     def test_pseudo_compliant_response_triggers_regen(self, core):
         signals = {**_nominal_signals(), "semantic_repeat": True, "loop_count": 1}
@@ -2054,15 +2061,36 @@ class TestOutputContracts:
 
     # REQUIRE_TEST ────────────────────────────────────────────────────────────
 
-    def test_require_test_passes_with_test_signal(self, core):
+    def test_require_test_passes_with_all_required_fields(self, core):
+        """PATCH 1 — REQUIRE_TEST requires ALL structural fields to be present."""
         decision = ControlDecision(
             active_mode=IntegrationMode.REQUIRE_TEST,
             prompt_overlay="",
         )
-        text = "We can test this: if the intervention is effective, we should observe a measurable improvement."
+        text = (
+            "* Hypothesis: early intervention reduces escalation.\n"
+            "* Test: run a controlled study with two cohorts.\n"
+            "* Expected outcome: the intervention group shows lower escalation rates.\n"
+            "* If true: the hypothesis is supported and the mechanism is confirmed.\n"
+            "* If false: the hypothesis must be revised or discarded."
+        )
         compliant, reason = core.validate_generated_output(text, decision)
         assert compliant is True
         assert "STATE-TRANSITION-SUCCESS" in reason
+        assert "valid_test=True" in reason
+
+    def test_require_test_fails_without_all_required_fields(self, core):
+        """PATCH 1 — Missing any required field causes non-compliance."""
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_TEST,
+            prompt_overlay="",
+        )
+        # Has some signals but missing required structural fields
+        text = "We can test this: if the intervention is effective, we should observe a measurable improvement."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "no concrete test" in reason
 
     def test_require_test_fails_without_test_signal(self, core):
         decision = ControlDecision(
@@ -2075,14 +2103,20 @@ class TestOutputContracts:
         assert "STATE-TRANSITION-FAIL" in reason
         assert "no concrete test" in reason
 
-    def test_require_test_passes_with_experiment_signal(self, core):
+    def test_require_test_fails_when_missing_if_true_and_if_false(self, core):
+        """PATCH 1 — Output with hypothesis and test but no if-true/if-false fails."""
         decision = ControlDecision(
             active_mode=IntegrationMode.REQUIRE_TEST,
             prompt_overlay="",
         )
-        text = "An experiment could verify this: run a controlled study and measure outcomes."
-        compliant, _ = core.validate_generated_output(text, decision)
-        assert compliant is True
+        text = (
+            "* Hypothesis: early intervention helps.\n"
+            "* Test: run a controlled study.\n"
+            "* Expected outcome: lower escalation."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
 
     # REQUIRE_CONCRETE_CASE ───────────────────────────────────────────────────
 
@@ -2145,22 +2179,56 @@ class TestOutputContracts:
 
     # REQUIRE_FORCED_CHOICE ───────────────────────────────────────────────────
 
-    def test_require_forced_choice_passes_with_committed_choice(self, core):
+    def test_require_forced_choice_passes_with_committed_choice_and_justification(self, core):
+        """PATCH 1 — REQUIRE_FORCED_CHOICE requires commitment, justification, AND change condition."""
         decision = ControlDecision(
             active_mode=IntegrationMode.REQUIRE_FORCED_CHOICE,
             prompt_overlay="",
         )
-        text = "I choose option A: individual agency is primary. Structural forces are secondary."
+        text = (
+            "I choose option A: individual agency is primary, because structural forces "
+            "cannot override a determined will. What would change this? Only if evidence showed "
+            "that structural outcomes are consistent regardless of individual action."
+        )
         compliant, reason = core.validate_generated_output(text, decision)
         assert compliant is True
         assert "STATE-TRANSITION-SUCCESS" in reason
 
-    def test_require_forced_choice_passes_with_position_signal(self, core):
+    def test_require_forced_choice_fails_without_justification(self, core):
+        """PATCH 1 — Commitment without justification fails."""
         decision = ControlDecision(
             active_mode=IntegrationMode.REQUIRE_FORCED_CHOICE,
             prompt_overlay="",
         )
-        text = "My position is that determinism is correct. Free will is an illusion."
+        text = "I choose option A. Structural forces are secondary."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "no justification" in reason
+
+    def test_require_forced_choice_fails_without_change_condition(self, core):
+        """PATCH 1 — Commitment + justification but no change condition fails."""
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_FORCED_CHOICE,
+            prompt_overlay="",
+        )
+        text = "I choose option A because structural forces cannot override individual will."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "no change condition" in reason
+
+    def test_require_forced_choice_passes_with_position_and_reason_and_condition(self, core):
+        """Position + 'because' clause + change condition satisfies all requirements."""
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_FORCED_CHOICE,
+            prompt_overlay="",
+        )
+        text = (
+            "My position is that determinism is correct, because causal chains are complete. "
+            "Free will is an illusion. This would change if we found evidence that quantum "
+            "indeterminacy propagates to macro-level decision making."
+        )
         compliant, _ = core.validate_generated_output(text, decision)
         assert compliant is True
 
@@ -2177,12 +2245,16 @@ class TestOutputContracts:
 
     # REQUIRE_BRANCH_CLOSURE ──────────────────────────────────────────────────
 
-    def test_require_branch_closure_passes_with_conclusion_signal(self, core):
+    def test_require_branch_closure_passes_with_conclusion_and_state_marker(self, core):
+        """PATCH 1 — REQUIRE_BRANCH_CLOSURE requires closure signal AND state marker."""
         decision = self._decision_for(
             core, {"unresolved": 3, "progress_after": 0.2}
         )
         assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
-        text = "To conclude this open question: the causal link is not established. I am closing this thread."
+        text = (
+            "To conclude this open question: the causal link is not established — "
+            "I am closing this thread as resolved."
+        )
         compliant, reason = core.validate_generated_output(text, decision)
         assert compliant is True
         assert "STATE-TRANSITION-SUCCESS" in reason
@@ -2195,6 +2267,17 @@ class TestOutputContracts:
         compliant, _ = core.validate_generated_output(text, decision)
         assert compliant is True
 
+    def test_require_branch_closure_fails_without_state_marker(self, core):
+        """PATCH 1 — Closure intent without an explicit state marker fails."""
+        decision = self._decision_for(
+            core, {"unresolved": 3, "progress_after": 0.2}
+        )
+        text = "To conclude this open question: the causal link is not established. I am closing this thread."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "state marker" in reason
+
     def test_require_branch_closure_fails_without_closure_signal(self, core):
         decision = self._decision_for(
             core, {"unresolved": 3, "progress_after": 0.2}
@@ -2203,3 +2286,231 @@ class TestOutputContracts:
         compliant, reason = core.validate_generated_output(text, decision)
         assert compliant is False
         assert "STATE-TRANSITION-FAIL" in reason
+
+
+# ---------------------------------------------------------------------------
+# PATCH 5 — Rhetorical escape detection in intervention modes
+# ---------------------------------------------------------------------------
+
+
+class TestRhetoricalEscapeDetection:
+    """PATCH 5 — Outputs using 'show me', 'consider X', 'imagine if' etc. during
+    intervention modes must be rejected as non-compliant."""
+
+    def _intervention_decision(self, mode: IntegrationMode) -> ControlDecision:
+        return ControlDecision(active_mode=mode, prompt_overlay="")
+
+    def test_show_me_rejected_in_require_test_mode(self):
+        core = IntegrationCore()
+        decision = self._intervention_decision(IntegrationMode.REQUIRE_TEST)
+        text = "Show me one example where this has been falsified and I will reconsider."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+        assert "rhetorical escape" in reason
+
+    def test_consider_this_rejected_in_require_forced_choice_mode(self):
+        core = IntegrationCore()
+        decision = self._intervention_decision(IntegrationMode.REQUIRE_FORCED_CHOICE)
+        text = "Consider this perspective before making a final commitment."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "rhetorical escape" in reason
+
+    def test_imagine_if_rejected_in_require_branch_closure_mode(self):
+        core = IntegrationCore()
+        decision = self._intervention_decision(IntegrationMode.REQUIRE_BRANCH_CLOSURE)
+        text = "Imagine if we had resolved that earlier — but I will not close it now."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "rhetorical escape" in reason
+
+    def test_rhetorical_escape_not_triggered_in_normal_mode(self):
+        """PATCH 5 — Rhetorical escape check only fires in intervention modes."""
+        core = IntegrationCore()
+        decision = ControlDecision(active_mode=IntegrationMode.NORMAL, prompt_overlay="")
+        # Even with "consider this" in the text, NORMAL mode goes through quality gate only
+        text = "Consider this a short answer."
+        compliant, _ = core.validate_generated_output(text, decision)
+        # NORMAL mode with short text passes quality gate regardless
+        assert compliant is True
+
+    def test_restate_opponent_rejected_in_require_concrete_case(self):
+        """PATCH 5 — Restating the opponent's words is a rhetorical escape."""
+        core = IntegrationCore()
+        decision = self._intervention_decision(IntegrationMode.REQUIRE_CONCRETE_CASE)
+        text = "As you said earlier, the argument rests on abstraction — so to use your framing."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "rhetorical escape" in reason
+
+    def test_show_me_rejected_in_concrete_override_mode(self):
+        """PATCH 5 — Rhetorical escape now covers CONCRETE_OVERRIDE (Fix: check runs before all modes)."""
+        core = IntegrationCore()
+        decision = self._intervention_decision(IntegrationMode.CONCRETE_OVERRIDE)
+        text = "Show me what you mean and I will respond with a concrete case."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "rhetorical escape" in reason
+
+    def test_consider_this_rejected_in_attack_override_mode(self):
+        """PATCH 5 — Rhetorical escape now covers ATTACK_OVERRIDE (Fix: check runs before all modes)."""
+        core = IntegrationCore()
+        decision = self._intervention_decision(IntegrationMode.ATTACK_OVERRIDE)
+        text = "Consider this before making a structural challenge."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "rhetorical escape" in reason
+
+
+# ---------------------------------------------------------------------------
+# PATCH 4 — Force outcome condition rule
+# ---------------------------------------------------------------------------
+
+
+class TestForceOutcomeRule:
+    """PATCH 4 — When turns > threshold + stagnation persists, or unresolved overloads,
+    the cortex enforces an outcome mode unconditionally."""
+
+    def test_force_outcome_triggers_on_long_stagnant_conversation(self):
+        """turns > FORCE_OUTCOME_TURNS_THRESHOLD and stagnation >= threshold fires."""
+        from entelgia.integration_core import (
+            _FORCE_OUTCOME_TURNS_THRESHOLD,
+            _FORCE_OUTCOME_STAGNATION_THRESHOLD,
+        )
+        core = IntegrationCore()
+        signals = {
+            **_nominal_signals(),
+            "turn_count": _FORCE_OUTCOME_TURNS_THRESHOLD + 1,
+            "stagnation": _FORCE_OUTCOME_STAGNATION_THRESHOLD,
+        }
+        decision = core.pre_generation_decision("Socrates", signals)
+        assert decision.active_mode in (
+            IntegrationMode.REQUIRE_BRANCH_CLOSURE,
+            IntegrationMode.REQUIRE_FORCED_CHOICE,
+        )
+
+    def test_force_outcome_triggers_on_unresolved_overload(self):
+        """unresolved >= FORCE_OUTCOME_UNRESOLVED_THRESHOLD fires regardless of turns."""
+        from entelgia.integration_core import _FORCE_OUTCOME_UNRESOLVED_THRESHOLD
+        core = IntegrationCore()
+        signals = {
+            **_nominal_signals(),
+            "unresolved": _FORCE_OUTCOME_UNRESOLVED_THRESHOLD,
+            "turn_count": 0,  # early in conversation
+        }
+        decision = core.pre_generation_decision("Socrates", signals)
+        assert decision.active_mode in (
+            IntegrationMode.REQUIRE_BRANCH_CLOSURE,
+            IntegrationMode.REQUIRE_FORCED_CHOICE,
+        )
+
+    def test_force_outcome_selects_branch_closure_when_unresolved_items_present(self):
+        """With any unresolved item (> 0), force-outcome chooses REQUIRE_BRANCH_CLOSURE."""
+        from entelgia.integration_core import (
+            _FORCE_OUTCOME_UNRESOLVED_THRESHOLD,
+        )
+        core = IntegrationCore()
+        # Use the unresolved-overload path (stagnation low so stagnation rule
+        # doesn't fire first; unresolved >= threshold triggers force-outcome).
+        signals = {
+            **_nominal_signals(),
+            "stagnation": 0.1,  # below _STAGNATION_SUPPRESS_THRESHOLD (0.25)
+            "unresolved": _FORCE_OUTCOME_UNRESOLVED_THRESHOLD,  # = 5
+            "turn_count": 0,
+        }
+        decision = core.pre_generation_decision("Socrates", signals)
+        assert decision.active_mode == IntegrationMode.REQUIRE_BRANCH_CLOSURE
+
+    def test_force_outcome_selects_forced_choice_without_unresolved(self):
+        """Without unresolved items, force-outcome falls back to REQUIRE_FORCED_CHOICE."""
+        from entelgia.integration_core import (
+            _FORCE_OUTCOME_TURNS_THRESHOLD,
+            _FORCE_OUTCOME_STAGNATION_THRESHOLD,
+        )
+        core = IntegrationCore()
+        signals = {
+            **_nominal_signals(),
+            "turn_count": _FORCE_OUTCOME_TURNS_THRESHOLD + 1,
+            "stagnation": _FORCE_OUTCOME_STAGNATION_THRESHOLD,
+            "unresolved": 0,
+        }
+        decision = core.pre_generation_decision("Socrates", signals)
+        assert decision.active_mode == IntegrationMode.REQUIRE_FORCED_CHOICE
+
+    def test_force_outcome_does_not_trigger_below_threshold(self):
+        """Below both thresholds, force-outcome rule does not fire."""
+        from entelgia.integration_core import (
+            _FORCE_OUTCOME_TURNS_THRESHOLD,
+            _FORCE_OUTCOME_STAGNATION_THRESHOLD,
+            _FORCE_OUTCOME_UNRESOLVED_THRESHOLD,
+        )
+        core = IntegrationCore()
+        signals = {
+            **_nominal_signals(),
+            # Keep stagnation below _STAGNATION_SUPPRESS_THRESHOLD (0.25) to avoid
+            # triggering other stagnation rules at the same time.
+            "stagnation": 0.1,
+            "turn_count": _FORCE_OUTCOME_TURNS_THRESHOLD - 1,
+            "unresolved": min(_FORCE_OUTCOME_UNRESOLVED_THRESHOLD - 1, 1),
+        }
+        decision = core.pre_generation_decision("Socrates", signals)
+        # Should be NORMAL (no other trigger active in nominal signals)
+        assert decision.active_mode == IntegrationMode.NORMAL
+
+
+# ---------------------------------------------------------------------------
+# PATCH 6 — Logging: valid_test=True in REQUIRE_TEST success
+# ---------------------------------------------------------------------------
+
+
+class TestPatch6Logging:
+    """PATCH 6 — Structured log fields emitted for state transitions."""
+
+    def test_require_test_success_log_includes_valid_test_flag(self):
+        """[STATE-TRANSITION-SUCCESS] for REQUIRE_TEST includes valid_test=True."""
+        core = IntegrationCore()
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_TEST,
+            prompt_overlay="",
+        )
+        text = (
+            "* Hypothesis: intervention reduces escalation.\n"
+            "* Test: run a controlled trial.\n"
+            "* Expected outcome: lower rates in treatment group.\n"
+            "* If true: hypothesis confirmed.\n"
+            "* If false: hypothesis must be revised."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True
+        assert "valid_test=True" in reason
+
+    def test_state_transition_fail_in_reason_string(self):
+        """[STATE-TRANSITION-FAIL] appears in reason when mode contract is violated."""
+        core = IntegrationCore()
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_TEST,
+            prompt_overlay="",
+        )
+        text = "This is a purely philosophical position."
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is False
+        assert "STATE-TRANSITION-FAIL" in reason
+
+    def test_require_test_all_fields_present_passes_contract(self):
+        """Full structured test with all 5 fields passes the PATCH 1 contract."""
+        core = IntegrationCore()
+        decision = ControlDecision(
+            active_mode=IntegrationMode.REQUIRE_TEST,
+            prompt_overlay="",
+        )
+        text = (
+            "Hypothesis: X causes Y.\n"
+            "Test: apply X to group A and not group B.\n"
+            "Expected outcome: group A shows higher Y.\n"
+            "If true: causal link is supported.\n"
+            "If false: alternative explanations must be explored."
+        )
+        compliant, reason = core.validate_generated_output(text, decision)
+        assert compliant is True
+        assert "STATE-TRANSITION-SUCCESS" in reason
