@@ -25,6 +25,8 @@ import Entelgia_production_meta as _meta
 from Entelgia_production_meta import (
     TOPIC_CLUSTERS,
     _pick_random_seed_topic,
+    _OPEN_SEED_QUESTIONS,
+    _pick_random_open_question,
     Config,
 )
 
@@ -102,16 +104,43 @@ class TestPickRandomSeedTopic:
         ), f"Expected topics from multiple clusters, got: {seen_clusters}"
 
 
+class TestOpenSeedQuestions:
+    """_OPEN_SEED_QUESTIONS and _pick_random_open_question() validation."""
+
+    def test_exactly_15_questions(self):
+        """_OPEN_SEED_QUESTIONS must contain exactly 15 entries."""
+        assert len(_OPEN_SEED_QUESTIONS) == 15
+
+    def test_all_questions_are_non_empty_strings(self):
+        """Every entry must be a non-empty string."""
+        for q in _OPEN_SEED_QUESTIONS:
+            assert isinstance(q, str) and q.strip(), f"Invalid question: {q!r}"
+
+    def test_no_duplicate_questions(self):
+        """No duplicates allowed in _OPEN_SEED_QUESTIONS."""
+        assert len(_OPEN_SEED_QUESTIONS) == len(set(_OPEN_SEED_QUESTIONS))
+
+    def test_pick_returns_question_from_list(self):
+        """_pick_random_open_question() must always return an entry from the list."""
+        for _ in range(30):
+            q = _pick_random_open_question()
+            assert q in _OPEN_SEED_QUESTIONS, f"Returned {q!r} not in list"
+
+    def test_pick_covers_multiple_questions(self):
+        """Over many calls, at least 2 distinct questions must be returned."""
+        results = {_pick_random_open_question() for _ in range(60)}
+        assert len(results) >= 2, "Expected diversity across 60 calls"
+
+
 class TestConfigSeedTopic:
     """Config seed_topic field validation."""
 
-    def test_default_seed_topic_is_in_clusters(self):
-        """Config() default seed_topic must come from TOPIC_CLUSTERS."""
-        all_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
+    def test_default_seed_topic_is_open_question(self):
+        """Config() default seed_topic must come from _OPEN_SEED_QUESTIONS."""
         cfg = Config()
-        assert (
-            cfg.seed_topic in all_topics
-        ), f"Config default seed_topic {cfg.seed_topic!r} not found in TOPIC_CLUSTERS"
+        assert cfg.seed_topic in _OPEN_SEED_QUESTIONS, (
+            f"Config default seed_topic {cfg.seed_topic!r} not in _OPEN_SEED_QUESTIONS"
+        )
 
     def test_explicit_seed_topic_is_respected(self):
         """Config(seed_topic=...) must use the provided value."""
@@ -119,7 +148,7 @@ class TestConfigSeedTopic:
         assert cfg.seed_topic == "Freedom"
 
     def test_explicit_custom_seed_topic(self):
-        """Config accepts seed_topic values outside TOPIC_CLUSTERS."""
+        """Config accepts seed_topic values outside _OPEN_SEED_QUESTIONS."""
         cfg = Config(seed_topic="My custom topic")
         assert cfg.seed_topic == "My custom topic"
 

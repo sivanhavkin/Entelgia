@@ -878,6 +878,34 @@ def _pick_random_seed_topic() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Open-question seed starters — shown at the very beginning of a session to
+# invite personal, reflective engagement before diving into the dialogue.
+# ---------------------------------------------------------------------------
+_OPEN_SEED_QUESTIONS: list[str] = [
+    "What motivates you?",
+    "What do you believe in most deeply?",
+    "What question keeps you up at night?",
+    "What does a meaningful life look like to you?",
+    "What would you do differently if you could start over?",
+    "What is something you changed your mind about recently?",
+    "What does freedom mean to you?",
+    "What makes a decision truly right or wrong?",
+    "What is the hardest truth you have had to accept?",
+    "What do you think most people get wrong about happiness?",
+    "What would you sacrifice for something you believe in?",
+    "What is the most important lesson you have learned from failure?",
+    "What do you think the world needs more of right now?",
+    "What does it mean to truly know yourself?",
+    "What is one belief you hold that others might find surprising?",
+]
+
+
+def _pick_random_open_question() -> str:
+    """Randomly select an open-question seed starter."""
+    return random.choice(_OPEN_SEED_QUESTIONS)
+
+
+# ---------------------------------------------------------------------------
 # Topic proposal & selection helpers (Part A & B)
 # ---------------------------------------------------------------------------
 
@@ -2117,7 +2145,7 @@ class Config:
     store_raw_stm: bool = False
     store_raw_subconscious_ltm: bool = False
     max_turns: int = 200
-    seed_topic: str = field(default_factory=_pick_random_seed_topic)
+    seed_topic: str = field(default_factory=_pick_random_open_question)
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3
