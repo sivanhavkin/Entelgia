@@ -2117,7 +2117,7 @@ class Config:
     store_raw_stm: bool = False
     store_raw_subconscious_ltm: bool = False
     max_turns: int = 200
-    seed_topic: str = field(default_factory=_pick_random_seed_topic)
+    seed_topic: str = "What motivates you?"
     cache_size: int = 5000
     emotion_cache_ttl: int = 3600
     llm_max_retries: int = 3

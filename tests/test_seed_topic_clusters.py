@@ -105,13 +105,10 @@ class TestPickRandomSeedTopic:
 class TestConfigSeedTopic:
     """Config seed_topic field validation."""
 
-    def test_default_seed_topic_is_in_clusters(self):
-        """Config() default seed_topic must come from TOPIC_CLUSTERS."""
-        all_topics = {t for topics in TOPIC_CLUSTERS.values() for t in topics}
+    def test_default_seed_topic_is_open_question(self):
+        """Config() default seed_topic must be the open-question starter."""
         cfg = Config()
-        assert (
-            cfg.seed_topic in all_topics
-        ), f"Config default seed_topic {cfg.seed_topic!r} not found in TOPIC_CLUSTERS"
+        assert cfg.seed_topic == "What motivates you?"
 
     def test_explicit_seed_topic_is_respected(self):
         """Config(seed_topic=...) must use the provided value."""
